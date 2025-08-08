@@ -2,19 +2,16 @@ import { cn } from "@/lib/utils";
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <svg
+    <svg 
+      width="32" 
+      height="32" 
+      viewBox="0 0 32 32" 
+      fill="none" 
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={cn("h-8 w-8 text-primary", className)}
+      className={cn("text-primary", className)}
     >
-      <path d="M12 2L2 7l10 5 10-5-10-5z" />
-      <path d="M2 17l10 5 10-5" />
-      <path d="M2 12l10 5 10-5" />
+        <rect width="32" height="32" rx="8" fill="currentColor"/>
+        <path d="M15.904 23.3333V14.0207H11.7387V10.2933H15.904V8.48C15.904 5.25333 17.7653 3.57333 20.6613 3.57333H23.5947V7.29333H21.5C20.1013 7.29333 19.808 7.94667 19.808 8.93333V10.2933H23.632L23.0187 14.0207H19.808V23.3333H15.904Z" fill="white"/>
     </svg>
   );
 }

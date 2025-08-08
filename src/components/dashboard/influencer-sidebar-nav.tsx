@@ -1,15 +1,16 @@
 'use client';
 
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, Trophy } from "lucide-react";
+import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, Trophy, Settings, BarChart3, Star, Zap } from "lucide-react";
 
 const influencerNavItems = [
-    { title: "Dashboard", href: "/influencer/dashboard", icon: LayoutDashboard },
-    { title: "Missões", href: "#", icon: Trophy },
-    { title: "Trilhas", href: "#", icon: BookOpen },
+    { title: "Trilhas", href: "/influencer/trilhas", icon: BookOpen },
+    { title: "Missões", href: "#", icon: Zap },
+    { title: "Rankings", href: "#", icon: BarChart3 },
     { title: "Recompensas", href: "#", icon: Gift },
     { title: "Biblioteca", href: "#", icon: Library },
-    { title: "Assistente IA", href: "/influencer/assistente", icon: Sparkles },
+    { title: "Assistente de Conteúdo", href: "/influencer/assistente", icon: Sparkles },
+    { title: "Configurações", href: "#", icon: Settings },
 ];
 
 export function InfluencerSidebarNav() {

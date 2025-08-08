@@ -1,7 +1,8 @@
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { LanguageToggle } from "@/components/language-toggle"
-import { UserNav } from "@/components/user-nav"
+import { Button } from "@/components/ui/button";
 import type React from 'react';
+import { Github, Code, RefreshCw } from 'lucide-react';
+
 
 type HeaderProps = {
     title: string;
@@ -13,12 +14,19 @@ export function Header({ title, children }: HeaderProps) {
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm md:px-6">
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
-        <h1 className="font-headline text-xl font-semibold md:text-2xl">{title}</h1>
+        <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
+            <Code className="h-4 w-4" />
+            <span>/u/trails</span>
+            <RefreshCw className="h-4 w-4 cursor-pointer" />
+            <Github className="h-4 w-4 cursor-pointer" />
+        </div>
       </div>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-4">
+        <div className="hidden md:flex items-center gap-2">
+            <Button variant="outline">Invite</Button>
+            <Button>Publish</Button>
+        </div>
         {children}
-        <LanguageToggle />
-        <UserNav />
       </div>
     </header>
   )

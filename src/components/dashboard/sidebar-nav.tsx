@@ -23,11 +23,16 @@ export function SidebarNav({ items }: SidebarNavProps) {
         <SidebarMenuItem key={item.href}>
           <SidebarMenuButton
             asChild
-            isActive={pathname === item.href}
-            className={cn("justify-start", pathname === item.href && "bg-sidebar-accent")}
+            isActive={pathname.startsWith(item.href)}
+            className={cn(
+                "justify-start font-medium", 
+                pathname.startsWith(item.href) ? 
+                "bg-sidebar-accent text-sidebar-accent-foreground" : 
+                "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            )}
           >
             <Link href={item.href}>
-              <item.icon className="h-4 w-4" />
+              <item.icon className="h-5 w-5" />
               <span>{item.title}</span>
             </Link>
           </SidebarMenuButton>
