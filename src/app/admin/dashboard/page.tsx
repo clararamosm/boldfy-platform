@@ -1,24 +1,14 @@
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Eye, PlusCircle, Users, Trophy, Gift, CheckCircle } from "lucide-react";
+import { PlusCircle, Users, Trophy, Gift, CheckCircle } from "lucide-react";
 
 export default function AdminDashboardPage() {
   return (
     <>
-      <Header title="Admin Dashboard">
-        <div className="flex items-center space-x-2">
-            <Switch id="view-mode" />
-            <Label htmlFor="view-mode" className="flex items-center gap-2 text-sm font-medium">
-                <Eye className="h-4 w-4" />
-                Visão Influenciador
-            </Label>
-        </div>
-      </Header>
+      <Header title="Dashboard" />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <Card>
