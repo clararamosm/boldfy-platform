@@ -5,12 +5,12 @@ import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, Trophy, Settings, B
 
 const influencerNavItems = [
     { title: "Trilhas", href: "/influencer/trilhas", icon: BookOpen },
-    { title: "Missões", href: "#", icon: Zap },
-    { title: "Rankings", href: "#", icon: BarChart3 },
-    { title: "Recompensas", href: "#", icon: Gift },
-    { title: "Biblioteca", href: "#", icon: Library },
+    { title: "Missões", href: "/influencer/missoes", icon: Zap },
+    { title: "Rankings", href: "/influencer/rankings", icon: BarChart3 },
+    { title: "Recompensas", href: "/influencer/recompensas", icon: Gift },
+    { title: "Biblioteca", href: "/influencer/biblioteca", icon: Library },
     { title: "Assistente de Conteúdo", href: "/influencer/assistente", icon: Sparkles },
-    { title: "Configurações", href: "#", icon: Settings },
+    { title: "Configurações", href: "/influencer/configuracoes", icon: Settings },
 ];
 
 export function InfluencerSidebarNav() {

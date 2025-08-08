@@ -5,12 +5,12 @@ import { BookOpen, Cog, Gift, LayoutDashboard, Library, Trophy, Users } from "lu
 
 const adminNavItems = [
     { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-    { title: "Colaboradores", href: "#", icon: Users },
-    { title: "Missões", href: "#", icon: Trophy },
-    { title: "Trilhas", href: "#", icon: BookOpen },
-    { title: "Recompensas", href: "#", icon: Gift },
-    { title: "Biblioteca", href: "#", icon: Library },
-    { title: "Configurações", href: "#", icon: Cog },
+    { title: "Colaboradores", href: "/admin/colaboradores", icon: Users },
+    { title: "Missões", href: "/admin/missoes", icon: Trophy },
+    { title: "Trilhas", href: "/admin/trilhas", icon: BookOpen },
+    { title: "Recompensas", href: "/admin/recompensas", icon: Gift },
+    { title: "Biblioteca", href: "/admin/biblioteca", icon: Library },
+    { title: "Configurações", href: "/admin/configuracoes", icon: Cog },
 ];
 
 export function AdminSidebarNav() {

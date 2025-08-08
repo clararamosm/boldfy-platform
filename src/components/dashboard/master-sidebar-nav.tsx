@@ -5,8 +5,8 @@ import { Building2, Globe, LayoutDashboard } from "lucide-react";
 
 const masterNavItems = [
     { title: "Dashboard", href: "/master/dashboard", icon: LayoutDashboard },
-    { title: "Empresas", href: "#", icon: Building2 },
-    { title: "Conteúdo Global", href: "#", icon: Globe },
+    { title: "Empresas", href: "/master/empresas", icon: Building2 },
+    { title: "Conteúdo Global", href: "/master/conteudo-global", icon: Globe },
 ];
 
 export function MasterSidebarNav() {
