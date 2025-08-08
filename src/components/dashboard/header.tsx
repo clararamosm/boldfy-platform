@@ -15,10 +15,7 @@ export function Header({ title, children }: HeaderProps) {
       <div className="flex items-center gap-2">
         <SidebarTrigger className="md:hidden" />
         <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-            <Code className="h-4 w-4" />
-            <span>/u/trails</span>
-            <RefreshCw className="h-4 w-4 cursor-pointer" />
-            <Github className="h-4 w-4 cursor-pointer" />
+            {/* Content removed as requested */}
         </div>
       </div>
       <div className="ml-auto flex items-center gap-4">
