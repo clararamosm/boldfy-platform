@@ -1,7 +1,5 @@
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button";
 import type React from 'react';
-import { Github, Code, RefreshCw } from 'lucide-react';
 
 
 type HeaderProps = {
@@ -19,10 +17,6 @@ export function Header({ title, children }: HeaderProps) {
         </div>
       </div>
       <div className="ml-auto flex items-center gap-4">
-        <div className="hidden md:flex items-center gap-2">
-            <Button variant="outline">Invite</Button>
-            <Button>Publish</Button>
-        </div>
         {children}
       </div>
     </header>
