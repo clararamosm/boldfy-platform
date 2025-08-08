@@ -1,18 +1,7 @@
 import type React from "react";
 import { SidebarProvider, Sidebar, SidebarInset, SidebarHeader, SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
-import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, Trophy } from "lucide-react";
-
-const influencerNavItems = [
-    { title: "Dashboard", href: "/influencer/dashboard", icon: LayoutDashboard },
-    { title: "Missões", href: "#", icon: Trophy },
-    { title: "Trilhas", href: "#", icon: BookOpen },
-    { title: "Recompensas", href: "#", icon: Gift },
-    { title: "Biblioteca", href: "#", icon: Library },
-    { title: "Assistente IA", href: "/influencer/assistente", icon: Sparkles },
-];
-
+import { InfluencerSidebarNav } from "@/components/dashboard/influencer-sidebar-nav";
 
 export default function InfluencerLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -25,7 +14,7 @@ export default function InfluencerLayout({ children }: { children: React.ReactNo
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <SidebarNav items={influencerNavItems} />
+          <InfluencerSidebarNav />
         </SidebarContent>
         <SidebarFooter>
           {/* Footer content if needed */}
