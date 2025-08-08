@@ -4,6 +4,7 @@ import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, Trophy, Settings, BarChart3, Star, Zap } from "lucide-react";
 
 const influencerNavItems = [
+    { title: "Dashboard", href: "/influencer/dashboard", icon: LayoutDashboard },
     { title: "Trilhas", href: "/influencer/trilhas", icon: BookOpen },
     { title: "Missões", href: "/influencer/missoes", icon: Zap },
     { title: "Rankings", href: "/influencer/rankings", icon: BarChart3 },

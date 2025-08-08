@@ -35,7 +35,7 @@ export default function LoginPage() {
                 <p className="text-sm text-muted-foreground">For demonstration purposes:</p>
                 <div className="flex flex-col gap-2 sm:flex-row">
                     <Button asChild variant="outline" className="w-full">
-                        <Link href="/influencer/trilhas">Sign in as Influencer</Link>
+                        <Link href="/influencer/dashboard">Sign in as Influencer</Link>
                     </Button>
                     <Button asChild variant="outline" className="w-full">
                         <Link href="/admin/dashboard">Sign in as Admin</Link>
