@@ -48,8 +48,8 @@ export default function InfluencerLayout({ children }: { children: React.ReactNo
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                    Configurações
+                <DropdownMenuItem asChild>
+                  <Link href="/influencer/configuracoes">Configurações</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                     Suporte
