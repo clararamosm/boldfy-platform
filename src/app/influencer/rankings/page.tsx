@@ -16,10 +16,13 @@ const RankingPodium = ({ rank, name, points, avatarSrc, avatarFallback, highligh
             </Avatar>
             {rank === 1 && <Crown className="absolute -top-3 left-1/2 -translate-x-1/2 h-8 w-8 text-yellow-500" />}
         </div>
-        <div className="flex flex-col flex-grow justify-center mt-4">
+        <div className="flex flex-col flex-grow justify-center mt-4 items-center">
             <h3 className="font-semibold text-lg">{name}</h3>
-            <p className="text-muted-foreground font-bold text-primary">{points.toLocaleString()}</p>
-            <p className="font-bold text-lg">{rank}º Lugar</p>
+             <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0 mt-1">
+                <Zap className="h-3 w-3 mr-1"/>
+                {points.toLocaleString()}
+            </Badge>
+            <p className="font-bold text-lg mt-1">{rank}º Lugar</p>
         </div>
     </Card>
 );
@@ -39,9 +42,12 @@ const CategoryRanking = ({ title, icon, data }) => (
                         <AvatarImage src={item.avatarSrc} data-ai-hint="person avatar" />
                         <AvatarFallback>{item.avatarFallback}</AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                         <p className="font-medium text-sm">{item.name}</p>
-                        <p className="text-xs text-primary font-semibold">{item.points.toLocaleString()}</p>
+                        <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0 font-normal">
+                           <Zap className="h-3 w-3 mr-1"/>
+                           {item.points.toLocaleString()}
+                       </Badge>
                     </div>
                 </div>
             ))}
@@ -141,7 +147,12 @@ export default function InfluencerRankingsPage() {
                                     <span>Carla Costa</span>
                                 </div>
                              </TableCell>
-                             <TableCell className="text-right font-semibold">1250</TableCell>
+                             <TableCell className="text-right font-semibold">
+                                 <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
+                                    <Zap className="h-3 w-3 mr-1"/>
+                                    1250
+                                </Badge>
+                             </TableCell>
                         </TableRow>
                         <TableRow>
                              <TableCell className="font-medium">2º</TableCell>
@@ -154,7 +165,12 @@ export default function InfluencerRankingsPage() {
                                     <span>João Paulo</span>
                                 </div>
                              </TableCell>
-                             <TableCell className="text-right font-semibold">890</TableCell>
+                             <TableCell className="text-right font-semibold">
+                                 <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
+                                    <Zap className="h-3 w-3 mr-1"/>
+                                    890
+                                </Badge>
+                             </TableCell>
                         </TableRow>
                         <TableRow className="bg-secondary">
                              <TableCell className="font-medium">3º</TableCell>
@@ -167,7 +183,12 @@ export default function InfluencerRankingsPage() {
                                     <span className="font-medium">Você</span>
                                 </div>
                              </TableCell>
-                             <TableCell className="text-right font-semibold">750</TableCell>
+                             <TableCell className="text-right font-semibold">
+                                <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
+                                    <Zap className="h-3 w-3 mr-1"/>
+                                    750
+                                </Badge>
+                             </TableCell>
                         </TableRow>
                         <TableRow>
                              <TableCell className="font-medium">4º</TableCell>
@@ -180,7 +201,12 @@ export default function InfluencerRankingsPage() {
                                     <span>Ricardo Mendes</span>
                                 </div>
                              </TableCell>
-                             <TableCell className="text-right">620</TableCell>
+                             <TableCell className="text-right">
+                                <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
+                                    <Zap className="h-3 w-3 mr-1"/>
+                                    620
+                                </Badge>
+                             </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
