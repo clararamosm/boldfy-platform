@@ -1,34 +1,48 @@
 // src/app/influencer/trilhas/[id]/page.tsx
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, CheckCircle, Video, FileText, ChevronRight, ChevronLeft, Award } from "lucide-react";
+import { ArrowLeft, CheckCircle, Video, FileText, ChevronRight, ChevronLeft, Award, Loader2 } from "lucide-react";
 import Link from 'next/link';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const mockTrailData = {
-    title: "Onboarding de Novos Influenciadores",
-    topics: [
-        { id: 'topic1', title: 'Bem-vindo à Boldfy!', type: 'video', content: 'Conheça nossa missão, visão e valores, e como você pode se tornar um advogado da marca de sucesso.', videoUrl: 'https://placehold.co/1280x720.png' },
-        { id: 'topic2', title: 'Entendendo a Plataforma', type: 'video', content: 'Um tour completo pelas funcionalidades da plataforma Brand Advocate Hub.', videoUrl: 'https://placehold.co/1280x720.png' },
-    ],
-    quiz: {
-        id: 'quiz1',
-        title: 'Quiz Final',
-        questions: [
-            { id: 'q1', text: 'Qual é o principal objetivo da nossa plataforma?', options: ['Vender produtos', 'Engajar colaboradores', 'Fazer amigos', 'Postar fotos'], correctAnswer: 'Engajar colaboradores' },
-            { id: 'q2', text: 'O que são as missões?', options: ['Tarefas para ganhar pontos', 'Reuniões semanais', 'Férias coletivas', 'Nenhuma das anteriores'], correctAnswer: 'Tarefas para ganhar pontos' },
-        ]
-    }
-};
+// Interfaces for fetched data
+interface Topic {
+    id: string;
+    title: string;
+    type: 'video' | 'text';
+    content: string;
+    videoUrl?: string;
+}
+
+interface QuizQuestion {
+    id: string;
+    text: string;
+    options: string[];
+    correctAnswer: string;
+}
+
+interface Quiz {
+    id: string;
+    title: string;
+    questions: QuizQuestion[];
+}
+
+interface TrailData {
+    title: string;
+    topics: Topic[];
+    quiz: Quiz;
+}
+
 
 const TopicNavItem = ({ topic, isActive, onClick, isCompleted }) => (
     <button
@@ -60,18 +74,79 @@ const QuizNavItem = ({ quiz, isActive, onClick, isCompleted }) => (
     </button>
 );
 
+const TrailContentSkeleton = () => (
+     <Card>
+        <CardHeader>
+            <Skeleton className="aspect-video w-full rounded-lg" />
+        </CardHeader>
+        <CardContent>
+            <Skeleton className="h-8 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6 mt-1" />
+        </CardContent>
+    </Card>
+);
+
 export default function TrailDetailPage({ params }: { params: { id: string } }) {
-    const [activeItem, setActiveItem] = useState(mockTrailData.topics[0]);
+    const [trailData, setTrailData] = useState<TrailData | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [activeItem, setActiveItem] = useState<Topic | Quiz | null>(null);
     const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
     const [quizAnswers, setQuizAnswers] = useState({});
     const [quizSubmitted, setQuizSubmitted] = useState(false);
 
-    const allItems = [...mockTrailData.topics, mockTrailData.quiz];
-    const activeIndex = allItems.findIndex(item => item.id === activeItem.id);
+    useEffect(() => {
+        const fetchTrailData = async () => {
+            setIsLoading(true);
+            try {
+                // In a real app, you would fetch this from Firestore based on params.id
+                // For demonstration, we'll simulate a fetch with mock data.
+                await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+                const mockTrailData: TrailData = {
+                    title: "Onboarding de Novos Influenciadores",
+                    topics: [
+                        { id: 'topic1', title: 'Bem-vindo à Boldfy!', type: 'video', content: 'Conheça nossa missão, visão e valores, e como você pode se tornar um advogado da marca de sucesso.', videoUrl: 'https://placehold.co/1280x720.png' },
+                        { id: 'topic2', title: 'Entendendo a Plataforma', type: 'video', content: 'Um tour completo pelas funcionalidades da plataforma Brand Advocate Hub.', videoUrl: 'https://placehold.co/1280x720.png' },
+                    ],
+                    quiz: {
+                        id: 'quiz1',
+                        title: 'Quiz Final',
+                        questions: [
+                            { id: 'q1', text: 'Qual é o principal objetivo da nossa plataforma?', options: ['Vender produtos', 'Engajar colaboradores', 'Fazer amigos', 'Postar fotos'], correctAnswer: 'Engajar colaboradores' },
+                            { id: 'q2', text: 'O que são as missões?', options: ['Tarefas para ganhar pontos', 'Reuniões semanais', 'Férias coletivas', 'Nenhuma das anteriores'], correctAnswer: 'Tarefas para ganhar pontos' },
+                        ]
+                    }
+                };
+                setTrailData(mockTrailData);
+                setActiveItem(mockTrailData.topics[0]);
+            } catch (error) {
+                console.error("Failed to fetch trail data", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
 
-    const progress = useMemo(() => (completedItems.size / allItems.length) * 100, [completedItems, allItems.length]);
+        fetchTrailData();
+    }, [params.id]);
+
+
+    const allItems = useMemo(() => {
+        if (!trailData) return [];
+        return [...trailData.topics, trailData.quiz];
+    }, [trailData]);
+    
+    const activeIndex = useMemo(() => {
+        if (!activeItem) return -1;
+        return allItems.findIndex(item => item.id === activeItem.id);
+    }, [activeItem, allItems]);
+
+    const progress = useMemo(() => {
+        if (allItems.length === 0) return 0;
+        return (completedItems.size / allItems.length) * 100
+    }, [completedItems, allItems.length]);
 
     const handleItemCompletion = () => {
+        if (!activeItem) return;
         setCompletedItems(prev => new Set(prev).add(activeItem.id));
         if (activeIndex < allItems.length - 1) {
             setActiveItem(allItems[activeIndex + 1]);
@@ -79,9 +154,10 @@ export default function TrailDetailPage({ params }: { params: { id: string } }) 
     };
     
     const handleQuizSubmit = () => {
+        if (!trailData) return;
         setQuizSubmitted(true);
-        const correctAnswers = mockTrailData.quiz.questions.filter(q => quizAnswers[q.id] === q.correctAnswer).length;
-        if(correctAnswers === mockTrailData.quiz.questions.length) {
+        const correctAnswers = trailData.quiz.questions.filter(q => quizAnswers[q.id] === q.correctAnswer).length;
+        if(correctAnswers === trailData.quiz.questions.length) {
             handleItemCompletion();
         }
     }
@@ -98,9 +174,55 @@ export default function TrailDetailPage({ params }: { params: { id: string } }) 
         }
     }
 
+    if (isLoading) {
+        return (
+            <>
+                <Header title="Carregando Trilha...">
+                    <Button variant="outline" asChild>
+                        <Link href="/influencer/trilhas">
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+                            Voltar para Trilhas
+                        </Link>
+                    </Button>
+                </Header>
+                <main className="flex-1 overflow-auto p-4 md:p-6">
+                     <div className="grid gap-8 md:grid-cols-[280px_1fr]">
+                        <Card>
+                             <CardHeader>
+                                <Skeleton className="h-6 w-3/4" />
+                                <div className="flex justify-between items-center text-sm text-muted-foreground pt-2">
+                                     <Skeleton className="h-4 w-1/4" />
+                                     <Skeleton className="h-4 w-1/4" />
+                                </div>
+                                <Skeleton className="h-2 w-full" />
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <Skeleton className="h-12 w-full" />
+                                <Skeleton className="h-12 w-full" />
+                                <Skeleton className="h-12 w-full" />
+                            </CardContent>
+                        </Card>
+                        <TrailContentSkeleton />
+                     </div>
+                </main>
+            </>
+        )
+    }
+
+    if (!trailData || !activeItem) {
+        return (
+             <main className="flex-1 overflow-auto p-4 md:p-6 text-center">
+                <p>Trilha não encontrada ou ocorreu um erro.</p>
+                <Button variant="link" asChild><Link href="/influencer/trilhas">Voltar</Link></Button>
+             </main>
+        )
+    }
+
+    const isQuiz = 'questions' in activeItem;
+
     return (
         <>
-            <Header title={mockTrailData.title}>
+            <Header title={trailData.title}>
                  <Button variant="outline" asChild>
                     <Link href="/influencer/trilhas">
                         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -122,7 +244,7 @@ export default function TrailDetailPage({ params }: { params: { id: string } }) 
                                 <Progress value={progress} className="h-2" />
                             </CardHeader>
                             <CardContent className="space-y-2">
-                                {mockTrailData.topics.map(topic => (
+                                {trailData.topics.map(topic => (
                                     <TopicNavItem 
                                         key={topic.id} 
                                         topic={topic} 
@@ -132,10 +254,10 @@ export default function TrailDetailPage({ params }: { params: { id: string } }) 
                                     />
                                 ))}
                                 <QuizNavItem 
-                                    quiz={mockTrailData.quiz}
-                                    isActive={activeItem.id === mockTrailData.quiz.id} 
-                                    onClick={() => setActiveItem(mockTrailData.quiz)}
-                                    isCompleted={completedItems.has(mockTrailData.quiz.id)}
+                                    quiz={trailData.quiz}
+                                    isActive={activeItem.id === trailData.quiz.id} 
+                                    onClick={() => setActiveItem(trailData.quiz)}
+                                    isCompleted={completedItems.has(trailData.quiz.id)}
                                 />
                             </CardContent>
                         </Card>
@@ -143,26 +265,26 @@ export default function TrailDetailPage({ params }: { params: { id: string } }) 
 
                     {/* Conteúdo do Tópico/Quiz */}
                     <div className="min-w-0">
-                        {activeItem.type === 'video' ? (
+                        {!isQuiz ? (
                             <Card>
                                 <CardHeader>
                                     <div className="aspect-video bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                                        <Image src={activeItem.videoUrl} alt={activeItem.title} width={1280} height={720} data-ai-hint="video lesson" className="w-full h-full object-cover" />
+                                        <Image src={(activeItem as Topic).videoUrl || 'https://placehold.co/1280x720.png'} alt={activeItem.title} width={1280} height={720} data-ai-hint="video lesson" className="w-full h-full object-cover" />
                                     </div>
                                 </CardHeader>
                                 <CardContent>
                                     <h2 className="text-2xl font-bold font-headline mb-2">{activeItem.title}</h2>
-                                    <p className="text-muted-foreground">{activeItem.content}</p>
+                                    <p className="text-muted-foreground">{(activeItem as Topic).content}</p>
                                 </CardContent>
                             </Card>
                         ) : (
                             <Card>
                                 <CardHeader>
-                                    <h2 className="text-2xl font-bold font-headline">{mockTrailData.quiz.title}</h2>
+                                    <h2 className="text-2xl font-bold font-headline">{trailData.quiz.title}</h2>
                                     <p className="text-muted-foreground">Teste seus conhecimentos para concluir a trilha.</p>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
-                                    {mockTrailData.quiz.questions.map((q, index) => (
+                                    {trailData.quiz.questions.map((q, index) => (
                                         <div key={q.id}>
                                             <p className="font-semibold mb-3">{index + 1}. {q.text}</p>
                                             <RadioGroup
@@ -193,7 +315,7 @@ export default function TrailDetailPage({ params }: { params: { id: string } }) 
                                     <CheckCircle className="h-5 w-5" />
                                     <span>Concluído</span>
                                 </div>
-                            ) : activeItem.type === 'video' ? (
+                            ) : !isQuiz ? (
                                 <Button onClick={handleItemCompletion}>Concluir Tópico</Button>
                             ) : (
                                 <Button onClick={handleQuizSubmit} disabled={quizSubmitted}>Enviar Respostas</Button>
