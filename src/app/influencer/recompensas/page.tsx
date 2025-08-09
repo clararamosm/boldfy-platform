@@ -50,28 +50,28 @@ export default function InfluencerRecompensasPage() {
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <CardContent className="p-4 flex flex-col">
                     <Zap className="h-6 w-6 text-muted-foreground mb-2" />
                     <p className="text-sm font-medium text-muted-foreground">Pontos Disponíveis</p>
                     <p className="text-2xl font-bold font-headline">1.250</p>
                 </CardContent>
             </Card>
              <Card>
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <CardContent className="p-4 flex flex-col">
                     <TrendingUp className="h-6 w-6 text-muted-foreground mb-2" />
                     <p className="text-sm font-medium text-muted-foreground">Pontos Ganhos (Total)</p>
                     <p className="text-2xl font-bold font-headline">6.250</p>
                 </CardContent>
             </Card>
              <Card>
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <CardContent className="p-4 flex flex-col">
                     <TrendingDown className="h-6 w-6 text-muted-foreground mb-2" />
                     <p className="text-sm font-medium text-muted-foreground">Pontos Gastos</p>
                     <p className="text-2xl font-bold font-headline">5.000</p>
                 </CardContent>
             </Card>
              <Card>
-                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <CardContent className="p-4 flex flex-col">
                     <Award className="h-6 w-6 text-muted-foreground mb-2" />
                     <p className="text-sm font-medium text-muted-foreground">Prêmios Resgatados</p>
                     <p className="text-2xl font-bold font-headline">1</p>
