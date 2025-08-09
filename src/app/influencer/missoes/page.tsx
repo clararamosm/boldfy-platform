@@ -5,7 +5,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, Upload, Circle, Clock, Zap, CalendarDays, FileImage } from "lucide-react";
+import { CheckCircle, Upload, Clock, Zap, CalendarDays } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -23,23 +23,17 @@ const MissionCard = ({ title, description, points, status, period }: { title: st
     const uploadForm = (
         <div className="space-y-2">
             <Label htmlFor="submission-file" className="sr-only">Arquivo</Label>
-            <Input id="submission-file" type="file" accept="image/*" onChange={(e) => setFileUploaded(e.target.files.length > 0)} />
-            <p className="text-xs text-muted-foreground pt-1">Envie uma imagem como comprovação.</p>
+            <Input id="submission-file" type="file" accept="image/*,video/*,.pdf" onChange={(e) => setFileUploaded(e.target.files.length > 0)} />
+            <p className="text-xs text-muted-foreground pt-1">Envie uma imagem, vídeo ou PDF como comprovação.</p>
         </div>
     );
-
-    const uploadButton = (
-        <Button disabled={!fileUploaded}>
-            <Upload className="mr-2 h-4 w-4" /> Concluir Missão
-        </Button>
-    )
 
     const statusInfo = {
         completa: {
             icon: <CheckCircle className="h-4 w-4 mr-2" />,
             text: "Missão Completa",
             color: "text-green-600",
-            button: null
+            button: <Button disabled variant="secondary">Concluída</Button>
         },
         pendente: {
             icon: null,
@@ -50,7 +44,7 @@ const MissionCard = ({ title, description, points, status, period }: { title: st
                     title="Enviar Comprovação"
                     description={`Envie um anexo para completar a missão "${title}".`}
                     trigger={<Button><Upload className="mr-2 h-4 w-4" /> Enviar Comprovação</Button>}
-                    actionText="Concluir Missão"
+                    actionText={fileUploaded ? "Concluir Missão" : "Selecione um arquivo"}
                     showCancel
                 >
                     {uploadForm}
@@ -117,7 +111,7 @@ export default function InfluencerMissoesPage() {
                 </div>
                 <div className="p-2">
                     <div className="flex items-center justify-between gap-2 text-sm font-medium text-muted-foreground mb-2">
-                        <span>Pontos de Missões Fixas</span>
+                        <span>Progresso em Missões Fixas</span>
                         <span>50 / 50</span>
                     </div>
                     <Progress value={100} className="h-2" />
@@ -129,7 +123,7 @@ export default function InfluencerMissoesPage() {
         <Tabs defaultValue="semana">
             <TabsList className="mb-4">
                 <TabsTrigger value="semana">Missões da Semana</TabsTrigger>
-                <TabsTrigger value="onboarding">Missões Fixas</TabsTrigger>
+                <TabsTrigger value="fixas">Missões Fixas</TabsTrigger>
             </TabsList>
             <TabsContent value="semana">
                 <div className="space-y-4">
@@ -149,7 +143,7 @@ export default function InfluencerMissoesPage() {
                     />
                 </div>
             </TabsContent>
-             <TabsContent value="onboarding">
+             <TabsContent value="fixas">
                  <div className="space-y-4">
                     <MissionCard
                         title="Atualize seu banner do LinkedIn"
