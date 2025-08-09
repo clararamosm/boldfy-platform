@@ -3,7 +3,7 @@
 /**
  * @fileOverview A content alignment AI agent for influencers.
  *
- * - alignContent - A function that handles the content alignment process.
+ * - alignContentFlow - The Genkit flow that handles the content alignment process.
  * - AlignContentInput - The input type for the alignContent function.
  * - AlignContentOutput - The return type for the alignContent function.
  */
@@ -25,8 +25,9 @@ const AlignContentOutputSchema = z.object({
 });
 export type AlignContentOutput = z.infer<typeof AlignContentOutputSchema>;
 
+// This is the main function that will be exported and called by the server action.
 export async function alignContent(input: AlignContentInput): Promise<AlignContentOutput> {
-  return alignContentFlow(input);
+  return alignContentFlow.run(input);
 }
 
 const prompt = ai.definePrompt({
@@ -58,7 +59,7 @@ Return only the refined content in the alignedContent field.
 `,
 });
 
-const alignContentFlow = ai.defineFlow(
+export const alignContentFlow = ai.defineFlow(
   {
     name: 'alignContentFlow',
     inputSchema: AlignContentInputSchema,
