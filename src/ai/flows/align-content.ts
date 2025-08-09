@@ -50,7 +50,7 @@ You will create the perfect post by mixing the Company Brand Profile with the In
 
 **Task:**
 Refine the original content based on the following requirements:
-1.  **Format:** {{{format}}}. If "linkedin", use emojis, short paragraphs, and hashtags. If "text-heavy", focus on detailed information with less formatting. If "hybrid", find a balance.
+1.  **Format:** {{{format}}}. If "linkedin", use short paragraphs with plenty of line breaks, create objective lists where appropriate, and use emojis sparingly only to add value. Do not include hashtags. If "text-heavy", focus on detailed information with less formatting. If "hybrid", find a balance.
 2.  **Length:** {{{length}}}. "short" should be a few sentences, "medium" a couple of paragraphs, and "long" should be more extensive.
 3.  **Tone:** The final output must be a seamless blend of the company's professional tone and the influencer's personal style.
 
