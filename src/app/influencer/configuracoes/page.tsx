@@ -1,4 +1,4 @@
-
+// src/app/influencer/configuracoes/page.tsx
 'use client';
 
 import { Header } from "@/components/dashboard/header";
@@ -133,8 +133,39 @@ export default function SettingsPage() {
         <Header title="Configurações" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <div className="grid gap-6 max-w-4xl mx-auto">
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-64 w-full" />
+            <Card>
+                <CardHeader>
+                    <CardTitle><Skeleton className="h-7 w-24" /></CardTitle>
+                    <CardDescription><Skeleton className="h-4 w-72" /></CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <Skeleton className="h-20 w-20 rounded-full" />
+                        <Skeleton className="h-10 w-28" />
+                    </div>
+                    <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                    <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                    <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                </CardContent>
+                <CardFooter className="border-t px-6 py-4">
+                    <Skeleton className="h-10 w-36" />
+                </CardFooter>
+            </Card>
+             <Card>
+                <CardHeader>
+                     <CardTitle><Skeleton className="h-7 w-40" /></CardTitle>
+                    <CardDescription><Skeleton className="h-4 w-96" /></CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                    <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                    <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-20 w-full" /></div>
+                    <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                </CardContent>
+                <CardFooter className="border-t px-6 py-4">
+                    <Skeleton className="h-10 w-36" />
+                </CardFooter>
+            </Card>
           </div>
         </main>
       </>
@@ -156,13 +187,13 @@ export default function SettingsPage() {
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src="https://placehold.co/100x100.png" data-ai-hint="person avatar" />
-                  <AvatarFallback>{profile.name?.[0] || 'U'}</AvatarFallback>
+                  <AvatarFallback>{profile.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <Button variant="outline">Mudar foto</Button>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="name">Nome</Label>
-                <Input id="name" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} />
+                <Input id="name" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} disabled={isSaving} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -192,7 +223,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="voice">Tom de Voz</Label>
-                 <Select value={branding.voice} onValueChange={value => setBranding({...branding, voice: value})}>
+                 <Select value={branding.voice} onValueChange={value => setBranding({...branding, voice: value})} disabled={isSaving}>
                   <SelectTrigger id="voice">
                     <SelectValue placeholder="Selecione um tom" />
                   </SelectTrigger>
@@ -206,15 +237,15 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="expertise">Expertises</Label>
-                <Input id="expertise" placeholder="Ex: Marketing Digital, Vendas, Liderança" value={branding.expertise} onChange={e => setBranding({...branding, expertise: e.target.value})} />
+                <Input id="expertise" placeholder="Ex: Marketing Digital, Vendas, Liderança" value={branding.expertise} onChange={e => setBranding({...branding, expertise: e.target.value})} disabled={isSaving} />
               </div>
                <div className="space-y-2">
                 <Label htmlFor="value">Entrega de Valor</Label>
-                <Textarea id="value" placeholder="O que você oferece de único para sua audiência?" value={branding.value} onChange={e => setBranding({...branding, value: e.target.value})} />
+                <Textarea id="value" placeholder="O que você oferece de único para sua audiência?" value={branding.value} onChange={e => setBranding({...branding, value: e.target.value})} disabled={isSaving} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="position">Qual sua posição na empresa?</Label>
-                <Input id="position" placeholder="Ex: Gerente de Marketing" value={branding.position} onChange={e => setBranding({...branding, position: e.target.value})} />
+                <Input id="position" placeholder="Ex: Gerente de Marketing" value={branding.position} onChange={e => setBranding({...branding, position: e.target.value})} disabled={isSaving} />
               </div>
             </CardContent>
              <CardFooter className="border-t px-6 py-4">
@@ -288,3 +319,5 @@ export default function SettingsPage() {
     </>
   );
 }
+
+    
