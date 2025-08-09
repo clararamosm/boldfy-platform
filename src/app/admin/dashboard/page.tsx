@@ -12,7 +12,7 @@ export default function AdminDashboardPage() {
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
                     <CardTitle className="text-sm font-medium">Colaboradores Ativos</CardTitle>
                     <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
@@ -22,7 +22,7 @@ export default function AdminDashboardPage() {
                 </CardContent>
             </Card>
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
                     <CardTitle className="text-sm font-medium">Engajamento</CardTitle>
                     <Trophy className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
@@ -32,7 +32,7 @@ export default function AdminDashboardPage() {
                 </CardContent>
             </Card>
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
                     <CardTitle className="text-sm font-medium">Recompensas Resgatadas</CardTitle>
                     <Gift className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
@@ -42,7 +42,7 @@ export default function AdminDashboardPage() {
                 </CardContent>
             </Card>
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
                     <CardTitle className="text-sm font-medium">Missões Completas</CardTitle>
                     <CheckCircle className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
