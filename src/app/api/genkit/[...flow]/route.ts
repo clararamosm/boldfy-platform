@@ -2,7 +2,7 @@
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { NextRequest } from 'next/server';
-import { firebaseAuth } from '@genkit-ai/firebase/auth';
+import { firebaseAuth } from '@genkit-ai/firebase';
 import { startFlowsServer } from '@genkit-ai/next';
 
 import '@/ai/flows/align-content';
