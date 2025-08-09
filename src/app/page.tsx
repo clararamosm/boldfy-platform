@@ -46,11 +46,28 @@ export default function LoginPage() {
 
     } catch (error: any) {
       console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro no Login',
-        description: 'Credenciais inválidas. Por favor, tente novamente.',
-      });
+      // In a real app, you might want to create a user if they don't exist.
+      // For this demo, we assume users are pre-created or we show an error.
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+         toast({
+            variant: 'destructive',
+            title: 'Erro no Login',
+            description: 'Credenciais inválidas. Por favor, tente novamente.',
+        });
+      } else if (error.code === 'auth/wrong-password') {
+         toast({
+            variant: 'destructive',
+            title: 'Erro no Login',
+            description: 'Senha incorreta. Por favor, tente novamente.',
+        });
+      }
+      else {
+        toast({
+            variant: 'destructive',
+            title: 'Erro no Login',
+            description: 'Ocorreu um erro desconhecido.',
+        });
+      }
     } finally {
       setIsLoading(false);
     }
