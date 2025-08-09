@@ -20,7 +20,6 @@ const RankingPodium = ({ rank, name, points, avatarSrc, avatarFallback, highligh
             <h3 className="font-semibold text-lg">{name}</h3>
             <p className="text-muted-foreground font-bold text-primary">{points.toLocaleString()}</p>
             <p className="font-bold text-lg">{rank}º Lugar</p>
-            {highlight && <Badge className="mt-2 mx-auto">Você</Badge>}
         </div>
     </Card>
 );
