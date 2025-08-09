@@ -8,7 +8,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Loader2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Loader2, Users, UserCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -26,9 +26,23 @@ type Collaborator = {
   avatarUrl?: string;
 };
 
+const StatCard = ({ title, value, icon: Icon }) => (
+    <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <Icon className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+            <div className="text-2xl font-bold">{value}</div>
+        </CardContent>
+    </Card>
+);
+
+
 export default function AdminColaboradoresPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalLicenses, setTotalLicenses] = useState(50); // Mock data for licenses
 
   useEffect(() => {
     const fetchCollaborators = async () => {
@@ -42,6 +56,12 @@ export default function AdminColaboradoresPage() {
         // const querySnapshot = await getDocs(collection(db, "companies", "company-123", "collaborators"));
         // const fetchedCollaborators = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Collaborator[];
         // setCollaborators(fetchedCollaborators);
+        
+        // Also fetch company data to get total licenses
+        // const companyDoc = await getDoc(doc(db, "companies", "company-123"));
+        // if(companyDoc.exists()) {
+        //   setTotalLicenses(companyDoc.data().licenses || 0);
+        // }
         setCollaborators(mockCollaborators);
       } catch (error) {
         console.error("Error fetching collaborators: ", error);
@@ -64,7 +84,11 @@ export default function AdminColaboradoresPage() {
   return (
     <>
       <Header title="Colaboradores" />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
+      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
+        <div className="grid gap-4 md:grid-cols-2">
+            <StatCard title="Colaboradores Ativos" value={`${collaborators.length}`} icon={UserCheck} />
+            <StatCard title="Licenças Contratadas" value={`${totalLicenses}`} icon={Users} />
+        </div>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
