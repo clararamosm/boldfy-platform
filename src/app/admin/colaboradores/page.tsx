@@ -42,10 +42,12 @@ const StatCard = ({ title, value, icon: Icon }) => (
 export default function AdminColaboradoresPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [totalLicenses, setTotalLicenses] = useState(50); // Mock data for licenses
 
   useEffect(() => {
     const fetchCollaborators = async () => {
+      setIsLoading(true);
       try {
         // Mock data for demonstration until Firestore is populated
         const mockCollaborators: Collaborator[] = [
@@ -62,6 +64,7 @@ export default function AdminColaboradoresPage() {
         // if(companyDoc.exists()) {
         //   setTotalLicenses(companyDoc.data().licenses || 0);
         // }
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate fetch delay
         setCollaborators(mockCollaborators);
       } catch (error) {
         console.error("Error fetching collaborators: ", error);
@@ -73,6 +76,15 @@ export default function AdminColaboradoresPage() {
 
     fetchCollaborators();
   }, []);
+
+  const handleInvite = async () => {
+      setIsSubmitting(true);
+      // TODO: Implement invite logic (e.g., call a server action or Firebase function)
+      console.log("Sending invite...");
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async operation
+      setIsSubmitting(false);
+      // You would typically close the dialog here and show a toast
+  }
 
   const inviteButton = (
     <Button size="sm">
@@ -99,11 +111,12 @@ export default function AdminColaboradoresPage() {
               title="Convidar Colaborador"
               description="Envie um convite por e-mail para um novo colaborador se juntar à plataforma."
               trigger={inviteButton}
-              actionText="Enviar Convite"
+              actionText={isSubmitting ? "Enviando..." : "Enviar Convite"}
+              onAction={handleInvite}
             >
               <div className="space-y-2">
                 <Label htmlFor="email">E-mail do Colaborador</Label>
-                <Input id="email" type="email" placeholder="nome@empresa.com.br" />
+                <Input id="email" type="email" placeholder="nome@empresa.com.br" disabled={isSubmitting} />
               </div>
             </ActionDialog>
           </CardHeader>
