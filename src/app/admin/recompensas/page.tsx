@@ -2,6 +2,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +16,10 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from '@/hooks/use-toast';
+import { ca } from 'date-fns/locale';
 
+const companyId = "company-123";
 
 type Reward = {
     id: string;
@@ -32,8 +37,8 @@ type Rescue = {
     status: 'Pendente' | 'Pago';
 }
 
-const RewardForm = ({ reward, isSubmitting }: { reward?: Reward, isSubmitting: boolean }) => (
-    <>
+const RewardForm = ({ reward, isSubmitting, formRef }: { reward?: Reward, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement> }) => (
+    <form id="reward-form" ref={formRef} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="reward-name">Nome da Recompensa</Label>
         <Input id="reward-name" name="name" placeholder="Ex: Vale-presente iFood R$50" defaultValue={reward?.name} disabled={isSubmitting} required />
@@ -46,51 +51,151 @@ const RewardForm = ({ reward, isSubmitting }: { reward?: Reward, isSubmitting: b
         <Label htmlFor="reward-stock">Estoque</Label>
         <Input id="reward-stock" name="stock" type="number" placeholder="Deixe em branco para ilimitado" defaultValue={reward?.stock === 'Ilimitado' ? '' : reward?.stock} disabled={isSubmitting} />
       </div>
-    </>
+    </form>
 );
 
 
 export default function AdminRecompensasPage() {
+    const { toast } = useToast();
     const [rewards, setRewards] = useState<Reward[]>([]);
     const [rescues, setRescues] = useState<Rescue[]>([]);
+    const [monthlyPrize, setMonthlyPrize] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const formRef = React.useRef<HTMLFormElement>(null);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                // MOCK DATA - In a real app, fetch from Firestore
-                const mockRewards: Reward[] = [
-                    { id: "1", name: "Vale-presente iFood R$50", points: 5000, stock: 15, status: "Disponível" },
-                    { id: "2", name: "Day Off", points: 10000, stock: "Ilimitado", status: "Disponível" },
-                    { id: "3", name: "Vale-presente Spotify", points: 3000, stock: 0, status: "Desativada" },
-                ];
-                const mockRescues: Rescue[] = [
-                    { id: "r1", userName: "Carla Costa", rewardName: "Vale-presente iFood R$50", date: "2024-07-10", status: "Pendente" },
-                    { id: "r2", userName: "João Paulo", rewardName: "Day Off", date: "2024-07-05", status: "Pago" },
-                ];
 
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                setRewards(mockRewards);
-                setRescues(mockRescues);
-            } catch (error) {
-                console.error("Error fetching data:", error);
-                // Handle error with toast
-            } finally {
-                setIsLoading(false);
+    const fetchRewards = async () => {
+        try {
+            const rewardsCollection = collection(db, "companies", companyId, "rewards");
+            const rewardsSnapshot = await getDocs(rewardsCollection);
+            const rewardsList = rewardsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reward));
+            setRewards(rewardsList);
+        } catch (error) {
+            console.error("Error fetching rewards:", error);
+            toast({ variant: 'destructive', title: 'Erro ao buscar recompensas.' });
+        }
+    }
+
+     const fetchRescues = async () => {
+        try {
+            const rescuesCollection = collection(db, "companies", companyId, "rescues");
+            const rescuesSnapshot = await getDocs(rescuesCollection);
+            const rescuesList = rescuesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rescue));
+            setRescues(rescuesList);
+        } catch (error) {
+            console.error("Error fetching rescues:", error);
+            toast({ variant: 'destructive', title: 'Erro ao buscar resgates.' });
+        }
+    }
+    
+    const fetchMonthlyPrize = async () => {
+        try {
+            const companyDocRef = doc(db, "companies", companyId);
+            const companyDoc = await getDoc(companyDocRef);
+            if(companyDoc.exists()) {
+                setMonthlyPrize(companyDoc.data()?.monthlyPrize || '');
             }
-        };
+        } catch (error) {
+             console.error("Error fetching monthly prize:", error);
+        }
+    }
+
+    const fetchData = async () => {
+        setIsLoading(true);
+        await Promise.all([fetchRewards(), fetchRescues(), fetchMonthlyPrize()]);
+        setIsLoading(false);
+    }
+    
+    useEffect(() => {
         fetchData();
     }, []);
 
     const handleAction = async (rewardId?: string) => {
+        if(!formRef.current) return;
+
         setIsSubmitting(true);
-        // TODO: Implement create/update logic for Firestore
-        console.log("Submitting form for reward:", rewardId);
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setIsSubmitting(false);
-        // Close dialog and show toast
+        const formData = new FormData(formRef.current);
+        const name = formData.get('name') as string;
+        const points = Number(formData.get('points'));
+        const stock = formData.get('stock') ? Number(formData.get('stock')) : 'Ilimitado';
+
+        if(!name || !points) {
+            toast({ variant: 'destructive', title: 'Campos obrigatórios', description: 'Nome e pontos são obrigatórios.' });
+            setIsSubmitting(false);
+            return;
+        }
+
+        const rewardData = { name, points, stock, status: 'Disponível' as const };
+
+        try {
+            if (rewardId) {
+                const rewardDoc = doc(db, "companies", companyId, "rewards", rewardId);
+                await updateDoc(rewardDoc, rewardData);
+                toast({ title: 'Recompensa atualizada!' });
+            } else {
+                await addDoc(collection(db, "companies", companyId, "rewards"), rewardData);
+                toast({ title: 'Recompensa criada!' });
+            }
+            fetchRewards();
+        } catch (error) {
+            console.error("Error saving reward:", error);
+            toast({ variant: 'destructive', title: 'Erro ao salvar recompensa.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    const handleToggleStatus = async (reward: Reward) => {
+        try {
+            const rewardDoc = doc(db, "companies", companyId, "rewards", reward.id);
+            const newStatus = reward.status === 'Disponível' ? 'Desativada' : 'Disponível';
+            await updateDoc(rewardDoc, { status: newStatus });
+            toast({ title: `Status alterado para ${newStatus}` });
+            fetchRewards();
+        } catch(error) {
+             console.error("Error toggling status:", error);
+            toast({ variant: 'destructive', title: 'Erro ao alterar status.' });
+        }
+    }
+
+    const handleDelete = async (rewardId: string) => {
+        if (!confirm('Tem certeza que deseja excluir esta recompensa?')) return;
+        try {
+            const rewardDoc = doc(db, "companies", companyId, "rewards", rewardId);
+            await deleteDoc(rewardDoc);
+            toast({ title: 'Recompensa excluída.' });
+            fetchRewards();
+        } catch (error) {
+            console.error("Error deleting reward:", error);
+            toast({ variant: 'destructive', title: 'Erro ao excluir recompensa.' });
+        }
+    }
+
+    const handleMarkAsPaid = async (rescueId: string) => {
+         try {
+            const rescueDoc = doc(db, "companies", companyId, "rescues", rescueId);
+            await updateDoc(rescueDoc, { status: 'Pago' });
+            toast({ title: 'Resgate marcado como pago.' });
+            fetchRescues();
+        } catch (error) {
+            console.error("Error marking as paid:", error);
+            toast({ variant: 'destructive', title: 'Erro ao marcar como pago.' });
+        }
+    }
+    
+    const handleSaveMonthlyPrize = async () => {
+        setIsSubmitting(true);
+        try {
+            const companyDocRef = doc(db, "companies", companyId);
+            await setDoc(companyDocRef, { monthlyPrize }, { merge: true });
+            toast({ title: "Prêmio do mês salvo com sucesso!"});
+        } catch(error) {
+            console.error("Error saving monthly prize: ", error);
+            toast({ variant: 'destructive', title: "Erro ao salvar prêmio do mês."});
+        } finally {
+            setIsSubmitting(false);
+        }
     }
 
     const addRewardButton = (
@@ -107,8 +212,9 @@ export default function AdminRecompensasPage() {
             trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar</DropdownMenuItem>}
             actionText={isSubmitting ? "Salvando..." : "Salvar Alterações"}
             onAction={() => handleAction(reward.id)}
+            formId="reward-form"
         >
-            <RewardForm reward={reward} isSubmitting={isSubmitting} />
+            <RewardForm reward={reward} isSubmitting={isSubmitting} formRef={formRef}/>
         </ActionDialog>
     );
 
@@ -139,8 +245,9 @@ export default function AdminRecompensasPage() {
               trigger={addRewardButton}
               actionText={isSubmitting ? "Salvando..." : "Salvar Recompensa"}
               onAction={() => handleAction()}
+              formId="reward-form"
             >
-              <RewardForm isSubmitting={isSubmitting} />
+              <RewardForm isSubmitting={isSubmitting} formRef={formRef} />
             </ActionDialog>
           </div>
           <TabsContent value="loja" className="space-y-6">
@@ -155,7 +262,7 @@ export default function AdminRecompensasPage() {
                 <CardContent>
                     <div className="max-w-xs">
                         <Label htmlFor="monthly-prize">Recompensa</Label>
-                        <Select defaultValue="day-off">
+                        <Select value={monthlyPrize} onValueChange={setMonthlyPrize} disabled={isLoading}>
                             <SelectTrigger id="monthly-prize">
                                 <SelectValue placeholder="Selecione uma recompensa" />
                             </SelectTrigger>
@@ -168,7 +275,10 @@ export default function AdminRecompensasPage() {
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button disabled={isSubmitting}>Salvar Prêmio do Mês</Button>
+                    <Button disabled={isSubmitting} onClick={handleSaveMonthlyPrize}>
+                        {isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
+                        Salvar Prêmio do Mês
+                    </Button>
                 </CardFooter>
             </Card>
             <Card>
@@ -201,8 +311,8 @@ export default function AdminRecompensasPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <EditRewardButton reward={reward} />
-                                <DropdownMenuItem>{reward.status === 'Disponível' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => handleToggleStatus(reward)}>{reward.status === 'Disponível' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(reward.id)}>Excluir</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -235,12 +345,12 @@ export default function AdminRecompensasPage() {
                          <TableRow key={rescue.id}>
                           <TableCell className="font-medium">{rescue.userName}</TableCell>
                           <TableCell>{rescue.rewardName}</TableCell>
-                          <TableCell>{rescue.date}</TableCell>
+                          <TableCell>{new Date(rescue.date).toLocaleDateString()}</TableCell>
                           <TableCell>
                             <Badge variant={rescue.status === 'Pendente' ? 'destructive' : 'default'} className={rescue.status === 'Pago' ? "bg-green-600 hover:bg-green-700" : ""}>{rescue.status}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Button size="sm" variant="outline" disabled={rescue.status === 'Pago'}>
+                            <Button size="sm" variant="outline" disabled={rescue.status === 'Pago'} onClick={() => handleMarkAsPaid(rescue.id)}>
                                 {rescue.status === 'Pendente' ? 'Marcar como Pago' : 'Pago'}
                             </Button>
                           </TableCell>

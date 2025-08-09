@@ -1,3 +1,4 @@
+
 // src/app/influencer/rankings/page.tsx
 'use client';
 
@@ -5,11 +6,17 @@ import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Crown, Trophy, Gift, BookOpen, Zap, Calendar } from "lucide-react";
+import { Crown, Trophy, Gift, BookOpen, Zap, Calendar, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import React, { useState, useEffect } from 'react';
+import { db } from "@/lib/firebase";
+import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
+const companyId = 'company-123';
+const currentUserId = 'user-123'; // In a real app, this comes from auth
 
 type UserRanking = {
     id: string;
@@ -17,7 +24,7 @@ type UserRanking = {
     points: number;
     avatarUrl?: string;
     isCurrentUser?: boolean;
-}
+};
 
 const PodiumCard = ({ rank, user, highlight = false }: { rank: number, user: UserRanking, highlight?: boolean }) => (
     <Card className={`flex flex-col items-center p-4 text-center ${highlight ? 'bg-secondary' : ''} h-full`}>
@@ -39,39 +46,81 @@ const PodiumCard = ({ rank, user, highlight = false }: { rank: number, user: Use
     </Card>
 );
 
+const PageSkeleton = () => (
+    <>
+        <div className="grid gap-4 md:grid-cols-3 items-stretch">
+            <Skeleton className="h-64" />
+            <Skeleton className="h-72" />
+            <Skeleton className="h-64" />
+        </div>
+        <Skeleton className="h-24" />
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-7 w-48" />
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                </div>
+            </CardContent>
+        </Card>
+    </>
+);
+
 
 export default function InfluencerRankingsPage() {
-    // In a real app, this data would be fetched and managed in state.
+    const { toast } = useToast();
     const [generalRanking, setGeneralRanking] = useState<UserRanking[]>([]);
-    const [missionRanking, setMissionRanking] = useState<UserRanking[]>([]);
-    const [trailRanking, setTrailRanking] = useState<UserRanking[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
-            // Mock data simulating a fetch from Firestore
-            const mockUsers: UserRanking[] = [
-                { id: '1', name: 'Carla Costa', points: 1250, avatarUrl: "https://placehold.co/80x80.png" },
-                { id: '2', name: 'João Paulo', points: 890, avatarUrl: "https://placehold.co/80x80.png" },
-                { id: '3', name: 'Você', points: 750, avatarUrl: "https://placehold.co/80x80.png", isCurrentUser: true },
-                { id: '4', name: 'Ricardo Mendes', points: 620, avatarUrl: "https://placehold.co/80x80.png" },
-            ];
+            try {
+                // In a real app, you would query users belonging to the companyId
+                const usersQuery = query(
+                    collection(db, "users"), 
+                    // where("companyId", "==", companyId) // Add this line in a real app
+                    orderBy("points", "desc")
+                );
+                
+                const querySnapshot = await getDocs(usersQuery);
+                const fetchedUsers = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    name: doc.data().profile?.name || doc.data().name || 'Usuário Anônimo', // Adjust based on your user data structure
+                    points: doc.data().points || 0,
+                    avatarUrl: doc.data().profile?.avatarUrl || `https://placehold.co/80x80.png`,
+                    isCurrentUser: doc.id === currentUserId
+                }));
 
-            // Here you would sort and slice for each ranking type
-            setGeneralRanking(mockUsers.sort((a, b) => b.points - a.points));
-            
-            // For demo purposes, we'll shuffle the points for other rankings
-            setMissionRanking([...mockUsers].sort((a, b) => b.points - a.points / 2));
-            setTrailRanking([...mockUsers].sort((a, b) => b.points - a.points * 1.5));
-            
-            setIsLoading(false);
+                setGeneralRanking(fetchedUsers);
+
+            } catch(error) {
+                console.error("Error fetching ranking:", error);
+                toast({ variant: 'destructive', title: "Erro ao carregar ranking" });
+            } finally {
+                setIsLoading(false);
+            }
         };
         fetchData();
-    }, []);
+    }, [toast]);
 
     const top3 = generalRanking.slice(0, 3);
     const currentUser = generalRanking.find(u => u.isCurrentUser);
+
+    if (isLoading) {
+        return (
+             <>
+                <Header title="Rankings" />
+                <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
+                    <PageSkeleton />
+                </main>
+            </>
+        )
+    }
 
   return (
     <>
@@ -81,8 +130,8 @@ export default function InfluencerRankingsPage() {
         {/* Podium Section */}
         {top3.length >= 3 && (
             <div className="grid gap-4 md:grid-cols-3 items-stretch">
-                <PodiumCard rank={2} user={top3[1]} />
-                <PodiumCard rank={1} user={top3[0]} />
+                <PodiumCard rank={2} user={top3[1]} highlight={top3[1].isCurrentUser} />
+                <PodiumCard rank={1} user={top3[0]} highlight={top3[0].isCurrentUser} />
                 <PodiumCard rank={3} user={top3[2]} highlight={top3[2].isCurrentUser} />
             </div>
         )}
@@ -136,7 +185,7 @@ export default function InfluencerRankingsPage() {
                                             <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
                                             <AvatarFallback>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
                                         </Avatar>
-                                        <span className={user.isCurrentUser ? 'font-bold' : ''}>{user.name}</span>
+                                        <span className={user.isCurrentUser ? 'font-bold' : ''}>{user.name === 'Você' ? 'Você' : user.name}</span>
                                     </div>
                                  </TableCell>
                                  <TableCell className="text-right">
@@ -151,7 +200,6 @@ export default function InfluencerRankingsPage() {
                 </Table>
             </CardContent>
         </Card>
-
       </main>
     </>
   );
