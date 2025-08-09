@@ -14,7 +14,23 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+type Reward = {
+    name: string;
+    points: number;
+    stock: string | number;
+    status: 'Disponível' | 'Desativada';
+};
+
+
 export default function AdminRecompensasPage() {
+
+    const rewards: Reward[] = [
+        { name: "Vale-presente iFood R$50", points: 5000, stock: 15, status: "Disponível" },
+        { name: "Day Off", points: 10000, stock: "Ilimitado", status: "Disponível" },
+        { name: "Vale-presente Spotify", points: 3000, stock: 0, status: "Desativada" },
+    ];
+
+
   const addRewardButton = (
     <Button size="sm">
       <PlusCircle className="mr-2 h-4 w-4" />
@@ -22,25 +38,30 @@ export default function AdminRecompensasPage() {
     </Button>
   );
 
-  const editRewardButton = (
-      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-          Editar
-      </DropdownMenuItem>
+  const EditRewardButton = ({ reward }: { reward: Reward }) => (
+    <ActionDialog
+        title="Editar Recompensa"
+        description="Atualize os detalhes da recompensa."
+        trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar</DropdownMenuItem>}
+        actionText="Salvar Alterações"
+    >
+        <RewardForm reward={reward} />
+    </ActionDialog>
   );
 
-  const rewardForm = (
+  const RewardForm = ({ reward }: { reward?: Reward }) => (
     <>
       <div className="space-y-2">
         <Label htmlFor="reward-name">Nome da Recompensa</Label>
-        <Input id="reward-name" placeholder="Ex: Vale-presente iFood R$50" />
+        <Input id="reward-name" placeholder="Ex: Vale-presente iFood R$50" defaultValue={reward?.name} />
       </div>
        <div className="space-y-2">
         <Label htmlFor="reward-points">Custo (Pontos)</Label>
-        <Input id="reward-points" type="number" placeholder="Ex: 5000" />
+        <Input id="reward-points" type="number" placeholder="Ex: 5000" defaultValue={reward?.points} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="reward-stock">Estoque</Label>
-        <Input id="reward-stock" type="number" placeholder="Deixe em branco para ilimitado" />
+        <Input id="reward-stock" type="number" placeholder="Deixe em branco para ilimitado" defaultValue={reward?.stock === 'Ilimitado' ? '' : reward?.stock} />
       </div>
     </>
   );
@@ -61,7 +82,7 @@ export default function AdminRecompensasPage() {
               trigger={addRewardButton}
               actionText="Salvar Recompensa"
             >
-              {rewardForm}
+              <RewardForm />
             </ActionDialog>
           </div>
           <TabsContent value="loja" className="space-y-6">
@@ -108,81 +129,26 @@ export default function AdminRecompensasPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Vale-presente iFood R$50</TableCell>
-                      <TableCell>5000</TableCell>
-                      <TableCell>15</TableCell>
-                      <TableCell><Badge variant="default">Disponível</Badge></TableCell>
-                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <ActionDialog
-                                title="Editar Recompensa"
-                                description="Atualize os detalhes da recompensa."
-                                trigger={editRewardButton}
-                                actionText="Salvar Alterações"
-                            >
-                                {rewardForm}
-                            </ActionDialog>
-                            <DropdownMenuItem>Desativar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Day Off</TableCell>
-                      <TableCell>10000</TableCell>
-                      <TableCell>Ilimitado</TableCell>
-                      <TableCell><Badge variant="default">Disponível</Badge></TableCell>
-                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <ActionDialog
-                                title="Editar Recompensa"
-                                description="Atualize os detalhes da recompensa."
-                                trigger={editRewardButton}
-                                actionText="Salvar Alterações"
-                            >
-                                {rewardForm}
-                            </ActionDialog>
-                            <DropdownMenuItem>Desativar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                     <TableRow>
-                      <TableCell className="font-medium text-muted-foreground">Vale-presente Spotify</TableCell>
-                      <TableCell className="text-muted-foreground">3000</TableCell>
-                      <TableCell className="text-muted-foreground">0</TableCell>
-                      <TableCell><Badge variant="outline">Desativada</Badge></TableCell>
-                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <ActionDialog
-                                title="Editar Recompensa"
-                                description="Atualize os detalhes da recompensa."
-                                trigger={editRewardButton}
-                                actionText="Salvar Alterações"
-                            >
-                                {rewardForm}
-                            </ActionDialog>
-                            <DropdownMenuItem>Ativar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+                    {rewards.map((reward) => (
+                        <TableRow key={reward.name} className={reward.status === 'Desativada' ? 'text-muted-foreground' : ''}>
+                          <TableCell className="font-medium">{reward.name}</TableCell>
+                          <TableCell>{reward.points}</TableCell>
+                          <TableCell>{reward.stock}</TableCell>
+                          <TableCell><Badge variant={reward.status === 'Disponível' ? 'default' : 'outline'}>{reward.status}</Badge></TableCell>
+                           <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <EditRewardButton reward={reward} />
+                                <DropdownMenuItem>{reward.status === 'Disponível' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
