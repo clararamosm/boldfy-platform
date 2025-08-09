@@ -209,7 +209,7 @@ export default function AdminConfiguracoesPage() {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="adminName">Nome do Admin</Label>
-                    <Input id="adminName" value={formData.adminName} onChange={handleInputChange} />
+                    <Input id="adminName" value={formData.adminName} onChange={handleInputChange} disabled={isSaving} />
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
@@ -217,7 +217,7 @@ export default function AdminConfiguracoesPage() {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="companyName">Nome da Empresa</Label>
-                    <Input id="companyName" value={formData.companyName} onChange={handleInputChange} />
+                    <Input id="companyName" value={formData.companyName} onChange={handleInputChange} disabled={isSaving} />
                 </div>
                 </CardContent>
                 <CardFooter className="border-t px-6 py-4">
@@ -238,19 +238,19 @@ export default function AdminConfiguracoesPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="tagline">Tagline</Label>
-                <Input id="tagline" placeholder="Sua tagline ou slogan" value={formData.tagline} onChange={handleInputChange} />
+                <Input id="tagline" placeholder="Sua tagline ou slogan" value={formData.tagline} onChange={handleInputChange} disabled={isSaving} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="audience">Público-alvo</Label>
-                <Textarea id="audience" placeholder="Descreva seu público-alvo" value={formData.audience} onChange={handleInputChange} />
+                <Textarea id="audience" placeholder="Descreva seu público-alvo" value={formData.audience} onChange={handleInputChange} disabled={isSaving} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tone">Tom de Voz</Label>
-                <Textarea id="tone" placeholder="Descreva o tom de voz da marca" value={formData.tone} onChange={handleInputChange} />
+                <Textarea id="tone" placeholder="Descreva o tom de voz da marca" value={formData.tone} onChange={handleInputChange} disabled={isSaving} />
               </div>
                <div className="space-y-2">
                 <Label htmlFor="messages">Mensagens-chave</Label>
-                <Textarea id="messages" placeholder="Quais são as mensagens principais que devem ser comunicadas?" value={formData.messages} onChange={handleInputChange} />
+                <Textarea id="messages" placeholder="Quais são as mensagens principais que devem ser comunicadas?" value={formData.messages} onChange={handleInputChange} disabled={isSaving} />
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
