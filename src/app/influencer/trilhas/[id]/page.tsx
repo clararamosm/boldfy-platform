@@ -345,5 +345,3 @@ export default function TrailDetailPage({ params }: { params: { id: string } }) 
         </>
     );
 }
-
-    
