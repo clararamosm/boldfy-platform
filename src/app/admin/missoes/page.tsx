@@ -2,7 +2,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon, ChevronDown } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon, ChevronDown, GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
@@ -14,16 +14,35 @@ import { Calendar } from "@/components/ui/calendar";
 
 export default function AdminMissoesPage() {
   const createTimedMissionButton = (
-    <DropdownMenuItem>
+    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
       Criar Missão Padrão
     </DropdownMenuItem>
   );
 
   const createFixedMissionButton = (
-    <DropdownMenuItem>
+     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
       Criar Missão Fixa
     </DropdownMenuItem>
   );
+
+    const editFixedMissionButton = (
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+            Editar
+        </DropdownMenuItem>
+    );
+
+    const editActiveMissionButton = (
+         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+            Editar
+        </DropdownMenuItem>
+    );
+
+     const viewSubmissionsButton = (
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+            Ver Envios
+        </DropdownMenuItem>
+    );
+
 
   const timedMissionForm = (
     <>
@@ -89,6 +108,10 @@ export default function AdminMissoesPage() {
     </>
   );
 
+  const submissionsView = (
+    <p className="text-sm text-muted-foreground">Nenhum envio para esta missão ainda.</p>
+  );
+
   return (
     <>
       <Header title="Missões" />
@@ -132,22 +155,35 @@ export default function AdminMissoesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[40px]"><span className="sr-only">Reordenar</span></TableHead>
                       <TableHead>Nome</TableHead>
                       <TableHead>Pontos</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Participantes</TableHead>
                       <TableHead><span className="sr-only">Ações</span></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                      <TableRow>
+                      <TableCell className="cursor-grab"><GripVertical className="h-5 w-5 text-muted-foreground" /></TableCell>
                       <TableCell className="font-medium">Atualize seu banner do LinkedIn</TableCell>
                       <TableCell>50</TableCell>
+                      <TableCell><Badge variant="outline">Fixa</Badge></TableCell>
+                      <TableCell>45 / 45</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                             <ActionDialog
+                              title="Editar Missão Fixa"
+                              description="Atualize os detalhes desta missão."
+                              trigger={editFixedMissionButton}
+                              actionText="Salvar Alterações"
+                            >
+                              {fixedMissionForm}
+                            </ActionDialog>
                             <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -188,8 +224,22 @@ export default function AdminMissoesPage() {
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver Envios</DropdownMenuItem>
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <ActionDialog
+                                title="Ver Envios"
+                                description="Veja as comprovações enviadas pelos colaboradores."
+                                trigger={viewSubmissionsButton}
+                                actionText="Fechar"
+                                >
+                                {submissionsView}
+                            </ActionDialog>
+                             <ActionDialog
+                              title="Editar Missão"
+                              description="Atualize os detalhes desta missão."
+                              trigger={editActiveMissionButton}
+                              actionText="Salvar Alterações"
+                            >
+                              {timedMissionForm}
+                            </ActionDialog>
                             <DropdownMenuItem>Desativar</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -206,8 +256,15 @@ export default function AdminMissoesPage() {
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                           <DropdownMenuContent align="end">
+                             <ActionDialog
+                              title="Editar Missão"
+                              description="Atualize os detalhes desta missão."
+                              trigger={editActiveMissionButton}
+                              actionText="Salvar Alterações"
+                            >
+                              {timedMissionForm}
+                            </ActionDialog>
                             <DropdownMenuItem>Cancelar</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -243,7 +300,14 @@ export default function AdminMissoesPage() {
                       <TableCell><Badge variant="outline">Passada</Badge></TableCell>
                       <TableCell>41 / 45</TableCell>
                       <TableCell>
-                         <Button variant="ghost" size="sm">Ver Envios</Button>
+                         <ActionDialog
+                            title="Ver Envios"
+                            description="Veja as comprovações enviadas pelos colaboradores."
+                            trigger={<Button variant="ghost" size="sm">Ver Envios</Button>}
+                            actionText="Fechar"
+                            >
+                            {submissionsView}
+                        </ActionDialog>
                       </TableCell>
                     </TableRow>
                   </TableBody>
