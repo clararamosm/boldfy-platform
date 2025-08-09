@@ -2,7 +2,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
@@ -13,14 +13,19 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 
 export default function AdminMissoesPage() {
-  const createMissionButton = (
-    <Button size="sm">
-      <PlusCircle className="mr-2 h-4 w-4" />
-      Criar Missão
-    </Button>
+  const createTimedMissionButton = (
+    <DropdownMenuItem>
+      Criar Missão Padrão
+    </DropdownMenuItem>
   );
 
-  const missionForm = (
+  const createFixedMissionButton = (
+    <DropdownMenuItem>
+      Criar Missão Fixa
+    </DropdownMenuItem>
+  );
+
+  const timedMissionForm = (
     <>
       <div className="space-y-2">
         <Label htmlFor="mission-name">Nome da Missão</Label>
@@ -67,25 +72,96 @@ export default function AdminMissoesPage() {
     </>
   );
 
+  const fixedMissionForm = (
+     <>
+      <div className="space-y-2">
+        <Label htmlFor="fixed-mission-name">Nome da Missão</Label>
+        <Input id="fixed-mission-name" placeholder="Ex: Atualize seu banner do LinkedIn" />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="fixed-mission-description">Descrição</Label>
+        <Textarea id="fixed-mission-description" placeholder="Descreva o que o colaborador precisa fazer." />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="fixed-mission-points">Pontos</Label>
+        <Input id="fixed-mission-points" type="number" placeholder="Ex: 50" />
+      </div>
+    </>
+  );
+
   return (
     <>
       <Header title="Missões" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
           <div className="flex items-center justify-between">
              <div/>
-            <ActionDialog
-              title="Criar Nova Missão"
-              description="Configure uma nova missão para seus colaboradores."
-              trigger={createMissionButton}
-              actionText="Salvar Missão"
-            >
-              {missionForm}
-            </ActionDialog>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button size="sm">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        <span>Criar Missão</span>
+                        <ChevronDown className="ml-2 h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <ActionDialog
+                      title="Criar Missão Padrão"
+                      description="Configure uma nova missão com data de início e fim."
+                      trigger={createTimedMissionButton}
+                      actionText="Salvar Missão"
+                    >
+                      {timedMissionForm}
+                    </ActionDialog>
+                    <ActionDialog
+                      title="Criar Missão Fixa"
+                      description="Configure uma missão que ficará sempre ativa."
+                      trigger={createFixedMissionButton}
+                      actionText="Salvar Missão"
+                    >
+                      {fixedMissionForm}
+                    </ActionDialog>
+                </DropdownMenuContent>
+            </DropdownMenu>
           </div>
             <Card>
               <CardHeader>
+                <CardTitle>Missões Fixas</CardTitle>
+                <CardDescription>Gerencie as missões de onboarding que estão sempre ativas.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Pontos</TableHead>
+                      <TableHead><span className="sr-only">Ações</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                     <TableRow>
+                      <TableCell className="font-medium">Atualize seu banner do LinkedIn</TableCell>
+                      <TableCell>50</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Missões Ativas e Agendadas</CardTitle>
-                <CardDescription>Gerencie as missões que estão ativas ou programadas para seus colaboradores.</CardDescription>
+                <CardDescription>Gerencie as missões com data definida para seus colaboradores.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -100,24 +176,6 @@ export default function AdminMissoesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                     <TableRow>
-                      <TableCell className="font-medium">Atualize seu banner do LinkedIn</TableCell>
-                      <TableCell>Sempre Ativa</TableCell>
-                      <TableCell>50</TableCell>
-                      <TableCell><Badge variant="secondary">Fixa</Badge></TableCell>
-                      <TableCell>N/A</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
-                            <DropdownMenuItem>Desativar</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Compartilhar post no LinkedIn</TableCell>
                       <TableCell>15/07 - 22/07</TableCell>
