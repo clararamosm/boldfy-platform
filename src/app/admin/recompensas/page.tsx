@@ -181,6 +181,15 @@ export default function AdminRecompensasPage() {
                         <Button size="sm" variant="outline">Marcar como Pago</Button>
                       </TableCell>
                     </TableRow>
+                     <TableRow>
+                      <TableCell className="font-medium">João Paulo</TableCell>
+                      <TableCell>Day Off</TableCell>
+                      <TableCell>2024-07-05</TableCell>
+                      <TableCell><Badge className="bg-green-600 text-white hover:bg-green-700">Pago</Badge></TableCell>
+                      <TableCell>
+                        <Button size="sm" variant="outline" disabled>Pago</Button>
+                      </TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </CardContent>
