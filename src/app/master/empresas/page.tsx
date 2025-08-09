@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, LogIn } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 
 export default function MasterEmpresasPage() {
     const addCompanyButton = (
@@ -82,6 +83,9 @@ export default function MasterEmpresasPage() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/admin/dashboard"><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem>Editar</DropdownMenuItem>
                                         <DropdownMenuItem>Desativar</DropdownMenuItem>
                                     </DropdownMenuContent>
@@ -104,6 +108,9 @@ export default function MasterEmpresasPage() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                        <DropdownMenuItem asChild>
+                                            <Link href="/admin/dashboard"><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem>Editar</DropdownMenuItem>
                                         <DropdownMenuItem>Desativar</DropdownMenuItem>
                                     </DropdownMenuContent>
@@ -126,6 +133,9 @@ export default function MasterEmpresasPage() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                         <DropdownMenuItem asChild>
+                                            <Link href="/admin/dashboard"><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem>Editar</DropdownMenuItem>
                                         <DropdownMenuItem>Ativar</DropdownMenuItem>
                                     </DropdownMenuContent>
