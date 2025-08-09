@@ -34,42 +34,34 @@ export default function AdminDashboardPage() {
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div>
-                        <CardTitle className="font-headline">Gerenciar Conteúdo</CardTitle>
-                        <CardDescription>Crie e edite missões, trilhas e recompensas.</CardDescription>
+                        <CardTitle className="font-headline">Atividade Recente</CardTitle>
+                        <CardDescription>Acompanhe as últimas atividades na plataforma.</CardDescription>
                     </div>
-                    <Button size="sm">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Criar Novo
-                    </Button>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Nome</TableHead>
-                                <TableHead>Tipo</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Data de Criação</TableHead>
+                                <TableHead>Usuário</TableHead>
+                                <TableHead>Ação</TableHead>
+                                <TableHead>Data</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             <TableRow>
-                                <TableCell className="font-medium">Onboarding de Novos Influenciadores</TableCell>
-                                <TableCell>Trilha</TableCell>
-                                <TableCell><Badge variant="default">Ativa</Badge></TableCell>
-                                <TableCell>2024-05-10</TableCell>
+                                <TableCell className="font-medium">Carla Costa</TableCell>
+                                <TableCell>Completou a trilha "Onboarding de Novos Influenciadores"</TableCell>
+                                <TableCell>2024-07-20</TableCell>
                             </TableRow>
                              <TableRow>
-                                <TableCell className="font-medium">Compartilhar Post no LinkedIn</TableCell>
-                                <TableCell>Missão</TableCell>
-                                <TableCell><Badge variant="default">Ativa</Badge></TableCell>
-                                <TableCell>2024-05-15</TableCell>
+                                <TableCell className="font-medium">João Paulo</TableCell>
+                                <TableCell>Resgatou a recompensa "Vale-presente iFood R$50"</TableCell>
+                                <TableCell>2024-07-19</TableCell>
                             </TableRow>
                              <TableRow>
-                                <TableCell className="font-medium">Vale-presente iFood R$50</TableCell>
-                                <TableCell>Recompensa</TableCell>
-                                <TableCell><Badge variant="outline">Disponível</Badge></TableCell>
-                                <TableCell>2024-05-01</TableCell>
+                                <TableCell className="font-medium">Carla Costa</TableCell>
+                                <TableCell>Completou a missão "Compartilhar Post no LinkedIn"</TableCell>
+                                <TableCell>2024-07-18</TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>
