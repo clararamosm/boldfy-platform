@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { useActionState } from 'react';
+import { useActionState } from 'react-dom';
 import { createCheckoutSession } from '@/app/actions';
 import { getStripe } from '@/lib/stripe-client';
 
