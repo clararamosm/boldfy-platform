@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { useToast } from '@/hooks/use-toast';
 
 type Collaborator = {
   id: string;
@@ -43,51 +44,45 @@ export default function AdminColaboradoresPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [totalLicenses, setTotalLicenses] = useState(50); // Mock data for licenses
+  const [totalLicenses, setTotalLicenses] = useState(0); 
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchCollaborators = async () => {
       setIsLoading(true);
       try {
-        // Mock data for demonstration until Firestore is populated
+        // MOCK DATA - In a real app, this would be fetched from Firestore
+        // e.g., /companies/{companyId}/collaborators and /companies/{companyId} for licenses
         const mockCollaborators: Collaborator[] = [
            { id: '1', name: 'Carla Costa', email: 'carla@boldfy.com.br', points: 1250, status: 'Ativo', entryDate: '2023-10-01', avatarUrl: 'https://placehold.co/40x40.png' },
            { id: '2', name: 'João Paulo', email: 'joao@boldfy.com.br', points: 890, status: 'Ativo', entryDate: '2023-11-15', avatarUrl: 'https://placehold.co/40x40.png' },
         ];
-        // In a real scenario, you would fetch from Firestore like this:
-        // const querySnapshot = await getDocs(collection(db, "companies", "company-123", "collaborators"));
-        // const fetchedCollaborators = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Collaborator[];
-        // setCollaborators(fetchedCollaborators);
         
-        // Also fetch company data to get total licenses
-        // const companyDoc = await getDoc(doc(db, "companies", "company-123"));
-        // if(companyDoc.exists()) {
-        //   setTotalLicenses(companyDoc.data().licenses || 0);
-        // }
         await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate fetch delay
         setCollaborators(mockCollaborators);
+        setTotalLicenses(50); // Mock license data
       } catch (error) {
         console.error("Error fetching collaborators: ", error);
-        // Handle error (e.g., show a toast notification)
+        toast({ variant: "destructive", title: "Erro ao buscar colaboradores."});
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchCollaborators();
-  }, []);
+  }, [toast]);
 
   const handleInvite = async () => {
       setIsSubmitting(true);
       // TODO: Implement invite logic (e.g., call a server action or Firebase function)
       console.log("Sending invite...");
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async operation
+      toast({ title: "Convite enviado com sucesso!"});
       setIsSubmitting(false);
-      // You would typically close the dialog here and show a toast
   }
 
   const inviteButton = (
-    <Button size="sm">
+    <Button size="sm" disabled={isSubmitting}>
       <PlusCircle className="mr-2 h-4 w-4" />
       Convidar Colaborador
     </Button>
@@ -143,7 +138,7 @@ export default function AdminColaboradoresPage() {
                   </TableRow>
                 ) : collaborators.length === 0 ? (
                    <TableRow>
-                    <TableCell colSpan={5} className="text-center">
+                    <TableCell colSpan={5} className="text-center py-8">
                       Nenhum colaborador encontrado.
                     </TableCell>
                   </TableRow>
