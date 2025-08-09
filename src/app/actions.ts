@@ -3,9 +3,10 @@
 
 import { alignContent } from '@/ai/flows/align-content';
 import { z } from 'zod';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-
+import { stripe } from '@/lib/stripe';
+import { headers } from 'next/headers';
 
 // Mock database call to get company profile
 async function getCompanyProfile(companyId: string): Promise<string> {
@@ -110,4 +111,82 @@ export async function handleAlignContent(
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
     return { error: `Ocorreu um erro ao alinhar o conteúdo: ${errorMessage}`, alignedContent: null };
   }
+}
+
+// --- Stripe Checkout Action ---
+
+const CreateCheckoutSessionSchema = z.object({
+  companyName: z.string(),
+  adminName: z.string(),
+  adminEmail: z.string().email(),
+  licenses: z.coerce.number().int().positive(),
+  priceId: z.string(), // e.g., price_1PJU0dRx1EDs2Xy7nopfo123
+});
+
+type CheckoutState = {
+    sessionId?: string;
+    error?: string;
+}
+
+export async function createCheckoutSession(prevState: CheckoutState, formData: FormData): Promise<CheckoutState> {
+    const validatedData = CreateCheckoutSessionSchema.safeParse({
+        companyName: formData.get('companyName'),
+        adminName: formData.get('adminName'),
+        adminEmail: formData.get('adminEmail'),
+        licenses: formData.get('licenses'),
+        priceId: process.env.STRIPE_PRICE_ID, // Using environment variable for price ID
+    });
+
+    if(!validatedData.success) {
+        return { error: validatedData.error.errors.map(e => e.message).join(', ') };
+    }
+
+    const { companyName, adminName, adminEmail, licenses, priceId } = validatedData.data;
+    const origin = headers().get('origin');
+    
+    try {
+        // Create a pre-company document in Firestore to hold the data temporarily
+        // A webhook handler would later update this to 'active' and create the admin user.
+        const pendingCompanyRef = await addDoc(collection(db, "companies"), {
+            companyName,
+            adminProfile: {
+                name: adminName,
+                email: adminEmail,
+            },
+            licenses,
+            status: 'pending_payment' as const,
+            createdAt: serverTimestamp(),
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+        });
+
+        // Create a Stripe Checkout Session
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price: priceId,
+                    quantity: licenses,
+                },
+            ],
+            mode: 'subscription',
+            success_url: `${origin}/master/empresas?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${origin}/master/empresas?payment_canceled=true`,
+            metadata: {
+                // Pass the ID of the Firestore document to the webhook handler
+                companyId: pendingCompanyRef.id,
+            }
+        });
+
+        if (!session.id) {
+            throw new Error("Could not create Stripe session.");
+        }
+
+        return { sessionId: session.id };
+
+    } catch (error) {
+        console.error(error);
+        const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+        return { error: `Erro ao criar checkout: ${errorMessage}` };
+    }
 }

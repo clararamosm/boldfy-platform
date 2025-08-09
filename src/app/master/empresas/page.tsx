@@ -17,11 +17,14 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useActionState } from 'react';
+import { createCheckoutSession } from '@/app/actions';
+import { getStripe } from '@/lib/stripe-client';
 
 type Company = {
     id: string;
     companyName: string;
-    status: 'Ativa' | 'Inativa';
+    status: 'Ativa' | 'Inativa' | 'pending_payment';
     licenses: number;
     adminProfile: { email: string; name: string; };
     createdAt: any;
@@ -42,8 +45,8 @@ const CompanyForm = ({ isSubmitting, formRef }: { isSubmitting: boolean, formRef
             <Input name="adminEmail" id="admin-email" type="email" placeholder="admin@techcorp.com" disabled={isSubmitting} required />
         </div>
          <div className="space-y-2">
-            <Label htmlFor="licenses">Número de Licenças</Label>
-            <Input name="licenses" id="licenses" type="number" placeholder="Ex: 100" disabled={isSubmitting} required />
+            <Label htmlFor="licenses">Número de Licenças (Assentos)</Label>
+            <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="1" disabled={isSubmitting} required />
         </div>
     </form>
 );
@@ -53,8 +56,31 @@ export default function MasterEmpresasPage() {
     const { toast } = useToast();
     const [companies, setCompanies] = useState<Company[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
+
+    const [checkoutState, formAction, isSubmitting] = useActionState(createCheckoutSession, { error: undefined, sessionId: undefined });
+
+    useEffect(() => {
+        if (checkoutState.sessionId) {
+            const redirectToCheckout = async () => {
+                const stripe = await getStripe();
+                if (!stripe) {
+                    console.error("Stripe.js not loaded");
+                    return;
+                }
+                await stripe.redirectToCheckout({ sessionId: checkoutState.sessionId! });
+            }
+            redirectToCheckout();
+        }
+        if (checkoutState.error) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro no Checkout',
+                description: checkoutState.error,
+            });
+        }
+    }, [checkoutState, toast]);
+
 
     const fetchCompanies = async () => {
         setIsLoading(true);
@@ -75,39 +101,12 @@ export default function MasterEmpresasPage() {
         fetchCompanies();
     }, []);
 
-    const handleAddCompany = async () => {
-        if (!formRef.current) return;
-        
-        setIsSubmitting(true);
-        const formData = new FormData(formRef.current);
-        const companyData = {
-            companyName: formData.get('companyName') as string,
-            adminProfile: {
-                name: formData.get('adminName') as string,
-                email: formData.get('adminEmail') as string,
-            },
-            licenses: Number(formData.get('licenses')),
-            status: 'Ativa' as const,
-            createdAt: serverTimestamp(),
-        };
-
-        if (!companyData.companyName || !companyData.adminProfile.email || !companyData.licenses) {
-            toast({ variant: 'destructive', title: 'Campos obrigatórios faltando.' });
-            setIsSubmitting(false);
-            return;
+    const handleFormAction = () => {
+        if (formRef.current) {
+            const formData = new FormData(formRef.current);
+            formAction(formData);
         }
-
-        try {
-            await addDoc(collection(db, "companies"), companyData);
-            toast({ title: 'Empresa adicionada com sucesso!' });
-            fetchCompanies();
-        } catch(error) {
-             console.error("Error adding company:", error);
-             toast({ variant: 'destructive', title: 'Erro ao adicionar empresa' });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+    }
     
      const handleToggleStatus = async (company: Company) => {
         const newStatus = company.status === 'Ativa' ? 'Inativa' : 'Ativa';
@@ -129,6 +128,19 @@ export default function MasterEmpresasPage() {
         </Button>
     );
 
+    const getStatusBadge = (status: Company['status']) => {
+        switch (status) {
+            case 'Ativa':
+                return <Badge variant="default">Ativa</Badge>;
+            case 'Inativa':
+                return <Badge variant="destructive">Inativa</Badge>;
+            case 'pending_payment':
+                return <Badge variant="secondary">Pagamento Pendente</Badge>;
+            default:
+                return <Badge variant="outline">{status}</Badge>;
+        }
+    };
+
   return (
     <>
       <Header title="Empresas" />
@@ -137,15 +149,14 @@ export default function MasterEmpresasPage() {
             <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                     <CardTitle className="font-headline">Gerenciamento de Empresas</CardTitle>
-                    <CardDescription>Adicione, edite ou remova empresas clientes.</CardDescription>
+                    <CardDescription>Adicione novas empresas clientes. O admin será redirecionado para o pagamento.</CardDescription>
                 </div>
                 <ActionDialog
                     title="Adicionar Nova Empresa"
-                    description="Cadastre uma nova empresa cliente na plataforma."
+                    description="Preencha os dados da nova empresa. Você será redirecionado para o Stripe para efetuar o pagamento da assinatura."
                     trigger={addCompanyButton}
-                    actionText={isSubmitting ? "Salvando..." : "Salvar Empresa"}
-                    onAction={handleAddCompany}
-                    formId="company-form"
+                    actionText={isSubmitting ? "Redirecionando..." : "Ir para Pagamento"}
+                    onAction={handleFormAction}
                 >
                     <CompanyForm isSubmitting={isSubmitting} formRef={formRef} />
                 </ActionDialog>
@@ -177,9 +188,9 @@ export default function MasterEmpresasPage() {
                             </TableRow>
                         ) : (
                             companies.map(company => (
-                                <TableRow key={company.id}>
+                                <TableRow key={company.id} className={company.status !== 'Ativa' ? 'text-muted-foreground' : ''}>
                                     <TableCell className="font-medium">{company.companyName}</TableCell>
-                                    <TableCell><Badge variant={company.status === 'Ativa' ? 'default' : 'destructive'}>{company.status}</Badge></TableCell>
+                                    <TableCell>{getStatusBadge(company.status)}</TableCell>
                                     <TableCell>0 / {company.licenses}</TableCell>
                                     <TableCell>{company.adminProfile?.email}</TableCell>
                                     <TableCell>{company.createdAt?.toDate ? format(company.createdAt.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
@@ -193,11 +204,13 @@ export default function MasterEmpresasPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                <DropdownMenuItem asChild>
+                                                <DropdownMenuItem asChild disabled={company.status !== 'Ativa'}>
                                                     <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
                                                 </DropdownMenuItem>
                                                 {/* <DropdownMenuItem>Editar</DropdownMenuItem> */}
-                                                <DropdownMenuItem onClick={() => handleToggleStatus(company)}>{company.status === 'Ativa' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleToggleStatus(company)} disabled={company.status === 'pending_payment'}>
+                                                    {company.status === 'Ativa' ? 'Desativar' : 'Ativar'}
+                                                </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
