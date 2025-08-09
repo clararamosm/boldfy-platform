@@ -27,7 +27,7 @@ const RewardCard = ({ title, points, image, dataAiHint }) => (
         <CardFooter className="flex justify-between items-center">
              <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
                 <Zap className="h-3 w-3 mr-1"/>
-                {points.toLocaleString()} pts
+                {points.toLocaleString()}
             </Badge>
             <Button>Resgatar</Button>
         </CardFooter>
@@ -45,7 +45,7 @@ const PointHistoryItem = ({ icon, title, date, points, type }) => (
         </div>
          <Badge variant="secondary" className={`${type === 'gain' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} whitespace-nowrap shrink-0`}>
             <Zap className="h-3 w-3 mr-1"/>
-            {type === 'gain' ? '+' : '-'}{points.toLocaleString()} pts
+            {type === 'gain' ? '+' : '-'}{points.toLocaleString()}
         </Badge>
     </div>
 )

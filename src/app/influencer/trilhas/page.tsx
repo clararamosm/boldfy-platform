@@ -21,7 +21,7 @@ const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTo
                 <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
                     <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
                         <Zap className="h-3 w-3 mr-1"/>
-                        {points} pts
+                        {points}
                     </Badge>
                      <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
                         <Star className="h-3 w-3 mr-1"/>

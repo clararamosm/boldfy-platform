@@ -74,7 +74,7 @@ const MissionCard = ({ title, description, points, status, period }: { title: st
                 <CardTitle className="font-headline text-lg">{title}</CardTitle>
                  <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
                     <Zap className="h-3 w-3 mr-1"/>
-                    {points} pts
+                    {points}
                 </Badge>
             </div>
              <CardDescription>{description}</CardDescription>

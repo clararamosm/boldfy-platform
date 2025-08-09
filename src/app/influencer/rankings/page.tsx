@@ -18,7 +18,7 @@ const RankingPodium = ({ rank, name, points, avatarSrc, avatarFallback, highligh
         </div>
         <div className="flex flex-col flex-grow justify-center mt-4">
             <h3 className="font-semibold text-lg">{name}</h3>
-            <p className="text-muted-foreground font-bold text-primary">{points.toLocaleString()} pts</p>
+            <p className="text-muted-foreground font-bold text-primary">{points.toLocaleString()}</p>
             <p className="font-bold text-lg">{rank}º Lugar</p>
             {highlight && <Badge className="mt-2 mx-auto">Você</Badge>}
         </div>
@@ -42,7 +42,7 @@ const CategoryRanking = ({ title, icon, data }) => (
                     </Avatar>
                     <div>
                         <p className="font-medium text-sm">{item.name}</p>
-                        <p className="text-xs text-primary font-semibold">{item.points.toLocaleString()} pts</p>
+                        <p className="text-xs text-primary font-semibold">{item.points.toLocaleString()}</p>
                     </div>
                 </div>
             ))}

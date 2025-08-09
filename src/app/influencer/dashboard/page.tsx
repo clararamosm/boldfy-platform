@@ -11,7 +11,7 @@ const MissionItem = ({ title, points, href }) => (
         <span className="font-medium">{title}</span>
         <div className="flex items-center gap-2 text-primary">
             <Zap className="h-4 w-4" />
-            <span className="font-bold">{points} pts</span>
+            <span className="font-bold">{points}</span>
         </div>
     </Link>
 )
