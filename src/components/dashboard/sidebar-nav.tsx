@@ -25,7 +25,7 @@ export function SidebarNav({ items }: SidebarNavProps) {
             asChild
             isActive={pathname.startsWith(item.href)}
             className={cn(
-                "justify-start font-medium", 
+                "justify-start font-medium group-data-[state=collapsed]:w-auto group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:-ml-1", 
                 pathname.startsWith(item.href) ? 
                 "bg-sidebar-accent text-sidebar-accent-foreground" : 
                 "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -33,7 +33,7 @@ export function SidebarNav({ items }: SidebarNavProps) {
           >
             <Link href={item.href}>
               <item.icon className="h-5 w-5" />
-              <span>{item.title}</span>
+              <span className="group-data-[state=collapsed]:hidden">{item.title}</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
