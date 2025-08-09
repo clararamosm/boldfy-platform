@@ -7,18 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Gift, History, Zap, PlusCircle, MinusCircle, Award, TrendingUp, TrendingDown } from "lucide-react";
 import Image from "next/image";
 
-const RewardCard = ({ title, points, image, dataAiHint }) => (
+const RewardCard = ({ title, points }) => (
     <Card>
         <CardHeader className="p-0">
             <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg overflow-hidden">
-                <Image 
-                    src={image}
-                    alt={title}
-                    width={300}
-                    height={168}
-                    className="w-full h-full object-cover"
-                    data-ai-hint={dataAiHint}
-                />
+                <Gift className="h-12 w-12 text-muted-foreground" />
             </div>
         </CardHeader>
         <CardContent className="p-4">
@@ -57,9 +50,11 @@ export default function InfluencerRecompensasPage() {
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Pontos Disponíveis</CardTitle>
-                    <Zap className="h-4 w-4 text-muted-foreground" />
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                        <Zap className="h-4 w-4 text-muted-foreground" />
+                        Pontos Disponíveis
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold font-headline">1.250</div>
@@ -67,9 +62,11 @@ export default function InfluencerRecompensasPage() {
                 </CardContent>
             </Card>
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Pontos Ganhos (Total)</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        Pontos Ganhos (Total)
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold font-headline">6.250</div>
@@ -77,9 +74,11 @@ export default function InfluencerRecompensasPage() {
                 </CardContent>
             </Card>
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Pontos Gastos</CardTitle>
-                    <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                        <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                        Pontos Gastos
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold font-headline">5.000</div>
@@ -87,9 +86,11 @@ export default function InfluencerRecompensasPage() {
                 </CardContent>
             </Card>
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Prêmios Resgatados</CardTitle>
-                    <Award className="h-4 w-4 text-muted-foreground" />
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                        <Award className="h-4 w-4 text-muted-foreground" />
+                        Prêmios Resgatados
+                    </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="text-2xl font-bold font-headline">1</div>
@@ -106,8 +107,8 @@ export default function InfluencerRecompensasPage() {
             </TabsList>
             <TabsContent value="loja" className="mt-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    <RewardCard title="Vale-presente iFood R$50" points={5000} image="https://placehold.co/600x400.png" dataAiHint="food voucher" />
-                    <RewardCard title="Day Off" points={10000} image="https://placehold.co/600x400.png" dataAiHint="vacation relaxation" />
+                    <RewardCard title="Vale-presente iFood R$50" points={5000} />
+                    <RewardCard title="Day Off" points={10000} />
                 </div>
             </TabsContent>
             <TabsContent value="meus-resgates" className="mt-4">
