@@ -5,7 +5,7 @@ import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
 import { db } from '@/lib/firebase-admin'; // Use server-side admin SDK
-import { auth } from 'firebase-admin';
+import { auth as adminAuth } from 'firebase-admin';
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -34,41 +34,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     
     // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
-        // 1. Create Firebase Auth user
-        let userRecord;
-        try {
-            userRecord = await auth().createUser({
-                email: adminEmail,
-                emailVerified: false, // Or true, if you want to auto-verify
-                displayName: adminName,
-                // You might want to generate a random password and send a password reset email
-                disabled: false,
-            });
-        } catch (error: any) {
-            if (error.code === 'auth/email-already-exists') {
-                 console.warn(`Auth user with email ${adminEmail} already exists. Attempting to link.`);
-                 userRecord = await auth().getUserByEmail(adminEmail);
-            } else {
-                throw error; // Re-throw other errors
-            }
-        }
-       
+       const userRecord = await adminAuth.getUserByEmail(adminEmail);
+       if (!userRecord) {
+           throw new Error(`User with email ${adminEmail} not found in Firebase Auth.`);
+       }
 
-        // 2. Create user document in Firestore
         const userRef = db.collection('users').doc(userRecord.uid);
-        transaction.set(userRef, {
-            role: 'admin',
-            companyId: companyId,
-            companyName: companyData?.companyName,
-            points: 0,
-            profile: {
-                name: adminName,
-                email: adminEmail,
-            },
-            createdAt: new Date().toISOString(),
+
+        // 1. Update User status to 'Ativo'
+        transaction.update(userRef, {
+            status: 'Ativo' as const,
         });
         
-        // 3. Update company status to 'Ativa'
+        // 2. Update company status to 'Ativa'
         transaction.update(companyRef, {
             status: 'Ativa' as const,
             stripeCustomerId: session.customer,
@@ -80,7 +58,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.log(`Successfully activated company ${companyId} for admin ${adminEmail}`);
 
     // Here you would typically send a welcome email to the admin
-    // with a link to set their password.
+    // confirming their account is now active.
 }
 
 

@@ -1,18 +1,17 @@
-
+// src/app/actions.ts
 'use server';
 
 import { alignContent } from '@/ai/flows/align-content';
 import { z } from 'zod';
-import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { stripe } from '@/lib/stripe';
 import { headers } from 'next/headers';
+import { auth as adminAuth } from '@/lib/firebase-admin';
 
-// Mock database call to get company profile
+// --- AI Content Alignment Action ---
+
 async function getCompanyProfile(companyId: string): Promise<string> {
-  // In a real application, this would fetch data from Firestore.
-  // For this example, we'll return a mock profile based on the ID.
-  console.log(`Fetching profile for company: ${companyId}`);
   const companyDocRef = doc(db, "companies", companyId);
   const companyDocSnap = await getDoc(companyDocRef);
 
@@ -29,12 +28,9 @@ async function getCompanyProfile(companyId: string): Promise<string> {
         `;
       }
   }
-
-  // Fallback mock profile
   throw new Error('Perfil da empresa não encontrado ou incompleto.');
 }
 
-// Fetches the influencer's personal branding from Firestore.
 async function getPersonalBranding(userId: string): Promise<string> {
     const userDocRef = doc(db, "users", userId);
     const userDocSnap = await getDoc(userDocRef);
@@ -52,7 +48,6 @@ async function getPersonalBranding(userId: string): Promise<string> {
         }
     }
     
-    // Fallback profile if no data is found
     return `
         Tone of Voice: Amigável e Inspirador.
         Expertise: Marketing Digital, Vendas, Liderança.
@@ -61,11 +56,10 @@ async function getPersonalBranding(userId: string): Promise<string> {
     `;
 }
 
-
 const AlignContentActionSchema = z.object({
   content: z.string().min(1, { message: 'O conteúdo não pode estar vazio.' }),
   companyId: z.string(),
-  userId: z.string(), // Added userId to the schema
+  userId: z.string(),
   format: z.enum(['linkedin', 'text-heavy', 'hybrid']),
   length: z.enum(['short', 'medium', 'long']),
 });
@@ -83,7 +77,7 @@ export async function handleAlignContent(
     const validatedData = AlignContentActionSchema.safeParse({
       content: formData.get('content'),
       companyId: formData.get('companyId'),
-      userId: formData.get('userId'), // Get userId from formData
+      userId: formData.get('userId'),
       format: formData.get('format'),
       length: formData.get('length'),
     });
@@ -93,9 +87,8 @@ export async function handleAlignContent(
     }
 
     const { content, companyId, userId, format, length } = validatedData.data;
-
     const companyProfile = await getCompanyProfile(companyId);
-    const personalBranding = await getPersonalBranding(userId); // Pass the dynamic user ID
+    const personalBranding = await getPersonalBranding(userId);
 
     const result = await alignContent({ 
         content, 
@@ -107,19 +100,102 @@ export async function handleAlignContent(
 
     return { alignedContent: result.alignedContent, error: null };
   } catch (error) {
-    console.error(error);
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
     return { error: `Ocorreu um erro ao alinhar o conteúdo: ${errorMessage}`, alignedContent: null };
   }
 }
 
-// --- Stripe Checkout Action ---
+// --- Company & Admin Onboarding Action (by Master) ---
+
+const InviteAdminSchema = z.object({
+  companyName: z.string().min(1, 'Nome da empresa é obrigatório.'),
+  adminName: z.string().min(1, 'Nome do admin é obrigatório.'),
+  adminEmail: z.string().email('E-mail inválido.'),
+  licenses: z.coerce.number().int().positive('Número de licenças deve ser positivo.'),
+});
+
+type InviteAdminState = {
+    success?: boolean;
+    error?: string;
+};
+
+export async function inviteAdmin(prevState: InviteAdminState, formData: FormData): Promise<InviteAdminState> {
+    const validatedData = InviteAdminSchema.safeParse({
+        companyName: formData.get('companyName'),
+        adminName: formData.get('adminName'),
+        adminEmail: formData.get('adminEmail'),
+        licenses: formData.get('licenses'),
+    });
+
+    if (!validatedData.success) {
+        return { error: validatedData.error.errors.map(e => e.message).join(', ') };
+    }
+    
+    const { companyName, adminName, adminEmail, licenses } = validatedData.data;
+
+    try {
+        const companyRef = doc(collection(db, "companies"));
+        const companyId = companyRef.id;
+
+        // 1. Create Auth user (will be passwordless initially, admin will set password)
+        let userRecord;
+        try {
+            userRecord = await adminAuth.createUser({
+                email: adminEmail,
+                emailVerified: false,
+                displayName: adminName,
+                disabled: false,
+            });
+            // TODO: In a real app, send a password reset email here.
+            // await adminAuth.generatePasswordResetLink(adminEmail);
+        } catch (error: any) {
+             if (error.code === 'auth/email-already-exists') {
+                return { error: `Um usuário com o e-mail ${adminEmail} já existe.` };
+            }
+            throw error;
+        }
+
+        // 2. Create Company document with 'Inativa' status
+        await setDoc(companyRef, {
+            companyName,
+            adminProfile: { name: adminName, email: adminEmail },
+            licenses,
+            status: 'Inativa' as const,
+            createdAt: serverTimestamp(),
+            stripeCustomerId: null,
+            stripeSubscriptionId: null,
+        });
+
+        // 3. Create User document
+        const userDocRef = doc(db, "users", userRecord.uid);
+        await setDoc(userDocRef, {
+            role: 'admin',
+            companyId: companyId,
+            companyName: companyName,
+            points: 0,
+            status: 'Pendente' as const,
+            profile: { name: adminName, email: adminEmail },
+            createdAt: serverTimestamp(),
+        });
+
+        console.log(`Empresa "${companyName}" e Admin "${adminEmail}" criados com status inativo.`);
+        return { success: true };
+
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+        return { error: `Erro ao criar empresa: ${errorMessage}` };
+    }
+}
+
+
+// --- Stripe Checkout Action (by Company Admin) ---
 
 const CreateCheckoutSessionSchema = z.object({
+  companyId: z.string(),
   companyName: z.string(),
-  adminName: z.string(),
   adminEmail: z.string().email(),
   licenses: z.coerce.number().int().positive(),
+  adminName: z.string()
 });
 
 type CheckoutState = {
@@ -129,10 +205,11 @@ type CheckoutState = {
 
 export async function createCheckoutSession(prevState: CheckoutState, formData: FormData): Promise<CheckoutState> {
     const validatedData = CreateCheckoutSessionSchema.safeParse({
+        companyId: formData.get('companyId'),
         companyName: formData.get('companyName'),
-        adminName: formData.get('adminName'),
         adminEmail: formData.get('adminEmail'),
         licenses: formData.get('licenses'),
+        adminName: formData.get('adminName')
     });
 
     if(!validatedData.success) {
@@ -143,26 +220,10 @@ export async function createCheckoutSession(prevState: CheckoutState, formData: 
         return { error: 'A variável de ambiente STRIPE_PRICE_ID não está configurada.' };
     }
 
-    const { companyName, adminName, adminEmail, licenses } = validatedData.data;
+    const { companyId, companyName, adminEmail, licenses, adminName } = validatedData.data;
     const origin = headers().get('origin');
     
     try {
-        // Create a pre-company document in Firestore to hold the data temporarily
-        // The webhook handler will later update this to 'active' and create the admin user.
-        const pendingCompanyRef = await addDoc(collection(db, "companies"), {
-            companyName,
-            adminProfile: {
-                name: adminName,
-                email: adminEmail,
-            },
-            licenses,
-            status: 'pending_payment' as const,
-            createdAt: serverTimestamp(),
-            stripeCustomerId: null,
-            stripeSubscriptionId: null,
-        });
-
-        // Create a Stripe Checkout Session
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
@@ -172,18 +233,15 @@ export async function createCheckoutSession(prevState: CheckoutState, formData: 
                 },
             ],
             mode: 'subscription',
-            success_url: `${origin}/master/empresas?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${origin}/master/empresas?payment_canceled=true`,
-            // Pass the ID of the Firestore document to the webhook handler
-            // This is crucial for linking the payment to the company.
+            success_url: `${origin}/admin/configuracoes?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${origin}/admin/configuracoes?payment_canceled=true`,
             metadata: {
-                companyId: pendingCompanyRef.id,
+                companyId: companyId,
                 companyName,
                 adminEmail,
                 adminName,
                 licenses: licenses.toString()
             },
-             // Pass customer email to prefill Stripe checkout page
             customer_email: adminEmail
         });
 
@@ -194,7 +252,6 @@ export async function createCheckoutSession(prevState: CheckoutState, formData: 
         return { sessionId: session.id };
 
     } catch (error) {
-        console.error(error);
         const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
         return { error: `Erro ao criar checkout: ${errorMessage}` };
     }

@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, orderBy } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,20 +18,17 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { createCheckoutSession } from '@/app/actions';
-import { getStripe } from '@/lib/stripe-client';
-import { useSearchParams } from 'next/navigation';
+import { inviteAdmin } from '@/app/actions';
 
 type Company = {
     id: string;
     companyName: string;
-    status: 'Ativa' | 'Inativa' | 'pending_payment';
+    status: 'Ativa' | 'Inativa';
     licenses: number;
     adminProfile: { email: string; name: string; };
     createdAt: any;
 };
 
-// Sub-component to use useFormStatus
 function CompanyFormContent() {
     const { pending } = useFormStatus();
     return (
@@ -56,9 +53,9 @@ function CompanyFormContent() {
     );
 }
 
-const CompanyForm = ({ formRef, formAction }: { formRef: React.RefObject<HTMLFormElement>, formAction: (payload: FormData) => void }) => {
+const CompanyForm = ({ formAction }: { formAction: (payload: FormData) => void }) => {
     return (
-        <form ref={formRef} action={formAction} id="company-form">
+        <form action={formAction} id="company-form">
             <CompanyFormContent />
         </form>
     );
@@ -69,18 +66,15 @@ export default function MasterEmpresasPage() {
     const { toast } = useToast();
     const [companies, setCompanies] = useState<Company[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const formRef = useRef<HTMLFormElement>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-    const [checkoutState, formAction] = useActionState(createCheckoutSession, { error: undefined, sessionId: undefined });
+    const [inviteState, formAction] = useActionState(inviteAdmin, { error: undefined, success: undefined });
 
-    // Handle toast notifications for payment status
-    const searchParams = useSearchParams();
     const fetchCompanies = async () => {
         setIsLoading(true);
         try {
             const companiesQuery = collection(db, "companies");
-            const querySnapshot = await getDocs(companiesQuery);
+            const querySnapshot = await getDocs(query(companiesQuery, orderBy("createdAt", "desc")));
             const companiesList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
             setCompanies(companiesList);
         } catch (error) {
@@ -90,46 +84,24 @@ export default function MasterEmpresasPage() {
             setIsLoading(false);
         }
     };
-
+    
     useEffect(() => {
-        if (searchParams.get('payment_success')) {
+        if(inviteState.success) {
             toast({
-                title: 'Pagamento Iniciado!',
-                description: 'A nova empresa será ativada assim que o pagamento for confirmado.',
+                title: 'Empresa e Admin Criados!',
+                description: 'Um convite (simulado) foi enviado para o admin. Eles precisarão fazer login e pagar para ativar a conta.',
             });
-            fetchCompanies(); // Refresh list
+            setIsDialogOpen(false);
+            fetchCompanies();
         }
-        if (searchParams.get('payment_canceled')) {
-             toast({
-                variant: 'destructive',
-                title: 'Pagamento Cancelado',
-                description: 'O processo de criação da empresa foi cancelado.',
-            });
-        }
-    }, [searchParams, toast]);
-
-    // Handle Stripe redirect and errors
-    useEffect(() => {
-        if (checkoutState.sessionId) {
-            const redirectToCheckout = async () => {
-                const stripe = await getStripe();
-                if (!stripe) {
-                    toast({ variant: 'destructive', title: 'Erro', description: 'Stripe.js não foi carregado.' });
-                    return;
-                }
-                setIsDialogOpen(false); // Close dialog before redirecting
-                await stripe.redirectToCheckout({ sessionId: checkoutState.sessionId! });
-            }
-            redirectToCheckout();
-        }
-        if (checkoutState.error) {
+         if (inviteState.error) {
             toast({
                 variant: 'destructive',
-                title: 'Erro no Checkout',
-                description: checkoutState.error,
+                title: 'Erro ao Criar Empresa',
+                description: inviteState.error,
             });
         }
-    }, [checkoutState, toast]);
+    }, [inviteState, toast]);
 
     useEffect(() => {
         fetchCompanies();
@@ -161,8 +133,6 @@ export default function MasterEmpresasPage() {
                 return <Badge variant="default">Ativa</Badge>;
             case 'Inativa':
                 return <Badge variant="destructive">Inativa</Badge>;
-            case 'pending_payment':
-                return <Badge variant="secondary">Pagamento Pendente</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
         }
@@ -176,21 +146,18 @@ export default function MasterEmpresasPage() {
             <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                     <CardTitle className="font-headline">Gerenciamento de Empresas</CardTitle>
-                    <CardDescription>Adicione novas empresas clientes. O admin será redirecionado para o pagamento.</CardDescription>
+                    <CardDescription>Crie um novo ambiente de empresa e convide um administrador.</CardDescription>
                 </div>
                  <ActionDialog
                     title="Adicionar Nova Empresa"
-                    description="Preencha os dados da nova empresa. Você será redirecionado para o Stripe para efetuar o pagamento da assinatura."
+                    description="Preencha os dados para criar uma nova empresa. O administrador receberá um convite para ativar a conta."
                     trigger={addCompanyButton}
-                    actionText="Ir para Pagamento"
+                    actionText="Criar e Convidar Admin"
                     formId="company-form"
                     open={isDialogOpen}
                     onOpenChange={setIsDialogOpen}
                 >
-                    <CompanyForm 
-                        formRef={formRef}
-                        formAction={formAction}
-                    />
+                    <CompanyForm formAction={formAction} />
                 </ActionDialog>
             </CardHeader>
             <CardContent>
@@ -239,7 +206,7 @@ export default function MasterEmpresasPage() {
                                                 <DropdownMenuItem asChild disabled={company.status !== 'Ativa'}>
                                                     <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleToggleStatus(company)} disabled={company.status === 'pending_payment'}>
+                                                <DropdownMenuItem onClick={() => handleToggleStatus(company)}>
                                                     {company.status === 'Ativa' ? 'Desativar' : 'Ativar'}
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
