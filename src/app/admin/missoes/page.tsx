@@ -1,11 +1,12 @@
 
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon, ChevronDown, GripVertical } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon, ChevronDown, GripVertical, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
@@ -15,7 +16,133 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
+type Mission = {
+  id: string;
+  name: string;
+  points: number;
+  participants: string;
+  status: 'Fixa' | 'Ativa' | 'Agendada' | 'Passada';
+  period?: string;
+}
+
+const TimedMissionForm = ({ isSubmitting = false }) => (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="mission-name">Nome da Missão</Label>
+        <Input id="mission-name" placeholder="Ex: Compartilhar post no LinkedIn" disabled={isSubmitting} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="mission-description">Descrição</Label>
+        <Textarea id="mission-description" placeholder="Descreva o que o colaborador precisa fazer." disabled={isSubmitting} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="mission-points">Pontos</Label>
+        <Input id="mission-points" type="number" placeholder="Ex: 100" disabled={isSubmitting} />
+      </div>
+       <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+            <Label htmlFor="start-date">Data de Início</Label>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSubmitting}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        <span>Selecione uma data</span>
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" />
+                </PopoverContent>
+            </Popover>
+        </div>
+        <div className="space-y-2">
+            <Label htmlFor="end-date">Data de Término</Label>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSubmitting}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        <span>Selecione uma data</span>
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" />
+                </PopoverContent>
+            </Popover>
+        </div>
+      </div>
+    </>
+  );
+
+  const FixedMissionForm = ({ isSubmitting = false }) => (
+     <>
+      <div className="space-y-2">
+        <Label htmlFor="fixed-mission-name">Nome da Missão</Label>
+        <Input id="fixed-mission-name" placeholder="Ex: Atualize seu banner do LinkedIn" disabled={isSubmitting}/>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="fixed-mission-description">Descrição</Label>
+        <Textarea id="fixed-mission-description" placeholder="Descreva o que o colaborador precisa fazer." disabled={isSubmitting} />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="fixed-mission-points">Pontos</Label>
+        <Input id="fixed-mission-points" type="number" placeholder="Ex: 50" disabled={isSubmitting}/>
+      </div>
+    </>
+  );
+
+  const SubmissionsView = () => (
+    <p className="text-sm text-muted-foreground">Nenhum envio para esta missão ainda.</p>
+  );
+
+  const TableSkeleton = ({ cols }) => (
+    <TableRow>
+      <TableCell colSpan={cols} className="h-24 text-center">
+        <div className="flex justify-center items-center">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando missões...
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+
+
 export default function AdminMissoesPage() {
+  const [fixedMissions, setFixedMissions] = useState<Mission[]>([]);
+  const [timedMissions, setTimedMissions] = useState<Mission[]>([]);
+  const [pastMissions, setPastMissions] = useState<Mission[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchMissions = async () => {
+      setIsLoading(true);
+      // MOCK DATA - In a real app, fetch from Firestore
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const mockFixed: Mission[] = [
+        { id: 'fix1', name: 'Atualize seu banner do LinkedIn', points: 50, participants: '45 / 45', status: 'Fixa' },
+      ];
+      const mockTimed: Mission[] = [
+        { id: 'time1', name: 'Compartilhar post no LinkedIn', points: 100, participants: '32 / 45', status: 'Ativa', period: '15/07 - 22/07' },
+        { id: 'time2', name: 'Gravar vídeo sobre novo feature', points: 250, participants: '0 / 45', status: 'Agendada', period: '25/07 - 01/08' },
+      ];
+      const mockPast: Mission[] = [
+        { id: 'past1', name: 'Post sobre o Dia do Programador', points: 100, participants: '41 / 45', status: 'Passada', period: '01/07 - 08/07' },
+      ];
+      setFixedMissions(mockFixed);
+      setTimedMissions(mockTimed);
+      setPastMissions(mockPast);
+      setIsLoading(false);
+    }
+    fetchMissions();
+  }, []);
+
+  const handleAction = async () => {
+    setIsSubmitting(true);
+    console.log("Submitting form...");
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async
+    setIsSubmitting(false);
+  }
+
+  // --- RENDER ---
+
   const createTimedMissionButton = (
     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
       Criar Missão Padrão
@@ -47,74 +174,6 @@ export default function AdminMissoesPage() {
     );
 
 
-  const timedMissionForm = (
-    <>
-      <div className="space-y-2">
-        <Label htmlFor="mission-name">Nome da Missão</Label>
-        <Input id="mission-name" placeholder="Ex: Compartilhar post no LinkedIn" />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="mission-description">Descrição</Label>
-        <Textarea id="mission-description" placeholder="Descreva o que o colaborador precisa fazer." />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="mission-points">Pontos</Label>
-        <Input id="mission-points" type="number" placeholder="Ex: 100" />
-      </div>
-       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-            <Label htmlFor="start-date">Data de Início</Label>
-            <Popover>
-                <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        <span>Selecione uma data</span>
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" />
-                </PopoverContent>
-            </Popover>
-        </div>
-        <div className="space-y-2">
-            <Label htmlFor="end-date">Data de Término</Label>
-            <Popover>
-                <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        <span>Selecione uma data</span>
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" />
-                </PopoverContent>
-            </Popover>
-        </div>
-      </div>
-    </>
-  );
-
-  const fixedMissionForm = (
-     <>
-      <div className="space-y-2">
-        <Label htmlFor="fixed-mission-name">Nome da Missão</Label>
-        <Input id="fixed-mission-name" placeholder="Ex: Atualize seu banner do LinkedIn" />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="fixed-mission-description">Descrição</Label>
-        <Textarea id="fixed-mission-description" placeholder="Descreva o que o colaborador precisa fazer." />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="fixed-mission-points">Pontos</Label>
-        <Input id="fixed-mission-points" type="number" placeholder="Ex: 50" />
-      </div>
-    </>
-  );
-
-  const submissionsView = (
-    <p className="text-sm text-muted-foreground">Nenhum envio para esta missão ainda.</p>
-  );
-
   return (
     <>
       <Header title="Missões" />
@@ -123,7 +182,7 @@ export default function AdminMissoesPage() {
              <div/>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button size="sm">
+                    <Button size="sm" disabled={isSubmitting}>
                         <PlusCircle className="mr-2 h-4 w-4" />
                         <span>Criar Missão</span>
                         <ChevronDown className="ml-2 h-4 w-4" />
@@ -134,17 +193,19 @@ export default function AdminMissoesPage() {
                       title="Criar Missão Padrão"
                       description="Configure uma nova missão com data de início e fim."
                       trigger={createTimedMissionButton}
-                      actionText="Salvar Missão"
+                      actionText={isSubmitting ? "Salvando..." : "Salvar Missão"}
+                      onAction={handleAction}
                     >
-                      {timedMissionForm}
+                      <TimedMissionForm isSubmitting={isSubmitting} />
                     </ActionDialog>
                     <ActionDialog
                       title="Criar Missão Fixa"
                       description="Configure uma missão que ficará sempre ativa."
                       trigger={createFixedMissionButton}
-                      actionText="Salvar Missão"
+                      actionText={isSubmitting ? "Salvando..." : "Salvar Missão"}
+                      onAction={handleAction}
                     >
-                      {fixedMissionForm}
+                      <FixedMissionForm isSubmitting={isSubmitting} />
                     </ActionDialog>
                 </DropdownMenuContent>
             </DropdownMenu>
@@ -167,32 +228,34 @@ export default function AdminMissoesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                     <TableRow>
-                      <TableCell className="cursor-grab"><GripVertical className="h-5 w-5 text-muted-foreground" /></TableCell>
-                      <TableCell className="font-medium">Atualize seu banner do LinkedIn</TableCell>
-                      <TableCell>50</TableCell>
-                      <TableCell><Badge variant="outline">Fixa</Badge></TableCell>
-                      <TableCell>45 / 45</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                             <ActionDialog
-                              title="Editar Missão Fixa"
-                              description="Atualize os detalhes desta missão."
-                              trigger={editFixedMissionButton}
-                              actionText="Salvar Alterações"
-                            >
-                              {fixedMissionForm}
-                            </ActionDialog>
-                            <DropdownMenuItem>Desativar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+                     {isLoading ? <TableSkeleton cols={6} /> : fixedMissions.map((mission) => (
+                        <TableRow key={mission.id}>
+                          <TableCell className="cursor-grab"><GripVertical className="h-5 w-5 text-muted-foreground" /></TableCell>
+                          <TableCell className="font-medium">{mission.name}</TableCell>
+                          <TableCell>{mission.points}</TableCell>
+                          <TableCell><Badge variant="outline">{mission.status}</Badge></TableCell>
+                          <TableCell>{mission.participants}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                 <ActionDialog
+                                  title="Editar Missão Fixa"
+                                  description="Atualize os detalhes desta missão."
+                                  trigger={editFixedMissionButton}
+                                  actionText="Salvar Alterações"
+                                >
+                                  <FixedMissionForm isSubmitting={isSubmitting} />
+                                </ActionDialog>
+                                <DropdownMenuItem>Desativar</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                     ))}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -216,66 +279,48 @@ export default function AdminMissoesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Compartilhar post no LinkedIn</TableCell>
-                      <TableCell>15/07 - 22/07</TableCell>
-                      <TableCell>100</TableCell>
-                      <TableCell><Badge>Ativa</Badge></TableCell>
-                      <TableCell>32 / 45</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <ActionDialog
-                                title="Ver Envios"
-                                description="Veja as comprovações enviadas pelos colaboradores."
-                                trigger={viewSubmissionsButton}
-                                actionText="Fechar"
+                    {isLoading ? <TableSkeleton cols={6} /> : timedMissions.map((mission) => (
+                        <TableRow key={mission.id}>
+                          <TableCell className="font-medium">{mission.name}</TableCell>
+                          <TableCell>{mission.period}</TableCell>
+                          <TableCell>{mission.points}</TableCell>
+                          <TableCell>
+                            <Badge variant={mission.status === 'Ativa' ? 'default' : 'secondary'} className={mission.status === 'Agendada' ? 'bg-primary/80 text-primary-foreground' : ''}>
+                              {mission.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{mission.participants}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {mission.status === 'Ativa' && (
+                                  <ActionDialog
+                                    title="Ver Envios"
+                                    description="Veja as comprovações enviadas pelos colaboradores."
+                                    trigger={viewSubmissionsButton}
+                                    actionText="Fechar"
+                                    >
+                                    <SubmissionsView />
+                                  </ActionDialog>
+                                )}
+                                 <ActionDialog
+                                  title="Editar Missão"
+                                  description="Atualize os detalhes desta missão."
+                                  trigger={editActiveMissionButton}
+                                  actionText="Salvar Alterações"
                                 >
-                                {submissionsView}
-                            </ActionDialog>
-                             <ActionDialog
-                              title="Editar Missão"
-                              description="Atualize os detalhes desta missão."
-                              trigger={editActiveMissionButton}
-                              actionText="Salvar Alterações"
-                            >
-                              {timedMissionForm}
-                            </ActionDialog>
-                            <DropdownMenuItem>Desativar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                     <TableRow>
-                      <TableCell className="font-medium">Gravar vídeo sobre novo feature</TableCell>
-                       <TableCell>25/07 - 01/08</TableCell>
-                      <TableCell>250</TableCell>
-                      <TableCell><Badge className="bg-primary/80 text-primary-foreground">Agendada</Badge></TableCell>
-                      <TableCell>0 / 45</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                           <DropdownMenuContent align="end">
-                             <ActionDialog
-                              title="Editar Missão"
-                              description="Atualize os detalhes desta missão."
-                              trigger={editActiveMissionButton}
-                              actionText="Salvar Alterações"
-                            >
-                              {timedMissionForm}
-                            </ActionDialog>
-                            <DropdownMenuItem>Cancelar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+                                  <TimedMissionForm isSubmitting={isSubmitting}/>
+                                </ActionDialog>
+                                <DropdownMenuItem>{mission.status === 'Agendada' ? 'Cancelar' : 'Desativar'}</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -299,23 +344,25 @@ export default function AdminMissoesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow className="text-muted-foreground">
-                      <TableCell className="font-medium">Post sobre o Dia do Programador</TableCell>
-                      <TableCell>01/07 - 08/07</TableCell>
-                      <TableCell>100</TableCell>
-                      <TableCell><Badge variant="outline">Passada</Badge></TableCell>
-                      <TableCell>41 / 45</TableCell>
-                      <TableCell>
-                         <ActionDialog
-                            title="Ver Envios"
-                            description="Veja as comprovações enviadas pelos colaboradores."
-                            trigger={<Button variant="ghost" size="sm">Ver Envios</Button>}
-                            actionText="Fechar"
-                            >
-                            {submissionsView}
-                        </ActionDialog>
-                      </TableCell>
-                    </TableRow>
+                     {isLoading ? <TableSkeleton cols={6} /> : pastMissions.map((mission) => (
+                        <TableRow key={mission.id} className="text-muted-foreground">
+                          <TableCell className="font-medium">{mission.name}</TableCell>
+                          <TableCell>{mission.period}</TableCell>
+                          <TableCell>{mission.points}</TableCell>
+                          <TableCell><Badge variant="outline">{mission.status}</Badge></TableCell>
+                          <TableCell>{mission.participants}</TableCell>
+                          <TableCell>
+                             <ActionDialog
+                                title="Ver Envios"
+                                description="Veja as comprovações enviadas pelos colaboradores."
+                                trigger={<Button variant="ghost" size="sm">Ver Envios</Button>}
+                                actionText="Fechar"
+                                >
+                                <SubmissionsView />
+                            </ActionDialog>
+                          </TableCell>
+                        </TableRow>
+                     ))}
                   </TableBody>
                 </Table>
               </CardContent>
