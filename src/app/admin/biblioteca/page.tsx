@@ -13,6 +13,7 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from '@/hooks/use-toast';
 
 // In a real app, this type would likely be defined in a shared types file.
 type Asset = {
@@ -65,6 +66,7 @@ export default function AdminBibliotecaPage() {
     const [assets, setAssets] = useState<Asset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { toast } = useToast();
 
     // Fetch assets from Firestore
     useEffect(() => {
@@ -78,30 +80,47 @@ export default function AdminBibliotecaPage() {
                     { id: "2", name: "Guia de Tom de Voz", type: "application/pdf", category: "Assets de Marca", uploadDate: "2024-06-20", fileUrl: "#" },
                     { id: "3", name: "Ebook sobre IA", type: "application/pdf", category: "Materiais Ricos", uploadDate: "2024-07-18", fileUrl: "#" },
                 ];
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 setAssets(mockAssets);
             } catch (error) {
                 console.error("Error fetching assets: ", error);
+                toast({ variant: "destructive", title: "Erro ao buscar ativos."});
             } finally {
                 setIsLoading(false);
             }
         };
         fetchAssets();
-    }, []);
+    }, [toast]);
 
-    // Placeholder for handle upload/edit logic
     const handleAction = async (assetId?: string) => {
         setIsSubmitting(true);
         // TODO: Implement file upload to Storage and data saving to Firestore
-        console.log("Submitting form...", assetId);
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async operation
-        setIsSubmitting(false);
-        // You would typically close the dialog here and show a toast
+        console.log("Submitting form...", assetId ? `Editing ${assetId}`: 'Creating new');
+        try {
+            await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async operation
+            toast({
+                title: "Sucesso!",
+                description: `Ativo ${assetId ? 'atualizado' : 'criado'} com sucesso.`,
+            });
+            // Here you would refetch the assets list
+        } catch (error) {
+            console.error("Error submitting asset:", error);
+            toast({ variant: "destructive", title: "Erro ao salvar ativo."});
+        } finally {
+            setIsSubmitting(false);
+        }
     };
-
-    // --- RENDER ---
     
+    const handleDelete = async (assetId: string) => {
+        // TODO: Implement file deletion from Storage and data from Firestore
+        toast({
+            title: `Ativo ${assetId} excluído.`,
+            description: "A exclusão foi simulada com sucesso.",
+        });
+    }
+
     const uploadButton = (
-        <Button size="sm">
+        <Button size="sm" disabled={isSubmitting}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Novo Upload
         </Button>
@@ -160,6 +179,12 @@ export default function AdminBibliotecaPage() {
                             </div>
                         </TableCell>
                     </TableRow>
+                ) : assets.length === 0 ? (
+                     <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8">
+                           Nenhum ativo encontrado.
+                        </TableCell>
+                    </TableRow>
                 ) : assets.map((asset) => (
                     <TableRow key={asset.id}>
                         <TableCell className="font-medium flex items-center gap-2">
@@ -177,9 +202,13 @@ export default function AdminBibliotecaPage() {
                                 <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem>Baixar</DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <a href={asset.fileUrl} target="_blank" rel="noopener noreferrer">Baixar</a>
+                                </DropdownMenuItem>
                                 <EditAssetButton asset={asset} />
-                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(asset.id)}>
+                                    Excluir
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
