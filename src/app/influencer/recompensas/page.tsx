@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Gift, History, Zap, PlusCircle, MinusCircle } from "lucide-react";
+import { Gift, History, Zap, PlusCircle, MinusCircle, Award, TrendingUp, TrendingDown } from "lucide-react";
 import Image from "next/image";
 
 const RewardCard = ({ title, points, image, dataAiHint }) => (
@@ -55,15 +55,48 @@ export default function InfluencerRecompensasPage() {
     <>
       <Header title="Recompensas" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
-        <Card className="bg-primary text-primary-foreground">
-            <CardContent className="p-4 flex justify-between items-center">
-                <div>
-                    <p className="text-sm">Meus Pontos</p>
-                    <p className="text-3xl font-bold font-headline">1,250</p>
-                </div>
-                <Gift className="h-10 w-10 text-primary-foreground/50"/>
-            </CardContent>
-        </Card>
+         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Pontos Disponíveis</CardTitle>
+                    <Zap className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold font-headline">1.250</div>
+                     <p className="text-xs text-muted-foreground">Pronto para resgatar</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Pontos Ganhos (Total)</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold font-headline">6.250</div>
+                     <p className="text-xs text-muted-foreground">Total acumulado</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Pontos Gastos</CardTitle>
+                    <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold font-headline">5.000</div>
+                    <p className="text-xs text-muted-foreground">Em resgates de prêmios</p>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium">Prêmios Resgatados</CardTitle>
+                    <Award className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    <div className="text-2xl font-bold font-headline">1</div>
+                     <p className="text-xs text-muted-foreground">Total de resgates</p>
+                </CardContent>
+            </Card>
+        </div>
 
         <Tabs defaultValue="loja">
             <TabsList>
