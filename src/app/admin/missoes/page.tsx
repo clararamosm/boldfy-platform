@@ -10,6 +10,7 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function AdminMissoesPage() {
   const createMissionButton = (
@@ -32,6 +33,19 @@ export default function AdminMissoesPage() {
       <div className="space-y-2">
         <Label htmlFor="mission-points">Pontos</Label>
         <Input id="mission-points" type="number" placeholder="Ex: 100" />
+      </div>
+      <div className="space-y-2">
+        <Label>Duração da Missão</Label>
+        <RadioGroup defaultValue="7d" className="flex items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="7d" id="d7" />
+            <Label htmlFor="d7" className="font-normal">7 dias</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="14d" id="d14" />
+            <Label htmlFor="d14" className="font-normal">14 dias</Label>
+          </div>
+        </RadioGroup>
       </div>
     </>
   );
