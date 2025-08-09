@@ -9,6 +9,7 @@ import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { TrailForm, Trail } from "@/components/dashboard/trail-form";
+import { Badge } from "@/components/ui/badge";
 
 // Adicionando novas propriedades para as métricas
 type GlobalTrail = Trail & {
@@ -16,9 +17,14 @@ type GlobalTrail = Trail & {
     uniqueUsers: number;
 }
 
-const globalTrails: GlobalTrail[] = [
+const activeGlobalTrails: GlobalTrail[] = [
     { name: "Cultura da Empresa 101", topics: 4, companies: 12, creationDate: "2023-02-10", status: 'Ativa', description: "Uma introdução à cultura da empresa.", views: 1250, uniqueUsers: 450 },
     { name: "Dominando Nossos Produtos", topics: 3, companies: 8, creationDate: "2023-04-05", status: 'Ativa', description: "Conheça a fundo os produtos que oferecemos.", views: 890, uniqueUsers: 320 },
+];
+
+const inactiveGlobalTrails: GlobalTrail[] = [
+    { name: "Guia de Boas Práticas em Redes Sociais", topics: 5, companies: 0, creationDate: "2023-08-15", status: 'Arquivada', description: "Um guia completo para colaboradores.", views: 2300, uniqueUsers: 950 },
+    { name: "Introdução à IA Generativa", topics: 2, companies: 0, creationDate: "2024-01-20", status: 'Rascunho', description: "Primeiros passos com IA.", views: 0, uniqueUsers: 0 },
 ];
 
 const EditTrailButton = ({ trail }: { trail: Trail }) => (
@@ -44,7 +50,7 @@ export default function MasterConteudoGlobalPage() {
   return (
     <>
       <Header title="Conteúdo Global" />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
+      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -74,7 +80,7 @@ export default function MasterConteudoGlobalPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {globalTrails.map((trail) => (
+                {activeGlobalTrails.map((trail) => (
                     <TableRow key={trail.name}>
                         <TableCell className="font-medium">{trail.name}</TableCell>
                         <TableCell>{trail.topics}</TableCell>
@@ -88,7 +94,6 @@ export default function MasterConteudoGlobalPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <EditTrailButton trail={trail} />
-                                <DropdownMenuItem>Ver Empresas</DropdownMenuItem>
                                 <DropdownMenuItem className="text-destructive">Arquivar</DropdownMenuItem>
                             </DropdownMenuContent>
                             </DropdownMenu>
@@ -98,6 +103,52 @@ export default function MasterConteudoGlobalPage() {
               </TableBody>
             </Table>
           </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+              <CardTitle className="font-headline">Trilhas Inativas</CardTitle>
+              <CardDescription>Gerencie trilhas arquivadas ou em rascunho.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Nome da Trilha</TableHead>
+                            <TableHead>Tópicos</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Data de Criação</TableHead>
+                            <TableHead><span className="sr-only">Ações</span></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {inactiveGlobalTrails.map((trail) => (
+                            <TableRow key={trail.name} className="text-muted-foreground">
+                                <TableCell className="font-medium">{trail.name}</TableCell>
+                                <TableCell>{trail.topics}</TableCell>
+                                <TableCell>
+                                    <Badge variant={trail.status === 'Arquivada' ? 'outline' : 'secondary'}>
+                                        {trail.status}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>{trail.creationDate}</TableCell>
+                                <TableCell>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <EditTrailButton trail={trail} />
+                                            <DropdownMenuItem>Ativar</DropdownMenuItem>
+                                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
         </Card>
       </main>
     </>
