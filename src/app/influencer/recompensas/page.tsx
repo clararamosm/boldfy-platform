@@ -1,9 +1,10 @@
+// src/app/influencer/recompensas/page.tsx
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Gift, History } from "lucide-react";
+import { Gift, History, Zap, PlusCircle, MinusCircle } from "lucide-react";
 import Image from "next/image";
 
 const RewardCard = ({ title, points, image, dataAiHint }) => (
@@ -24,10 +25,29 @@ const RewardCard = ({ title, points, image, dataAiHint }) => (
             <CardTitle className="text-base font-semibold">{title}</CardTitle>
         </CardContent>
         <CardFooter className="flex justify-between items-center">
-            <div className="font-bold text-primary">{points.toLocaleString()} pts</div>
+             <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
+                <Zap className="h-3 w-3 mr-1"/>
+                {points.toLocaleString()} pts
+            </Badge>
             <Button>Resgatar</Button>
         </CardFooter>
     </Card>
+)
+
+const PointHistoryItem = ({ icon, title, date, points, type }) => (
+     <div className="flex justify-between items-center p-3 rounded-lg hover:bg-muted/50">
+        <div className="flex items-center gap-3">
+            {icon}
+            <div>
+                <p className="font-medium">{title}</p>
+                <p className="text-sm text-muted-foreground">{date}</p>
+            </div>
+        </div>
+         <Badge variant="secondary" className={`${type === 'gain' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} whitespace-nowrap shrink-0`}>
+            <Zap className="h-3 w-3 mr-1"/>
+            {type === 'gain' ? '+' : '-'}{points.toLocaleString()} pts
+        </Badge>
+    </div>
 )
 
 export default function InfluencerRecompensasPage() {
@@ -48,7 +68,8 @@ export default function InfluencerRecompensasPage() {
         <Tabs defaultValue="loja">
             <TabsList>
                 <TabsTrigger value="loja">Loja</TabsTrigger>
-                <TabsTrigger value="historico">Meus Resgates</TabsTrigger>
+                <TabsTrigger value="meus-resgates">Meus Resgates</TabsTrigger>
+                <TabsTrigger value="historico-pontos">Histórico de Pontos</TabsTrigger>
             </TabsList>
             <TabsContent value="loja" className="mt-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -56,12 +77,12 @@ export default function InfluencerRecompensasPage() {
                     <RewardCard title="Day Off" points={10000} image="https://placehold.co/600x400.png" dataAiHint="vacation relaxation" />
                 </div>
             </TabsContent>
-            <TabsContent value="historico" className="mt-4">
+            <TabsContent value="meus-resgates" className="mt-4">
                 <Card>
                     <CardHeader>
                         <CardTitle className="font-headline flex items-center gap-2">
                            <History className="h-5 w-5 text-muted-foreground" />
-                           Histórico de Resgates
+                           Meus Resgates
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -72,6 +93,40 @@ export default function InfluencerRecompensasPage() {
                             </div>
                             <Badge variant="destructive">Pendente</Badge>
                         </div>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+             <TabsContent value="historico-pontos" className="mt-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="font-headline flex items-center gap-2">
+                           <History className="h-5 w-5 text-muted-foreground" />
+                           Histórico de Pontos
+                        </CardTitle>
+                         <CardDescription>Acompanhe aqui seus pontos ganhos e gastos.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="divide-y divide-border -mt-2">
+                       <PointHistoryItem 
+                            icon={<PlusCircle className="h-6 w-6 text-green-500" />}
+                            title="Completou Trilha: Onboarding de Novos Influenciadores"
+                            date="15 de Julho, 2024"
+                            points={500}
+                            type="gain"
+                       />
+                       <PointHistoryItem 
+                            icon={<PlusCircle className="h-6 w-6 text-green-500" />}
+                            title="Completou Missão: Atualize seu banner do LinkedIn"
+                            date="14 de Julho, 2024"
+                            points={50}
+                            type="gain"
+                       />
+                       <PointHistoryItem 
+                            icon={<MinusCircle className="h-6 w-6 text-destructive" />}
+                            title="Resgate: Vale-presente iFood R$50"
+                            date="10 de Julho, 2024"
+                            points={5000}
+                            type="spend"
+                       />
                     </CardContent>
                 </Card>
             </TabsContent>
