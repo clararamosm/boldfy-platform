@@ -74,11 +74,11 @@ export default function TrilhasPage() {
                 title="Onboarding de Novos Influenciadores" 
                 points={500} 
                 bonus={100} 
-                progress={100}
-                tasksCompleted={2}
-                tasksTotal={2}
-                buttonText="Revisar conteúdo"
-                buttonVariant="secondary"
+                progress={0}
+                tasksCompleted={0}
+                tasksTotal={3}
+                buttonText="Iniciar Trilha"
+                buttonVariant="default"
                 type="personalizada"
             />
             <TrailCard 
