@@ -1,16 +1,32 @@
+// src/app/admin/trilhas/page.tsx
+'use client';
+
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, PlusCircle, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Progress } from "@/components/ui/progress";
+
+type Trail = {
+  name: string;
+  status: 'Ativa' | 'Inativa';
+  enrolled: number;
+  total: number;
+};
+
+const trails: Trail[] = [
+  { name: "Onboarding de Novos Influenciadores", status: "Ativa", enrolled: 45, total: 45 },
+];
 
 export default function AdminTrilhasPage() {
   const createTrailButton = (
@@ -20,18 +36,69 @@ export default function AdminTrilhasPage() {
     </Button>
   );
 
-  const trailForm = (
+  const TrailForm = ({ trail }: { trail?: Trail }) => (
      <>
       <div className="space-y-2">
         <Label htmlFor="trail-name">Nome da Trilha</Label>
-        <Input id="trail-name" placeholder="Ex: Onboarding de Novos Influenciadores" />
+        <Input id="trail-name" placeholder="Ex: Onboarding de Novos Influenciadores" defaultValue={trail?.name} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="trail-description">Descrição</Label>
-        <Textarea id="trail-description" placeholder="Descreva o objetivo da trilha de aprendizagem." />
+        <Textarea id="trail-description" placeholder="Descreva o objetivo da trilha de aprendizagem." defaultValue="Prepare novos colaboradores para se tornarem advogados da marca." />
       </div>
     </>
-  )
+  );
+
+  const EditTrailButton = ({ trail }: { trail: Trail }) => (
+    <ActionDialog
+      title="Editar Trilha"
+      description="Altere o nome ou a descrição da sua trilha de aprendizagem."
+      trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar Conteúdo</DropdownMenuItem>}
+      actionText="Salvar Alterações"
+    >
+      <TrailForm trail={trail} />
+    </ActionDialog>
+  );
+
+  const ProgressView = () => (
+    <div className="space-y-4">
+        <div className="flex items-center gap-3">
+             <Avatar>
+                <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="person avatar" />
+                <AvatarFallback>CC</AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+                <p className="font-medium text-sm">Carla Costa</p>
+                <Progress value={100} className="h-2 mt-1" />
+            </div>
+            <span className="text-sm font-semibold">100%</span>
+        </div>
+        <div className="flex items-center gap-3">
+             <Avatar>
+                <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="person avatar" />
+                <AvatarFallback>JP</AvatarFallback>
+            </Avatar>
+            <div className="flex-1">
+                <p className="font-medium text-sm">João Paulo</p>
+                <Progress value={75} className="h-2 mt-1" />
+            </div>
+            <span className="text-sm font-semibold">75%</span>
+        </div>
+    </div>
+  );
+
+   const ViewProgressButton = () => (
+    <ActionDialog
+      title="Progresso da Trilha"
+      description="Acompanhe o progresso dos colaboradores nesta trilha."
+      trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Ver Progresso</DropdownMenuItem>}
+      actionText="Fechar"
+      showCancel={false}
+    >
+      <ProgressView />
+    </ActionDialog>
+  );
+
 
   return (
     <>
@@ -49,7 +116,7 @@ export default function AdminTrilhasPage() {
               trigger={createTrailButton}
               actionText="Salvar Trilha"
             >
-              {trailForm}
+              <TrailForm />
             </ActionDialog>
           </div>
           <TabsContent value="personalizadas">
@@ -69,23 +136,27 @@ export default function AdminTrilhasPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Onboarding de Novos Influenciadores</TableCell>
-                      <TableCell><Badge>Ativa</Badge></TableCell>
-                      <TableCell>45 / 45</TableCell>
-                      <TableCell>
-                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Editar Conteúdo</DropdownMenuItem>
-                            <DropdownMenuItem>Ver Progresso</DropdownMenuItem>
-                            <DropdownMenuItem>Desativar</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+                    {trails.map((trail) => (
+                        <TableRow key={trail.name}>
+                          <TableCell className="font-medium">{trail.name}</TableCell>
+                          <TableCell><Badge variant={trail.status === 'Ativa' ? 'default' : 'outline'}>{trail.status}</Badge></TableCell>
+                          <TableCell>{trail.enrolled} / {trail.total}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <EditTrailButton trail={trail} />
+                                <ViewProgressButton />
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem>{trail.status === 'Ativa' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
