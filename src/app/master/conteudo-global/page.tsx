@@ -1,11 +1,12 @@
 // src/app/master/conteudo-global/page.tsx
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Zap, Star } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Zap, Star, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { TrailForm, Trail } from "@/components/dashboard/trail-form";
@@ -13,19 +14,9 @@ import { Badge } from "@/components/ui/badge";
 
 // Adicionando novas propriedades para as métricas
 type GlobalTrail = Trail & {
-    views: number;
-    uniqueUsers: number;
+    views?: number;
+    uniqueUsers?: number;
 }
-
-const activeGlobalTrails: GlobalTrail[] = [
-    { name: "Cultura da Empresa 101", topics: 4, creationDate: "2023-02-10", status: 'Ativa', description: "Uma introdução à cultura da empresa.", views: 1250, uniqueUsers: 450, points: 250, bonus: 50 },
-    { name: "Dominando Nossos Produtos", topics: 3, creationDate: "2023-04-05", status: 'Ativa', description: "Conheça a fundo os produtos que oferecemos.", views: 890, uniqueUsers: 320, points: 400, bonus: 0 },
-];
-
-const inactiveGlobalTrails: GlobalTrail[] = [
-    { name: "Guia de Boas Práticas em Redes Sociais", topics: 5, creationDate: "2023-08-15", status: 'Arquivada', description: "Um guia completo para colaboradores.", views: 2300, uniqueUsers: 950, points: 150, bonus: 0 },
-    { name: "Introdução à IA Generativa", topics: 2, creationDate: "2024-01-20", status: 'Rascunho', description: "Primeiros passos com IA.", views: 0, uniqueUsers: 0, points: 100, bonus: 20 },
-];
 
 const EditTrailButton = ({ trail }: { trail: Trail }) => (
   <ActionDialog
@@ -40,7 +31,51 @@ const EditTrailButton = ({ trail }: { trail: Trail }) => (
   </ActionDialog>
 );
 
+const TableSkeleton = ({ colSpan }) => (
+    <TableRow>
+        <TableCell colSpan={colSpan} className="text-center h-24">
+            <div className="flex justify-center items-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando trilhas...
+            </div>
+        </TableCell>
+    </TableRow>
+);
+
+
 export default function MasterConteudoGlobalPage() {
+    const [activeTrails, setActiveTrails] = useState<GlobalTrail[]>([]);
+    const [inactiveTrails, setInactiveTrails] = useState<GlobalTrail[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchTrails = async () => {
+            setIsLoading(true);
+            try {
+                // MOCK DATA - In a real app, this would be fetched from Firestore
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                 const mockActiveTrails: GlobalTrail[] = [
+                    { name: "Cultura da Empresa 101", topics: 4, creationDate: "2023-02-10", status: 'Ativa', description: "Uma introdução à cultura da empresa.", views: 1250, uniqueUsers: 450, points: 250, bonus: 50 },
+                    { name: "Dominando Nossos Produtos", topics: 3, creationDate: "2023-04-05", status: 'Ativa', description: "Conheça a fundo os produtos que oferecemos.", views: 890, uniqueUsers: 320, points: 400, bonus: 0 },
+                ];
+
+                const mockInactiveTrails: GlobalTrail[] = [
+                    { name: "Guia de Boas Práticas em Redes Sociais", topics: 5, creationDate: "2023-08-15", status: 'Arquivada', description: "Um guia completo para colaboradores.", views: 2300, uniqueUsers: 950, points: 150, bonus: 0 },
+                    { name: "Introdução à IA Generativa", topics: 2, creationDate: "2024-01-20", status: 'Rascunho', description: "Primeiros passos com IA.", views: 0, uniqueUsers: 0, points: 100, bonus: 20 },
+                ];
+
+                setActiveTrails(mockActiveTrails);
+                setInactiveTrails(mockInactiveTrails);
+            } catch (error) {
+                console.error("Error fetching global trails:", error);
+                // Handle error with a toast notification
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchTrails();
+    }, []);
+
     const createTrailButton = (
         <Button size="sm">
             <PlusCircle className="mr-2 h-4 w-4" />
@@ -82,7 +117,7 @@ export default function MasterConteudoGlobalPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activeGlobalTrails.map((trail) => (
+                {isLoading ? <TableSkeleton colSpan={6} /> : activeTrails.map((trail) => (
                     <TableRow key={trail.name}>
                         <TableCell className="font-medium">{trail.name}</TableCell>
                          <TableCell>
@@ -137,7 +172,7 @@ export default function MasterConteudoGlobalPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {inactiveGlobalTrails.map((trail) => (
+                        {isLoading ? <TableSkeleton colSpan={5} /> : inactiveTrails.map((trail) => (
                             <TableRow key={trail.name} className="text-muted-foreground">
                                 <TableCell className="font-medium">{trail.name}</TableCell>
                                 <TableCell>
