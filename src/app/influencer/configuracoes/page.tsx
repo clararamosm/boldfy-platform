@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Loader2 } from "lucide-react";
@@ -43,45 +43,45 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
   const [branding, setBranding] = useState<BrandingData>({ voice: 'amigavel', expertise: '', value: '', position: '' });
   
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const userDocRef = doc(db, "users", userId);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const data = userDocSnap.data();
+        setProfile({
+          name: data.profile?.name || 'Clara',
+          email: data.profile?.email || 'clara@boldfy.com.br',
+          company: data.companyName || 'Boldfy'
+        });
+        setBranding({
+          voice: data.personalBranding?.voice || 'amigavel',
+          expertise: data.personalBranding?.expertise || '',
+          value: data.personalBranding?.value || '',
+          position: data.personalBranding?.position || '',
+        });
+      } else {
+         // Set mock data if document doesn't exist
+         setProfile({ name: 'Clara', email: 'clara@boldfy.com.br', company: 'Boldfy' });
+         setBranding({ voice: 'amigavel', expertise: 'Marketing Digital, Vendas, Liderança', value: 'Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.', position: 'Gerente de Marketing' });
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      toast({
+        variant: 'destructive',
+        title: "Erro ao carregar dados",
+        description: "Não foi possível buscar suas informações. Tente novamente.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const userDocRef = doc(db, "users", userId);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-          const data = userDocSnap.data();
-          setProfile({
-            name: data.profile?.name || 'Clara',
-            email: data.profile?.email || 'clara@boldfy.com.br',
-            company: data.companyName || 'Boldfy'
-          });
-          setBranding({
-            voice: data.personalBranding?.voice || 'amigavel',
-            expertise: data.personalBranding?.expertise || '',
-            value: data.personalBranding?.value || '',
-            position: data.personalBranding?.position || '',
-          });
-        } else {
-           // Set mock data if document doesn't exist
-           setProfile({ name: 'Clara', email: 'clara@boldfy.com.br', company: 'Boldfy' });
-           setBranding({ voice: 'amigavel', expertise: 'Marketing Digital, Vendas, Liderança', value: 'Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.', position: 'Gerente de Marketing' });
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-        toast({
-          variant: 'destructive',
-          title: "Erro ao carregar dados",
-          description: "Não foi possível buscar suas informações. Tente novamente.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchData();
-  }, [toast]);
+  }, [fetchData]);
 
   const handleSave = async (section: 'profile' | 'branding') => {
     setIsSaving(true);
@@ -319,5 +319,3 @@ export default function SettingsPage() {
     </>
   );
 }
-
-    
