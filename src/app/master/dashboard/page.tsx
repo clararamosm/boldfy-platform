@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Building2, BookOpen, Globe, LogIn, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 
 type Company = {
@@ -20,6 +21,7 @@ type Company = {
     status: 'Ativa' | 'Inativa';
     licenses: number;
     adminProfile: { email: string };
+    createdAt?: any;
 };
 
 type MasterStats = {
@@ -57,24 +59,27 @@ export default function MasterDashboardPage() {
             setIsLoading(true);
             try {
                 // Fetch companies
-                const companiesQuery = collection(db, "companies");
+                const companiesQuery = query(collection(db, "companies"), orderBy("createdAt", "desc"), limit(5));
                 const companiesSnap = await getDocs(companiesQuery);
                 const companiesList = companiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Company[];
                 
+                const allCompaniesSnap = await getDocs(collection(db, "companies"));
+
+
                 // Fetch users to calculate total collaborators
                 const usersQuery = collection(db, "users");
                 const usersSnap = await getDocs(usersQuery);
                 const collaboratorsCount = usersSnap.size;
 
                 const mockStats: MasterStats = {
-                    activeCompanies: companiesList.filter(c => c.status === 'Ativa').length,
+                    activeCompanies: allCompaniesSnap.docs.filter(c => c.data().status === 'Ativa').length,
                     totalCollaborators: collaboratorsCount,
                     globalTrails: 5, // Placeholder, would be fetched from a 'global-trails' collection
                     avgEngagement: 78, // Placeholder
                 };
                 
                 setStats(mockStats);
-                setRecentCompanies(companiesList.slice(0, 5)); // Show most recent 5
+                setRecentCompanies(companiesList); 
             } catch (error) {
                 console.error("Error fetching master data:", error);
                  toast({ variant: 'destructive', title: 'Erro ao buscar dados mestre' });

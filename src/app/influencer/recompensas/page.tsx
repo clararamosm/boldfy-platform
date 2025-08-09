@@ -1,16 +1,15 @@
-
 // src/app/influencer/recompensas/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, getDocs, query, where, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, addDoc, serverTimestamp, writeBatch, orderBy } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Gift, History, Zap, TrendingUp, TrendingDown, PlusCircle, MinusCircle, Loader2 } from "lucide-react";
+import { Gift, History, Zap, TrendingUp, TrendingDown, PlusCircle, MinusCircle, Loader2, BookOpen, Trophy } from "lucide-react";
 import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -42,6 +41,7 @@ type HistoryItem = {
     date: any;
     points: number;
     type: 'gain' | 'spend';
+    source?: 'missao' | 'trilha' | 'resgate';
 };
 
 const RewardCard = ({ reward, onRedeem, disabled }: { reward: Reward, onRedeem: () => void, disabled: boolean }) => (
@@ -75,6 +75,16 @@ const RewardCard = ({ reward, onRedeem, disabled }: { reward: Reward, onRedeem: 
        <p>Você tem certeza que quer resgatar esta recompensa?</p>
     </ActionDialog>
 );
+
+const getHistoryIcon = (source: HistoryItem['source'], type: HistoryItem['type']) => {
+    if (type === 'spend') return <MinusCircle className="h-6 w-6 text-destructive" />;
+    
+    switch (source) {
+        case 'missao': return <Trophy className="h-6 w-6 text-green-500" />;
+        case 'trilha': return <BookOpen className="h-6 w-6 text-green-500" />;
+        default: return <PlusCircle className="h-6 w-6 text-green-500" />;
+    }
+};
 
 const PointHistoryItem = ({ icon, description, date, points, type }: HistoryItem) => (
      <div className="flex justify-between items-center p-3 rounded-lg hover:bg-muted/50">
@@ -144,7 +154,7 @@ export default function InfluencerRecompensasPage() {
     const [stats, setStats] = useState({ available: 0, gained: 0, spent: 0, redeemed: 0 });
     const [isLoading, setIsLoading] = useState(true);
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
             // Fetch Rewards
@@ -159,20 +169,20 @@ export default function InfluencerRecompensasPage() {
             const userData = userSnap.data();
 
             // Fetch Rescues for the user
-            const rescuesQuery = query(collection(db, "companies", companyId, "rescues"), where("userId", "==", userId));
+            const rescuesQuery = query(collection(db, "companies", companyId, "rescues"), where("userId", "==", userId), orderBy("date", "desc"));
             const rescuesSnap = await getDocs(rescuesQuery);
             const rescuesList = rescuesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rescue));
             setRescues(rescuesList);
 
             // Fetch History for the user
-            const historyQuery = query(collection(db, "users", userId, "pointHistory"));
+            const historyQuery = query(collection(db, "users", userId, "pointHistory"), orderBy("date", "desc"));
             const historySnap = await getDocs(historyQuery);
             const historyList = historySnap.docs.map(doc => {
                  const data = doc.data() as Omit<HistoryItem, 'id' | 'icon'>;
                  return {
                     id: doc.id,
                     ...data,
-                    icon: data.type === 'gain' ? <PlusCircle className="h-6 w-6 text-green-500" /> : <MinusCircle className="h-6 w-6 text-destructive" />
+                    icon: getHistoryIcon(data.source, data.type)
                  } as HistoryItem
             });
             setHistory(historyList);
@@ -194,11 +204,11 @@ export default function InfluencerRecompensasPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [toast]);
     
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [fetchData]);
     
     const handleRedeem = async (reward: Reward) => {
         if (stats.available < reward.points) {
@@ -230,7 +240,8 @@ export default function InfluencerRecompensasPage() {
                 type: 'spend',
                 points: reward.points,
                 description: `Resgate: ${reward.name}`,
-                date: serverTimestamp()
+                date: serverTimestamp(),
+                source: 'resgate',
             });
 
             // 4. (Optional) Decrement stock if not unlimited
