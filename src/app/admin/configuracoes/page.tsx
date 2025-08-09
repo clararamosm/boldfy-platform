@@ -1,7 +1,7 @@
 // src/app/admin/configuracoes/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useActionState } from "react";
+import { useState, useEffect, useCallback, useActionState, Suspense } from "react";
 import { useFormStatus } from "react-dom";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -67,7 +67,6 @@ function ActivationForm({ companyData }: { companyData: CompanyData }) {
 
 const SettingsSkeleton = () => (
     <>
-      <Header title="Configurações" />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-6 max-w-4xl mx-auto">
           {/* Admin Profile Skeleton */}
@@ -105,7 +104,7 @@ const SettingsSkeleton = () => (
 );
 
 
-export default function AdminConfiguracoesPage() {
+function ConfiguracoesPageContent() {
     const { toast } = useToast();
     const [language, setLanguage] = useState("pt-br");
     const [isLoading, setIsLoading] = useState(true);
@@ -421,4 +420,13 @@ export default function AdminConfiguracoesPage() {
       </main>
     </>
   );
+}
+
+
+export default function AdminConfiguracoesPage() {
+    return (
+        <Suspense fallback={<SettingsSkeleton />}>
+            <ConfiguracoesPageContent />
+        </Suspense>
+    );
 }
