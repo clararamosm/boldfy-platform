@@ -1,7 +1,8 @@
 // src/app/master/empresas/page.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
@@ -17,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { useActionState } from 'react-dom';
 import { createCheckoutSession } from '@/app/actions';
 import { getStripe } from '@/lib/stripe-client';
 
@@ -30,26 +30,38 @@ type Company = {
     createdAt: any;
 };
 
-const CompanyForm = ({ isSubmitting, formRef }: { isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement>}) => (
-    <form ref={formRef} id="company-form" className="space-y-4">
-        <div className="space-y-2">
-            <Label htmlFor="company-name">Nome da Empresa</Label>
-            <Input name="companyName" id="company-name" placeholder="Ex: TechCorp" disabled={isSubmitting} required />
+// Sub-component to use useFormStatus
+function CompanyFormContent({ isSubmitting }: { isSubmitting: boolean }) {
+    return (
+        <div className="space-y-4">
+            <div className="space-y-2">
+                <Label htmlFor="company-name">Nome da Empresa</Label>
+                <Input name="companyName" id="company-name" placeholder="Ex: TechCorp" disabled={isSubmitting} required />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="admin-name">Nome do Admin</Label>
+                <Input name="adminName" id="admin-name" placeholder="Ex: João Silva" disabled={isSubmitting} required />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="admin-email">E-mail do Admin</Label>
+                <Input name="adminEmail" id="admin-email" type="email" placeholder="admin@techcorp.com" disabled={isSubmitting} required />
+            </div>
+             <div className="space-y-2">
+                <Label htmlFor="licenses">Número de Licenças (Assentos)</Label>
+                <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="1" disabled={isSubmitting} required />
+            </div>
         </div>
-        <div className="space-y-2">
-            <Label htmlFor="admin-name">Nome do Admin</Label>
-            <Input name="adminName" id="admin-name" placeholder="Ex: João Silva" disabled={isSubmitting} required />
-        </div>
-        <div className="space-y-2">
-            <Label htmlFor="admin-email">E-mail do Admin</Label>
-            <Input name="adminEmail" id="admin-email" type="email" placeholder="admin@techcorp.com" disabled={isSubmitting} required />
-        </div>
-         <div className="space-y-2">
-            <Label htmlFor="licenses">Número de Licenças (Assentos)</Label>
-            <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="1" disabled={isSubmitting} required />
-        </div>
-    </form>
-);
+    );
+}
+
+const CompanyForm = ({ formRef, formAction }: { formRef: React.RefObject<HTMLFormElement>, formAction: (payload: FormData) => void }) => {
+    const { pending } = useFormStatus();
+    return (
+        <form ref={formRef} action={formAction} id="company-form">
+            <CompanyFormContent isSubmitting={pending} />
+        </form>
+    );
+};
 
 
 export default function MasterEmpresasPage() {
@@ -58,7 +70,7 @@ export default function MasterEmpresasPage() {
     const [isLoading, setIsLoading] = useState(true);
     const formRef = useRef<HTMLFormElement>(null);
 
-    const [checkoutState, formAction, isSubmitting] = useActionState(createCheckoutSession, { error: undefined, sessionId: undefined });
+    const [checkoutState, formAction] = useActionState(createCheckoutSession, { error: undefined, sessionId: undefined });
 
     useEffect(() => {
         if (checkoutState.sessionId) {
@@ -100,13 +112,6 @@ export default function MasterEmpresasPage() {
     useEffect(() => {
         fetchCompanies();
     }, []);
-
-    const handleFormAction = () => {
-        if (formRef.current) {
-            const formData = new FormData(formRef.current);
-            formAction(formData);
-        }
-    }
     
      const handleToggleStatus = async (company: Company) => {
         const newStatus = company.status === 'Ativa' ? 'Inativa' : 'Ativa';
@@ -122,7 +127,7 @@ export default function MasterEmpresasPage() {
     };
 
     const addCompanyButton = (
-        <Button size="sm" disabled={isSubmitting}>
+        <Button size="sm">
             <PlusCircle className="mr-2 h-4 w-4" />
             Adicionar Empresa
         </Button>
@@ -155,10 +160,11 @@ export default function MasterEmpresasPage() {
                     title="Adicionar Nova Empresa"
                     description="Preencha os dados da nova empresa. Você será redirecionado para o Stripe para efetuar o pagamento da assinatura."
                     trigger={addCompanyButton}
-                    actionText={isSubmitting ? "Redirecionando..." : "Ir para Pagamento"}
-                    onAction={handleFormAction}
+                    actionText="Ir para Pagamento"
+                    formId="company-form"
+                    // The onAction is now handled by the form itself
                 >
-                    <CompanyForm isSubmitting={isSubmitting} formRef={formRef} />
+                    <CompanyForm formRef={formRef} formAction={formAction} />
                 </ActionDialog>
             </CardHeader>
             <CardContent>
