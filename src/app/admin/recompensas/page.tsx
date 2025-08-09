@@ -158,6 +158,31 @@ export default function AdminRecompensasPage() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
+                     <TableRow>
+                      <TableCell className="font-medium text-muted-foreground">Vale-presente Spotify</TableCell>
+                      <TableCell className="text-muted-foreground">3000</TableCell>
+                      <TableCell className="text-muted-foreground">0</TableCell>
+                      <TableCell><Badge variant="outline">Desativada</Badge></TableCell>
+                       <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <ActionDialog
+                                title="Editar Recompensa"
+                                description="Atualize os detalhes da recompensa."
+                                trigger={editRewardButton}
+                                actionText="Salvar Alterações"
+                            >
+                                {rewardForm}
+                            </ActionDialog>
+                            <DropdownMenuItem>Ativar</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
                   </TableBody>
                 </Table>
               </CardContent>
