@@ -2,15 +2,15 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 export default function AdminMissoesPage() {
   const createMissionButton = (
@@ -34,18 +34,35 @@ export default function AdminMissoesPage() {
         <Label htmlFor="mission-points">Pontos</Label>
         <Input id="mission-points" type="number" placeholder="Ex: 100" />
       </div>
-      <div className="space-y-2">
-        <Label>Duração da Missão</Label>
-        <RadioGroup defaultValue="7d" className="flex items-center gap-4">
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="7d" id="d7" />
-            <Label htmlFor="d7" className="font-normal">7 dias</Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <RadioGroupItem value="14d" id="d14" />
-            <Label htmlFor="d14" className="font-normal">14 dias</Label>
-          </div>
-        </RadioGroup>
+       <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+            <Label htmlFor="start-date">Data de Início</Label>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        <span>Selecione uma data</span>
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" />
+                </PopoverContent>
+            </Popover>
+        </div>
+        <div className="space-y-2">
+            <Label htmlFor="end-date">Data de Término</Label>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        <span>Selecione uma data</span>
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" />
+                </PopoverContent>
+            </Popover>
+        </div>
       </div>
     </>
   );
@@ -53,14 +70,9 @@ export default function AdminMissoesPage() {
   return (
     <>
       <Header title="Missões" />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
-        <Tabs defaultValue="ativas">
-          <div className="flex items-center justify-between mb-4">
-            <TabsList>
-              <TabsTrigger value="ativas">Missões Ativas</TabsTrigger>
-              <TabsTrigger value="fixas">Missões Fixas (Onboarding)</TabsTrigger>
-              <TabsTrigger value="calendario">Calendário</TabsTrigger>
-            </TabsList>
+      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
+          <div className="flex items-center justify-between">
+             <div/>
             <ActionDialog
               title="Criar Nova Missão"
               description="Configure uma nova missão para seus colaboradores."
@@ -70,17 +82,17 @@ export default function AdminMissoesPage() {
               {missionForm}
             </ActionDialog>
           </div>
-          <TabsContent value="ativas">
             <Card>
               <CardHeader>
-                <CardTitle>Missões da Semana</CardTitle>
-                <CardDescription>Gerencie as missões que estão ativas para seus colaboradores.</CardDescription>
+                <CardTitle>Missões Ativas e Agendadas</CardTitle>
+                <CardDescription>Gerencie as missões que estão ativas ou programadas para seus colaboradores.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
+                      <TableHead>Período</TableHead>
                       <TableHead>Pontos</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Participantes</TableHead>
@@ -88,10 +100,29 @@ export default function AdminMissoesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                     <TableRow>
+                      <TableCell className="font-medium">Atualize seu banner do LinkedIn</TableCell>
+                      <TableCell>Sempre Ativa</TableCell>
+                      <TableCell>50</TableCell>
+                      <TableCell><Badge variant="secondary">Fixa</Badge></TableCell>
+                      <TableCell>N/A</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <DropdownMenuItem>Desativar</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Compartilhar post no LinkedIn</TableCell>
+                      <TableCell>15/07 - 22/07</TableCell>
                       <TableCell>100</TableCell>
-                      <TableCell><Badge variant="default">Ativa</Badge></TableCell>
+                      <TableCell><Badge>Ativa</Badge></TableCell>
                       <TableCell>32 / 45</TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -106,32 +137,12 @@ export default function AdminMissoesPage() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="fixas">
-            <Card>
-              <CardHeader>
-                <CardTitle>Missões Fixas (Onboarding)</CardTitle>
-                <CardDescription>Gerencie as missões que todo novo colaborador deve completar.</CardDescription>
-              </CardHeader>
-               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Nome</TableHead>
-                      <TableHead>Pontos</TableHead>
-                      <TableHead>Status</TableHead>
-                       <TableHead><span className="sr-only">Ações</span></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Atualize seu banner do LinkedIn</TableCell>
-                      <TableCell>50</TableCell>
-                      <TableCell><Badge variant="default">Ativa</Badge></TableCell>
+                     <TableRow>
+                      <TableCell className="font-medium">Gravar vídeo sobre novo feature</TableCell>
+                       <TableCell>25/07 - 01/08</TableCell>
+                      <TableCell>250</TableCell>
+                      <TableCell><Badge className="bg-primary/80 text-primary-foreground">Agendada</Badge></TableCell>
+                      <TableCell>0 / 45</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -139,7 +150,7 @@ export default function AdminMissoesPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem>Editar</DropdownMenuItem>
-                            <DropdownMenuItem>Desativar</DropdownMenuItem>
+                            <DropdownMenuItem>Cancelar</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -148,19 +159,39 @@ export default function AdminMissoesPage() {
                 </Table>
               </CardContent>
             </Card>
-          </TabsContent>
-           <TabsContent value="calendario">
+
             <Card>
               <CardHeader>
-                <CardTitle>Calendário de Missões</CardTitle>
-                <CardDescription>Planeje as missões para as próximas semanas.</CardDescription>
+                <CardTitle>Histórico de Missões</CardTitle>
+                <CardDescription>Visualize o desempenho das missões que já foram encerradas.</CardDescription>
               </CardHeader>
-              <CardContent className="flex items-center justify-center h-64">
-                <p className="text-muted-foreground">Componente de calendário de missões aqui.</p>
+               <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Período</TableHead>
+                      <TableHead>Pontos</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Participantes</TableHead>
+                       <TableHead><span className="sr-only">Ações</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow className="text-muted-foreground">
+                      <TableCell className="font-medium">Post sobre o Dia do Programador</TableCell>
+                      <TableCell>01/07 - 08/07</TableCell>
+                      <TableCell>100</TableCell>
+                      <TableCell><Badge variant="outline">Passada</Badge></TableCell>
+                      <TableCell>41 / 45</TableCell>
+                      <TableCell>
+                         <Button variant="ghost" size="sm">Ver Envios</Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
       </main>
     </>
   );
