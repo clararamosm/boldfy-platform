@@ -40,33 +40,6 @@ export default function AdminRecompensasPage() {
     <>
       <Header title="Recompensas" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
-        <Card>
-            <CardHeader>
-                <CardTitle className="font-headline flex items-center gap-2">
-                    <Trophy className="h-5 w-5 text-muted-foreground" />
-                    Prêmio do Mês (Top 1 Ranking)
-                </CardTitle>
-                <CardDescription>Selecione qual recompensa da loja será o prêmio para o primeiro lugar do ranking neste mês.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="max-w-xs">
-                    <Label htmlFor="monthly-prize">Recompensa</Label>
-                     <Select defaultValue="day-off">
-                        <SelectTrigger id="monthly-prize">
-                            <SelectValue placeholder="Selecione uma recompensa" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="ifood-50">Vale-presente iFood R$50</SelectItem>
-                            <SelectItem value="day-off">Day Off</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </CardContent>
-            <CardFooter>
-                <Button>Salvar Prêmio do Mês</Button>
-            </CardFooter>
-        </Card>
-
         <Tabs defaultValue="loja">
           <div className="flex items-center justify-between mb-4">
             <TabsList>
@@ -82,7 +55,33 @@ export default function AdminRecompensasPage() {
               {rewardForm}
             </ActionDialog>
           </div>
-          <TabsContent value="loja">
+          <TabsContent value="loja" className="space-y-6">
+             <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline flex items-center gap-2">
+                        <Trophy className="h-5 w-5 text-muted-foreground" />
+                        Prêmio do Mês (Top 1 Ranking)
+                    </CardTitle>
+                    <CardDescription>Selecione qual recompensa da loja será o prêmio para o primeiro lugar do ranking neste mês.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="max-w-xs">
+                        <Label htmlFor="monthly-prize">Recompensa</Label>
+                        <Select defaultValue="day-off">
+                            <SelectTrigger id="monthly-prize">
+                                <SelectValue placeholder="Selecione uma recompensa" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ifood-50">Vale-presente iFood R$50</SelectItem>
+                                <SelectItem value="day-off">Day Off</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+                <CardFooter>
+                    <Button>Salvar Prêmio do Mês</Button>
+                </CardFooter>
+            </Card>
             <Card>
               <CardHeader>
                 <CardTitle>Gerenciar Loja de Recompensas</CardTitle>
