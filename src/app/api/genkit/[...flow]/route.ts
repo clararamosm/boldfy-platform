@@ -1,22 +1,8 @@
 // src/app/api/genkit/[...flow]/route.ts
 import { appRoute } from '@genkit-ai/next';
-import { alignContentFlow } from '@/ai/flows/align-content';
-import { firebaseAuth } from '@genkit-ai/firebase';
+import '@/ai/flows/align-content';
 
-// By naming the file [...flow], we can handle different flows based on the path.
-export const POST = appRoute({
-  flow: alignContentFlow,
-  auth: firebaseAuth((user) => {
-    if (!user.email_verified) {
-      throw new Error("User's email must be verified to run this flow.");
-    }
-    // You can add more checks here, e.g., for specific roles
-    // if (!user.customClaims?.roles?.includes('influencer')) {
-    //    throw new Error('User does not have the required role.');
-    // }
-  }),
-  // Optionally, you can add CORS configuration if your client is on a different domain.
-  // cors: {
-  //   origin: '*',
-  // },
-});
+// With the native Firebase Genkit integration, we just need to export appRoute()
+// and ensure our flow files are imported somewhere in the server build.
+// Firebase will automatically discover and serve the defined flows.
+export const POST = appRoute();
