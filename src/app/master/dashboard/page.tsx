@@ -10,9 +10,9 @@ import Link from "next/link";
 
 const StatCard = ({ title, value, description, icon: Icon }) => (
     <Card>
-        <CardHeader className="items-start">
-            <Icon className="h-6 w-6 text-muted-foreground mb-2" />
-            <CardTitle className="text-sm font-medium h-10">{title}</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <Icon className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
             <div className="text-2xl font-bold font-headline">{value}</div>
@@ -32,6 +32,51 @@ export default function MasterDashboardPage() {
            <StatCard title="Trilhas Globais" value="5" description="Conteúdos disponíveis" icon={Globe} />
            <StatCard title="Engajamento Médio" value="78%" description="Atividade na plataforma" icon={BookOpen} />
         </div>
+         <Card>
+          <CardHeader>
+            <CardTitle>Empresas Recentes</CardTitle>
+            <CardDescription>
+              As últimas empresas que se juntaram à plataforma.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Empresa</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Licenças</TableHead>
+                        <TableHead>Admin</TableHead>
+                        <TableHead><span className="sr-only">Ações</span></TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    <TableRow>
+                        <TableCell className="font-medium">Innovate Inc.</TableCell>
+                        <TableCell><Badge variant="default">Ativa</Badge></TableCell>
+                        <TableCell>45 / 50</TableCell>
+                        <TableCell>admin.innovate@example.com</TableCell>
+                        <TableCell>
+                            <Button variant="outline" size="sm" asChild>
+                               <Link href="/admin/dashboard"><LogIn className="mr-2 h-4 w-4" />Visualizar</Link>
+                            </Button>
+                        </TableCell>
+                    </TableRow>
+                     <TableRow>
+                        <TableCell className="font-medium">TechCorp</TableCell>
+                        <TableCell><Badge variant="default">Ativa</Badge></TableCell>
+                        <TableCell>100 / 100</TableCell>
+                        <TableCell>admin.techcorp@example.com</TableCell>
+                        <TableCell>
+                            <Button variant="outline" size="sm" asChild>
+                               <Link href="/admin/dashboard"><LogIn className="mr-2 h-4 w-4" />Visualizar</Link>
+                            </Button>
+                        </TableCell>
+                    </TableRow>
+                </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </main>
     </>
   );
