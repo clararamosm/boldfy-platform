@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '../ui/button';
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 type ActionDialogProps = {
   trigger: React.ReactNode;
@@ -21,6 +22,7 @@ type ActionDialogProps = {
   actionText: string;
   onAction?: () => void;
   showCancel?: boolean;
+  className?: string;
 };
 
 export function ActionDialog({
@@ -31,6 +33,7 @@ export function ActionDialog({
   actionText,
   onAction,
   showCancel = true,
+  className
 }: ActionDialogProps) {
     const [isOpen, setIsOpen] = React.useState(false);
 
@@ -44,7 +47,7 @@ export function ActionDialog({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild onClick={() => setIsOpen(true)}>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className={cn("sm:max-w-xl", className)}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
@@ -58,3 +61,5 @@ export function ActionDialog({
     </Dialog>
   );
 }
+
+    
