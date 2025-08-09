@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User, Eye } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
 
@@ -22,17 +22,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <SidebarContent>
           <AdminSidebarNav />
         </SidebarContent>
-        <SidebarFooter className="p-2 mt-auto">
-          <div className="pb-2 group-data-[state=expanded]:hidden">
-             <Button asChild variant="ghost" className="w-full">
-                <Link href="/influencer/dashboard"><Eye className="h-4 w-4" /></Link>
-            </Button>
-          </div>
-           <div className="p-2 border-t group-data-[state=collapsed]:hidden">
-             <Button asChild variant="outline" className="w-full">
-                <Link href="/influencer/dashboard"><Eye className="mr-2 h-4 w-4" />Visão Influenciador</Link>
-            </Button>
-          </div>
+        <SidebarFooter className="p-2 mt-auto border-t">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-auto w-full justify-start p-2 group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:w-auto group-data-[state=collapsed]:mx-auto">
