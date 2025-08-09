@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowRight } from "lucide-react";
+import Link from "next/link";
+import Image from "next/image";
 
 export default function InfluencerDashboardPage() {
   return (
@@ -19,7 +21,9 @@ export default function InfluencerDashboardPage() {
               <p className="text-xs text-muted-foreground">+200 pontos esta semana</p>
             </CardContent>
             <CardFooter>
-              <Button>Resgatar Recompensas</Button>
+              <Button asChild>
+                <Link href="/influencer/recompensas">Resgatar Recompensas</Link>
+              </Button>
             </CardFooter>
           </Card>
 
@@ -29,12 +33,20 @@ export default function InfluencerDashboardPage() {
               <CardDescription>Compartilhe nosso novo post no blog e ganhe 100 pontos!</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow">
-               <div className="h-full bg-muted rounded-lg flex items-center justify-center p-4">
-                  <p className="text-muted-foreground">Prévia do post aqui</p>
+               <div className="h-full bg-muted rounded-lg flex items-center justify-center p-4 aspect-video relative">
+                    <Image
+                        src="https://placehold.co/600x400.png"
+                        alt="Prévia do post"
+                        fill
+                        className="object-cover rounded-lg"
+                        data-ai-hint="social media post"
+                    />
                </div>
             </CardContent>
             <CardFooter>
-              <Button variant="secondary">Ver Detalhes</Button>
+              <Button variant="secondary" asChild>
+                <Link href="/influencer/missoes">Ver Detalhes</Link>
+              </Button>
             </CardFooter>
           </Card>
 
@@ -49,7 +61,9 @@ export default function InfluencerDashboardPage() {
                   <span className="text-sm text-muted-foreground">75% Completo</span>
                 </div>
                 <Progress value={75} />
-                <Button variant="link" size="sm" className="px-0">Continuar <ArrowRight className="ml-1 h-4 w-4" /></Button>
+                <Button variant="link" size="sm" className="px-0" asChild>
+                    <Link href="/influencer/trilhas">Continuar <ArrowRight className="ml-1 h-4 w-4" /></Link>
+                </Button>
               </div>
               <div>
                 <div className="mb-2 flex justify-between items-center">
@@ -57,7 +71,9 @@ export default function InfluencerDashboardPage() {
                   <span className="text-sm text-muted-foreground">30% Completo</span>
                 </div>
                 <Progress value={30} />
-                <Button variant="link" size="sm" className="px-0">Continuar <ArrowRight className="ml-1 h-4 w-4" /></Button>
+                <Button variant="link" size="sm" className="px-0" asChild>
+                    <Link href="/influencer/trilhas">Continuar <ArrowRight className="ml-1 h-4 w-4" /></Link>
+                </Button>
               </div>
             </CardContent>
           </Card>

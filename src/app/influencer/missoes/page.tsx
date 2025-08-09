@@ -2,10 +2,37 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, Upload } from "lucide-react";
+import { CheckCircle, Upload, Circle, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-const MissionCard = ({ title, description, points, status, onAction, actionText }) => (
+type MissionStatus = 'completa' | 'pendente' | 'agendada';
+
+const MissionCard = ({ title, description, points, status }: { title: string, description: string, points: number, status: MissionStatus }) => {
+    
+    const statusInfo = {
+        completa: {
+            icon: <CheckCircle className="h-4 w-4 mr-2" />,
+            text: "Missão Completa",
+            color: "text-green-600",
+            button: null
+        },
+        pendente: {
+            icon: null,
+            text: "",
+            color: "",
+            button: <Button><Upload className="mr-2 h-4 w-4" /> Enviar Comprovação</Button>
+        },
+        agendada: {
+            icon: <Clock className="h-4 w-4 mr-2" />,
+            text: "Missão Agendada",
+            color: "text-muted-foreground",
+            button: <Button disabled>Em breve</Button>
+        }
+    }
+
+    const currentStatus = statusInfo[status];
+    
+    return (
     <Card>
         <CardHeader>
             <div className="flex justify-between items-start">
@@ -19,22 +46,18 @@ const MissionCard = ({ title, description, points, status, onAction, actionText 
             </div>
         </CardHeader>
         <CardFooter className="flex justify-between items-center">
-            {status === 'completa' ? (
-                <div className="text-sm text-green-600 flex items-center font-medium">
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Missão Completa
+            {status !== 'pendente' ? (
+                <div className={`text-sm ${currentStatus.color} flex items-center font-medium`}>
+                    {currentStatus.icon}
+                    {currentStatus.text}
                 </div>
             ) : (
                 <span/>
             )}
-            {status !== 'completa' && (
-                <Button onClick={onAction}>
-                    {actionText}
-                </Button>
-            )}
+            {currentStatus.button}
         </CardFooter>
     </Card>
-);
+)};
 
 export default function InfluencerMissoesPage() {
   return (
@@ -49,15 +72,16 @@ export default function InfluencerMissoesPage() {
             <TabsContent value="semana">
                 <div className="space-y-4">
                     <MissionCard
-                        title="Compartilhe o post no LinkedIn"
-                        description="Ajude a divulgar nosso último artigo sobre as tendências de IA para 2025."
+                        title="Compartilhar post no LinkedIn"
+                        description="Ajude a divulgar nosso último artigo sobre as tendências de IA para 2025. Período: 15/07 - 22/07."
                         points={100}
                         status="pendente"
-                        actionText={
-                            <>
-                                <Upload className="mr-2 h-4 w-4" /> Enviar Comprovação
-                            </>
-                        }
+                    />
+                     <MissionCard
+                        title="Gravar vídeo sobre novo feature"
+                        description="Crie um vídeo curto (1 min) explicando a nova funcionalidade XYZ para nossos clientes. Período: 25/07 - 01/08."
+                        points={250}
+                        status="agendada"
                     />
                 </div>
             </TabsContent>
