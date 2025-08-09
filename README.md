@@ -1,25 +1,25 @@
-# Firebase Studio
+# Boldfy - Plataforma de Gamificação
 
-This is a NextJS starter in Firebase Studio.
+Bem-vindo à sua nova plataforma de gamificação para embaixadores de marca. Este guia irá ajudá-lo a configurar o primeiro usuário (Master) para que você possa começar a adicionar empresas clientes.
 
 ## Como Iniciar e Definir o Usuário Master
 
-Para que a aplicação funcione corretamente e você possa começar a adicionar empresas clientes, o primeiro passo é criar o usuário **Master**. Este usuário é o super administrador da plataforma.
+Para que a aplicação funcione corretamente e você possa começar a adicionar empresas clientes, o primeiro passo é criar o usuário **Master**. Este usuário é o superadministrador da plataforma.
 
-A criação do usuário Master é um processo manual e seguro, feito em duas etapas.
+A criação do usuário Master é um processo manual e seguro, feito em duas etapas diretamente no seu console do Firebase.
 
 ### 1. Criar a Autenticação do Usuário
 
 Vá para o seu console do Firebase:
 
-1.  Selecione o seu projeto.
+1.  Selecione o seu projeto (`boldfy-app`).
 2.  No menu à esquerda, vá para **Authentication**.
 3.  Clique no botão **Adicionar usuário**.
-4.  Digite o e-mail que você deseja para o seu usuário Master (ex: `master@suaempresa.com`).
+4.  Digite o e-mail que você deseja para o seu usuário Master (ex: `clara@boldfy.com.br`).
 5.  Crie uma senha forte.
 6.  Clique em **Adicionar usuário**.
 
-Após adicionar, você verá o usuário na lista. Copie o **UID** do usuário que você acabou de criar (ele se parece com algo como `aBCdEfgHiJkLmNoPqRsTuVwXyZ1`).
+Após adicionar, você verá o usuário na lista. **Copie o UID do usuário** que você acabou de criar (ele se parece com algo como `aBCdEfgHiJkLmNoPqRsTuVwXyZ1`).
 
 ### 2. Criar o Documento do Usuário no Firestore
 

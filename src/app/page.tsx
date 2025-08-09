@@ -59,7 +59,7 @@ export default function LoginPage() {
                 case AuthErrorCodes.USER_DELETED:
                     errorMessage = 'Este usuário foi excluído.';
                     break;
-                case AuthErrorCodes.INVALID_LOGIN_CREDENTIALS:
+                case 'auth/invalid-credential':
                     errorMessage = 'Credenciais inválidas. Verifique seu e-mail e senha.';
                     break;
                 default:
@@ -119,21 +119,6 @@ export default function LoginPage() {
                 {isLoading ? <Loader2 className="animate-spin" /> : 'Login'}
               </Button>
             </form>
-             <div className="mt-6 space-y-2 text-center">
-                <p className="text-sm text-muted-foreground">Para demonstração, use um dos e-mails abaixo com qualquer senha.</p>
-                 <p className="text-xs text-muted-foreground">(A criação de conta foi desabilitada por segurança).</p>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button onClick={() => setEmail('clara@boldfy.com.br')} variant="outline" className="w-full text-xs">
-                        Logar como Influenciador
-                    </Button>
-                    <Button onClick={() => setEmail('admin@boldfy.com.br')} variant="outline" className="w-full text-xs">
-                       Logar como Admin
-                    </Button>
-                    <Button onClick={() => setEmail('master@boldfy.com.br')} variant="outline" className="w-full text-xs">
-                        Logar como Master
-                    </Button>
-                </div>
-            </div>
           </CardContent>
         </Card>
       </div>
