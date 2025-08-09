@@ -32,7 +32,8 @@ const EditTrailButton = ({ trail }: { trail: Trail }) => (
     title="Editar Trilha Global"
     description="Altere o conteúdo da sua trilha, adicione tópicos, vídeos e edite o quiz."
     trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar Conteúdo</DropdownMenuItem>}
-    actionText="Salvar Alterações"
+    actionText="Publicar Alterações"
+    secondaryAction={<Button variant="outline">Salvar como Rascunho</Button>}
     className="sm:max-w-3xl"
   >
     <TrailForm trail={trail} />
@@ -61,7 +62,8 @@ export default function MasterConteudoGlobalPage() {
                 title="Criar Trilha Global"
                 description="Crie uma nova trilha de aprendizagem que ficará disponível para todas as empresas."
                 trigger={createTrailButton}
-                actionText="Salvar Trilha"
+                actionText="Publicar Trilha"
+                secondaryAction={<Button variant="outline">Salvar como Rascunho</Button>}
                 className="sm:max-w-3xl"
             >
                 <TrailForm />
