@@ -22,9 +22,9 @@ type Asset = {
 };
 
 const assets: Asset[] = [
-    { name: "Banner LinkedIn - Lançamento", type: "Imagem (PNG)", category: "Posts", uploadDate: "2024-07-15", icon: <ImageIcon className="h-5 w-5 text-muted-foreground" /> },
-    { name: "Guia de Tom de Voz", type: "Documento (PDF)", category: "Assets de Marca", uploadDate: "2024-06-20", icon: <FileText className="h-5 w-5 text-muted-foreground" /> },
-    { name: "Ebook sobre IA", type: "Documento (PDF)", category: "Materiais Ricos", uploadDate: "2024-07-18", icon: <FileText className="h-5 w-5 text-muted-foreground" /> },
+    { name: "Banner LinkedIn - Lançamento", type: "PNG", category: "Posts", uploadDate: "2024-07-15", icon: <ImageIcon className="h-5 w-5 text-muted-foreground" /> },
+    { name: "Guia de Tom de Voz", type: "PDF", category: "Assets de Marca", uploadDate: "2024-06-20", icon: <FileText className="h-5 w-5 text-muted-foreground" /> },
+    { name: "Ebook sobre IA", type: "PDF", category: "Materiais Ricos", uploadDate: "2024-07-18", icon: <FileText className="h-5 w-5 text-muted-foreground" /> },
 ];
 
 const AssetForm = ({ asset }: { asset?: Asset }) => (
