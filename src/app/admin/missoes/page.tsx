@@ -187,6 +187,7 @@ export default function AdminMissoesPage() {
                             >
                               {fixedMissionForm}
                             </ActionDialog>
+                            <DropdownMenuItem>Desativar</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -244,6 +245,7 @@ export default function AdminMissoesPage() {
                               {timedMissionForm}
                             </ActionDialog>
                             <DropdownMenuItem>Desativar</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -269,6 +271,7 @@ export default function AdminMissoesPage() {
                               {timedMissionForm}
                             </ActionDialog>
                             <DropdownMenuItem>Cancelar</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
