@@ -1,13 +1,14 @@
+
 'use client';
 
-import { useActionState, useEffect, useRef } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { handleAlignContent } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2, ClipboardCopy, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
@@ -39,6 +40,7 @@ export function AiAssistantForm({ companyId }: { companyId: string }) {
   const [state, formAction] = useActionState(handleAlignContent, initialState);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
     if (state?.error) {
@@ -49,6 +51,14 @@ export function AiAssistantForm({ companyId }: { companyId: string }) {
       });
     }
   }, [state, toast]);
+
+  const handleCopy = () => {
+    if (state?.alignedContent) {
+      navigator.clipboard.writeText(state.alignedContent);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  };
 
   return (
     <form ref={formRef} action={formAction}>
@@ -79,7 +89,7 @@ export function AiAssistantForm({ companyId }: { companyId: string }) {
               <RadioGroup name="format" defaultValue="linkedin" className="gap-2">
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="linkedin" id="format-linkedin" />
-                  <Label htmlFor="format-linkedin" className="font-normal">LinkedIn (com emojis e hashtags)</Label>
+                  <Label htmlFor="format-linkedin" className="font-normal">LinkedIn</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="text-heavy" id="format-text-heavy" />
@@ -110,7 +120,11 @@ export function AiAssistantForm({ companyId }: { companyId: string }) {
             </div>
           </div>
 
-          <div className="grid w-full gap-1.5">
+          <div className="flex justify-end">
+            <SubmitButton />
+          </div>
+
+          <div className="grid w-full gap-1.5 relative">
             <Label htmlFor="aligned-content">Conteúdo Refinado pela IA</Label>
             <Textarea
               id="aligned-content"
@@ -119,13 +133,22 @@ export function AiAssistantForm({ companyId }: { companyId: string }) {
               readOnly
               value={state?.alignedContent || ''}
               rows={12}
-              className="bg-muted focus-visible:ring-0"
+              className="bg-muted focus-visible:ring-0 pr-10"
             />
+             {state?.alignedContent && (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-7 right-1 h-8 w-8 text-muted-foreground"
+                    onClick={handleCopy}
+                >
+                    {isCopied ? <Check className="h-4 w-4 text-primary" /> : <ClipboardCopy className="h-4 w-4" />}
+                    <span className="sr-only">Copiar texto</span>
+                </Button>
+            )}
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end">
-          <SubmitButton />
-        </CardFooter>
       </Card>
     </form>
   );
