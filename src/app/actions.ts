@@ -30,7 +30,7 @@ async function getCompanyProfile(companyId: string): Promise<string> {
   }
 
   // Fallback mock profile
-  return 'Generic company profile: be friendly and professional.';
+  throw new Error('Perfil da empresa não encontrado ou incompleto.');
 }
 
 // Fetches the influencer's personal branding from Firestore.
@@ -93,10 +93,6 @@ export async function handleAlignContent(
     const { content, companyId, format, length } = validatedData.data;
 
     const companyProfile = await getCompanyProfile(companyId);
-
-    if (!companyProfile) {
-        return { error: 'Perfil da empresa não encontrado.' };
-    }
 
     // TODO: Pass the actual user ID from the session
     const personalBranding = await getPersonalBranding();
