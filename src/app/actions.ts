@@ -120,6 +120,10 @@ type InviteAdminState = {
 };
 
 export async function inviteAdmin(prevState: InviteAdminState, formData: FormData): Promise<InviteAdminState> {
+    if (!adminAuth) {
+        return { error: "O serviço de autenticação do administrador não está disponível. Verifique a configuração do servidor." };
+    }
+
     const validatedData = InviteAdminSchema.safeParse({
         companyName: formData.get('companyName'),
         adminName: formData.get('adminName'),
