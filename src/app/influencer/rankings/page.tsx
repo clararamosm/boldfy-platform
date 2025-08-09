@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
 
-const RankingPodium = ({ rank, name, points, avatarSrc, avatarFallback, highlight = false, isCenter = false }) => (
-    <Card className={`flex flex-col items-center p-4 text-center ${highlight ? 'bg-secondary' : ''} ${isCenter ? 'transform md:-translate-y-4' : ''}`}>
+const RankingPodium = ({ rank, name, points, avatarSrc, avatarFallback, highlight = false }) => (
+    <Card className={`flex flex-col items-center p-4 text-center ${highlight ? 'bg-secondary' : ''} h-full`}>
         <div className="relative">
             <Avatar className="w-20 h-20 border-4 border-primary">
                 <AvatarImage src={avatarSrc} data-ai-hint="person avatar" />
@@ -16,10 +16,12 @@ const RankingPodium = ({ rank, name, points, avatarSrc, avatarFallback, highligh
             </Avatar>
             {rank === 1 && <Crown className="absolute -top-3 left-1/2 -translate-x-1/2 h-8 w-8 text-yellow-500" />}
         </div>
-        <h3 className="mt-4 font-semibold text-lg">{name}</h3>
-        <p className="text-muted-foreground font-bold text-primary">{points.toLocaleString()} pts</p>
-        <p className="font-bold text-lg">{rank}º Lugar</p>
-        {highlight && <Badge className="mt-2">Você</Badge>}
+        <div className="flex flex-col flex-grow justify-center mt-4">
+            <h3 className="font-semibold text-lg">{name}</h3>
+            <p className="text-muted-foreground font-bold text-primary">{points.toLocaleString()} pts</p>
+            <p className="font-bold text-lg">{rank}º Lugar</p>
+            {highlight && <Badge className="mt-2 mx-auto">Você</Badge>}
+        </div>
     </Card>
 );
 
@@ -66,21 +68,20 @@ export default function InfluencerRankingsPage() {
     <>
       <Header title="Rankings" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
-        <div className="grid gap-4 md:grid-cols-3 items-end">
-             <RankingPodium 
-                rank={2}
-                name="João Paulo"
-                points={890}
-                avatarSrc="https://placehold.co/80x80.png"
-                avatarFallback="JP"
-             />
+        <div className="grid gap-4 md:grid-cols-3 items-stretch">
              <RankingPodium 
                 rank={1}
                 name="Carla Costa"
                 points={1250}
                 avatarSrc="https://placehold.co/80x80.png"
                 avatarFallback="CC"
-                isCenter
+             />
+             <RankingPodium 
+                rank={2}
+                name="João Paulo"
+                points={890}
+                avatarSrc="https://placehold.co/80x80.png"
+                avatarFallback="JP"
              />
             <RankingPodium 
                 rank={3}
