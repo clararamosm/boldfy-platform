@@ -44,6 +44,7 @@ type QuizQuestion = {
 
 const trails: Trail[] = [
   { name: "Onboarding de Novos Influenciadores", status: "Ativa", enrolled: 45, total: 45 },
+  { name: "Como criar conteúdo viral", status: "Inativa", enrolled: 30, total: 45 },
 ];
 
 const TrailForm = ({ trail }: { trail?: Trail }) => {
@@ -253,7 +254,7 @@ export default function AdminTrilhasPage() {
                   </TableHeader>
                   <TableBody>
                     {trails.map((trail) => (
-                        <TableRow key={trail.name}>
+                        <TableRow key={trail.name} className={trail.status === 'Inativa' ? 'text-muted-foreground' : ''}>
                           <TableCell className="font-medium">{trail.name}</TableCell>
                           <TableCell><Badge variant={trail.status === 'Ativa' ? 'default' : 'outline'}>{trail.status}</Badge></TableCell>
                           <TableCell>{trail.enrolled} / {trail.total}</TableCell>
@@ -331,5 +332,3 @@ export default function AdminTrilhasPage() {
     </>
   );
 }
-
-    
