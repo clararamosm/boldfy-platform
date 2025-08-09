@@ -2,14 +2,21 @@
 import { genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { NextRequest } from 'next/server';
-import {nextPlugin} from '@genkit-ai/next';
+import { firebaseAuth } from '@genkit-ai/firebase/auth';
+import { defineFlow, startFlowsServer } from '@genkit-ai/flow';
 
 import '@/ai/flows/align-content';
 
-const { POST } = nextPlugin({
+const { POST } = startFlowsServer({
   plugins: [
     googleAI(),
   ],
+  // This is how you can enable authentication on your flows.
+  // We are using Firebase Auth here, but you can configure your own
+  // policies as well.
+  // flowAuth: {
+  //   alignContent: firebaseAuth((user) => !!user.email),
+  // },
 });
 
 export { POST };
