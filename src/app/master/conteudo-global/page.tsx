@@ -10,9 +10,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { TrailForm, Trail } from "@/components/dashboard/trail-form";
 
-const globalTrails: Trail[] = [
-    { name: "Cultura da Empresa 101", topics: 4, companies: 12, creationDate: "2023-02-10", status: 'Ativa', description: "Uma introdução à cultura da empresa." },
-    { name: "Dominando Nossos Produtos", topics: 3, companies: 8, creationDate: "2023-04-05", status: 'Ativa', description: "Conheça a fundo os produtos que oferecemos." },
+// Adicionando novas propriedades para as métricas
+type GlobalTrail = Trail & {
+    views: number;
+    uniqueUsers: number;
+}
+
+const globalTrails: GlobalTrail[] = [
+    { name: "Cultura da Empresa 101", topics: 4, companies: 12, creationDate: "2023-02-10", status: 'Ativa', description: "Uma introdução à cultura da empresa.", views: 1250, uniqueUsers: 450 },
+    { name: "Dominando Nossos Produtos", topics: 3, companies: 8, creationDate: "2023-04-05", status: 'Ativa', description: "Conheça a fundo os produtos que oferecemos.", views: 890, uniqueUsers: 320 },
 ];
 
 const EditTrailButton = ({ trail }: { trail: Trail }) => (
@@ -61,7 +67,8 @@ export default function MasterConteudoGlobalPage() {
                 <TableRow>
                   <TableHead>Nome da Trilha</TableHead>
                   <TableHead>Tópicos</TableHead>
-                  <TableHead>Empresas Ativas</TableHead>
+                  <TableHead>Visualizações</TableHead>
+                  <TableHead>Usuários Únicos</TableHead>
                    <TableHead>Data de Criação</TableHead>
                   <TableHead><span className="sr-only">Ações</span></TableHead>
                 </TableRow>
@@ -71,7 +78,8 @@ export default function MasterConteudoGlobalPage() {
                     <TableRow key={trail.name}>
                         <TableCell className="font-medium">{trail.name}</TableCell>
                         <TableCell>{trail.topics}</TableCell>
-                        <TableCell>{trail.companies}</TableCell>
+                        <TableCell>{trail.views}</TableCell>
+                        <TableCell>{trail.uniqueUsers}</TableCell>
                         <TableCell>{trail.creationDate}</TableCell>
                         <TableCell>
                             <DropdownMenu>
