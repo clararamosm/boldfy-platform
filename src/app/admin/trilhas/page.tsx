@@ -86,11 +86,12 @@ export default function AdminTrilhasPage() {
     const fetchTrails = async () => {
       setIsLoading(true);
       try {
+        // MOCK DATA - In a real scenario, you'd fetch from Firestore:
+        await new Promise(resolve => setTimeout(resolve, 1000));
         const mockTrails: Trail[] = [
             { name: "Onboarding de Novos Influenciadores", status: "Ativa", enrolled: 45, total: 45, description: "Prepare novos colaboradores para se tornarem advogados da marca.", points: 500, bonus: 100 },
             { name: "Como criar conteúdo viral", status: "Inativa", enrolled: 30, total: 45, description: "Aprenda técnicas para criar posts que engajam.", points: 300, bonus: 50 },
         ];
-        // In a real scenario, you'd fetch from Firestore:
         // const querySnapshot = await getDocs(collection(db, "companies", "company-123", "trails"));
         // const fetchedTrails = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Trail[];
         // setTrails(fetchedTrails);
