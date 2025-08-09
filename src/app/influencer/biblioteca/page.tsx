@@ -1,9 +1,10 @@
 // src/app/influencer/biblioteca/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import React, { useState, useEffect, useCallback } from 'react';
+import { collection, getDocs, query, doc, getDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Download } from "lucide-react";
@@ -12,9 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-
-// This would come from the user's session
-const companyId = "company-123";
 
 type Asset = {
     id: string;
@@ -90,23 +88,39 @@ export default function InfluencerBibliotecaPage() {
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
 
-    useEffect(() => {
-        const fetchAssets = async () => {
-            setIsLoading(true);
-            try {
-                const assetsCollection = collection(db, "companies", companyId, "assets");
-                const assetsSnapshot = await getDocs(assetsCollection);
-                const assetsList = assetsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Asset));
-                setAssets(assetsList);
-            } catch (error) {
-                console.error("Failed to fetch assets:", error);
-                 toast({ variant: 'destructive', title: 'Erro ao buscar ativos.' });
-            } finally {
-                setIsLoading(false);
-            }
+    const fetchAssets = useCallback(async (companyId: string) => {
+        setIsLoading(true);
+        try {
+            const assetsCollection = collection(db, "companies", companyId, "assets");
+            const assetsSnapshot = await getDocs(assetsCollection);
+            const assetsList = assetsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Asset));
+            setAssets(assetsList);
+        } catch (error) {
+            console.error("Failed to fetch assets:", error);
+             toast({ variant: 'destructive', title: 'Erro ao buscar ativos.' });
+        } finally {
+            setIsLoading(false);
         }
-        fetchAssets();
     }, [toast]);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+            if (user) {
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    const companyId = userDocSnap.data().companyId;
+                    fetchAssets(companyId);
+                } else {
+                    toast({ variant: 'destructive', title: "Erro de usuário" });
+                    setIsLoading(false);
+                }
+            } else {
+                 setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
+    }, [fetchAssets, toast]);
 
 
   const renderAssets = (category?: Asset['category']) => {

@@ -1,7 +1,10 @@
 // src/app/influencer/dashboard/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +12,8 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowRight, Zap, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock data structures - in a real app, these would be imported from a types file
 type Mission = {
     id: string;
     title: string;
@@ -104,17 +107,23 @@ const DashboardSkeleton = () => (
 export default function InfluencerDashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const { toast } = useToast();
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setIsLoading(true);
-            // Simulate fetching data from Firestore
-            await new Promise(resolve => setTimeout(resolve, 1500));
+    const fetchData = useCallback(async (userId: string) => {
+        setIsLoading(true);
+        try {
+            // Fetch user data
+            const userDocRef = doc(db, "users", userId);
+            const userDocSnap = await getDoc(userDocRef);
+            if (!userDocSnap.exists()) {
+                throw new Error("Usuário não encontrado.");
+            }
+            const userData = userDocSnap.data();
 
-            // Mock data - replace with actual Firestore call
+            // In a real app, fetch dynamic missions and trails
             const mockData: DashboardData = {
-                points: 1250,
-                pointsThisWeek: 200,
+                points: userData.points || 0,
+                pointsThisWeek: 200, // This would be a calculated value
                 missions: [
                     { id: '1', title: "Compartilhar post no LinkedIn", points: 100, href: "/influencer/missoes" },
                 ],
@@ -124,10 +133,24 @@ export default function InfluencerDashboardPage() {
                 ]
             };
             setData(mockData);
+        } catch (error) {
+            console.error("Error fetching dashboard data:", error);
+            toast({ variant: 'destructive', title: "Erro ao carregar dashboard." });
+        } finally {
             setIsLoading(false);
-        };
-        fetchData();
-    }, []);
+        }
+    }, [toast]);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
+            if (user) {
+                fetchData(user.uid);
+            } else {
+                setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
+    }, [fetchData]);
 
 
   if (isLoading || !data) {

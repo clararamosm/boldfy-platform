@@ -16,6 +16,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
+// MOCK DATA - In a real app, this data would be fetched from Firestore
+const mockFixedMissions = [
+  { id: 'fix1', name: 'Atualize seu banner do LinkedIn', points: 50, participants: '45 / 45', status: 'Fixa' },
+];
+const mockTimedMissions = [
+  { id: 'time1', name: 'Compartilhar post no LinkedIn', points: 100, participants: '32 / 45', status: 'Ativa', period: '15/07 - 22/07' },
+  { id: 'time2', name: 'Gravar vídeo sobre novo feature', points: 250, participants: '0 / 45', status: 'Agendada', period: '25/07 - 01/08' },
+];
+const mockPastMissions = [
+  { id: 'past1', name: 'Post sobre o Dia do Programador', points: 100, participants: '41 / 45', status: 'Passada', period: '01/07 - 08/07' },
+];
+
+
 type Mission = {
   id: string;
   name: string;
@@ -116,19 +129,9 @@ export default function AdminMissoesPage() {
       setIsLoading(true);
       // MOCK DATA - In a real app, fetch from Firestore
       await new Promise(resolve => setTimeout(resolve, 1000));
-      const mockFixed: Mission[] = [
-        { id: 'fix1', name: 'Atualize seu banner do LinkedIn', points: 50, participants: '45 / 45', status: 'Fixa' },
-      ];
-      const mockTimed: Mission[] = [
-        { id: 'time1', name: 'Compartilhar post no LinkedIn', points: 100, participants: '32 / 45', status: 'Ativa', period: '15/07 - 22/07' },
-        { id: 'time2', name: 'Gravar vídeo sobre novo feature', points: 250, participants: '0 / 45', status: 'Agendada', period: '25/07 - 01/08' },
-      ];
-      const mockPast: Mission[] = [
-        { id: 'past1', name: 'Post sobre o Dia do Programador', points: 100, participants: '41 / 45', status: 'Passada', period: '01/07 - 08/07' },
-      ];
-      setFixedMissions(mockFixed);
-      setTimedMissions(mockTimed);
-      setPastMissions(mockPast);
+      setFixedMissions(mockFixedMissions);
+      setTimedMissions(mockTimedMissions);
+      setPastMissions(mockPastMissions);
       setIsLoading(false);
     }
     fetchMissions();
@@ -140,8 +143,6 @@ export default function AdminMissoesPage() {
     await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async
     setIsSubmitting(false);
   }
-
-  // --- RENDER ---
 
   const createTimedMissionButton = (
     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
@@ -228,7 +229,11 @@ export default function AdminMissoesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                     {isLoading ? <TableSkeleton cols={6} /> : fixedMissions.map((mission) => (
+                     {isLoading ? <TableSkeleton cols={6} /> : fixedMissions.length === 0 ? (
+                        <TableRow>
+                           <TableCell colSpan={6} className="text-center py-8">Nenhuma missão fixa encontrada.</TableCell>
+                        </TableRow>
+                     ) : fixedMissions.map((mission) => (
                         <TableRow key={mission.id}>
                           <TableCell className="cursor-grab"><GripVertical className="h-5 w-5 text-muted-foreground" /></TableCell>
                           <TableCell className="font-medium">{mission.name}</TableCell>
@@ -279,7 +284,11 @@ export default function AdminMissoesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isLoading ? <TableSkeleton cols={6} /> : timedMissions.map((mission) => (
+                    {isLoading ? <TableSkeleton cols={6} /> : timedMissions.length === 0 ? (
+                         <TableRow>
+                           <TableCell colSpan={6} className="text-center py-8">Nenhuma missão ativa ou agendada.</TableCell>
+                        </TableRow>
+                    ) : timedMissions.map((mission) => (
                         <TableRow key={mission.id}>
                           <TableCell className="font-medium">{mission.name}</TableCell>
                           <TableCell>{mission.period}</TableCell>
@@ -344,7 +353,11 @@ export default function AdminMissoesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                     {isLoading ? <TableSkeleton cols={6} /> : pastMissions.map((mission) => (
+                     {isLoading ? <TableSkeleton cols={6} /> : pastMissions.length === 0 ? (
+                        <TableRow>
+                           <TableCell colSpan={6} className="text-center py-8">Nenhum histórico de missões.</TableCell>
+                        </TableRow>
+                     ) : pastMissions.map((mission) => (
                         <TableRow key={mission.id} className="text-muted-foreground">
                           <TableCell className="font-medium">{mission.name}</TableCell>
                           <TableCell>{mission.period}</TableCell>
@@ -371,5 +384,3 @@ export default function AdminMissoesPage() {
     </>
   );
 }
-
-    

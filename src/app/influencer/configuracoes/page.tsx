@@ -13,12 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-
-// TODO: Replace with actual logged-in user ID
-const userId = "user-123";
 
 type ProfileData = {
   name: string;
@@ -39,11 +37,12 @@ export default function SettingsPage() {
   const [language, setLanguage] = useState("pt-br");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
   const [branding, setBranding] = useState<BrandingData>({ voice: 'amigavel', expertise: '', value: '', position: '' });
   
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (userId: string) => {
     setIsLoading(true);
     try {
       const userDocRef = doc(db, "users", userId);
@@ -52,9 +51,9 @@ export default function SettingsPage() {
       if (userDocSnap.exists()) {
         const data = userDocSnap.data();
         setProfile({
-          name: data.profile?.name || 'Clara',
-          email: data.profile?.email || 'clara@boldfy.com.br',
-          company: data.companyName || 'Boldfy'
+          name: data.profile?.name || '',
+          email: data.profile?.email || '',
+          company: data.companyName || 'N/A'
         });
         setBranding({
           voice: data.personalBranding?.voice || 'amigavel',
@@ -62,10 +61,6 @@ export default function SettingsPage() {
           value: data.personalBranding?.value || '',
           position: data.personalBranding?.position || '',
         });
-      } else {
-         // Set mock data if document doesn't exist
-         setProfile({ name: 'Clara', email: 'clara@boldfy.com.br', company: 'Boldfy' });
-         setBranding({ voice: 'amigavel', expertise: 'Marketing Digital, Vendas, Liderança', value: 'Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.', position: 'Gerente de Marketing' });
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -80,13 +75,22 @@ export default function SettingsPage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchData();
+        const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
+            if (user) {
+                setCurrentUserId(user.uid);
+                fetchData(user.uid);
+            } else {
+                setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
   }, [fetchData]);
 
   const handleSave = async (section: 'profile' | 'branding') => {
+    if (!currentUserId) return;
     setIsSaving(true);
     try {
-        const userDocRef = doc(db, "users", userId);
+        const userDocRef = doc(db, "users", currentUserId);
         
         let dataToSave = {};
         if (section === 'profile') {

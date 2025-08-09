@@ -8,14 +8,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Crown, Trophy, Gift, Calendar, Zap, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import React, { useState, useEffect } from 'react';
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, getDoc, doc } from "firebase/firestore";
+import React, { useState, useEffect, useCallback } from 'react';
+import { db, auth } from "@/lib/firebase";
+import { collection, getDocs, query, orderBy, getDoc, doc, where } from "firebase/firestore";
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { auth } from '@/lib/firebase';
-
-const companyId = 'company-123'; // In a real app, this comes from user's company relation
 
 type UserRanking = {
     id: string;
@@ -75,69 +73,77 @@ export default function InfluencerRankingsPage() {
     const [generalRanking, setGeneralRanking] = useState<UserRanking[]>([]);
     const [monthlyPrize, setMonthlyPrize] = useState({ name: 'Prêmio não definido', id: ''});
     const [isLoading, setIsLoading] = useState(true);
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
 
      useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged(user => {
-            if (user) {
-                setCurrentUserId(user.uid);
-            } else {
-                // Handle user not logged in
-                setCurrentUserId(null);
-            }
+        const unsubscribe = onAuthStateChanged(auth, user => {
+            setCurrentUser(user);
         });
         return () => unsubscribe();
     }, []);
 
-    useEffect(() => {
-        if (!currentUserId) return; // Don't fetch if no user
+    const fetchData = useCallback(async (user: User) => {
+        setIsLoading(true);
+        try {
+            const userDocRef = doc(db, "users", user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (!userDocSnap.exists()) {
+                throw new Error("Usuário não encontrado.");
+            }
+            const companyId = userDocSnap.data().companyId;
+            if (!companyId) {
+                 throw new Error("Usuário não associado a uma empresa.");
+            }
 
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                // Fetch all users (in a real app, query by companyId)
-                const usersQuery = query(
-                    collection(db, "users"), 
-                    // where("companyId", "==", companyId) // Add this line in a real app
-                    orderBy("points", "desc")
-                );
-                
-                const querySnapshot = await getDocs(usersQuery);
-                const fetchedUsers = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    name: doc.data().profile?.name || doc.data().name || 'Usuário Anônimo',
-                    points: doc.data().points || 0,
-                    avatarUrl: doc.data().profile?.avatarUrl || `https://placehold.co/80x80.png`,
-                    isCurrentUser: doc.id === currentUserId
-                }));
-                setGeneralRanking(fetchedUsers);
+            // Fetch all users from the same company
+            const usersQuery = query(
+                collection(db, "users"), 
+                where("companyId", "==", companyId),
+                orderBy("points", "desc")
+            );
+            
+            const querySnapshot = await getDocs(usersQuery);
+            const fetchedUsers = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                name: doc.data().profile?.name || doc.data().name || 'Usuário Anônimo',
+                points: doc.data().points || 0,
+                avatarUrl: doc.data().profile?.avatarUrl || `https://placehold.co/80x80.png`,
+                isCurrentUser: doc.id === user.uid
+            }));
+            setGeneralRanking(fetchedUsers);
 
-                // Fetch monthly prize
-                const companyDocRef = doc(db, "companies", companyId);
-                const companyDocSnap = await getDoc(companyDocRef);
-                if (companyDocSnap.exists()) {
-                    const prizeId = companyDocSnap.data()?.monthlyPrize;
-                    if (prizeId) {
-                        const prizeDocRef = doc(db, "companies", companyId, "rewards", prizeId);
-                        const prizeDocSnap = await getDoc(prizeDocRef);
-                        if (prizeDocSnap.exists()) {
-                            setMonthlyPrize({ name: prizeDocSnap.data()?.name, id: prizeId });
-                        }
+            // Fetch monthly prize
+            const companyDocRef = doc(db, "companies", companyId);
+            const companyDocSnap = await getDoc(companyDocRef);
+            if (companyDocSnap.exists()) {
+                const prizeId = companyDocSnap.data()?.monthlyPrize;
+                if (prizeId) {
+                    const prizeDocRef = doc(db, "companies", companyId, "rewards", prizeId);
+                    const prizeDocSnap = await getDoc(prizeDocRef);
+                    if (prizeDocSnap.exists()) {
+                        setMonthlyPrize({ name: prizeDocSnap.data()?.name, id: prizeId });
                     }
                 }
-
-            } catch(error) {
-                console.error("Error fetching ranking:", error);
-                toast({ variant: 'destructive', title: "Erro ao carregar ranking" });
-            } finally {
-                setIsLoading(false);
             }
-        };
-        fetchData();
-    }, [toast, currentUserId]);
+
+        } catch(error) {
+            console.error("Error fetching ranking:", error);
+            toast({ variant: 'destructive', title: "Erro ao carregar ranking", description: (error as Error).message });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
+    
+    useEffect(() => {
+        if (currentUser) {
+            fetchData(currentUser);
+        } else {
+            setIsLoading(false); // If no user, stop loading
+        }
+    }, [currentUser, fetchData]);
+
 
     const top3 = generalRanking.slice(0, 3);
-    const currentUser = generalRanking.find(u => u.isCurrentUser);
 
     if (isLoading) {
         return (
@@ -147,6 +153,14 @@ export default function InfluencerRankingsPage() {
                     <PageSkeleton />
                 </main>
             </>
+        )
+    }
+    
+    if (!currentUser) {
+        return (
+             <main className="flex-1 overflow-auto p-4 md:p-6 text-center">
+                <p>Faça login para ver os rankings.</p>
+             </main>
         )
     }
 

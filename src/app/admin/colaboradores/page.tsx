@@ -1,9 +1,10 @@
 // src/app/admin/colaboradores/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, getDocs, doc, getDoc, query } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,26 +18,28 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
 
-const companyId = "company-123"; // In a real app, this would come from the user's session
-
 type Collaborator = {
   id: string;
   name: string;
   email: string;
   points: number;
   status: 'Ativo' | 'Inativo';
-  entryDate: string;
+  entryDate: any;
   avatarUrl?: string;
 };
 
-const StatCard = ({ title, value, icon: Icon }) => (
+const StatCard = ({ title, value, icon: Icon, isLoading }: { title: string, value: string, icon: React.ElementType, isLoading: boolean }) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
             <Icon className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-            <div className="text-2xl font-bold">{value}</div>
+            {isLoading ? (
+                <div className="h-8 w-16 bg-muted rounded animate-pulse mt-1" />
+            ) : (
+                <div className="text-2xl font-bold">{value}</div>
+            )}
         </CardContent>
     </Card>
 );
@@ -46,22 +49,26 @@ export default function AdminColaboradoresPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const [totalLicenses, setTotalLicenses] = useState(0); 
   const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchCollaborators = async () => {
+  
+  const fetchData = useCallback(async (currentCompanyId: string) => {
       setIsLoading(true);
       try {
-        const companyDocRef = doc(db, "companies", companyId);
+        const companyDocRef = doc(db, "companies", currentCompanyId);
         const companyDocSnap = await getDoc(companyDocRef);
         if(companyDocSnap.exists()) {
             setTotalLicenses(companyDocSnap.data().licenses || 0);
         }
 
-        const collaboratorsQuery = collection(db, "companies", companyId, "collaborators");
+        const collaboratorsQuery = query(collection(db, "companies", currentCompanyId, "collaborators"));
         const querySnapshot = await getDocs(collaboratorsQuery);
-        const fetchedCollaborators = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Collaborator[];
+        const fetchedCollaborators = querySnapshot.docs.map(doc => ({ 
+            id: doc.id,
+            ...doc.data(),
+            entryDate: doc.data().entryDate?.toDate() // Convert timestamp
+         }) as Collaborator);
         setCollaborators(fetchedCollaborators);
         
       } catch (error) {
@@ -70,12 +77,31 @@ export default function AdminColaboradoresPage() {
       } finally {
         setIsLoading(false);
       }
-    };
-
-    fetchCollaborators();
   }, [toast]);
+  
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+        if (user) {
+            const userDocRef = doc(db, "users", user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+                const userCompanyId = userDocSnap.data().companyId;
+                setCompanyId(userCompanyId);
+                fetchData(userCompanyId);
+            } else {
+                 toast({ variant: "destructive", title: "Usuário não encontrado no banco de dados."});
+                 setIsLoading(false);
+            }
+        } else {
+            setIsLoading(false);
+        }
+    });
+    return () => unsubscribe();
+  }, [fetchData, toast]);
+
 
   const handleInvite = async () => {
+      if (!companyId) return;
       setIsSubmitting(true);
       // TODO: Implement invite logic (e.g., call a server action or Firebase function)
       // This would typically involve sending an email and creating a pending user.
@@ -83,10 +109,11 @@ export default function AdminColaboradoresPage() {
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async operation
       toast({ title: "Convite enviado com sucesso!"});
       setIsSubmitting(false);
+      fetchData(companyId);
   }
 
   const inviteButton = (
-    <Button size="sm" disabled={isSubmitting}>
+    <Button size="sm" disabled={isSubmitting || !companyId}>
       <PlusCircle className="mr-2 h-4 w-4" />
       Convidar Colaborador
     </Button>
@@ -97,8 +124,8 @@ export default function AdminColaboradoresPage() {
       <Header title="Colaboradores" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
-            <StatCard title="Colaboradores Ativos" value={`${collaborators.length}`} icon={UserCheck} />
-            <StatCard title="Licenças Contratadas" value={`${totalLicenses}`} icon={Users} />
+            <StatCard title="Colaboradores Ativos" value={`${collaborators.length}`} icon={UserCheck} isLoading={isLoading} />
+            <StatCard title="Licenças Contratadas" value={`${totalLicenses}`} icon={Users} isLoading={isLoading} />
         </div>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -143,7 +170,7 @@ export default function AdminColaboradoresPage() {
                 ) : collaborators.length === 0 ? (
                    <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
-                      Nenhum colaborador encontrado.
+                      Nenhum colaborador encontrado. Convide o primeiro!
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -153,7 +180,7 @@ export default function AdminColaboradoresPage() {
                         <div className="flex items-center gap-3">
                           <Avatar>
                             <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
-                            <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                            <AvatarFallback>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
                           </Avatar>
                           <div>
                             <p className="font-medium">{user.name}</p>
@@ -163,7 +190,7 @@ export default function AdminColaboradoresPage() {
                       </TableCell>
                       <TableCell>{user.points}</TableCell>
                       <TableCell><Badge variant={user.status === 'Ativo' ? 'default' : 'destructive'}>{user.status}</Badge></TableCell>
-                      <TableCell>{new Date(user.entryDate).toLocaleDateString()}</TableCell>
+                      <TableCell>{user.entryDate?.toLocaleDateString() || 'N/A'}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

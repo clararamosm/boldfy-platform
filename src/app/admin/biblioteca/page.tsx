@@ -1,10 +1,11 @@
 // src/app/admin/biblioteca/page.tsx
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '@/lib/firebase';
+import { db, storage, auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,17 +19,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
 
-const companyId = "company-123"; // In a real app, this would come from the user's session
-
-// In a real app, this type would likely be defined in a shared types file.
 type Asset = {
     id: string;
     name: string;
     type: string;
     category: 'Posts' | 'Materiais Ricos' | 'Assets de Marca';
-    uploadDate: any; // Firestore timestamp
+    uploadDate: any; 
     fileUrl: string; 
-    filePath: string; // To find the file in Storage for deletion
+    filePath: string;
 };
 
 const getAssetIcon = (type: string) => {
@@ -38,8 +36,6 @@ const getAssetIcon = (type: string) => {
     return <FileText className="h-5 w-5 text-muted-foreground" />;
 };
 
-
-// AssetForm Component for Create/Edit
 const AssetForm = ({ asset, isSubmitting, formRef, fileRef }: { asset?: Asset, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement>, fileRef: React.RefObject<HTMLInputElement> }) => (
     <form id="asset-form" ref={formRef}>
         <div className="space-y-4">
@@ -74,14 +70,15 @@ export default function AdminBibliotecaPage() {
     const [assets, setAssets] = useState<Asset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [companyId, setCompanyId] = useState<string | null>(null);
     const { toast } = useToast();
     const formRef = useRef<HTMLFormElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const fetchAssets = async () => {
+    const fetchAssets = useCallback(async (currentCompanyId: string) => {
         setIsLoading(true);
         try {
-            const assetsCollection = collection(db, "companies", companyId, "assets");
+            const assetsCollection = collection(db, "companies", currentCompanyId, "assets");
             const assetsSnapshot = await getDocs(assetsCollection);
             const assetsList = assetsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Asset));
             setAssets(assetsList);
@@ -91,13 +88,32 @@ export default function AdminBibliotecaPage() {
         } finally {
             setIsLoading(false);
         }
-    };
-    
+    }, [toast]);
+
     useEffect(() => {
-        fetchAssets();
-    }, []);
+        const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+            if (user) {
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    const userCompanyId = userDocSnap.data().companyId;
+                    setCompanyId(userCompanyId);
+                    fetchAssets(userCompanyId);
+                } else {
+                     toast({ variant: "destructive", title: "Usuário não encontrado no banco de dados."});
+                     setIsLoading(false);
+                }
+            } else {
+                setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
+    }, [fetchAssets, toast]);
+    
 
     const handleAction = async (assetId?: string) => {
+        if (!companyId) return;
+
         setIsSubmitting(true);
         const formData = new FormData(formRef.current!);
         const file = fileInputRef.current?.files?.[0];
@@ -111,7 +127,6 @@ export default function AdminBibliotecaPage() {
             let filePath = '';
             
             if (file) {
-                // If editing, delete the old file first
                 if (assetId) {
                     const oldAsset = assets.find(a => a.id === assetId);
                     if (oldAsset?.filePath) {
@@ -126,9 +141,9 @@ export default function AdminBibliotecaPage() {
                 fileUrl = await getDownloadURL(uploadResult.ref);
             }
 
-            const assetData = {
+            const assetData: Partial<Asset> & {category: string, name: string} = {
                 name: formData.get('name') as string,
-                category: formData.get('category') as string,
+                category: formData.get('category') as 'Posts' | 'Materiais Ricos' | 'Assets de Marca',
                 ...(file && { 
                     fileUrl, 
                     filePath, 
@@ -138,11 +153,9 @@ export default function AdminBibliotecaPage() {
             };
 
             if (assetId) {
-                // Update
                 const assetDoc = doc(db, "companies", companyId, "assets", assetId);
                 await updateDoc(assetDoc, assetData);
             } else {
-                // Create
                 await addDoc(collection(db, "companies", companyId, "assets"), assetData);
             }
 
@@ -150,7 +163,7 @@ export default function AdminBibliotecaPage() {
                 title: "Sucesso!",
                 description: `Ativo ${assetId ? 'atualizado' : 'criado'} com sucesso.`,
             });
-            fetchAssets(); // Refetch assets list
+            fetchAssets(companyId);
         } catch (error) {
             console.error("Error submitting asset:", error);
             toast({ variant: "destructive", title: "Erro ao salvar ativo.", description: (error as Error).message });
@@ -160,14 +173,12 @@ export default function AdminBibliotecaPage() {
     };
     
     const handleDelete = async (asset: Asset) => {
-        if (!confirm(`Tem certeza que deseja excluir o ativo "${asset.name}"?`)) return;
+        if (!companyId || !confirm(`Tem certeza que deseja excluir o ativo "${asset.name}"?`)) return;
         
         try {
-            // Delete file from Storage
             const fileRef = ref(storage, asset.filePath);
             await deleteObject(fileRef);
 
-            // Delete doc from Firestore
             const assetDoc = doc(db, "companies", companyId, "assets", asset.id);
             await deleteDoc(assetDoc);
             
@@ -175,7 +186,7 @@ export default function AdminBibliotecaPage() {
                 title: `Ativo excluído.`,
                 description: "O ativo foi removido com sucesso.",
             });
-            fetchAssets(); // Refetch
+            fetchAssets(companyId);
         } catch(error) {
             console.error("Error deleting asset:", error);
              toast({ variant: "destructive", title: "Erro ao excluir ativo." });
@@ -183,7 +194,7 @@ export default function AdminBibliotecaPage() {
     }
 
     const uploadButton = (
-        <Button size="sm" disabled={isSubmitting}>
+        <Button size="sm" disabled={isSubmitting || !companyId}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Novo Upload
         </Button>
@@ -247,7 +258,7 @@ export default function AdminBibliotecaPage() {
                 ) : assets.length === 0 ? (
                      <TableRow>
                         <TableCell colSpan={5} className="text-center py-8">
-                           Nenhum ativo encontrado.
+                           Nenhum ativo encontrado. Comece fazendo um novo upload.
                         </TableCell>
                     </TableRow>
                 ) : assets.map((asset) => (

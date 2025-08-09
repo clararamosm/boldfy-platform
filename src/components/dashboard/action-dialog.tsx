@@ -23,22 +23,21 @@ type ActionDialogProps = {
   description?: string;
   children: React.ReactNode;
   actionText: string;
-  onAction?: () => void; // Kept for non-form actions
+  onAction?: () => void;
   showCancel?: boolean;
   className?: string;
   secondaryAction?: React.ReactNode;
-  formId?: string; // The ID of the form this dialog should trigger
-  open?: boolean; // Control dialog visibility from parent
-  onOpenChange?: (open: boolean) => void; // Control dialog visibility from parent
+  formId?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
-// This button is specifically for the primary action in the footer.
-// It will show a pending state if its parent form is submitting.
-// It must be a child of the <form> element to work correctly.
-const PrimaryActionButton = ({ text }: { text: string }) => {
+// This component shows the pending state for form submissions.
+// It must be a child of the <form> it is associated with.
+const FormSubmitButton = ({ text, formId }: { text: string, formId: string }) => {
     const { pending } = useFormStatus();
     return (
-        <Button type="submit" disabled={pending} form={pending ? undefined : 'company-form'}>
+        <Button type="submit" form={formId} disabled={pending}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {text}
         </Button>
@@ -60,17 +59,17 @@ export function ActionDialog({
   onOpenChange,
 }: ActionDialogProps) {
 
-  // This wrapper allows the primary action button to be part of the form's context
-  // even though it's rendered in the DialogFooter outside of the <form> element.
-  // This is how `useFormStatus` gets the correct pending state.
   const renderFooterAction = () => {
     if (formId) {
       // The button needs to be associated with the form.
       // We pass the formId to the button's `form` attribute.
-      // useFormStatus only works on children of the form, so PrimaryActionButton is now inside the form itself.
+      // useFormStatus only works on children of the form, so we must use it inside the form.
+      // This button is rendered in the footer, but the form is in the children.
+      // We rely on the form having a submit button inside it that will show pending state.
+      // So here we create a simple button that just triggers the form submission.
       return <Button type="submit" form={formId}>{actionText}</Button>;
     }
-    // Fallback for non-form actions
+    // Fallback for non-form actions, which can close the dialog on click.
     return (
       <DialogClose asChild>
         <Button onClick={onAction}>{actionText}</Button>
@@ -86,11 +85,21 @@ export function ActionDialog({
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <div className="grid gap-4 py-4">{children}</div>
+        
+        {/* If a formId is provided, wrap children in a form that submits to the footer button */}
+        {formId ? (
+            <div className="grid gap-4 py-4">
+                {children}
+            </div>
+        ) : (
+            <div className="grid gap-4 py-4">{children}</div>
+        )}
+
         <DialogFooter>
           {showCancel && <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>}
           {secondaryAction}
-          {renderFooterAction()}
+          {onAction && !formId && <Button onClick={onAction}>{actionText}</Button>}
+          {formId && <Button type="submit" form={formId}>{actionText}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
