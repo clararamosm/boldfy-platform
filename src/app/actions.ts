@@ -111,7 +111,7 @@ const InviteAdminSchema = z.object({
   companyName: z.string().min(1, 'Nome da empresa é obrigatório.'),
   adminName: z.string().min(1, 'Nome do admin é obrigatório.'),
   adminEmail: z.string().email('E-mail inválido.'),
-  licenses: z.coerce.number().int().positive('Número de licenças deve ser positivo.'),
+  licenses: z.coerce.number().int().min(5, 'O free trial requer no mínimo 5 licenças.').positive('Número de licenças deve ser positivo.'),
 });
 
 type InviteAdminState = {
@@ -150,8 +150,6 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
                 displayName: adminName,
                 disabled: false,
             });
-            // TODO: In a real app, send a password reset email here.
-            // await adminAuth.generatePasswordResetLink(adminEmail);
         } catch (error: any) {
              if (error.code === 'auth/email-already-exists') {
                 return { error: `Um usuário com o e-mail ${adminEmail} já existe.` };
@@ -159,13 +157,17 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
             throw error;
         }
 
-        // 2. Create Company document with 'Inativa' status
+        // 2. Create Company document with 'Trial' status and trial end date
+        const trialEndDate = new Date();
+        trialEndDate.setDate(trialEndDate.getDate() + 30);
+
         await setDoc(companyRef, {
             companyName,
             adminProfile: { name: adminName, email: adminEmail },
             licenses,
-            status: 'Inativa' as const,
+            status: 'Trial' as const,
             createdAt: serverTimestamp(),
+            trialEndsAt: trialEndDate.toISOString(),
             stripeCustomerId: null,
             stripeSubscriptionId: null,
         });
@@ -177,12 +179,12 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
             companyId: companyId,
             companyName: companyName,
             points: 0,
-            status: 'Pendente' as const,
+            status: 'Ativo' as const, // User is active during trial
             profile: { name: adminName, email: adminEmail },
             createdAt: serverTimestamp(),
         });
 
-        console.log(`Empresa "${companyName}" e Admin "${adminEmail}" criados com status inativo.`);
+        console.log(`Empresa "${companyName}" criada em modo Trial. Admin: "${adminEmail}".`);
         return { success: true };
 
     } catch (error) {
@@ -237,6 +239,9 @@ export async function createCheckoutSession(prevState: CheckoutState, formData: 
                 },
             ],
             mode: 'subscription',
+            subscription_data: {
+                trial_period_days: 30,
+            },
             success_url: `${origin}/admin/configuracoes?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${origin}/admin/configuracoes?payment_canceled=true`,
             metadata: {

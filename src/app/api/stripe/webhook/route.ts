@@ -26,7 +26,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     }
 
     const companyData = companySnap.data();
-    // Prevent processing the same event twice
+    // Prevent processing the same event twice if status is already active
     if (companyData?.status === 'Ativa') {
         console.log(`Webhook Info: Company ${companyId} is already active. Ignoring event.`);
         return;
@@ -34,12 +34,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     
     // Use a transaction to ensure atomicity
     await db.runTransaction(async (transaction) => {
-       const userRecord = await adminAuth.getUserByEmail(adminEmail);
-       if (!userRecord) {
-           throw new Error(`User with email ${adminEmail} not found in Firebase Auth.`);
+       const userQuery = await db.collection('users').where('profile.email', '==', adminEmail).limit(1).get();
+       
+       if(userQuery.empty){
+           throw new Error(`User with email ${adminEmail} not found in Firestore.`);
        }
-
-        const userRef = db.collection('users').doc(userRecord.uid);
+       
+       const userRef = userQuery.docs[0].ref;
 
         // 1. Update User status to 'Ativo'
         transaction.update(userRef, {
@@ -51,7 +52,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             status: 'Ativa' as const,
             stripeCustomerId: session.customer,
             stripeSubscriptionId: session.subscription,
-            activatedAt: new Date().toISOString()
+            activatedAt: new Date().toISOString(),
+            trialEndsAt: null, // Clear trial end date upon activation
         });
     });
 

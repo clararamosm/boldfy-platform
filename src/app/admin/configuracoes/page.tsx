@@ -31,14 +31,17 @@ type CompanyData = {
     audience: string;
     tone: string;
     messages: string;
-    status: 'Ativa' | 'Inativa' | 'pending_payment';
+    status: 'Ativa' | 'Inativa' | 'Trial' | 'pending_payment';
     licenses: number;
+    trialEndsAt?: string;
 };
 
 function ActivationForm({ companyData }: { companyData: CompanyData }) {
     const { pending } = useFormStatus();
     
     if (!companyData) return null;
+
+    const isTrial = companyData.status === 'Trial';
 
     return (
         <div className="space-y-4">
@@ -54,7 +57,7 @@ function ActivationForm({ companyData }: { companyData: CompanyData }) {
                         Redirecionando...
                     </>
                 ) : (
-                    "Ativar Conta e Gerenciar Assinatura"
+                    isTrial ? "Iniciar Assinatura com 30 Dias Grátis" : "Ativar Assinatura"
                 )}
              </Button>
         </div>
@@ -80,6 +83,7 @@ export default function AdminConfiguracoesPage() {
         } else {
             // Handle user not logged in, maybe redirect
             setCurrentUserId(null);
+            setIsLoading(false);
         }
         });
         return () => unsubscribe();
@@ -89,16 +93,17 @@ export default function AdminConfiguracoesPage() {
     useEffect(() => {
         if (searchParams.get('payment_success')) {
             toast({
-                title: 'Pagamento Concluído!',
-                description: 'Sua conta foi ativada. Bem-vindo(a) à Boldfy!',
+                title: 'Assinatura Iniciada!',
+                description: 'Seu período de teste começou. Bem-vindo(a) à Boldfy!',
             });
             // You might want to refetch data here to update the UI instantly
+            if(currentUserId) fetchData(currentUserId);
         }
         if (searchParams.get('payment_canceled')) {
              toast({
                 variant: 'destructive',
-                title: 'Pagamento Cancelado',
-                description: 'O processo de ativação foi cancelado. Você pode tentar novamente a qualquer momento.',
+                title: 'Processo Cancelado',
+                description: 'O processo de assinatura foi cancelado. Você pode tentar novamente a qualquer momento.',
             });
         }
     }, [searchParams, toast]);
@@ -128,7 +133,6 @@ export default function AdminConfiguracoesPage() {
     const fetchData = useCallback(async (userId: string) => {
         setIsLoading(true);
         try {
-            // First, get the companyId from the user's document
             const userDocRef = doc(db, "users", userId);
             const userDocSnap = await getDoc(userDocRef);
             if (!userDocSnap.exists()) {
@@ -154,7 +158,8 @@ export default function AdminConfiguracoesPage() {
                     tone: data.branding?.tone || '',
                     messages: data.branding?.messages || '',
                     status: data.status || 'Inativa',
-                    licenses: data.licenses || 0
+                    licenses: data.licenses || 0,
+                    trialEndsAt: data.trialEndsAt
                 });
             } else {
                  toast({
@@ -230,6 +235,9 @@ export default function AdminConfiguracoesPage() {
             setCompanyData(prev => ({ ...prev!, [id]: value }));
         }
     };
+    
+    const isSubscriptionNeeded = companyData?.status === 'Inativa' || companyData?.status === 'Trial';
+    const isReadOnly = companyData?.status === 'Inativa';
 
     if (isLoading || !companyData) {
         return (
@@ -263,12 +271,15 @@ export default function AdminConfiguracoesPage() {
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-6 max-w-4xl mx-auto">
             
-            {companyData.status !== 'Ativa' && (
+            {isSubscriptionNeeded && (
                  <Card className="border-primary bg-primary/5">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><AlertCircle className="text-primary"/>Sua Conta Precisa de Ativação</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><AlertCircle className="text-primary"/>Sua Conta Precisa de uma Assinatura</CardTitle>
                         <CardDescription>
-                            Para desbloquear todas as funcionalidades da plataforma, como convidar colaboradores e criar missões, é necessário ativar sua assinatura.
+                            {companyData.status === 'Trial'
+                                ? 'Você está em um período de teste gratuito. Para garantir que não haja interrupção no serviço, inicie sua assinatura agora. A cobrança só ocorrerá após o fim do período de teste.'
+                                : 'Para desbloquear todas as funcionalidades da plataforma, como convidar colaboradores e criar missões, é necessário ativar sua assinatura.'
+                            }
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -290,7 +301,7 @@ export default function AdminConfiguracoesPage() {
                     <AvatarImage src="https://placehold.co/100x100.png" data-ai-hint="person avatar" />
                     <AvatarFallback>{companyData.adminName?.[0] || 'A'}</AvatarFallback>
                     </Avatar>
-                    <Button variant="outline">Mudar foto</Button>
+                    <Button variant="outline" disabled={isReadOnly}>Mudar foto</Button>
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="adminName">Nome do Admin</Label>
@@ -317,23 +328,23 @@ export default function AdminConfiguracoesPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="tagline">Tagline</Label>
-                <Input id="tagline" placeholder="Sua tagline ou slogan" value={companyData.tagline} onChange={handleInputChange} disabled={isSaving || companyData.status !== 'Ativa'} />
+                <Input id="tagline" placeholder="Sua tagline ou slogan" value={companyData.tagline} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="audience">Público-alvo</Label>
-                <Textarea id="audience" placeholder="Descreva seu público-alvo" value={companyData.audience} onChange={handleInputChange} disabled={isSaving || companyData.status !== 'Ativa'} />
+                <Textarea id="audience" placeholder="Descreva seu público-alvo" value={companyData.audience} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tone">Tom de Voz</Label>
-                <Textarea id="tone" placeholder="Descreva o tom de voz da marca" value={companyData.tone} onChange={handleInputChange} disabled={isSaving || companyData.status !== 'Ativa'} />
+                <Textarea id="tone" placeholder="Descreva o tom de voz da marca" value={companyData.tone} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
               </div>
                <div className="space-y-2">
                 <Label htmlFor="messages">Mensagens-chave</Label>
-                <Textarea id="messages" placeholder="Quais são as mensagens principais que devem ser comunicadas?" value={companyData.messages} onChange={handleInputChange} disabled={isSaving || companyData.status !== 'Ativa'} />
+                <Textarea id="messages" placeholder="Quais são as mensagens principais que devem ser comunicadas?" value={companyData.messages} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-                 <Button onClick={() => handleSaveChanges('branding')} disabled={isSaving || companyData.status !== 'Ativa'}>
+                 <Button onClick={() => handleSaveChanges('branding')} disabled={isSaving || isReadOnly}>
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Salvar Configurações da Empresa
                 </Button>
@@ -346,7 +357,7 @@ export default function AdminConfiguracoesPage() {
                 <CardDescription>Escolha o idioma de exibição do sistema.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Select value={language} onValueChange={setLanguage} disabled={companyData.status !== 'Ativa'}>
+                    <Select value={language} onValueChange={setLanguage} disabled={isReadOnly}>
                     <SelectTrigger className="w-[280px]">
                         <SelectValue placeholder="Selecione o idioma" />
                     </SelectTrigger>
@@ -357,7 +368,7 @@ export default function AdminConfiguracoesPage() {
                     </Select>
                 </CardContent>
                 <CardFooter className="border-t px-6 py-4">
-                <Button onClick={handleSaveLanguage} disabled={companyData.status !== 'Ativa'}>Salvar Idioma</Button>
+                <Button onClick={handleSaveLanguage} disabled={isReadOnly}>Salvar Idioma</Button>
                 </CardFooter>
             </Card>
 
@@ -369,30 +380,30 @@ export default function AdminConfiguracoesPage() {
                 <CardContent className="space-y-4">
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                    <Label htmlFor="new-missions" className={companyData.status !== 'Ativa' ? 'text-muted-foreground' : ''}>Resgates de Recompensas</Label>
+                    <Label htmlFor="new-missions" className={isReadOnly ? 'text-muted-foreground' : ''}>Resgates de Recompensas</Label>
                     <p className="text-sm text-muted-foreground">
                         Receba alertas quando um colaborador resgatar uma recompensa.
                     </p>
                     </div>
-                    <Switch id="new-missions" defaultChecked disabled={companyData.status !== 'Ativa'}/>
+                    <Switch id="new-missions" defaultChecked disabled={isReadOnly}/>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                    <Label htmlFor="new-trails" className={companyData.status !== 'Ativa' ? 'text-muted-foreground' : ''}>Novos Colaboradores</Label>
+                    <Label htmlFor="new-trails" className={isReadOnly ? 'text-muted-foreground' : ''}>Novos Colaboradores</Label>
                     <p className="text-sm text-muted-foreground">
                         Seja notificado quando um novo colaborador entrar na plataforma.
                     </p>
                     </div>
-                    <Switch id="new-trails" defaultChecked disabled={companyData.status !== 'Ativa'}/>
+                    <Switch id="new-trails" defaultChecked disabled={isReadOnly}/>
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
-                    <Label htmlFor="points-available" className={companyData.status !== 'Ativa' ? 'text-muted-foreground' : ''}>Relatórios Semanais</Label>
+                    <Label htmlFor="points-available" className={isReadOnly ? 'text-muted-foreground' : ''}>Relatórios Semanais</Label>
                     <p className="text-sm text-muted-foreground">
                         Receba relatórios de engajamento da plataforma.
                     </p>
                     </div>
-                    <Switch id="points-available" defaultChecked disabled={companyData.status !== 'Ativa'}/>
+                    <Switch id="points-available" defaultChecked disabled={isReadOnly}/>
                 </div>
                 </CardContent>
             </Card>

@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, orderBy, query } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +23,7 @@ import { inviteAdmin } from '@/app/actions';
 type Company = {
     id: string;
     companyName: string;
-    status: 'Ativa' | 'Inativa';
+    status: 'Ativa' | 'Inativa' | 'Trial';
     licenses: number;
     adminProfile: { email: string; name: string; };
     createdAt: any;
@@ -46,9 +46,10 @@ function CompanyFormContent() {
                 <Input name="adminEmail" id="adminEmail" type="email" placeholder="admin@techcorp.com" disabled={pending} required />
             </div>
              <div className="space-y-2">
-                <Label htmlFor="licenses">Número de Licenças (Assentos)</Label>
-                <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="1" disabled={pending} required />
-            </div>
+                <Label htmlFor="licenses">Número de Licenças (mín. 5)</Label>
+                <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="5" defaultValue="5" disabled={pending} required />
+             </div>
+             <p className="text-xs text-muted-foreground">O free trial de 30 dias permite até 5 licenças. Após o período, a cobrança será baseada no número de licenças definido aqui.</p>
         </div>
     );
 }
@@ -89,7 +90,7 @@ export default function MasterEmpresasPage() {
         if(inviteState.success) {
             toast({
                 title: 'Empresa e Admin Criados!',
-                description: 'Um convite (simulado) foi enviado para o admin. Eles precisarão fazer login e pagar para ativar a conta.',
+                description: 'A empresa foi criada em modo Trial. O admin pode agora fazer login e iniciar a assinatura.',
             });
             setIsDialogOpen(false);
             fetchCompanies();
@@ -133,6 +134,8 @@ export default function MasterEmpresasPage() {
                 return <Badge variant="default">Ativa</Badge>;
             case 'Inativa':
                 return <Badge variant="destructive">Inativa</Badge>;
+            case 'Trial':
+                return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Trial</Badge>;
             default:
                 return <Badge variant="outline">{status}</Badge>;
         }
@@ -150,7 +153,7 @@ export default function MasterEmpresasPage() {
                 </div>
                  <ActionDialog
                     title="Adicionar Nova Empresa"
-                    description="Preencha os dados para criar uma nova empresa. O administrador receberá um convite para ativar a conta."
+                    description="Preencha os dados para criar uma nova empresa. Ela começará com um free trial de 30 dias."
                     trigger={addCompanyButton}
                     actionText="Criar e Convidar Admin"
                     formId="company-form"
@@ -187,7 +190,7 @@ export default function MasterEmpresasPage() {
                             </TableRow>
                         ) : (
                             companies.map(company => (
-                                <TableRow key={company.id} className={company.status !== 'Ativa' ? 'text-muted-foreground' : ''}>
+                                <TableRow key={company.id} className={(company.status !== 'Ativa' && company.status !== 'Trial') ? 'text-muted-foreground' : ''}>
                                     <TableCell className="font-medium">{company.companyName}</TableCell>
                                     <TableCell>{getStatusBadge(company.status)}</TableCell>
                                     <TableCell>0 / {company.licenses}</TableCell>
@@ -203,7 +206,7 @@ export default function MasterEmpresasPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                                                <DropdownMenuItem asChild disabled={company.status !== 'Ativa'}>
+                                                <DropdownMenuItem asChild disabled={company.status === 'Inativa'}>
                                                     <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => handleToggleStatus(company)}>
