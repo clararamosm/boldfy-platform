@@ -50,39 +50,31 @@ export default function InfluencerRecompensasPage() {
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Pontos Disponíveis</CardTitle>
-                    <Zap className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">1.250</div>
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                    <Zap className="h-6 w-6 text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">Pontos Disponíveis</p>
+                    <p className="text-2xl font-bold font-headline">1.250</p>
                 </CardContent>
             </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Pontos Ganhos (Total)</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">6.250</div>
+             <Card>
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                    <TrendingUp className="h-6 w-6 text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">Pontos Ganhos (Total)</p>
+                    <p className="text-2xl font-bold font-headline">6.250</p>
                 </CardContent>
             </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Pontos Gastos</CardTitle>
-                    <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">5.000</div>
+             <Card>
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                    <TrendingDown className="h-6 w-6 text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">Pontos Gastos</p>
+                    <p className="text-2xl font-bold font-headline">5.000</p>
                 </CardContent>
             </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Prêmios Resgatados</CardTitle>
-                    <Award className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">1</div>
+             <Card>
+                <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                    <Award className="h-6 w-6 text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">Prêmios Resgatados</p>
+                    <p className="text-2xl font-bold font-headline">1</p>
                 </CardContent>
             </Card>
         </div>
