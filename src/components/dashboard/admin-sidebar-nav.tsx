@@ -1,7 +1,7 @@
 'use client';
 
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { BookOpen, Cog, Gift, LayoutDashboard, Library, Trophy, Users } from "lucide-react";
+import { BookOpen, Cog, Gift, LayoutDashboard, Library, Trophy, Users, Palette } from "lucide-react";
 
 const adminNavItems = [
     { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },

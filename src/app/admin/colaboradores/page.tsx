@@ -1,13 +1,104 @@
 import { Header } from "@/components/dashboard/header";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 export default function AdminColaboradoresPage() {
   return (
     <>
       <Header title="Colaboradores" />
       <main className="flex-1 overflow-auto p-4 md:p-6">
-        <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">Conteúdo de Colaboradores do Admin</p>
-        </div>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="font-headline">Gerenciar Colaboradores</CardTitle>
+              <CardDescription>Adicione, edite ou remova colaboradores da plataforma.</CardDescription>
+            </div>
+            <Button size="sm">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Convidar Colaborador
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Colaborador</TableHead>
+                  <TableHead>Pontos</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Data de Entrada</TableHead>
+                  <TableHead><span className="sr-only">Ações</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="person avatar" />
+                        <AvatarFallback>CC</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">Carla Costa</p>
+                        <p className="text-sm text-muted-foreground">carla@boldfy.com.br</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>1250</TableCell>
+                  <TableCell><Badge variant="default">Ativo</Badge></TableCell>
+                  <TableCell>2023-10-01</TableCell>
+                   <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                          <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
+                          <DropdownMenuItem>Editar</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive">Desativar</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+                 <TableRow>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar>
+                        <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="person avatar" />
+                        <AvatarFallback>JP</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">João Paulo</p>
+                        <p className="text-sm text-muted-foreground">joao@boldfy.com.br</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>890</TableCell>
+                  <TableCell><Badge variant="default">Ativo</Badge></TableCell>
+                  <TableCell>2023-11-15</TableCell>
+                   <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                          <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
+                          <DropdownMenuItem>Editar</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-destructive">Desativar</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </main>
     </>
   );
