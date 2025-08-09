@@ -1,13 +1,13 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState, useEffect, useRef } from 'react';
+import { useFormStatus } from 'react-dom';
 import { handleAlignContent } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Sparkles, Loader2 } from 'lucide-react';
-import { useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
@@ -36,7 +36,7 @@ function SubmitButton() {
 }
 
 export function AiAssistantForm({ companyId }: { companyId: string }) {
-  const [state, formAction] = useFormState(handleAlignContent, initialState);
+  const [state, formAction] = useActionState(handleAlignContent, initialState);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
 
