@@ -1,12 +1,14 @@
 // src/app/admin/trilhas/page.tsx
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Globe, Zap, Star } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Globe, Zap, Star, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,10 +19,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { Trail, TrailForm } from '@/components/dashboard/trail-form';
 
-const trails: Trail[] = [
-  { name: "Onboarding de Novos Influenciadores", status: "Ativa", enrolled: 45, total: 45, description: "Prepare novos colaboradores para se tornarem advogados da marca.", points: 500, bonus: 100 },
-  { name: "Como criar conteúdo viral", status: "Inativa", enrolled: 30, total: 45, description: "Aprenda técnicas para criar posts que engajam.", points: 300, bonus: 50 },
-];
 
 const globalTrails = [
     { name: "Cultura da Empresa 101", points: 250, bonus: 50, active: true },
@@ -81,6 +79,32 @@ const ProgressView = () => (
 
 
 export default function AdminTrilhasPage() {
+  const [trails, setTrails] = useState<Trail[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTrails = async () => {
+      setIsLoading(true);
+      try {
+        const mockTrails: Trail[] = [
+            { name: "Onboarding de Novos Influenciadores", status: "Ativa", enrolled: 45, total: 45, description: "Prepare novos colaboradores para se tornarem advogados da marca.", points: 500, bonus: 100 },
+            { name: "Como criar conteúdo viral", status: "Inativa", enrolled: 30, total: 45, description: "Aprenda técnicas para criar posts que engajam.", points: 300, bonus: 50 },
+        ];
+        // In a real scenario, you'd fetch from Firestore:
+        // const querySnapshot = await getDocs(collection(db, "companies", "company-123", "trails"));
+        // const fetchedTrails = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Trail[];
+        // setTrails(fetchedTrails);
+        setTrails(mockTrails);
+      } catch (error) {
+        console.error("Error fetching trails: ", error);
+        // handle error
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchTrails();
+  }, []);
+
   const createTrailButton = (
     <Button size="sm">
       <PlusCircle className="mr-2 h-4 w-4" />
@@ -127,41 +151,58 @@ export default function AdminTrilhasPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {trails.map((trail) => (
-                        <TableRow key={trail.name} className={trail.status === 'Inativa' ? 'text-muted-foreground' : ''}>
-                          <TableCell className="font-medium">{trail.name}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                                <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
-                                    <Zap className="h-3 w-3 mr-1"/>
-                                    {trail.points}
-                                </Badge>
-                                {trail.bonus > 0 && (
-                                <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
-                                    <Star className="h-3 w-3 mr-1"/>
-                                    {trail.bonus}
-                                </Badge>
-                                )}
-                            </div>
-                          </TableCell>
-                          <TableCell><Badge variant={trail.status === 'Ativa' ? 'default' : 'outline'}>{trail.status}</Badge></TableCell>
-                          <TableCell>{trail.enrolled} / {trail.total}</TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <EditTrailButton trail={trail} />
-                                <ViewProgressButton />
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem>{trail.status === 'Ativa' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center">
+                           <div className="flex justify-center items-center p-4">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                <span className="ml-2">Carregando trilhas...</span>
+                           </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : trails.length === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={5} className="text-center">
+                                Nenhuma trilha personalizada encontrada.
+                            </TableCell>
                         </TableRow>
-                    ))}
+                    ) : (
+                        trails.map((trail) => (
+                            <TableRow key={trail.name} className={trail.status === 'Inativa' ? 'text-muted-foreground' : ''}>
+                            <TableCell className="font-medium">{trail.name}</TableCell>
+                            <TableCell>
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+                                        <Zap className="h-3 w-3 mr-1"/>
+                                        {trail.points}
+                                    </Badge>
+                                    {trail.bonus > 0 && (
+                                    <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
+                                        <Star className="h-3 w-3 mr-1"/>
+                                        {trail.bonus}
+                                    </Badge>
+                                    )}
+                                </div>
+                            </TableCell>
+                            <TableCell><Badge variant={trail.status === 'Ativa' ? 'default' : 'outline'}>{trail.status}</Badge></TableCell>
+                            <TableCell>{trail.enrolled} / {trail.total}</TableCell>
+                            <TableCell>
+                                <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <EditTrailButton trail={trail} />
+                                    <ViewProgressButton />
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem>{trail.status === 'Ativa' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
+                                </DropdownMenuContent>
+                                </DropdownMenu>
+                            </TableCell>
+                            </TableRow>
+                        ))
+                    )}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -200,7 +241,6 @@ export default function AdminTrilhasPage() {
                                 {trail.bonus > 0 && (
                                 <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
                                     <Star className="h-3 w-3 mr-1"/>
-                                    {trail.bonus}
                                 </Badge>
                                 )}
                             </div>
@@ -223,3 +263,4 @@ export default function AdminTrilhasPage() {
     </>
   );
 }
+
