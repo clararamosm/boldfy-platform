@@ -5,52 +5,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Users, Trophy, Gift, CheckCircle } from "lucide-react";
 
+const StatCard = ({ title, value, description, icon: Icon }) => (
+    <Card>
+        <CardHeader>
+            <Icon className="h-6 w-6 text-muted-foreground mb-2" />
+            <CardTitle className="text-sm font-medium h-10">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <div className="text-2xl font-bold font-headline">{value}</div>
+            <p className="text-xs text-muted-foreground">{description}</p>
+        </CardContent>
+    </Card>
+);
+
+
 export default function AdminDashboardPage() {
   return (
     <>
       <Header title="Dashboard" />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-                <CardHeader className="flex flex-row items-start justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Colaboradores Ativos</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">45 / 50</div>
-                    <p className="text-xs text-muted-foreground">Licenças usadas</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-start justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Engajamento</CardTitle>
-                    <Trophy className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">82%</div>
-                    <p className="text-xs text-muted-foreground">+5% vs. mês passado</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-start justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Recompensas Resgatadas</CardTitle>
-                    <Gift className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">12</div>
-                    <p className="text-xs text-muted-foreground">Este mês</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-start justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Missões Completas</CardTitle>
-                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">153</div>
-                    <p className="text-xs text-muted-foreground">Esta semana</p>
-                </CardContent>
-            </Card>
+            <StatCard title="Colaboradores Ativos" value="45 / 50" description="Licenças usadas" icon={Users} />
+            <StatCard title="Engajamento" value="82%" description="+5% vs. mês passado" icon={Trophy} />
+            <StatCard title="Recompensas Resgatadas" value="12" description="Este mês" icon={Gift} />
+            <StatCard title="Missões Completas" value="153" description="Esta semana" icon={CheckCircle} />
         </div>
         <div className="mt-6">
             <Card>

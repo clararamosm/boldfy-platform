@@ -6,52 +6,30 @@ import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, PlusCircle, Users, Building2, BookOpen, Globe } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+
+const StatCard = ({ title, value, description, icon: Icon }) => (
+    <Card>
+        <CardHeader>
+            <Icon className="h-6 w-6 text-muted-foreground mb-2" />
+            <CardTitle className="text-sm font-medium h-10">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <div className="text-2xl font-bold font-headline">{value}</div>
+            <p className="text-xs text-muted-foreground">{description}</p>
+        </CardContent>
+    </Card>
+);
+
 export default function MasterDashboardPage() {
   return (
     <>
       <Header title="Master Dashboard" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Empresas Ativas</CardTitle>
-                    <Building2 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">15</div>
-                    <p className="text-xs text-muted-foreground">+2 novas este mês</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Colaboradores Totais</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">852</div>
-                    <p className="text-xs text-muted-foreground">Em todas as empresas</p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Trilhas Globais</CardTitle>
-                    <Globe className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">5</div>
-                    <p className="text-xs text-muted-foreground">Conteúdos disponíveis</p>
-                </CardContent>
-            </Card>
-             <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium">Engajamento Médio</CardTitle>
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold font-headline">78%</div>
-                    <p className="text-xs text-muted-foreground">Atividade na plataforma</p>
-                </CardContent>
-            </Card>
+           <StatCard title="Empresas Ativas" value="15" description="+2 novas este mês" icon={Building2} />
+           <StatCard title="Colaboradores Totais" value="852" description="Em todas as empresas" icon={Users} />
+           <StatCard title="Trilhas Globais" value="5" description="Conteúdos disponíveis" icon={Globe} />
+           <StatCard title="Engajamento Médio" value="78%" description="Atividade na plataforma" icon={BookOpen} />
         </div>
         
         <Card>
