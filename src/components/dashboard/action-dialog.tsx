@@ -23,6 +23,7 @@ type ActionDialogProps = {
   onAction?: () => void;
   showCancel?: boolean;
   className?: string;
+  secondaryAction?: React.ReactNode;
 };
 
 export function ActionDialog({
@@ -33,7 +34,8 @@ export function ActionDialog({
   actionText,
   onAction,
   showCancel = true,
-  className
+  className,
+  secondaryAction
 }: ActionDialogProps) {
     const [isOpen, setIsOpen] = React.useState(false);
 
@@ -55,11 +57,10 @@ export function ActionDialog({
         <div className="grid gap-4 py-4">{children}</div>
         <DialogFooter>
             {showCancel && <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>}
+            {secondaryAction}
             <Button onClick={handleAction}>{actionText}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-    

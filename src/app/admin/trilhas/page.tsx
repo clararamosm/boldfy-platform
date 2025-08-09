@@ -32,7 +32,8 @@ const EditTrailButton = ({ trail }: { trail: Trail }) => (
     title="Editar Trilha de Aprendizagem"
     description="Altere o conteúdo da sua trilha, adicione tópicos, vídeos e edite o quiz."
     trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar Conteúdo</DropdownMenuItem>}
-    actionText="Salvar Alterações"
+    actionText="Publicar Alterações"
+    secondaryAction={<Button variant="outline">Salvar como Rascunho</Button>}
     className="sm:max-w-3xl"
   >
     <TrailForm trail={trail} />
@@ -101,7 +102,8 @@ export default function AdminTrilhasPage() {
               title="Criar Trilha Personalizada"
               description="Crie uma nova trilha de aprendizagem para sua equipe com tópicos, vídeos e quizzes."
               trigger={createTrailButton}
-              actionText="Salvar Trilha"
+              actionText="Publicar Trilha"
+              secondaryAction={<Button variant="outline">Salvar como Rascunho</Button>}
               className="sm:max-w-3xl"
             >
               <TrailForm />
@@ -118,8 +120,7 @@ export default function AdminTrilhasPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
-                       <TableHead>Pontos</TableHead>
-                       <TableHead>Bônus</TableHead>
+                       <TableHead>Pontuação</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Inscritos</TableHead>
                       <TableHead><span className="sr-only">Ações</span></TableHead>
@@ -129,8 +130,20 @@ export default function AdminTrilhasPage() {
                     {trails.map((trail) => (
                         <TableRow key={trail.name} className={trail.status === 'Inativa' ? 'text-muted-foreground' : ''}>
                           <TableCell className="font-medium">{trail.name}</TableCell>
-                          <TableCell>{trail.points}</TableCell>
-                          <TableCell>{trail.bonus}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+                                    <Zap className="h-3 w-3 mr-1"/>
+                                    {trail.points}
+                                </Badge>
+                                {trail.bonus > 0 && (
+                                <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
+                                    <Star className="h-3 w-3 mr-1"/>
+                                    {trail.bonus} bônus
+                                </Badge>
+                                )}
+                            </div>
+                          </TableCell>
                           <TableCell><Badge variant={trail.status === 'Ativa' ? 'default' : 'outline'}>{trail.status}</Badge></TableCell>
                           <TableCell>{trail.enrolled} / {trail.total}</TableCell>
                           <TableCell>
@@ -184,10 +197,12 @@ export default function AdminTrilhasPage() {
                                     <Zap className="h-3 w-3 mr-1"/>
                                     {trail.points}
                                 </Badge>
+                                {trail.bonus > 0 && (
                                 <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
                                     <Star className="h-3 w-3 mr-1"/>
                                     {trail.bonus} bônus
                                 </Badge>
+                                )}
                             </div>
                          </TableCell>
                          <TableCell>
