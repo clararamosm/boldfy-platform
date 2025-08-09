@@ -1,49 +1,114 @@
 // src/app/influencer/trilhas/page.tsx
+'use client';
+
+import React, { useState, useEffect } from 'react';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Star, Zap, Globe, Building } from "lucide-react";
+import { Star, Zap, Globe, Building, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTotal, type, buttonText = "Ver conteúdo", buttonVariant = "default" }) => (
-    <Card className="shadow-sm">
-        <CardContent className="p-4">
-            <div className="flex justify-between items-start mb-2 gap-2">
-                <div>
-                     <Badge variant="outline" className="mb-2 font-normal">
-                        {type === 'global' ? <Globe className="h-3 w-3 mr-1.5" /> : <Building className="h-3 w-3 mr-1.5" />}
-                        {type === 'global' ? 'Global' : 'Personalizada'}
-                    </Badge>
-                    <h3 className="font-semibold">{title}</h3>
+// Mock data structure for a trail fetched from Firestore
+type Trail = {
+    id: string;
+    title: string;
+    points: number;
+    bonus: number;
+    type: 'global' | 'personalizada';
+    // Mock user progress
+    progress: number;
+    tasksCompleted: number;
+    tasksTotal: number;
+};
+
+
+const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTotal, type }) => {
+    let buttonText = "Iniciar Trilha";
+    let buttonVariant: "default" | "secondary" = "default";
+
+    if (progress > 0 && progress < 100) {
+        buttonText = "Continuar";
+    } else if (progress === 100) {
+        buttonText = "Revisar";
+        buttonVariant = "secondary";
+    }
+
+    return (
+        <Card className="shadow-sm">
+            <CardContent className="p-4">
+                <div className="flex justify-between items-start mb-2 gap-2">
+                    <div>
+                        <Badge variant="outline" className="mb-2 font-normal">
+                            {type === 'global' ? <Globe className="h-3 w-3 mr-1.5" /> : <Building className="h-3 w-3 mr-1.5" />}
+                            {type === 'global' ? 'Global' : 'Personalizada'}
+                        </Badge>
+                        <h3 className="font-semibold">{title}</h3>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
+                        <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+                            <Zap className="h-3 w-3 mr-1"/>
+                            {points}
+                        </Badge>
+                        <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
+                            <Star className="h-3 w-3 mr-1"/>
+                            {bonus}
+                        </Badge>
+                    </div>
                 </div>
-                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
-                    <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
-                        <Zap className="h-3 w-3 mr-1"/>
-                        {points}
-                    </Badge>
-                     <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
-                        <Star className="h-3 w-3 mr-1"/>
-                        {bonus}
-                    </Badge>
+                <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
+                    <span>Progresso</span>
+                    <span>{tasksCompleted}/{tasksTotal}</span>
                 </div>
-            </div>
-            <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
-                <span>Progresso</span>
-                <span>{tasksCompleted}/{tasksTotal}</span>
-            </div>
-            <Progress value={progress} />
-             <div className="mt-4">
-                <Button variant={buttonVariant} className="w-full sm:w-auto" asChild>
-                    <Link href={`/influencer/trilhas/${id}`}>{buttonText}</Link>
-                </Button>
-            </div>
-        </CardContent>
-    </Card>
-);
+                <Progress value={progress} />
+                <div className="mt-4">
+                    <Button variant={buttonVariant} className="w-full sm:w-auto" asChild>
+                        <Link href={`/influencer/trilhas/${id}`}>{buttonText}</Link>
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 export default function TrilhasPage() {
+    const [trails, setTrails] = useState<Trail[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+     useEffect(() => {
+        const fetchTrails = async () => {
+        setIsLoading(true);
+        try {
+            // Mock fetching logic. In a real app, you'd fetch trails for the company
+            // and then merge with the current user's progress data.
+            const mockFetchedTrails: Trail[] = [
+                { id: "onboarding", title: "Onboarding de Novos Influenciadores", points: 500, bonus: 100, progress: 0, tasksCompleted: 0, tasksTotal: 3, type: "personalizada" },
+                { id: "cultura", title: "Cultura da Empresa 101", points: 250, bonus: 50, progress: 75, tasksCompleted: 3, tasksTotal: 4, type: "global" },
+                { id: "produtos", title: "Dominando Nossos Produtos", points: 400, bonus: 0, progress: 100, tasksCompleted: 5, tasksTotal: 5, type: "global" },
+            ];
+
+            // Example of how you might fetch from Firestore
+            // const companyTrailsSnapshot = await getDocs(collection(db, "companies", "company-123", "trails"));
+            // const globalTrailsSnapshot = await getDocs(collection(db, "global-trails"));
+            // ... then merge and map with user progress
+            
+            setTrails(mockFetchedTrails);
+        } catch (error) {
+            console.error("Error fetching trails:", error);
+            // Handle error (e.g., show toast)
+        } finally {
+            setIsLoading(false);
+        }
+        };
+
+        fetchTrails();
+    }, []);
+
+
   return (
     <>
       <Header title="Trilhas de Aprendizagem" />
@@ -69,30 +134,16 @@ export default function TrilhasPage() {
         
         <div className="space-y-4">
             <h2 className="text-xl font-bold font-headline">Minhas Trilhas</h2>
-             <TrailCard 
-                id="onboarding"
-                title="Onboarding de Novos Influenciadores" 
-                points={500} 
-                bonus={100} 
-                progress={0}
-                tasksCompleted={0}
-                tasksTotal={3}
-                buttonText="Iniciar Trilha"
-                buttonVariant="default"
-                type="personalizada"
-            />
-            <TrailCard 
-                id="cultura"
-                title="Cultura da Empresa 101" 
-                points={500} 
-                bonus={100} 
-                progress={75}
-                tasksCompleted={3}
-                tasksTotal={4}
-                buttonText="Continuar"
-                buttonVariant="default"
-                type="global"
-            />
+             {isLoading ? (
+                <div className="flex justify-center items-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <span className="ml-3 text-muted-foreground">Carregando trilhas...</span>
+                </div>
+            ) : trails.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">Nenhuma trilha disponível no momento.</p>
+            ) : (
+                trails.map(trail => <TrailCard key={trail.id} {...trail} />)
+            )}
         </div>
       </main>
     </>
