@@ -34,8 +34,7 @@ async function getCompanyProfile(companyId: string): Promise<string> {
 }
 
 // Fetches the influencer's personal branding from Firestore.
-// TODO: Replace 'user-123' with the actual logged-in user's ID.
-async function getPersonalBranding(userId: string = "user-123"): Promise<string> {
+async function getPersonalBranding(userId: string): Promise<string> {
     const userDocRef = doc(db, "users", userId);
     const userDocSnap = await getDoc(userDocRef);
 
@@ -65,6 +64,7 @@ async function getPersonalBranding(userId: string = "user-123"): Promise<string>
 const AlignContentActionSchema = z.object({
   content: z.string().min(1, { message: 'O conteúdo não pode estar vazio.' }),
   companyId: z.string(),
+  userId: z.string(), // Added userId to the schema
   format: z.enum(['linkedin', 'text-heavy', 'hybrid']),
   length: z.enum(['short', 'medium', 'long']),
 });
@@ -82,6 +82,7 @@ export async function handleAlignContent(
     const validatedData = AlignContentActionSchema.safeParse({
       content: formData.get('content'),
       companyId: formData.get('companyId'),
+      userId: formData.get('userId'), // Get userId from formData
       format: formData.get('format'),
       length: formData.get('length'),
     });
@@ -90,12 +91,10 @@ export async function handleAlignContent(
       return { error: validatedData.error.errors.map((e) => e.message).join(', ') };
     }
 
-    const { content, companyId, format, length } = validatedData.data;
+    const { content, companyId, userId, format, length } = validatedData.data;
 
     const companyProfile = await getCompanyProfile(companyId);
-
-    // TODO: Pass the actual user ID from the session
-    const personalBranding = await getPersonalBranding();
+    const personalBranding = await getPersonalBranding(userId); // Pass the dynamic user ID
 
     const result = await alignContent({ 
         content, 

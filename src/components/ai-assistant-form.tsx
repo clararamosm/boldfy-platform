@@ -36,7 +36,8 @@ function SubmitButton() {
   );
 }
 
-export function AiAssistantForm({ companyId }: { companyId: string }) {
+// TODO: In a real app, the userId would come from the user's session.
+export function AiAssistantForm({ companyId, userId = "user-123" }: { companyId: string, userId?: string }) {
   const [state, formAction] = useActionState(handleAlignContent, initialState);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
@@ -63,6 +64,7 @@ export function AiAssistantForm({ companyId }: { companyId: string }) {
   return (
     <form ref={formRef} action={formAction}>
       <input type="hidden" name="companyId" value={companyId} />
+      <input type="hidden" name="userId" value={userId} />
       <Card className="mx-auto max-w-3xl">
         <CardHeader>
           <CardTitle className="font-headline">Alinhe seu conteúdo com a marca</CardTitle>
