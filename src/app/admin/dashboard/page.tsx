@@ -5,8 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Users, Trophy, Gift, CheckCircle, Loader2 } from "lucide-react";
+import { Users, Trophy, Gift, CheckCircle } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 
 type StatCardProps = {
