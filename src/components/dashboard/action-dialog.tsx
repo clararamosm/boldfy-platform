@@ -34,10 +34,11 @@ type ActionDialogProps = {
 
 // This button is specifically for the primary action in the footer.
 // It will show a pending state if its parent form is submitting.
+// It must be a child of the <form> element to work correctly.
 const PrimaryActionButton = ({ text }: { text: string }) => {
     const { pending } = useFormStatus();
     return (
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending} form={pending ? undefined : 'company-form'}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {text}
         </Button>
@@ -64,11 +65,10 @@ export function ActionDialog({
   // This is how `useFormStatus` gets the correct pending state.
   const renderFooterAction = () => {
     if (formId) {
-      return (
-        <form action={onAction as any}>
-          <PrimaryActionButton text={actionText} />
-        </form>
-      );
+      // The button needs to be associated with the form.
+      // We pass the formId to the button's `form` attribute.
+      // useFormStatus only works on children of the form, so PrimaryActionButton is now inside the form itself.
+      return <Button type="submit" form={formId}>{actionText}</Button>;
     }
     // Fallback for non-form actions
     return (
@@ -90,10 +90,7 @@ export function ActionDialog({
         <DialogFooter>
           {showCancel && <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>}
           {secondaryAction}
-          {/* We now submit the form using its ID, which is the standard HTML5 way */}
-          <Button type="submit" form={formId}>
-              {actionText}
-          </Button>
+          {renderFooterAction()}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -120,7 +120,6 @@ const CreateCheckoutSessionSchema = z.object({
   adminName: z.string(),
   adminEmail: z.string().email(),
   licenses: z.coerce.number().int().positive(),
-  priceId: z.string(), // e.g., price_1PJU0dRx1EDs2Xy7nopfo123
 });
 
 type CheckoutState = {
@@ -134,19 +133,22 @@ export async function createCheckoutSession(prevState: CheckoutState, formData: 
         adminName: formData.get('adminName'),
         adminEmail: formData.get('adminEmail'),
         licenses: formData.get('licenses'),
-        priceId: process.env.STRIPE_PRICE_ID, // Using environment variable for price ID
     });
 
     if(!validatedData.success) {
         return { error: validatedData.error.errors.map(e => e.message).join(', ') };
     }
+    
+    if (!process.env.STRIPE_PRICE_ID) {
+        return { error: 'A variável de ambiente STRIPE_PRICE_ID não está configurada.' };
+    }
 
-    const { companyName, adminName, adminEmail, licenses, priceId } = validatedData.data;
+    const { companyName, adminName, adminEmail, licenses } = validatedData.data;
     const origin = headers().get('origin');
     
     try {
         // Create a pre-company document in Firestore to hold the data temporarily
-        // A webhook handler would later update this to 'active' and create the admin user.
+        // The webhook handler will later update this to 'active' and create the admin user.
         const pendingCompanyRef = await addDoc(collection(db, "companies"), {
             companyName,
             adminProfile: {
@@ -165,17 +167,24 @@ export async function createCheckoutSession(prevState: CheckoutState, formData: 
             payment_method_types: ['card'],
             line_items: [
                 {
-                    price: priceId,
+                    price: process.env.STRIPE_PRICE_ID,
                     quantity: licenses,
                 },
             ],
             mode: 'subscription',
             success_url: `${origin}/master/empresas?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${origin}/master/empresas?payment_canceled=true`,
+            // Pass the ID of the Firestore document to the webhook handler
+            // This is crucial for linking the payment to the company.
             metadata: {
-                // Pass the ID of the Firestore document to the webhook handler
                 companyId: pendingCompanyRef.id,
-            }
+                companyName,
+                adminEmail,
+                adminName,
+                licenses: licenses.toString()
+            },
+             // Pass customer email to prefill Stripe checkout page
+            customer_email: adminEmail
         });
 
         if (!session.id) {

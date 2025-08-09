@@ -37,16 +37,16 @@ function CompanyFormContent() {
     return (
         <div className="space-y-4">
             <div className="space-y-2">
-                <Label htmlFor="company-name">Nome da Empresa</Label>
-                <Input name="companyName" id="company-name" placeholder="Ex: TechCorp" disabled={pending} required />
+                <Label htmlFor="companyName">Nome da Empresa</Label>
+                <Input name="companyName" id="companyName" placeholder="Ex: TechCorp" disabled={pending} required />
             </div>
             <div className="space-y-2">
-                <Label htmlFor="admin-name">Nome do Admin</Label>
-                <Input name="adminName" id="admin-name" placeholder="Ex: João Silva" disabled={pending} required />
+                <Label htmlFor="adminName">Nome do Admin</Label>
+                <Input name="adminName" id="adminName" placeholder="Ex: João Silva" disabled={pending} required />
             </div>
             <div className="space-y-2">
-                <Label htmlFor="admin-email">E-mail do Admin</Label>
-                <Input name="adminEmail" id="admin-email" type="email" placeholder="admin@techcorp.com" disabled={pending} required />
+                <Label htmlFor="adminEmail">E-mail do Admin</Label>
+                <Input name="adminEmail" id="adminEmail" type="email" placeholder="admin@techcorp.com" disabled={pending} required />
             </div>
              <div className="space-y-2">
                 <Label htmlFor="licenses">Número de Licenças (Assentos)</Label>
@@ -56,16 +56,9 @@ function CompanyFormContent() {
     );
 }
 
-const CompanyForm = ({ formRef, formAction, onFormActionComplete }: { formRef: React.RefObject<HTMLFormElement>, formAction: (payload: FormData) => void, onFormActionComplete: () => void }) => {
-    
-    // We need to wrap the form action to know when it's done.
-    const formActionWrapper = async (formData: FormData) => {
-        await formAction(formData);
-        onFormActionComplete();
-    };
-    
+const CompanyForm = ({ formRef, formAction }: { formRef: React.RefObject<HTMLFormElement>, formAction: (payload: FormData) => void }) => {
     return (
-        <form ref={formRef} action={formActionWrapper} id="company-form">
+        <form ref={formRef} action={formAction} id="company-form">
             <CompanyFormContent />
         </form>
     );
@@ -83,11 +76,26 @@ export default function MasterEmpresasPage() {
 
     // Handle toast notifications for payment status
     const searchParams = useSearchParams();
+    const fetchCompanies = async () => {
+        setIsLoading(true);
+        try {
+            const companiesQuery = collection(db, "companies");
+            const querySnapshot = await getDocs(companiesQuery);
+            const companiesList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
+            setCompanies(companiesList);
+        } catch (error) {
+            console.error("Error fetching companies:", error);
+            toast({ variant: 'destructive', title: 'Erro ao buscar empresas' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     useEffect(() => {
         if (searchParams.get('payment_success')) {
             toast({
-                title: 'Pagamento Concluído!',
-                description: 'A nova empresa foi criada e está aguardando ativação.',
+                title: 'Pagamento Iniciado!',
+                description: 'A nova empresa será ativada assim que o pagamento for confirmado.',
             });
             fetchCompanies(); // Refresh list
         }
@@ -109,6 +117,7 @@ export default function MasterEmpresasPage() {
                     toast({ variant: 'destructive', title: 'Erro', description: 'Stripe.js não foi carregado.' });
                     return;
                 }
+                setIsDialogOpen(false); // Close dialog before redirecting
                 await stripe.redirectToCheckout({ sessionId: checkoutState.sessionId! });
             }
             redirectToCheckout();
@@ -121,22 +130,6 @@ export default function MasterEmpresasPage() {
             });
         }
     }, [checkoutState, toast]);
-
-
-    const fetchCompanies = async () => {
-        setIsLoading(true);
-        try {
-            const companiesQuery = collection(db, "companies");
-            const querySnapshot = await getDocs(companiesQuery);
-            const companiesList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
-            setCompanies(companiesList);
-        } catch (error) {
-            console.error("Error fetching companies:", error);
-            toast({ variant: 'destructive', title: 'Erro ao buscar empresas' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     useEffect(() => {
         fetchCompanies();
@@ -196,11 +189,7 @@ export default function MasterEmpresasPage() {
                 >
                     <CompanyForm 
                         formRef={formRef}
-                        formAction={formAction} 
-                        onFormActionComplete={() => {
-                            // The dialog will not close automatically because the page will redirect.
-                            // No need to call setIsDialogOpen(false) here.
-                        }}
+                        formAction={formAction}
                     />
                 </ActionDialog>
             </CardHeader>
