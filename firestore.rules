@@ -1,0 +1,87 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if a user belongs to a specific company
+    function userBelongsToCompany(companyId) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+    }
+
+    // Helper function to check if a user is an admin of a specific company
+    function isCompanyAdmin(companyId) {
+      let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return userRole == 'admin' && userBelongsToCompany(companyId);
+    }
+    
+    // Helper function to check if a user is the master admin
+    function isMasterAdmin() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'master';
+    }
+
+    // Users can read their own document
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isMasterAdmin();
+      allow create: if isMasterAdmin() || isCompanyAdmin(request.resource.data.companyId); // Master creates admins, admins create users
+      allow update: if request.auth.uid == userId; // Users can update their own profile
+    }
+
+    // Companies can be read by their members or by the master admin
+    match /companies/{companyId} {
+      allow read: if userBelongsToCompany(companyId) || isMasterAdmin();
+      allow create: if isMasterAdmin(); // Only master can create new companies initially
+      allow update: if isCompanyAdmin(companyId) || isMasterAdmin(); // Only admin/master can update company details
+
+      // Subcollections within a company
+      
+      // Assets can be read by company members, managed by admins
+      match /assets/{assetId} {
+        allow read: if userBelongsToCompany(companyId);
+        allow write: if isCompanyAdmin(companyId);
+      }
+      
+      // Collaborators can be read by company members, managed by admins
+      match /collaborators/{collaboratorId} {
+         allow read: if userBelongsToCompany(companyId);
+         allow write: if isCompanyAdmin(companyId);
+      }
+      
+      // Missions can be read by company members, managed by admins
+      match /missions/{missionId} {
+        allow read: if userBelongsToCompany(companyId);
+        allow write: if isCompanyAdmin(companyId);
+      }
+      
+      // Rewards can be read by company members, managed by admins
+       match /rewards/{rewardId} {
+        allow read: if userBelongsToCompany(companyId);
+        allow write: if isCompanyAdmin(companyId);
+      }
+      
+      // Rescues: Users can create their own, admins can read all
+      match /rescues/{rescueId} {
+        allow read: if isCompanyAdmin(companyId);
+        allow create: if request.auth.uid == request.resource.data.userId && userBelongsToCompany(companyId);
+        allow update: if isCompanyAdmin(companyId); // Admin can update status to 'Paid'
+      }
+
+      // Activity can be read by company members, written by anyone in the company
+      match /activity/{activityId} {
+          allow read: if userBelongsToCompany(companyId);
+          allow write: if userBelongsToCompany(companyId);
+      }
+      
+      // Trails can be read by company members, managed by admins
+      match /trails/{trailId} {
+        allow read: if userBelongsToCompany(companyId);
+        allow write: if isCompanyAdmin(companyId);
+      }
+    }
+    
+    // Point History is private to each user
+    match /users/{userId}/pointHistory/{historyId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+  }
+}
