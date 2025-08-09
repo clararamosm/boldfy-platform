@@ -2,6 +2,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,21 +11,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Users, Building2, BookOpen, Globe, LogIn, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useToast } from '@/hooks/use-toast';
+
 
 type Company = {
     id: string;
-    name: string;
+    companyName: string;
     status: 'Ativa' | 'Inativa';
-    licensesUsed: number;
-    licensesTotal: number;
-    adminEmail: string;
+    licenses: number;
+    adminProfile: { email: string };
 };
 
 type MasterStats = {
     activeCompanies: number;
     totalCollaborators: number;
     globalTrails: number;
-    avgEngagement: number;
+    avgEngagement: number; // Placeholder
 };
 
 const StatCard = ({ title, value, description, icon: Icon, isLoading }: { title: string, value: string, description: string, icon: React.ElementType, isLoading: boolean }) => (
@@ -47,36 +50,40 @@ export default function MasterDashboardPage() {
     const [stats, setStats] = useState<MasterStats | null>(null);
     const [recentCompanies, setRecentCompanies] = useState<Company[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { toast } = useToast();
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                // MOCK DATA - In a real app, this would be fetched and aggregated from Firestore
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                // Fetch companies
+                const companiesQuery = collection(db, "companies");
+                const companiesSnap = await getDocs(companiesQuery);
+                const companiesList = companiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Company[];
                 
-                const mockStats: MasterStats = {
-                    activeCompanies: 15,
-                    totalCollaborators: 852,
-                    globalTrails: 5,
-                    avgEngagement: 78,
-                };
+                // Fetch users to calculate total collaborators
+                const usersQuery = collection(db, "users");
+                const usersSnap = await getDocs(usersQuery);
+                const collaboratorsCount = usersSnap.size;
 
-                const mockCompanies: Company[] = [
-                     { id: "1", name: "Innovate Inc.", status: "Ativa", licensesUsed: 45, licensesTotal: 50, adminEmail: "admin.innovate@example.com" },
-                     { id: "2", name: "TechCorp", status: "Ativa", licensesUsed: 100, licensesTotal: 100, adminEmail: "admin.techcorp@example.com" },
-                ];
+                const mockStats: MasterStats = {
+                    activeCompanies: companiesList.filter(c => c.status === 'Ativa').length,
+                    totalCollaborators: collaboratorsCount,
+                    globalTrails: 5, // Placeholder, would be fetched from a 'global-trails' collection
+                    avgEngagement: 78, // Placeholder
+                };
                 
                 setStats(mockStats);
-                setRecentCompanies(mockCompanies);
+                setRecentCompanies(companiesList.slice(0, 5)); // Show most recent 5
             } catch (error) {
                 console.error("Error fetching master data:", error);
+                 toast({ variant: 'destructive', title: 'Erro ao buscar dados mestre' });
             } finally {
                 setIsLoading(false);
             }
         };
         fetchData();
-    }, []);
+    }, [toast]);
 
   return (
     <>
@@ -115,16 +122,20 @@ export default function MasterDashboardPage() {
                                 </div>
                             </TableCell>
                         </TableRow>
+                    ) : recentCompanies.length === 0 ? (
+                         <TableRow>
+                            <TableCell colSpan={5} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
+                        </TableRow>
                     ) : (
                         recentCompanies.map(company => (
                              <TableRow key={company.id}>
-                                <TableCell className="font-medium">{company.name}</TableCell>
+                                <TableCell className="font-medium">{company.companyName}</TableCell>
                                 <TableCell><Badge variant={company.status === 'Ativa' ? 'default' : 'destructive'}>{company.status}</Badge></TableCell>
-                                <TableCell>{company.licensesUsed} / {company.licensesTotal}</TableCell>
-                                <TableCell>{company.adminEmail}</TableCell>
+                                <TableCell>0 / {company.licenses}</TableCell>
+                                <TableCell>{company.adminProfile?.email}</TableCell>
                                 <TableCell>
                                     <Button variant="outline" size="sm" asChild>
-                                       <Link href="/admin/dashboard"><LogIn className="mr-2 h-4 w-4" />Visualizar</Link>
+                                       <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar</Link>
                                     </Button>
                                 </TableCell>
                             </TableRow>

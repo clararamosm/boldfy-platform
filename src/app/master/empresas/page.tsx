@@ -1,7 +1,9 @@
 // src/app/master/empresas/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,16 +16,37 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 type Company = {
     id: string;
-    name: string;
+    companyName: string;
     status: 'Ativa' | 'Inativa';
-    licensesUsed: number;
-    licensesTotal: number;
-    adminEmail: string;
-    startDate: string;
+    licenses: number;
+    adminProfile: { email: string; name: string; };
+    createdAt: any;
 };
+
+const CompanyForm = ({ isSubmitting, formRef }: { isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement>}) => (
+    <form ref={formRef} id="company-form" className="space-y-4">
+        <div className="space-y-2">
+            <Label htmlFor="company-name">Nome da Empresa</Label>
+            <Input name="companyName" id="company-name" placeholder="Ex: TechCorp" disabled={isSubmitting} required />
+        </div>
+        <div className="space-y-2">
+            <Label htmlFor="admin-name">Nome do Admin</Label>
+            <Input name="adminName" id="admin-name" placeholder="Ex: João Silva" disabled={isSubmitting} required />
+        </div>
+        <div className="space-y-2">
+            <Label htmlFor="admin-email">E-mail do Admin</Label>
+            <Input name="adminEmail" id="admin-email" type="email" placeholder="admin@techcorp.com" disabled={isSubmitting} required />
+        </div>
+         <div className="space-y-2">
+            <Label htmlFor="licenses">Número de Licenças</Label>
+            <Input name="licenses" id="licenses" type="number" placeholder="Ex: 100" disabled={isSubmitting} required />
+        </div>
+    </form>
+);
 
 
 export default function MasterEmpresasPage() {
@@ -31,61 +54,79 @@ export default function MasterEmpresasPage() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const formRef = useRef<HTMLFormElement>(null);
+
+    const fetchCompanies = async () => {
+        setIsLoading(true);
+        try {
+            const companiesQuery = collection(db, "companies");
+            const querySnapshot = await getDocs(companiesQuery);
+            const companiesList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
+            setCompanies(companiesList);
+        } catch (error) {
+            console.error("Error fetching companies:", error);
+            toast({ variant: 'destructive', title: 'Erro ao buscar empresas' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchCompanies = async () => {
-            setIsLoading(true);
-            try {
-                // MOCK DATA - In a real app, fetch from Firestore
-                const mockCompanies: Company[] = [
-                    { id: "1", name: "TechCorp", status: "Ativa", licensesUsed: 100, licensesTotal: 100, adminEmail: "admin.techcorp@example.com", startDate: "2023-01-15" },
-                    { id: "2", name: "Innovate Inc.", status: "Ativa", licensesUsed: 45, licensesTotal: 50, adminEmail: "admin.innovate@example.com", startDate: "2023-03-01" },
-                    { id: "3", name: "Future Solutions", status: "Inativa", licensesUsed: 0, licensesTotal: 25, adminEmail: "admin.future@example.com", startDate: "2023-05-20" },
-                ];
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                setCompanies(mockCompanies);
-            } catch (error) {
-                console.error("Error fetching companies:", error);
-                toast({ variant: 'destructive', title: 'Erro ao buscar empresas' });
-            } finally {
-                setIsLoading(false);
-            }
-        };
         fetchCompanies();
-    }, [toast]);
+    }, []);
 
     const handleAddCompany = async () => {
+        if (!formRef.current) return;
+        
         setIsSubmitting(true);
-        // TODO: Implement create company logic (call a server action or Firebase function)
-        console.log("Creating new company...");
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        toast({ title: 'Empresa adicionada com sucesso!' });
-        setIsSubmitting(false);
-        // Here you would refetch the companies list
+        const formData = new FormData(formRef.current);
+        const companyData = {
+            companyName: formData.get('companyName') as string,
+            adminProfile: {
+                name: formData.get('adminName') as string,
+                email: formData.get('adminEmail') as string,
+            },
+            licenses: Number(formData.get('licenses')),
+            status: 'Ativa' as const,
+            createdAt: serverTimestamp(),
+        };
+
+        if (!companyData.companyName || !companyData.adminProfile.email || !companyData.licenses) {
+            toast({ variant: 'destructive', title: 'Campos obrigatórios faltando.' });
+            setIsSubmitting(false);
+            return;
+        }
+
+        try {
+            await addDoc(collection(db, "companies"), companyData);
+            toast({ title: 'Empresa adicionada com sucesso!' });
+            fetchCompanies();
+        } catch(error) {
+             console.error("Error adding company:", error);
+             toast({ variant: 'destructive', title: 'Erro ao adicionar empresa' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+     const handleToggleStatus = async (company: Company) => {
+        const newStatus = company.status === 'Ativa' ? 'Inativa' : 'Ativa';
+        try {
+            const companyDoc = doc(db, "companies", company.id);
+            await updateDoc(companyDoc, { status: newStatus });
+            toast({ title: `Status da empresa alterado para ${newStatus}` });
+            fetchCompanies();
+        } catch (error) {
+            console.error("Error toggling company status:", error);
+            toast({ variant: 'destructive', title: 'Erro ao alterar status da empresa.' });
+        }
     };
 
     const addCompanyButton = (
-        <Button size="sm">
+        <Button size="sm" disabled={isSubmitting}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Adicionar Empresa
         </Button>
-    );
-
-    const companyForm = (
-        <>
-            <div className="space-y-2">
-                <Label htmlFor="company-name">Nome da Empresa</Label>
-                <Input id="company-name" placeholder="Ex: TechCorp" disabled={isSubmitting} />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="admin-email">E-mail do Admin</Label>
-                <Input id="admin-email" type="email" placeholder="admin@techcorp.com" disabled={isSubmitting} />
-            </div>
-             <div className="space-y-2">
-                <Label htmlFor="licenses">Número de Licenças</Label>
-                <Input id="licenses" type="number" placeholder="Ex: 100" disabled={isSubmitting} />
-            </div>
-        </>
     );
 
   return (
@@ -104,8 +145,9 @@ export default function MasterEmpresasPage() {
                     trigger={addCompanyButton}
                     actionText={isSubmitting ? "Salvando..." : "Salvar Empresa"}
                     onAction={handleAddCompany}
+                    formId="company-form"
                 >
-                    {companyForm}
+                    <CompanyForm isSubmitting={isSubmitting} formRef={formRef} />
                 </ActionDialog>
             </CardHeader>
             <CardContent>
@@ -136,11 +178,11 @@ export default function MasterEmpresasPage() {
                         ) : (
                             companies.map(company => (
                                 <TableRow key={company.id}>
-                                    <TableCell className="font-medium">{company.name}</TableCell>
+                                    <TableCell className="font-medium">{company.companyName}</TableCell>
                                     <TableCell><Badge variant={company.status === 'Ativa' ? 'default' : 'destructive'}>{company.status}</Badge></TableCell>
-                                    <TableCell>{company.licensesUsed} / {company.licensesTotal}</TableCell>
-                                    <TableCell>{company.adminEmail}</TableCell>
-                                    <TableCell>{company.startDate}</TableCell>
+                                    <TableCell>0 / {company.licenses}</TableCell>
+                                    <TableCell>{company.adminProfile?.email}</TableCell>
+                                    <TableCell>{company.createdAt?.toDate ? format(company.createdAt.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                     <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -152,10 +194,10 @@ export default function MasterEmpresasPage() {
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>Ações</DropdownMenuLabel>
                                                 <DropdownMenuItem asChild>
-                                                    <Link href="/admin/dashboard"><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
+                                                    <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem>Editar</DropdownMenuItem>
-                                                <DropdownMenuItem>{company.status === 'Ativa' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
+                                                {/* <DropdownMenuItem>Editar</DropdownMenuItem> */}
+                                                <DropdownMenuItem onClick={() => handleToggleStatus(company)}>{company.status === 'Ativa' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>

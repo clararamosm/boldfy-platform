@@ -1,4 +1,3 @@
-
 // src/app/influencer/rankings/page.tsx
 'use client';
 
@@ -6,17 +5,17 @@ import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Crown, Trophy, Gift, BookOpen, Zap, Calendar, Loader2 } from "lucide-react";
+import { Crown, Trophy, Gift, Calendar, Zap, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import React, { useState, useEffect } from 'react';
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, getDoc, doc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { auth } from '@/lib/firebase';
 
-const companyId = 'company-123';
-const currentUserId = 'user-123'; // In a real app, this comes from auth
+const companyId = 'company-123'; // In a real app, this comes from user's company relation
 
 type UserRanking = {
     id: string;
@@ -74,13 +73,29 @@ const PageSkeleton = () => (
 export default function InfluencerRankingsPage() {
     const { toast } = useToast();
     const [generalRanking, setGeneralRanking] = useState<UserRanking[]>([]);
+    const [monthlyPrize, setMonthlyPrize] = useState({ name: 'Prêmio não definido', id: ''});
     const [isLoading, setIsLoading] = useState(true);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+     useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged(user => {
+            if (user) {
+                setCurrentUserId(user.uid);
+            } else {
+                // Handle user not logged in
+                setCurrentUserId(null);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
 
     useEffect(() => {
+        if (!currentUserId) return; // Don't fetch if no user
+
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                // In a real app, you would query users belonging to the companyId
+                // Fetch all users (in a real app, query by companyId)
                 const usersQuery = query(
                     collection(db, "users"), 
                     // where("companyId", "==", companyId) // Add this line in a real app
@@ -90,13 +105,26 @@ export default function InfluencerRankingsPage() {
                 const querySnapshot = await getDocs(usersQuery);
                 const fetchedUsers = querySnapshot.docs.map(doc => ({
                     id: doc.id,
-                    name: doc.data().profile?.name || doc.data().name || 'Usuário Anônimo', // Adjust based on your user data structure
+                    name: doc.data().profile?.name || doc.data().name || 'Usuário Anônimo',
                     points: doc.data().points || 0,
                     avatarUrl: doc.data().profile?.avatarUrl || `https://placehold.co/80x80.png`,
                     isCurrentUser: doc.id === currentUserId
                 }));
-
                 setGeneralRanking(fetchedUsers);
+
+                // Fetch monthly prize
+                const companyDocRef = doc(db, "companies", companyId);
+                const companyDocSnap = await getDoc(companyDocRef);
+                if (companyDocSnap.exists()) {
+                    const prizeId = companyDocSnap.data()?.monthlyPrize;
+                    if (prizeId) {
+                        const prizeDocRef = doc(db, "companies", companyId, "rewards", prizeId);
+                        const prizeDocSnap = await getDoc(prizeDocRef);
+                        if (prizeDocSnap.exists()) {
+                            setMonthlyPrize({ name: prizeDocSnap.data()?.name, id: prizeId });
+                        }
+                    }
+                }
 
             } catch(error) {
                 console.error("Error fetching ranking:", error);
@@ -106,7 +134,7 @@ export default function InfluencerRankingsPage() {
             }
         };
         fetchData();
-    }, [toast]);
+    }, [toast, currentUserId]);
 
     const top3 = generalRanking.slice(0, 3);
     const currentUser = generalRanking.find(u => u.isCurrentUser);
@@ -128,12 +156,14 @@ export default function InfluencerRankingsPage() {
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         
         {/* Podium Section */}
-        {top3.length >= 3 && (
+        {top3.length >= 3 ? (
             <div className="grid gap-4 md:grid-cols-3 items-stretch">
                 <PodiumCard rank={2} user={top3[1]} highlight={top3[1].isCurrentUser} />
                 <PodiumCard rank={1} user={top3[0]} highlight={top3[0].isCurrentUser} />
                 <PodiumCard rank={3} user={top3[2]} highlight={top3[2].isCurrentUser} />
             </div>
+        ) : (
+             <Card><CardContent className="p-4 text-center text-muted-foreground">O pódio será exibido quando houver pelo menos 3 participantes.</CardContent></Card>
         )}
 
         {/* Monthly Prize Section */}
@@ -144,15 +174,15 @@ export default function InfluencerRankingsPage() {
                         <Gift className="h-6 w-6" />
                     </div>
                     <div className="flex-grow text-center sm:text-left">
-                        <p className="font-bold">Prêmio de Agosto: Day Off!</p>
-                        <p className="text-sm text-muted-foreground">O top 1 do ranking este mês ganha um dia de folga.</p>
+                        <p className="font-bold">Prêmio do Mês: {monthlyPrize.name}!</p>
+                        <p className="text-sm text-muted-foreground">O top 1 do ranking este mês ganha esta recompensa.</p>
                     </div>
                     <div className="w-full sm:w-48 text-center sm:text-right">
                          <div className="flex items-center justify-center sm:justify-end gap-2 text-xs text-muted-foreground mb-1">
                             <Calendar className="h-3 w-3" />
-                            <span>15 de 31 dias</span>
+                            <span>{new Date().getDate()} de {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()} dias</span>
                         </div>
-                        <Progress value={(15/31) * 100} className="h-2" />
+                        <Progress value={(new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100} className="h-2" />
                     </div>
                 </div>
             </CardContent>
@@ -185,7 +215,7 @@ export default function InfluencerRankingsPage() {
                                             <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
                                             <AvatarFallback>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
                                         </Avatar>
-                                        <span className={user.isCurrentUser ? 'font-bold' : ''}>{user.name === 'Você' ? 'Você' : user.name}</span>
+                                        <span className={user.isCurrentUser ? 'font-bold' : ''}>{user.isCurrentUser ? 'Você' : user.name}</span>
                                     </div>
                                  </TableCell>
                                  <TableCell className="text-right">

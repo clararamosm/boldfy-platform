@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, AuthErrorCodes } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,8 @@ export default function LoginPage() {
       }
 
     } catch (error: any) {
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+      // Check if the error is due to user not found or wrong password
+      if (error.code === AuthErrorCodes.USER_DELETED || error.code === AuthErrorCodes.INVALID_LOGIN_CREDENTIALS) {
         // Simple demo logic: if user doesn't exist, create one.
         // In a real app, this would be a separate "Sign Up" flow.
         try {
@@ -57,6 +58,13 @@ export default function LoginPage() {
             email: user.email,
             role: userRole,
             createdAt: new Date(),
+            // Add initial data for a new user
+            points: 0,
+            profile: {
+                name: email.split('@')[0],
+                email: email,
+                avatarUrl: `https://placehold.co/100x100.png`
+            }
           });
           
            toast({
@@ -84,7 +92,7 @@ export default function LoginPage() {
         toast({
             variant: 'destructive',
             title: 'Erro no Login',
-            description: 'Credenciais inválidas ou ocorreu um erro.',
+            description: error.message || 'Credenciais inválidas ou ocorreu um erro.',
         });
       }
     } finally {
