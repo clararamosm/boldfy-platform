@@ -1,162 +1,26 @@
 // src/app/admin/trilhas/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Globe, Trash2, Upload, FileVideo, Plus } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Globe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from '@/components/ui/separator';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-
-type Trail = {
-  name: string;
-  status: 'Ativa' | 'Inativa';
-  enrolled: number;
-  total: number;
-};
-
-type Topic = {
-  id: number;
-  title: string;
-  description: string;
-  videoFile: File | null;
-};
-
-type QuizQuestion = {
-    id: number;
-    question: string;
-    options: string[];
-    correctAnswer: number;
-};
-
+import { Trail, TrailForm } from '@/components/dashboard/trail-form';
 
 const trails: Trail[] = [
-  { name: "Onboarding de Novos Influenciadores", status: "Ativa", enrolled: 45, total: 45 },
-  { name: "Como criar conteúdo viral", status: "Inativa", enrolled: 30, total: 45 },
+  { name: "Onboarding de Novos Influenciadores", status: "Ativa", enrolled: 45, total: 45, description: "Prepare novos colaboradores para se tornarem advogados da marca." },
+  { name: "Como criar conteúdo viral", status: "Inativa", enrolled: 30, total: 45, description: "Aprenda técnicas para criar posts que engajam." },
 ];
-
-const TrailForm = ({ trail }: { trail?: Trail }) => {
-  const [topics, setTopics] = useState<Topic[]>([
-    { id: 1, title: 'Bem-vindo à Boldfy!', description: 'Conheça nossa missão, visão e valores.', videoFile: null },
-  ]);
-  const [questions, setQuestions] = useState<QuizQuestion[]>([
-    { id: 1, question: 'Qual é o principal objetivo da nossa plataforma?', options: ['Vender produtos', 'Engajar colaboradores', 'Fazer amigos', 'Postar fotos'], correctAnswer: 1 },
-  ]);
-
-  const addTopic = () => {
-    setTopics([...topics, { id: Date.now(), title: '', description: '', videoFile: null }]);
-  };
-
-  const removeTopic = (id: number) => {
-    setTopics(topics.filter(topic => topic.id !== id));
-  };
-  
-  const addQuestion = () => {
-    setQuestions([...questions, { id: Date.now(), question: '', options: ['', '', '', ''], correctAnswer: 0 }]);
-  };
-
-  const removeQuestion = (id: number) => {
-    setQuestions(questions.filter(q => q.id !== id));
-  };
-
-
-  return (
-    <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-4 -mr-4">
-      {/* Informações Básicas */}
-      <div className="space-y-4">
-         <div className="space-y-2">
-            <Label htmlFor="trail-name" className="font-bold text-base">Nome da Trilha</Label>
-            <Input id="trail-name" placeholder="Ex: Onboarding de Novos Influenciadores" defaultValue={trail?.name} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="trail-description" className="font-bold text-base">Descrição</Label>
-            <Textarea id="trail-description" placeholder="Descreva o objetivo da trilha de aprendizagem." defaultValue="Prepare novos colaboradores para se tornarem advogados da marca." />
-          </div>
-      </div>
-      
-      <Separator />
-
-      {/* Tópicos */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-bold">Tópicos</h3>
-          <Button type="button" variant="outline" size="sm" onClick={addTopic}><Plus className="mr-2 h-4 w-4" />Adicionar Tópico</Button>
-        </div>
-        
-        <div className="space-y-4">
-          {topics.map((topic, index) => (
-            <Card key={topic.id} className="p-4 bg-muted/50">
-              <div className="flex justify-between items-center mb-4">
-                 <h4 className="font-semibold">Tópico {index + 1}</h4>
-                 <Button type="button" variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => removeTopic(topic.id)}>
-                    <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="space-y-3">
-                 <Input placeholder="Título do tópico" defaultValue={topic.title} />
-                 <Textarea placeholder="Descrição longa do tópico..." rows={4} defaultValue={topic.description} />
-                 <div className="space-y-2">
-                    <Label className="flex items-center gap-2 text-sm text-muted-foreground"><FileVideo className="h-4 w-4" />Vídeo do Tópico</Label>
-                    <Input type="file" accept="video/*" className="text-xs" />
-                 </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-       <Separator />
-
-      {/* Quiz */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-            <h3 className="text-lg font-bold">Quiz</h3>
-            <Button type="button" variant="outline" size="sm" onClick={addQuestion}><Plus className="mr-2 h-4 w-4" />Adicionar Pergunta</Button>
-        </div>
-
-        <div className="space-y-4">
-            {questions.map((q, qIndex) => (
-                 <Card key={q.id} className="p-4 bg-muted/50">
-                     <div className="flex justify-between items-center mb-4">
-                        <h4 className="font-semibold">Pergunta {qIndex + 1}</h4>
-                        <Button type="button" variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => removeQuestion(q.id)}>
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                     <div className="space-y-3">
-                        <Textarea placeholder="Qual é a pergunta?" defaultValue={q.question} />
-                        <RadioGroup defaultValue={q.correctAnswer.toString()}>
-                            {q.options.map((opt, oIndex) => (
-                                <div key={oIndex} className="flex items-center gap-2">
-                                    <RadioGroupItem value={oIndex.toString()} id={`q${q.id}-opt${oIndex}`} />
-                                    <Label htmlFor={`q${q.id}-opt${oIndex}`} className="flex-1">
-                                         <Input placeholder={`Opção ${oIndex + 1}`} defaultValue={opt} className="w-full"/>
-                                    </Label>
-                                </div>
-                            ))}
-                        </RadioGroup>
-                        <p className="text-xs text-muted-foreground">Marque a opção que representa a resposta correta.</p>
-                     </div>
-                 </Card>
-            ))}
-        </div>
-      </div>
-
-    </div>
-  );
-};
 
 const EditTrailButton = ({ trail }: { trail: Trail }) => (
   <ActionDialog
@@ -164,6 +28,7 @@ const EditTrailButton = ({ trail }: { trail: Trail }) => (
     description="Altere o conteúdo da sua trilha, adicione tópicos, vídeos e edite o quiz."
     trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar Conteúdo</DropdownMenuItem>}
     actionText="Salvar Alterações"
+    className="sm:max-w-3xl"
   >
     <TrailForm trail={trail} />
   </ActionDialog>
@@ -232,6 +97,7 @@ export default function AdminTrilhasPage() {
               description="Crie uma nova trilha de aprendizagem para sua equipe com tópicos, vídeos e quizzes."
               trigger={createTrailButton}
               actionText="Salvar Trilha"
+              className="sm:max-w-3xl"
             >
               <TrailForm />
             </ActionDialog>

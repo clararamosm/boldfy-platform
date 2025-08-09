@@ -1,3 +1,6 @@
+// src/app/master/conteudo-global/page.tsx
+'use client';
+
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,9 +8,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { TrailForm, Trail } from "@/components/dashboard/trail-form";
+
+const globalTrails: Trail[] = [
+    { name: "Cultura da Empresa 101", topics: 4, companies: 12, creationDate: "2023-02-10", status: 'Ativa', description: "Uma introdução à cultura da empresa." },
+    { name: "Dominando Nossos Produtos", topics: 3, companies: 8, creationDate: "2023-04-05", status: 'Ativa', description: "Conheça a fundo os produtos que oferecemos." },
+];
+
+const EditTrailButton = ({ trail }: { trail: Trail }) => (
+  <ActionDialog
+    title="Editar Trilha Global"
+    description="Altere o conteúdo da sua trilha, adicione tópicos, vídeos e edite o quiz."
+    trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar Conteúdo</DropdownMenuItem>}
+    actionText="Salvar Alterações"
+    className="sm:max-w-3xl"
+  >
+    <TrailForm trail={trail} />
+  </ActionDialog>
+);
 
 export default function MasterConteudoGlobalPage() {
     const createTrailButton = (
@@ -15,19 +33,6 @@ export default function MasterConteudoGlobalPage() {
             <PlusCircle className="mr-2 h-4 w-4" />
             Criar Trilha Global
         </Button>
-    );
-
-    const trailForm = (
-        <>
-            <div className="space-y-2">
-                <Label htmlFor="trail-name">Nome da Trilha</Label>
-                <Input id="trail-name" placeholder="Ex: Cultura da Empresa 101" />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="trail-description">Descrição</Label>
-                <Textarea id="trail-description" placeholder="Descreva o objetivo da trilha de aprendizagem global." />
-            </div>
-        </>
     );
 
   return (
@@ -45,8 +50,9 @@ export default function MasterConteudoGlobalPage() {
                 description="Crie uma nova trilha de aprendizagem que ficará disponível para todas as empresas."
                 trigger={createTrailButton}
                 actionText="Salvar Trilha"
+                className="sm:max-w-3xl"
             >
-                {trailForm}
+                <TrailForm />
             </ActionDialog>
           </CardHeader>
           <CardContent>
@@ -61,42 +67,26 @@ export default function MasterConteudoGlobalPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium">Cultura da Empresa 101</TableCell>
-                  <TableCell>4</TableCell>
-                  <TableCell>12</TableCell>
-                  <TableCell>2023-02-10</TableCell>
-                  <TableCell>
-                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Editar Conteúdo</DropdownMenuItem>
-                        <DropdownMenuItem>Ver Empresas</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Arquivar</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium">Dominando Nossos Produtos</TableCell>
-                  <TableCell>3</TableCell>
-                  <TableCell>8</TableCell>
-                  <TableCell>2023-04-05</TableCell>
-                  <TableCell>
-                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Editar Conteúdo</DropdownMenuItem>
-                        <DropdownMenuItem>Ver Empresas</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Arquivar</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+                {globalTrails.map((trail) => (
+                    <TableRow key={trail.name}>
+                        <TableCell className="font-medium">{trail.name}</TableCell>
+                        <TableCell>{trail.topics}</TableCell>
+                        <TableCell>{trail.companies}</TableCell>
+                        <TableCell>{trail.creationDate}</TableCell>
+                        <TableCell>
+                            <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <EditTrailButton trail={trail} />
+                                <DropdownMenuItem>Ver Empresas</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive">Arquivar</DropdownMenuItem>
+                            </DropdownMenuContent>
+                            </DropdownMenu>
+                        </TableCell>
+                    </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
