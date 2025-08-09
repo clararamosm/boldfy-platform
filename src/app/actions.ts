@@ -20,9 +20,24 @@ async function getCompanyProfile(companyId: string): Promise<string> {
   return 'Generic company profile: be friendly and professional.';
 }
 
+// Mock database call to get influencer's personal branding
+async function getPersonalBranding(): Promise<string> {
+    // In a real app, this would fetch the logged-in user's settings from Firestore.
+    // For this example, we'll return a mock personal branding profile.
+    return `
+        Tone of Voice: Amigável e Inspirador.
+        Expertise: Marketing Digital, Vendas, Liderança.
+        Value Proposition: Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.
+        Current Position: Gerente de Marketing.
+    `;
+}
+
+
 const AlignContentActionSchema = z.object({
   content: z.string().min(1, { message: 'O conteúdo não pode estar vazio.' }),
   companyId: z.string(),
+  format: z.enum(['linkedin', 'text-heavy', 'hybrid']),
+  length: z.enum(['short', 'medium', 'long']),
 });
 
 type AlignContentState = {
@@ -38,13 +53,15 @@ export async function handleAlignContent(
     const validatedData = AlignContentActionSchema.safeParse({
       content: formData.get('content'),
       companyId: formData.get('companyId'),
+      format: formData.get('format'),
+      length: formData.get('length'),
     });
 
     if (!validatedData.success) {
       return { error: validatedData.error.errors.map((e) => e.message).join(', ') };
     }
 
-    const { content, companyId } = validatedData.data;
+    const { content, companyId, format, length } = validatedData.data;
 
     const companyProfile = await getCompanyProfile(companyId);
 
@@ -52,7 +69,15 @@ export async function handleAlignContent(
         return { error: 'Perfil da empresa não encontrado.' };
     }
 
-    const result = await alignContent({ content, companyProfile });
+    const personalBranding = await getPersonalBranding();
+
+    const result = await alignContent({ 
+        content, 
+        companyProfile,
+        personalBranding,
+        format,
+        length
+    });
 
     return { alignedContent: result.alignedContent, error: null };
   } catch (error) {

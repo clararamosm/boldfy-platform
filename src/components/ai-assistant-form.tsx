@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Sparkles, Loader2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 
 const initialState = {
   alignedContent: null,
@@ -56,11 +57,11 @@ export function AiAssistantForm({ companyId }: { companyId: string }) {
         <CardHeader>
           <CardTitle className="font-headline">Alinhe seu conteúdo com a marca</CardTitle>
           <CardDescription>
-            Insira seu texto abaixo e nossa IA irá refiná-lo para garantir que ele esteja perfeitamente
-            alinhado com o tom e a voz da nossa marca.
+            Insira seu texto, escolha o formato e o tamanho, e nossa IA irá refiná-lo para garantir que ele esteja perfeitamente
+            alinhado com o tom da marca e com sua voz pessoal.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div className="grid w-full gap-1.5">
             <Label htmlFor="content">Seu Conteúdo</Label>
             <Textarea
@@ -71,6 +72,44 @@ export function AiAssistantForm({ companyId }: { companyId: string }) {
               required
             />
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <Label>Formato do Conteúdo</Label>
+              <RadioGroup name="format" defaultValue="linkedin" className="gap-2">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="linkedin" id="format-linkedin" />
+                  <Label htmlFor="format-linkedin" className="font-normal">LinkedIn (com emojis e hashtags)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="text-heavy" id="format-text-heavy" />
+                  <Label htmlFor="format-text-heavy" className="font-normal">Texto Denso</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="hybrid" id="format-hybrid" />
+                  <Label htmlFor="format-hybrid" className="font-normal">Híbrido</Label>
+                </div>
+              </RadioGroup>
+            </div>
+             <div className="space-y-3">
+              <Label>Tamanho do Conteúdo</Label>
+              <RadioGroup name="length" defaultValue="medium" className="gap-2">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="short" id="length-short" />
+                  <Label htmlFor="length-short" className="font-normal">Curto</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="medium" id="length-medium" />
+                  <Label htmlFor="length-medium" className="font-normal">Médio</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="long" id="length-long" />
+                  <Label htmlFor="length-long" className="font-normal">Longo</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          </div>
+
           <div className="grid w-full gap-1.5">
             <Label htmlFor="aligned-content">Conteúdo Refinado pela IA</Label>
             <Textarea
@@ -79,7 +118,7 @@ export function AiAssistantForm({ companyId }: { companyId: string }) {
               placeholder="O resultado da IA aparecerá aqui..."
               readOnly
               value={state?.alignedContent || ''}
-              rows={8}
+              rows={12}
               className="bg-muted focus-visible:ring-0"
             />
           </div>
