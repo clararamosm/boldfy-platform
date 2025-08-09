@@ -60,11 +60,11 @@ export default function InfluencerDashboardPage() {
               <div>
                 <div className="mb-2 flex justify-between items-center">
                   <h3 className="font-semibold">Onboarding de Novos Influenciadores</h3>
-                  <span className="text-sm text-muted-foreground">100% Completo</span>
+                  <span className="text-sm text-muted-foreground">0% Completo</span>
                 </div>
-                <Progress value={100} />
+                <Progress value={0} />
                 <Button variant="link" size="sm" className="px-0" asChild>
-                    <Link href="/influencer/trilhas">Revisar <ArrowRight className="ml-1 h-4 w-4" /></Link>
+                    <Link href="/influencer/trilhas/onboarding">Iniciar Trilha <ArrowRight className="ml-1 h-4 w-4" /></Link>
                 </Button>
               </div>
               <div>
@@ -74,7 +74,7 @@ export default function InfluencerDashboardPage() {
                 </div>
                 <Progress value={75} />
                 <Button variant="link" size="sm" className="px-0" asChild>
-                    <Link href="/influencer/trilhas">Continuar <ArrowRight className="ml-1 h-4 w-4" /></Link>
+                    <Link href="/influencer/trilhas/cultura">Continuar <ArrowRight className="ml-1 h-4 w-4" /></Link>
                 </Button>
               </div>
             </CardContent>
