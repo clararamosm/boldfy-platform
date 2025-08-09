@@ -139,7 +139,7 @@ export default function AdminTrilhasPage() {
                                 {trail.bonus > 0 && (
                                 <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
                                     <Star className="h-3 w-3 mr-1"/>
-                                    {trail.bonus} bônus
+                                    {trail.bonus}
                                 </Badge>
                                 )}
                             </div>
@@ -200,7 +200,7 @@ export default function AdminTrilhasPage() {
                                 {trail.bonus > 0 && (
                                 <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
                                     <Star className="h-3 w-3 mr-1"/>
-                                    {trail.bonus} bônus
+                                    {trail.bonus}
                                 </Badge>
                                 )}
                             </div>
