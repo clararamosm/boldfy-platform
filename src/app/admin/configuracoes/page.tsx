@@ -1,7 +1,7 @@
 // src/app/admin/configuracoes/page.tsx
 'use client';
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Header } from "@/components/dashboard/header";
@@ -17,14 +17,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
-
-type ProfileData = {
+type FormData = {
     adminName: string;
     companyName: string;
     email: string;
-};
-
-type CompanyBrandingData = {
     tagline: string;
     audience: string;
     tone: string;
@@ -38,50 +34,65 @@ export default function AdminConfiguracoesPage() {
     const [language, setLanguage] = useState("pt-br");
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [formData, setFormData] = useState<FormData>({
+        adminName: '',
+        companyName: '',
+        email: '',
+        tagline: '',
+        audience: '',
+        tone: '',
+        messages: '',
+    });
 
-    const [profile, setProfile] = useState<ProfileData>({ adminName: '', companyName: '', email: '' });
-    const [branding, setBranding] = useState<CompanyBrandingData>({ tagline: '', audience: '', tone: '', messages: '' });
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { id, value } = e.target;
+        setFormData(prev => ({ ...prev, [id]: value }));
+    };
+    
+    const fetchData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const companyDocRef = doc(db, "companies", companyId);
+            const companyDocSnap = await getDoc(companyDocRef);
+
+            if (companyDocSnap.exists()) {
+                const data = companyDocSnap.data();
+                setFormData({
+                    adminName: data.adminProfile?.name || 'Admin',
+                    companyName: data.companyName || 'Boldfy',
+                    email: data.adminProfile?.email || 'admin@boldfy.com.br',
+                    tagline: data.branding?.tagline || '',
+                    audience: data.branding?.audience || '',
+                    tone: data.branding?.tone || '',
+                    messages: data.branding?.messages || '',
+                });
+            } else {
+                // Set default data if doc doesn't exist
+                setFormData({
+                    adminName: 'Admin',
+                    companyName: 'Boldfy',
+                    email: 'admin@boldfy.com.br',
+                    tagline: 'Turning Employees into Brand Influencers.',
+                    audience: 'Internal employees of our client companies.',
+                    tone: 'Encouraging, motivating, and professional.',
+                    messages: 'Emphasize participation, learning, and brand advocacy.',
+                });
+            }
+        } catch (error) {
+            console.error("Error fetching settings: ", error);
+            toast({
+                variant: 'destructive',
+                title: "Erro ao carregar configurações",
+                description: "Não foi possível buscar os dados. Tente novamente mais tarde.",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
 
     useEffect(() => {
-        const fetchData = async () => {
-            setIsLoading(true);
-            try {
-                // Fetch profile and branding data from Firestore
-                const companyDocRef = doc(db, "companies", companyId);
-                const companyDocSnap = await getDoc(companyDocRef);
-
-                if (companyDocSnap.exists()) {
-                    const data = companyDocSnap.data();
-                    setProfile({
-                        adminName: data.adminProfile?.name || 'Admin',
-                        companyName: data.companyName || 'Boldfy',
-                        email: data.adminProfile?.email || 'admin@boldfy.com.br'
-                    });
-                    setBranding({
-                        tagline: data.branding?.tagline || '',
-                        audience: data.branding?.audience || '',
-                        tone: data.branding?.tone || '',
-                        messages: data.branding?.messages || ''
-                    });
-                } else {
-                    // Set default data if doc doesn't exist
-                    setProfile({ adminName: 'Admin', companyName: 'Boldfy', email: 'admin@boldfy.com.br' });
-                    setBranding({ tagline: 'Turning Employees into Brand Influencers.', audience: 'Internal employees of our client companies.', tone: 'Encouraging, motivating, and professional.', messages: 'Emphasize participation, learning, and brand advocacy.'});
-                }
-            } catch (error) {
-                console.error("Error fetching settings: ", error);
-                toast({
-                    variant: 'destructive',
-                    title: "Erro ao carregar configurações",
-                    description: "Não foi possível buscar os dados. Tente novamente mais tarde.",
-                });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
         fetchData();
-    }, [toast]);
+    }, [fetchData]);
     
     const handleSaveChanges = async (section: 'profile' | 'branding') => {
         setIsSaving(true);
@@ -91,15 +102,20 @@ export default function AdminConfiguracoesPage() {
             let dataToSave = {};
             if (section === 'profile') {
                 dataToSave = { 
-                    companyName: profile.companyName,
+                    companyName: formData.companyName,
                     adminProfile: {
-                        name: profile.adminName,
-                        email: profile.email // email is not editable, so we save it back as is
+                        name: formData.adminName,
+                        email: formData.email
                     }
                 };
             } else {
                  dataToSave = { 
-                    branding: branding
+                    branding: {
+                        tagline: formData.tagline,
+                        audience: formData.audience,
+                        tone: formData.tone,
+                        messages: formData.messages,
+                    }
                 };
             }
 
@@ -121,9 +137,7 @@ export default function AdminConfiguracoesPage() {
         }
     };
 
-
     const handleSaveLanguage = () => {
-        // This remains client-side for now, could be saved to user profile in Firestore
         toast({
             title: "Idioma salvo!",
             description: `O idioma foi alterado para ${language === 'pt-br' ? 'Português (Brasil)' : 'English (United States)'}.`,
@@ -154,6 +168,21 @@ export default function AdminConfiguracoesPage() {
                                 <Skeleton className="h-10 w-32" />
                             </CardFooter>
                         </Card>
+                         <Card>
+                            <CardHeader>
+                                <Skeleton className="h-7 w-48" />
+                                <Skeleton className="h-4 w-full max-w-sm" />
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
+                                <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-20 w-full" /></div>
+                                <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-20 w-full" /></div>
+                                <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-20 w-full" /></div>
+                            </CardContent>
+                             <CardFooter className="border-t px-6 py-4">
+                                <Skeleton className="h-10 w-48" />
+                            </CardFooter>
+                        </Card>
                     </div>
                 </main>
             </>
@@ -165,7 +194,6 @@ export default function AdminConfiguracoesPage() {
       <Header title="Configurações" />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-6 max-w-4xl mx-auto">
-            {/* Perfil */}
              <Card>
                 <CardHeader>
                 <CardTitle>Perfil do Administrador</CardTitle>
@@ -175,21 +203,21 @@ export default function AdminConfiguracoesPage() {
                 <div className="flex items-center gap-4">
                     <Avatar className="h-20 w-20">
                     <AvatarImage src="https://placehold.co/100x100.png" data-ai-hint="person avatar" />
-                    <AvatarFallback>{profile.adminName?.[0] || 'A'}</AvatarFallback>
+                    <AvatarFallback>{formData.adminName?.[0] || 'A'}</AvatarFallback>
                     </Avatar>
                     <Button variant="outline">Mudar foto</Button>
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="name">Nome do Admin</Label>
-                    <Input id="name" value={profile.adminName} onChange={e => setProfile({...profile, adminName: e.target.value})} />
+                    <Label htmlFor="adminName">Nome do Admin</Label>
+                    <Input id="adminName" value={formData.adminName} onChange={handleInputChange} />
                 </div>
                  <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" value={profile.email} disabled />
+                    <Input id="email" value={formData.email} disabled />
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="companyName">Nome da Empresa</Label>
-                    <Input id="companyName" value={profile.companyName} onChange={e => setProfile({...profile, companyName: e.target.value})} />
+                    <Input id="companyName" value={formData.companyName} onChange={handleInputChange} />
                 </div>
                 </CardContent>
                 <CardFooter className="border-t px-6 py-4">
@@ -200,7 +228,6 @@ export default function AdminConfiguracoesPage() {
                 </CardFooter>
             </Card>
 
-          {/* Configurações da Empresa */}
           <Card>
             <CardHeader>
               <CardTitle>Configurações da Empresa</CardTitle>
@@ -211,19 +238,19 @@ export default function AdminConfiguracoesPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="tagline">Tagline</Label>
-                <Input id="tagline" placeholder="Sua tagline ou slogan" value={branding.tagline} onChange={e => setBranding({...branding, tagline: e.target.value})} />
+                <Input id="tagline" placeholder="Sua tagline ou slogan" value={formData.tagline} onChange={handleInputChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="audience">Público-alvo</Label>
-                <Textarea id="audience" placeholder="Descreva seu público-alvo" value={branding.audience} onChange={e => setBranding({...branding, audience: e.target.value})} />
+                <Textarea id="audience" placeholder="Descreva seu público-alvo" value={formData.audience} onChange={handleInputChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="tone">Tom de Voz</Label>
-                <Textarea id="tone" placeholder="Descreva o tom de voz da marca" value={branding.tone} onChange={e => setBranding({...branding, tone: e.target.value})} />
+                <Textarea id="tone" placeholder="Descreva o tom de voz da marca" value={formData.tone} onChange={handleInputChange} />
               </div>
                <div className="space-y-2">
                 <Label htmlFor="messages">Mensagens-chave</Label>
-                <Textarea id="messages" placeholder="Quais são as mensagens principais que devem ser comunicadas?" value={branding.messages} onChange={e => setBranding({...branding, messages: e.target.value})} />
+                <Textarea id="messages" placeholder="Quais são as mensagens principais que devem ser comunicadas?" value={formData.messages} onChange={handleInputChange} />
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
@@ -234,7 +261,6 @@ export default function AdminConfiguracoesPage() {
             </CardFooter>
           </Card>
 
-            {/* Idioma */}
             <Card>
                 <CardHeader>
                 <CardTitle>Idioma</CardTitle>
@@ -256,7 +282,6 @@ export default function AdminConfiguracoesPage() {
                 </CardFooter>
             </Card>
 
-            {/* Notificações */}
             <Card>
                 <CardHeader>
                 <CardTitle>Notificações</CardTitle>
