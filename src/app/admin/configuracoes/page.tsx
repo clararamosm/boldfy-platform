@@ -1,7 +1,7 @@
 // src/app/admin/configuracoes/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useActionState, useRef } from "react";
+import { useState, useEffect, useCallback, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { createCheckoutSession } from "@/app/actions";
 import { getStripe } from "@/lib/stripe-client";
 import { useSearchParams } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, User } from "firebase/auth";
 
 type CompanyData = {
     id: string;
@@ -65,6 +65,46 @@ function ActivationForm({ companyData }: { companyData: CompanyData }) {
 }
 
 
+const SettingsSkeleton = () => (
+    <>
+      <Header title="Configurações" />
+      <main className="flex-1 overflow-auto p-4 md:p-6">
+        <div className="grid gap-6 max-w-4xl mx-auto">
+          {/* Admin Profile Skeleton */}
+          <Card>
+            <CardHeader>
+              <CardTitle><Skeleton className="h-7 w-48" /></CardTitle>
+              <CardDescription><Skeleton className="h-4 w-full max-w-sm" /></CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-20 w-20 rounded-full" />
+                <Skeleton className="h-10 w-28" />
+              </div>
+              <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
+              <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
+            </CardContent>
+          </Card>
+          {/* Company Settings Skeleton */}
+          <Card>
+            <CardHeader>
+                <CardTitle><Skeleton className="h-7 w-56" /></CardTitle>
+                <CardDescription><Skeleton className="h-4 w-full max-w-md" /></CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
+                <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-20 w-full" /></div>
+            </CardContent>
+             <CardFooter className="border-t px-6 py-4">
+                <Skeleton className="h-10 w-48" />
+            </CardFooter>
+          </Card>
+        </div>
+      </main>
+    </>
+);
+
+
 export default function AdminConfiguracoesPage() {
     const { toast } = useToast();
     const [language, setLanguage] = useState("pt-br");
@@ -75,63 +115,7 @@ export default function AdminConfiguracoesPage() {
     const [checkoutState, formAction] = useActionState(createCheckoutSession, { error: undefined, sessionId: undefined });
     const searchParams = useSearchParams();
 
-     // Listen to auth state changes to get the current user ID
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) {
-            setCurrentUserId(user.uid);
-        } else {
-            // Handle user not logged in, maybe redirect
-            setCurrentUserId(null);
-            setIsLoading(false);
-        }
-        });
-        return () => unsubscribe();
-    }, []);
-
-    // Handle toast notifications for payment status
-    useEffect(() => {
-        if (searchParams.get('payment_success')) {
-            toast({
-                title: 'Assinatura Iniciada!',
-                description: 'Seu período de teste começou. Bem-vindo(a) à Boldfy!',
-            });
-            // You might want to refetch data here to update the UI instantly
-            if(currentUserId) fetchData(currentUserId);
-        }
-        if (searchParams.get('payment_canceled')) {
-             toast({
-                variant: 'destructive',
-                title: 'Processo Cancelado',
-                description: 'O processo de assinatura foi cancelado. Você pode tentar novamente a qualquer momento.',
-            });
-        }
-    }, [searchParams, toast]);
-
-     // Handle Stripe redirect and errors
-    useEffect(() => {
-        if (checkoutState?.sessionId) {
-            const redirectToCheckout = async () => {
-                const stripe = await getStripe();
-                if (!stripe) {
-                    toast({ variant: 'destructive', title: 'Erro', description: 'Stripe.js não foi carregado.' });
-                    return;
-                }
-                await stripe.redirectToCheckout({ sessionId: checkoutState.sessionId! });
-            }
-            redirectToCheckout();
-        }
-        if (checkoutState?.error) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro no Checkout',
-                description: checkoutState.error,
-            });
-        }
-    }, [checkoutState, toast]);
-
     const fetchData = useCallback(async (userId: string) => {
-        setIsLoading(true);
         try {
             const userDocRef = doc(db, "users", userId);
             const userDocSnap = await getDoc(userDocRef);
@@ -180,11 +164,59 @@ export default function AdminConfiguracoesPage() {
         }
     }, [toast]);
 
+     // Listen to auth state changes to get the current user ID and fetch data
     useEffect(() => {
-        if(currentUserId) {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setCurrentUserId(user.uid);
+                fetchData(user.uid);
+            } else {
+                setCurrentUserId(null);
+                setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
+    }, [fetchData]);
+
+    // Handle toast notifications for payment status
+    useEffect(() => {
+        if (searchParams.get('payment_success') && currentUserId) {
+            toast({
+                title: 'Assinatura Iniciada!',
+                description: 'Seu período de teste começou. Bem-vindo(a) à Boldfy!',
+            });
             fetchData(currentUserId);
         }
-    }, [currentUserId, fetchData]);
+        if (searchParams.get('payment_canceled')) {
+             toast({
+                variant: 'destructive',
+                title: 'Processo Cancelado',
+                description: 'O processo de assinatura foi cancelado. Você pode tentar novamente a qualquer momento.',
+            });
+        }
+    }, [searchParams, toast, currentUserId, fetchData]);
+
+     // Handle Stripe redirect and errors
+    useEffect(() => {
+        if (checkoutState?.sessionId) {
+            const redirectToCheckout = async () => {
+                const stripe = await getStripe();
+                if (!stripe) {
+                    toast({ variant: 'destructive', title: 'Erro', description: 'Stripe.js não foi carregado.' });
+                    return;
+                }
+                await stripe.redirectToCheckout({ sessionId: checkoutState.sessionId! });
+            }
+            redirectToCheckout();
+        }
+        if (checkoutState?.error) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro no Checkout',
+                description: checkoutState.error,
+            });
+        }
+    }, [checkoutState, toast]);
     
     const handleSaveChanges = async (section: 'branding') => {
         if (!companyData) return;
@@ -240,29 +272,7 @@ export default function AdminConfiguracoesPage() {
     const isReadOnly = companyData?.status === 'Inativa';
 
     if (isLoading || !companyData) {
-        return (
-             <>
-                <Header title="Configurações" />
-                <main className="flex-1 overflow-auto p-4 md:p-6">
-                    <div className="grid gap-6 max-w-4xl mx-auto">
-                        <Card>
-                            <CardHeader>
-                                <Skeleton className="h-7 w-48" />
-                                <Skeleton className="h-4 w-full max-w-sm" />
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                               <div className="flex items-center gap-4">
-                                    <Skeleton className="h-20 w-20 rounded-full" />
-                                    <Skeleton className="h-10 w-28" />
-                                </div>
-                                <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
-                                <div className="space-y-2"><Skeleton className="h-4 w-20" /><Skeleton className="h-10 w-full" /></div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </main>
-            </>
-        )
+        return <SettingsSkeleton />;
     }
 
   return (
