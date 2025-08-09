@@ -1,6 +1,6 @@
 # Boldfy - Plataforma de Gamificação
 
-Bem-vindo à sua nova plataforma de gamificação para embaixadores de marca. Este guia irá ajudá-lo a configurar o primeiro usuário (Master) para que você possa começar a adicionar empresas clientes.
+Bem-vindo à sua nova plataforma de gamificação para embaixadores de marca. Este guia irá ajudá-lo a configurar o primeiro usuário (Master) e a preparar o ambiente para produção.
 
 ## Configuração do Ambiente
 
@@ -64,3 +64,16 @@ Para que a criação de novas empresas funcione automaticamente após o pagament
 8.  Clique em **Adicionar endpoint**.
 
 Agora, sempre que um pagamento for concluído, o Stripe enviará um evento para sua aplicação, que ativará a empresa e criará a conta do admin automaticamente.
+
+## 3. Ativar a API de IA (Genkit)
+
+O Genkit precisa que a API de IA da Plataforma Google Cloud (Vertex AI) esteja ativa para funcionar. O Firebase App Hosting geralmente ativa isso para você durante o deploy.
+
+Para verificar ou ativar manualmente:
+
+1.  Acesse o [Console do Google Cloud](https://console.cloud.google.com/).
+2.  Certifique-se de que o projeto selecionado é o seu projeto do Firebase.
+3.  No menu de busca, procure por **"Vertex AI API"**.
+4.  Na página da API, se ela não estiver ativa, clique em **"Ativar"**.
+
+Isso garante que o Assistente de Conteúdo de IA funcione corretamente em produção.
