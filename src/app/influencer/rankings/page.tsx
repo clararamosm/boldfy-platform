@@ -104,7 +104,7 @@ export default function InfluencerRankingsPage() {
                         <p className="text-sm text-muted-foreground">O top 1 do ranking este mês ganha um dia de folga.</p>
                     </div>
                     <div className="w-full sm:w-48 text-center sm:text-right">
-                         <div className="flex items-center justify-center sm:justify-end gap-2 text-xs text-muted-foreground mb-1 bg-background rounded-full px-2 py-1">
+                         <div className="flex items-center justify-center sm:justify-end gap-2 text-xs text-muted-foreground mb-1">
                             <Calendar className="h-3 w-3" />
                             <span>15 de 31 dias</span>
                         </div>
