@@ -1,29 +1,58 @@
+
 'use server';
 
 import { alignContent } from '@/ai/flows/align-content';
 import { z } from 'zod';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+
 
 // Mock database call to get company profile
 async function getCompanyProfile(companyId: string): Promise<string> {
   // In a real application, this would fetch data from Firestore.
   // For this example, we'll return a mock profile based on the ID.
   console.log(`Fetching profile for company: ${companyId}`);
-  if (companyId === 'company-123') {
-    return `
-      Company Name: Brand Advocate Hub
-      Tagline: Turning Employees into Brand Influencers.
-      Target Audience: Internal employees of our client companies.
-      Tone of Voice: Encouraging, motivating, and professional.
-      Key Messages: Emphasize participation, learning, and brand advocacy.
-    `;
+  const companyDocRef = doc(db, "companies", companyId);
+  const companyDocSnap = await getDoc(companyDocRef);
+
+  if (companyDocSnap.exists()) {
+      const data = companyDocSnap.data();
+      const branding = data.branding;
+      if (branding) {
+        return `
+            Company Name: ${data.companyName || 'N/A'}
+            Tagline: ${branding.tagline || 'N/A'}
+            Target Audience: ${branding.audience || 'N/A'}
+            Tone of Voice: ${branding.tone || 'N/A'}
+            Key Messages: ${branding.messages || 'N/A'}
+        `;
+      }
   }
+
+  // Fallback mock profile
   return 'Generic company profile: be friendly and professional.';
 }
 
-// Mock database call to get influencer's personal branding
-async function getPersonalBranding(): Promise<string> {
-    // In a real app, this would fetch the logged-in user's settings from Firestore.
-    // For this example, we'll return a mock personal branding profile.
+// Fetches the influencer's personal branding from Firestore.
+// TODO: Replace 'user-123' with the actual logged-in user's ID.
+async function getPersonalBranding(userId: string = "user-123"): Promise<string> {
+    const userDocRef = doc(db, "users", userId);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (userDocSnap.exists()) {
+        const data = userDocSnap.data();
+        const branding = data.personalBranding;
+        if (branding) {
+            return `
+                Tone of Voice: ${branding.voice || 'N/A'}
+                Expertise: ${branding.expertise || 'N/A'}
+                Value Proposition: ${branding.value || 'N/A'}
+                Current Position: ${branding.position || 'N/A'}
+            `;
+        }
+    }
+    
+    // Fallback profile if no data is found
     return `
         Tone of Voice: Amigável e Inspirador.
         Expertise: Marketing Digital, Vendas, Liderança.
@@ -69,6 +98,7 @@ export async function handleAlignContent(
         return { error: 'Perfil da empresa não encontrado.' };
     }
 
+    // TODO: Pass the actual user ID from the session
     const personalBranding = await getPersonalBranding();
 
     const result = await alignContent({ 

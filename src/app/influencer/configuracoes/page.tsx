@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Header } from "@/components/dashboard/header";
@@ -10,11 +11,114 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// TODO: Replace with actual logged-in user ID
+const userId = "user-123";
+
+type ProfileData = {
+  name: string;
+  email: string;
+  company: string;
+};
+
+type BrandingData = {
+  voice: string;
+  expertise: string;
+  value: string;
+  position: string;
+};
+
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [language, setLanguage] = useState("pt-br");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
+  const [branding, setBranding] = useState<BrandingData>({ voice: 'amigavel', expertise: '', value: '', position: '' });
+  
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const userDocRef = doc(db, "users", userId);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          const data = userDocSnap.data();
+          setProfile({
+            name: data.profile?.name || 'Clara',
+            email: data.profile?.email || 'clara@boldfy.com.br',
+            company: data.companyName || 'Boldfy'
+          });
+          setBranding({
+            voice: data.personalBranding?.voice || 'amigavel',
+            expertise: data.personalBranding?.expertise || '',
+            value: data.personalBranding?.value || '',
+            position: data.personalBranding?.position || '',
+          });
+        } else {
+           // Set mock data if document doesn't exist
+           setProfile({ name: 'Clara', email: 'clara@boldfy.com.br', company: 'Boldfy' });
+           setBranding({ voice: 'amigavel', expertise: 'Marketing Digital, Vendas, Liderança', value: 'Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.', position: 'Gerente de Marketing' });
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+        toast({
+          variant: 'destructive',
+          title: "Erro ao carregar dados",
+          description: "Não foi possível buscar suas informações. Tente novamente.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [toast]);
+
+  const handleSave = async (section: 'profile' | 'branding') => {
+    setIsSaving(true);
+    try {
+        const userDocRef = doc(db, "users", userId);
+        
+        let dataToSave = {};
+        if (section === 'profile') {
+            dataToSave = { 
+                profile: { 
+                    name: profile.name,
+                    email: profile.email // email is not editable
+                }
+            };
+        } else {
+            dataToSave = { personalBranding: branding };
+        }
+
+        await setDoc(userDocRef, dataToSave, { merge: true });
+
+        toast({
+            title: "Sucesso!",
+            description: `Suas configurações de ${section === 'profile' ? 'perfil' : 'branding'} foram salvas.`,
+        });
+
+    } catch (error) {
+        console.error("Error saving settings:", error);
+        toast({
+            variant: 'destructive',
+            title: "Erro ao salvar",
+            description: "Não foi possível salvar suas alterações. Tente novamente.",
+        });
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
 
   const handleSaveLanguage = () => {
     toast({
@@ -22,6 +126,20 @@ export default function SettingsPage() {
       description: `O idioma foi alterado para ${language === 'pt-br' ? 'Português (Brasil)' : 'English (United States)'}.`,
     });
   };
+
+  if (isLoading) {
+    return (
+      <>
+        <Header title="Configurações" />
+        <main className="flex-1 overflow-auto p-4 md:p-6">
+          <div className="grid gap-6 max-w-4xl mx-auto">
+            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        </main>
+      </>
+    )
+  }
 
   return (
     <>
@@ -38,25 +156,28 @@ export default function SettingsPage() {
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src="https://placehold.co/100x100.png" data-ai-hint="person avatar" />
-                  <AvatarFallback>U</AvatarFallback>
+                  <AvatarFallback>{profile.name?.[0] || 'U'}</AvatarFallback>
                 </Avatar>
                 <Button variant="outline">Mudar foto</Button>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="name">Nome</Label>
-                <Input id="name" defaultValue="Clara" />
+                <Input id="name" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" defaultValue="clara@boldfy.com.br" disabled />
+                <Input id="email" value={profile.email} disabled />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="company">Empresa</Label>
-                <Input id="company" defaultValue="Boldfy" disabled />
+                <Input id="company" value={profile.company} disabled />
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button>Salvar Alterações</Button>
+               <Button onClick={() => handleSave('profile')} disabled={isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Salvar Alterações
+              </Button>
             </CardFooter>
           </Card>
 
@@ -71,7 +192,7 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="voice">Tom de Voz</Label>
-                 <Select defaultValue="amigavel">
+                 <Select value={branding.voice} onValueChange={value => setBranding({...branding, voice: value})}>
                   <SelectTrigger id="voice">
                     <SelectValue placeholder="Selecione um tom" />
                   </SelectTrigger>
@@ -85,19 +206,22 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="expertise">Expertises</Label>
-                <Input id="expertise" placeholder="Ex: Marketing Digital, Vendas, Liderança" />
+                <Input id="expertise" placeholder="Ex: Marketing Digital, Vendas, Liderança" value={branding.expertise} onChange={e => setBranding({...branding, expertise: e.target.value})} />
               </div>
                <div className="space-y-2">
                 <Label htmlFor="value">Entrega de Valor</Label>
-                <Textarea id="value" placeholder="O que você oferece de único para sua audiência?" />
+                <Textarea id="value" placeholder="O que você oferece de único para sua audiência?" value={branding.value} onChange={e => setBranding({...branding, value: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="position">Qual sua posição na empresa?</Label>
-                <Input id="position" placeholder="Ex: Gerente de Marketing" />
+                <Input id="position" placeholder="Ex: Gerente de Marketing" value={branding.position} onChange={e => setBranding({...branding, position: e.target.value})} />
               </div>
             </CardContent>
              <CardFooter className="border-t px-6 py-4">
-              <Button>Salvar Branding</Button>
+              <Button onClick={() => handleSave('branding')} disabled={isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Salvar Branding
+              </Button>
             </CardFooter>
           </Card>
 
