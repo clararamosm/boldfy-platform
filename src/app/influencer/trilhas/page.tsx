@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Star, Zap, Globe, Building } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
-const TrailCard = ({ title, points, bonus, progress, tasksCompleted, tasksTotal, type, buttonText = "Ver conteúdo", buttonVariant = "default" }) => (
+const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTotal, type, buttonText = "Ver conteúdo", buttonVariant = "default" }) => (
     <Card className="shadow-sm">
         <CardContent className="p-4">
             <div className="flex justify-between items-start mb-2 gap-2">
@@ -34,7 +35,9 @@ const TrailCard = ({ title, points, bonus, progress, tasksCompleted, tasksTotal,
             </div>
             <Progress value={progress} />
              <div className="mt-4">
-                <Button variant={buttonVariant} className="w-full sm:w-auto">{buttonText}</Button>
+                <Button variant={buttonVariant} className="w-full sm:w-auto" asChild>
+                    <Link href={`/influencer/trilhas/${id}`}>{buttonText}</Link>
+                </Button>
             </div>
         </CardContent>
     </Card>
@@ -67,6 +70,7 @@ export default function TrilhasPage() {
         <div className="space-y-4">
             <h2 className="text-xl font-bold font-headline">Minhas Trilhas</h2>
              <TrailCard 
+                id="onboarding"
                 title="Onboarding de Novos Influenciadores" 
                 points={500} 
                 bonus={100} 
@@ -78,6 +82,7 @@ export default function TrilhasPage() {
                 type="personalizada"
             />
             <TrailCard 
+                id="cultura"
                 title="Cultura da Empresa 101" 
                 points={500} 
                 bonus={100} 
