@@ -1,16 +1,17 @@
 import type React from "react";
-import { SidebarProvider, Sidebar, SidebarInset, SidebarHeader, SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
+import { SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 import { Logo } from "@/components/logo";
 import { AdminSidebarNav } from "@/components/dashboard/admin-sidebar-nav";
+import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <SidebarProvider>
-      <Sidebar>
+
+  const sidebarContent = (
+     <>
         <SidebarHeader>
           <div className="flex items-center gap-2">
             <Logo />
-            <span className="font-headline text-lg font-semibold">Brand Advocate</span>
+            <span className="font-headline text-lg font-semibold group-data-[state=collapsed]:hidden">Brand Advocate</span>
           </div>
         </SidebarHeader>
         <SidebarContent>
@@ -19,10 +20,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <SidebarFooter>
           {/* Footer content */}
         </SidebarFooter>
-      </Sidebar>
-      <SidebarInset className="flex flex-col">
-        {children}
-      </SidebarInset>
-    </SidebarProvider>
+      </>
+  );
+
+  return (
+    <DashboardLayout sidebar={sidebarContent}>
+      {children}
+    </DashboardLayout>
   );
 }
