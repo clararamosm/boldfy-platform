@@ -1,14 +1,15 @@
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function AdminRecompensasPage() {
   const addRewardButton = (
@@ -38,7 +39,34 @@ export default function AdminRecompensasPage() {
   return (
     <>
       <Header title="Recompensas" />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
+      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
+        <Card>
+            <CardHeader>
+                <CardTitle className="font-headline flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-muted-foreground" />
+                    Prêmio do Mês (Top 1 Ranking)
+                </CardTitle>
+                <CardDescription>Selecione qual recompensa da loja será o prêmio para o primeiro lugar do ranking neste mês.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="max-w-xs">
+                    <Label htmlFor="monthly-prize">Recompensa</Label>
+                     <Select defaultValue="day-off">
+                        <SelectTrigger id="monthly-prize">
+                            <SelectValue placeholder="Selecione uma recompensa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ifood-50">Vale-presente iFood R$50</SelectItem>
+                            <SelectItem value="day-off">Day Off</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </CardContent>
+            <CardFooter>
+                <Button>Salvar Prêmio do Mês</Button>
+            </CardFooter>
+        </Card>
+
         <Tabs defaultValue="loja">
           <div className="flex items-center justify-between mb-4">
             <TabsList>
