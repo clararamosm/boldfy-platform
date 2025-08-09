@@ -1,3 +1,4 @@
+// src/components/dashboard/action-dialog.tsx
 'use client';
 
 import {
@@ -22,29 +23,23 @@ type ActionDialogProps = {
   description?: string;
   children: React.ReactNode;
   actionText: string;
-  onAction?: () => void;
+  onAction?: () => void; // Kept for non-form actions
   showCancel?: boolean;
   className?: string;
   secondaryAction?: React.ReactNode;
-  formId?: string;
+  formId?: string; // The ID of the form this dialog should trigger
+  open?: boolean; // Control dialog visibility from parent
+  onOpenChange?: (open: boolean) => void; // Control dialog visibility from parent
 };
 
-const ActionButton = ({ formId, onAction, actionText }: Pick<ActionDialogProps, 'formId' | 'onAction' | 'actionText'>) => {
+// This button is specifically for the primary action in the footer.
+// It will show a pending state if its parent form is submitting.
+const PrimaryActionButton = ({ text }: { text: string }) => {
     const { pending } = useFormStatus();
-    
-    const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (!formId && onAction) {
-            e.preventDefault();
-            onAction();
-        }
-    }
-
-    // if it's a form submission, the button's behavior is handled by the form.
-    // The `pending` state from useFormStatus will apply.
     return (
-        <Button form={formId} type={formId ? 'submit' : 'button'} onClick={onAction ? handleClick : undefined} disabled={pending}>
+        <Button type="submit" disabled={pending}>
             {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {actionText}
+            {text}
         </Button>
     )
 }
@@ -60,33 +55,31 @@ export function ActionDialog({
   className,
   secondaryAction,
   formId,
+  open,
+  onOpenChange,
 }: ActionDialogProps) {
-    const [isOpen, setIsOpen] = React.useState(false);
-    
-    // We need to wrap the ActionButton in a form context if formId is present.
-    // This is because useFormStatus can only be used inside a <form>.
-    // The dialog content itself might not be inside the form, so we create a small form here.
-    const renderActionButton = () => {
-      const button = <ActionButton formId={formId} onAction={onAction} actionText={actionText} />;
-      
-      // If a formId is provided, ActionButton expects to be inside a <form>
-      // so that useFormStatus can work. Since the DialogFooter is outside the form
-      // defined in the children, we can wrap the button in a dummy form if needed.
-      if (formId) {
-        return <form action={onAction as any}>{button}</form>
-      }
 
-      // If no formId, no form context is needed.
-      return <DialogClose asChild>{button}</DialogClose>
-    };
-
-    const handleActionClick = () => {
-        if(onAction) onAction();
-        if(!formId) setIsOpen(false); // Only close if not a form action
+  // This wrapper allows the primary action button to be part of the form's context
+  // even though it's rendered in the DialogFooter outside of the <form> element.
+  // This is how `useFormStatus` gets the correct pending state.
+  const renderFooterAction = () => {
+    if (formId) {
+      return (
+        <form action={onAction as any}>
+          <PrimaryActionButton text={actionText} />
+        </form>
+      );
     }
+    // Fallback for non-form actions
+    return (
+      <DialogClose asChild>
+        <Button onClick={onAction}>{actionText}</Button>
+      </DialogClose>
+    );
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className={cn("sm:max-w-xl", className)}>
         <DialogHeader>
@@ -95,11 +88,12 @@ export function ActionDialog({
         </DialogHeader>
         <div className="grid gap-4 py-4">{children}</div>
         <DialogFooter>
-            {showCancel && <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>}
-            {secondaryAction}
-            <Button onClick={handleActionClick} form={formId} type={formId ? 'submit' : 'button'}>
+          {showCancel && <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>}
+          {secondaryAction}
+          {/* We now submit the form using its ID, which is the standard HTML5 way */}
+          <Button type="submit" form={formId}>
               {actionText}
-            </Button>
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

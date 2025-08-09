@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { createCheckoutSession } from '@/app/actions';
 import { getStripe } from '@/lib/stripe-client';
+import { useSearchParams } from 'next/navigation';
 
 type Company = {
     id: string;
@@ -31,34 +32,41 @@ type Company = {
 };
 
 // Sub-component to use useFormStatus
-function CompanyFormContent({ isSubmitting }: { isSubmitting: boolean }) {
+function CompanyFormContent() {
+    const { pending } = useFormStatus();
     return (
         <div className="space-y-4">
             <div className="space-y-2">
                 <Label htmlFor="company-name">Nome da Empresa</Label>
-                <Input name="companyName" id="company-name" placeholder="Ex: TechCorp" disabled={isSubmitting} required />
+                <Input name="companyName" id="company-name" placeholder="Ex: TechCorp" disabled={pending} required />
             </div>
             <div className="space-y-2">
                 <Label htmlFor="admin-name">Nome do Admin</Label>
-                <Input name="adminName" id="admin-name" placeholder="Ex: João Silva" disabled={isSubmitting} required />
+                <Input name="adminName" id="admin-name" placeholder="Ex: João Silva" disabled={pending} required />
             </div>
             <div className="space-y-2">
                 <Label htmlFor="admin-email">E-mail do Admin</Label>
-                <Input name="adminEmail" id="admin-email" type="email" placeholder="admin@techcorp.com" disabled={isSubmitting} required />
+                <Input name="adminEmail" id="admin-email" type="email" placeholder="admin@techcorp.com" disabled={pending} required />
             </div>
              <div className="space-y-2">
                 <Label htmlFor="licenses">Número de Licenças (Assentos)</Label>
-                <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="1" disabled={isSubmitting} required />
+                <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="1" disabled={pending} required />
             </div>
         </div>
     );
 }
 
-const CompanyForm = ({ formRef, formAction }: { formRef: React.RefObject<HTMLFormElement>, formAction: (payload: FormData) => void }) => {
-    const { pending } = useFormStatus();
+const CompanyForm = ({ formRef, formAction, onFormActionComplete }: { formRef: React.RefObject<HTMLFormElement>, formAction: (payload: FormData) => void, onFormActionComplete: () => void }) => {
+    
+    // We need to wrap the form action to know when it's done.
+    const formActionWrapper = async (formData: FormData) => {
+        await formAction(formData);
+        onFormActionComplete();
+    };
+    
     return (
-        <form ref={formRef} action={formAction} id="company-form">
-            <CompanyFormContent isSubmitting={pending} />
+        <form ref={formRef} action={formActionWrapper} id="company-form">
+            <CompanyFormContent />
         </form>
     );
 };
@@ -69,15 +77,36 @@ export default function MasterEmpresasPage() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const formRef = useRef<HTMLFormElement>(null);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
 
     const [checkoutState, formAction] = useActionState(createCheckoutSession, { error: undefined, sessionId: undefined });
 
+    // Handle toast notifications for payment status
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        if (searchParams.get('payment_success')) {
+            toast({
+                title: 'Pagamento Concluído!',
+                description: 'A nova empresa foi criada e está aguardando ativação.',
+            });
+            fetchCompanies(); // Refresh list
+        }
+        if (searchParams.get('payment_canceled')) {
+             toast({
+                variant: 'destructive',
+                title: 'Pagamento Cancelado',
+                description: 'O processo de criação da empresa foi cancelado.',
+            });
+        }
+    }, [searchParams, toast]);
+
+    // Handle Stripe redirect and errors
     useEffect(() => {
         if (checkoutState.sessionId) {
             const redirectToCheckout = async () => {
                 const stripe = await getStripe();
                 if (!stripe) {
-                    console.error("Stripe.js not loaded");
+                    toast({ variant: 'destructive', title: 'Erro', description: 'Stripe.js não foi carregado.' });
                     return;
                 }
                 await stripe.redirectToCheckout({ sessionId: checkoutState.sessionId! });
@@ -156,15 +185,23 @@ export default function MasterEmpresasPage() {
                     <CardTitle className="font-headline">Gerenciamento de Empresas</CardTitle>
                     <CardDescription>Adicione novas empresas clientes. O admin será redirecionado para o pagamento.</CardDescription>
                 </div>
-                <ActionDialog
+                 <ActionDialog
                     title="Adicionar Nova Empresa"
                     description="Preencha os dados da nova empresa. Você será redirecionado para o Stripe para efetuar o pagamento da assinatura."
                     trigger={addCompanyButton}
                     actionText="Ir para Pagamento"
                     formId="company-form"
-                    // The onAction is now handled by the form itself
+                    open={isDialogOpen}
+                    onOpenChange={setIsDialogOpen}
                 >
-                    <CompanyForm formRef={formRef} formAction={formAction} />
+                    <CompanyForm 
+                        formRef={formRef}
+                        formAction={formAction} 
+                        onFormActionComplete={() => {
+                            // The dialog will not close automatically because the page will redirect.
+                            // No need to call setIsDialogOpen(false) here.
+                        }}
+                    />
                 </ActionDialog>
             </CardHeader>
             <CardContent>
@@ -213,7 +250,6 @@ export default function MasterEmpresasPage() {
                                                 <DropdownMenuItem asChild disabled={company.status !== 'Ativa'}>
                                                     <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
                                                 </DropdownMenuItem>
-                                                {/* <DropdownMenuItem>Editar</DropdownMenuItem> */}
                                                 <DropdownMenuItem onClick={() => handleToggleStatus(company)} disabled={company.status === 'pending_payment'}>
                                                     {company.status === 'Ativa' ? 'Desativar' : 'Ativar'}
                                                 </DropdownMenuItem>
