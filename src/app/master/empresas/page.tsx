@@ -5,8 +5,35 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ActionDialog } from "@/components/dashboard/action-dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function MasterEmpresasPage() {
+    const addCompanyButton = (
+        <Button size="sm">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Adicionar Empresa
+        </Button>
+    );
+
+    const companyForm = (
+        <>
+            <div className="space-y-2">
+                <Label htmlFor="company-name">Nome da Empresa</Label>
+                <Input id="company-name" placeholder="Ex: TechCorp" />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="admin-email">E-mail do Admin</Label>
+                <Input id="admin-email" type="email" placeholder="admin@techcorp.com" />
+            </div>
+             <div className="space-y-2">
+                <Label htmlFor="licenses">Número de Licenças</Label>
+                <Input id="licenses" type="number" placeholder="Ex: 100" />
+            </div>
+        </>
+    );
+
   return (
     <>
       <Header title="Empresas" />
@@ -17,10 +44,14 @@ export default function MasterEmpresasPage() {
                     <CardTitle className="font-headline">Gerenciamento de Empresas</CardTitle>
                     <CardDescription>Adicione, edite ou remova empresas clientes.</CardDescription>
                 </div>
-                <Button size="sm">
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Adicionar Empresa
-                </Button>
+                <ActionDialog
+                    title="Adicionar Nova Empresa"
+                    description="Cadastre uma nova empresa cliente na plataforma."
+                    trigger={addCompanyButton}
+                    actionText="Salvar Empresa"
+                >
+                    {companyForm}
+                </ActionDialog>
             </CardHeader>
             <CardContent>
                 <Table>

@@ -6,8 +6,18 @@ import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { ActionDialog } from "@/components/dashboard/action-dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function AdminColaboradoresPage() {
+  const inviteButton = (
+    <Button size="sm">
+      <PlusCircle className="mr-2 h-4 w-4" />
+      Convidar Colaborador
+    </Button>
+  );
+
   return (
     <>
       <Header title="Colaboradores" />
@@ -18,10 +28,17 @@ export default function AdminColaboradoresPage() {
               <CardTitle className="font-headline">Gerenciar Colaboradores</CardTitle>
               <CardDescription>Adicione, edite ou remova colaboradores da plataforma.</CardDescription>
             </div>
-            <Button size="sm">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Convidar Colaborador
-            </Button>
+            <ActionDialog
+              title="Convidar Colaborador"
+              description="Envie um convite por e-mail para um novo colaborador se juntar à plataforma."
+              trigger={inviteButton}
+              actionText="Enviar Convite"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="email">E-mail do Colaborador</Label>
+                <Input id="email" type="email" placeholder="nome@empresa.com.br" />
+              </div>
+            </ActionDialog>
           </CardHeader>
           <CardContent>
             <Table>

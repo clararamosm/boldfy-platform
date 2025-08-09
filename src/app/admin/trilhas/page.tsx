@@ -8,8 +8,31 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { ActionDialog } from "@/components/dashboard/action-dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function AdminTrilhasPage() {
+  const createTrailButton = (
+    <Button size="sm">
+      <PlusCircle className="mr-2 h-4 w-4" />
+      Criar Trilha
+    </Button>
+  );
+
+  const trailForm = (
+     <>
+      <div className="space-y-2">
+        <Label htmlFor="trail-name">Nome da Trilha</Label>
+        <Input id="trail-name" placeholder="Ex: Onboarding de Novos Influenciadores" />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="trail-description">Descrição</Label>
+        <Textarea id="trail-description" placeholder="Descreva o objetivo da trilha de aprendizagem." />
+      </div>
+    </>
+  )
+
   return (
     <>
       <Header title="Trilhas de Aprendizagem" />
@@ -20,10 +43,14 @@ export default function AdminTrilhasPage() {
               <TabsTrigger value="personalizadas">Trilhas Personalizadas</TabsTrigger>
               <TabsTrigger value="globais">Trilhas Globais</TabsTrigger>
             </TabsList>
-            <Button size="sm">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Criar Trilha
-            </Button>
+             <ActionDialog
+              title="Criar Trilha Personalizada"
+              description="Crie uma nova trilha de aprendizagem para sua equipe."
+              trigger={createTrailButton}
+              actionText="Salvar Trilha"
+            >
+              {trailForm}
+            </ActionDialog>
           </div>
           <TabsContent value="personalizadas">
             <Card>

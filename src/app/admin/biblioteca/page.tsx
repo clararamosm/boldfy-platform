@@ -5,8 +5,36 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { MoreHorizontal, PlusCircle, Folder, FileText, ImageIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ActionDialog } from "@/components/dashboard/action-dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function AdminBibliotecaPage() {
+  const uploadButton = (
+     <Button size="sm">
+        <PlusCircle className="mr-2 h-4 w-4" />
+        Novo Upload
+      </Button>
+  );
+
+  const uploadForm = (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="asset-name">Nome do Ativo</Label>
+        <Input id="asset-name" placeholder="Ex: Banner para LinkedIn" />
+      </div>
+       <div className="space-y-2">
+        <Label htmlFor="asset-category">Categoria</Label>
+        <Input id="asset-category" placeholder="Ex: Banners" />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="asset-file">Arquivo</Label>
+        <Input id="asset-file" type="file" />
+      </div>
+    </>
+  );
+
+
   return (
     <>
       <Header title="Biblioteca" />
@@ -17,10 +45,14 @@ export default function AdminBibliotecaPage() {
               <CardTitle className="font-headline">Gerenciar Ativos</CardTitle>
               <CardDescription>Faça upload e gerencie os ativos da sua marca.</CardDescription>
             </div>
-            <Button size="sm">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Novo Upload
-            </Button>
+             <ActionDialog
+              title="Novo Upload"
+              description="Faça o upload de um novo ativo para a biblioteca da sua marca."
+              trigger={uploadButton}
+              actionText="Fazer Upload"
+            >
+              {uploadForm}
+            </ActionDialog>
           </CardHeader>
           <CardContent>
             <Table>

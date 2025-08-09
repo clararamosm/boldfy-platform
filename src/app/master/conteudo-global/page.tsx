@@ -3,10 +3,33 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ActionDialog } from "@/components/dashboard/action-dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function MasterConteudoGlobalPage() {
+    const createTrailButton = (
+        <Button size="sm">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Criar Trilha Global
+        </Button>
+    );
+
+    const trailForm = (
+        <>
+            <div className="space-y-2">
+                <Label htmlFor="trail-name">Nome da Trilha</Label>
+                <Input id="trail-name" placeholder="Ex: Cultura da Empresa 101" />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="trail-description">Descrição</Label>
+                <Textarea id="trail-description" placeholder="Descreva o objetivo da trilha de aprendizagem global." />
+            </div>
+        </>
+    );
+
   return (
     <>
       <Header title="Conteúdo Global" />
@@ -17,10 +40,14 @@ export default function MasterConteudoGlobalPage() {
               <CardTitle className="font-headline">Gerenciar Trilhas Globais</CardTitle>
               <CardDescription>Crie e edite o conteúdo das trilhas de aprendizagem padrão.</CardDescription>
             </div>
-            <Button size="sm">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Criar Trilha Global
-            </Button>
+            <ActionDialog
+                title="Criar Trilha Global"
+                description="Crie uma nova trilha de aprendizagem que ficará disponível para todas as empresas."
+                trigger={createTrailButton}
+                actionText="Salvar Trilha"
+            >
+                {trailForm}
+            </ActionDialog>
           </CardHeader>
           <CardContent>
             <Table>

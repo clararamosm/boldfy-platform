@@ -4,10 +4,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ActionDialog } from "@/components/dashboard/action-dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 
 export default function AdminRecompensasPage() {
+  const addRewardButton = (
+    <Button size="sm">
+      <PlusCircle className="mr-2 h-4 w-4" />
+      Adicionar Recompensa
+    </Button>
+  );
+
+  const rewardForm = (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="reward-name">Nome da Recompensa</Label>
+        <Input id="reward-name" placeholder="Ex: Vale-presente iFood R$50" />
+      </div>
+       <div className="space-y-2">
+        <Label htmlFor="reward-points">Custo (Pontos)</Label>
+        <Input id="reward-points" type="number" placeholder="Ex: 5000" />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="reward-stock">Estoque</Label>
+        <Input id="reward-stock" type="number" placeholder="Deixe em branco para ilimitado" />
+      </div>
+    </>
+  );
+
   return (
     <>
       <Header title="Recompensas" />
@@ -18,10 +45,14 @@ export default function AdminRecompensasPage() {
               <TabsTrigger value="loja">Loja de Recompensas</TabsTrigger>
               <TabsTrigger value="historico">Histórico de Resgates</TabsTrigger>
             </TabsList>
-            <Button size="sm">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Adicionar Recompensa
-            </Button>
+            <ActionDialog
+              title="Adicionar Nova Recompensa"
+              description="Cadastre uma nova recompensa na loja para seus colaboradores."
+              trigger={addRewardButton}
+              actionText="Salvar Recompensa"
+            >
+              {rewardForm}
+            </ActionDialog>
           </div>
           <TabsContent value="loja">
             <Card>

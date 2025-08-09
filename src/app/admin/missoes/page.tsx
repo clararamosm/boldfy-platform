@@ -4,10 +4,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { MoreHorizontal, PlusCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ActionDialog } from "@/components/dashboard/action-dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function AdminMissoesPage() {
+  const createMissionButton = (
+    <Button size="sm">
+      <PlusCircle className="mr-2 h-4 w-4" />
+      Criar Missão
+    </Button>
+  );
+
+  const missionForm = (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="mission-name">Nome da Missão</Label>
+        <Input id="mission-name" placeholder="Ex: Compartilhar post no LinkedIn" />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="mission-description">Descrição</Label>
+        <Textarea id="mission-description" placeholder="Descreva o que o colaborador precisa fazer." />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="mission-points">Pontos</Label>
+        <Input id="mission-points" type="number" placeholder="Ex: 100" />
+      </div>
+    </>
+  );
+
   return (
     <>
       <Header title="Missões" />
@@ -19,10 +47,14 @@ export default function AdminMissoesPage() {
               <TabsTrigger value="fixas">Missões Fixas (Onboarding)</TabsTrigger>
               <TabsTrigger value="calendario">Calendário</TabsTrigger>
             </TabsList>
-             <Button size="sm">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Criar Missão
-            </Button>
+            <ActionDialog
+              title="Criar Nova Missão"
+              description="Configure uma nova missão para seus colaboradores."
+              trigger={createMissionButton}
+              actionText="Salvar Missão"
+            >
+              {missionForm}
+            </ActionDialog>
           </div>
           <TabsContent value="ativas">
             <Card>
