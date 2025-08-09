@@ -1,3 +1,5 @@
+'use client';
+
 import { Header } from "@/components/dashboard/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -7,8 +9,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function SettingsPage() {
+  const { toast } = useToast();
+  const [language, setLanguage] = useState("pt-br");
+
+  const handleSaveLanguage = () => {
+    toast({
+      title: "Idioma salvo!",
+      description: `O idioma foi alterado para ${language === 'pt-br' ? 'Português (Brasil)' : 'English (United States)'}.`,
+    });
+  };
+
   return (
     <>
       <Header title="Configurações" />
@@ -94,7 +108,7 @@ export default function SettingsPage() {
               <CardDescription>Escolha o idioma de exibição do sistema.</CardDescription>
             </CardHeader>
             <CardContent>
-                 <Select defaultValue="pt-br">
+                 <Select value={language} onValueChange={setLanguage}>
                   <SelectTrigger className="w-[280px]">
                     <SelectValue placeholder="Selecione o idioma" />
                   </SelectTrigger>
@@ -104,6 +118,9 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
             </CardContent>
+            <CardFooter className="border-t px-6 py-4">
+              <Button onClick={handleSaveLanguage}>Salvar Idioma</Button>
+            </CardFooter>
           </Card>
 
           {/* Notificações */}
