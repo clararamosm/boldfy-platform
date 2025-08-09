@@ -26,7 +26,7 @@ type Trail = {
 };
 
 
-const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTotal, type }) => {
+const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTotal, type }: Trail) => {
     let buttonText = "Iniciar Trilha";
     let buttonVariant: "default" | "secondary" = "default";
 
@@ -53,10 +53,12 @@ const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTo
                             <Zap className="h-3 w-3 mr-1"/>
                             {points}
                         </Badge>
-                        <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
-                            <Star className="h-3 w-3 mr-1"/>
-                            {bonus}
-                        </Badge>
+                        {bonus > 0 && (
+                            <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
+                                <Star className="h-3 w-3 mr-1"/>
+                                {bonus}
+                            </Badge>
+                        )}
                     </div>
                 </div>
                 <div className="flex justify-between items-center text-sm text-muted-foreground mb-2">
@@ -85,6 +87,7 @@ export default function TrilhasPage() {
         try {
             // Mock fetching logic. In a real app, you'd fetch trails for the company
             // and then merge with the current user's progress data.
+             await new Promise(resolve => setTimeout(resolve, 1000));
             const mockFetchedTrails: Trail[] = [
                 { id: "onboarding", title: "Onboarding de Novos Influenciadores", points: 500, bonus: 100, progress: 0, tasksCompleted: 0, tasksTotal: 3, type: "personalizada" },
                 { id: "cultura", title: "Cultura da Empresa 101", points: 250, bonus: 50, progress: 75, tasksCompleted: 3, tasksTotal: 4, type: "global" },
