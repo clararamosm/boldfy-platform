@@ -1,8 +1,14 @@
+// src/app/admin/colaboradores/page.tsx
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -10,7 +16,44 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 
+type Collaborator = {
+  id: string;
+  name: string;
+  email: string;
+  points: number;
+  status: 'Ativo' | 'Inativo';
+  entryDate: string;
+  avatarUrl?: string;
+};
+
 export default function AdminColaboradoresPage() {
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCollaborators = async () => {
+      try {
+        // Mock data for demonstration until Firestore is populated
+        const mockCollaborators: Collaborator[] = [
+           { id: '1', name: 'Carla Costa', email: 'carla@boldfy.com.br', points: 1250, status: 'Ativo', entryDate: '2023-10-01', avatarUrl: 'https://placehold.co/40x40.png' },
+           { id: '2', name: 'João Paulo', email: 'joao@boldfy.com.br', points: 890, status: 'Ativo', entryDate: '2023-11-15', avatarUrl: 'https://placehold.co/40x40.png' },
+        ];
+        // In a real scenario, you would fetch from Firestore like this:
+        // const querySnapshot = await getDocs(collection(db, "companies", "company-123", "collaborators"));
+        // const fetchedCollaborators = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Collaborator[];
+        // setCollaborators(fetchedCollaborators);
+        setCollaborators(mockCollaborators);
+      } catch (error) {
+        console.error("Error fetching collaborators: ", error);
+        // Handle error (e.g., show a toast notification)
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCollaborators();
+  }, []);
+
   const inviteButton = (
     <Button size="sm">
       <PlusCircle className="mr-2 h-4 w-4" />
@@ -52,66 +95,55 @@ export default function AdminColaboradoresPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="person avatar" />
-                        <AvatarFallback>CC</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">Carla Costa</p>
-                        <p className="text-sm text-muted-foreground">carla@boldfy.com.br</p>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center">
+                      <div className="flex justify-center items-center p-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <span className="ml-2">Carregando colaboradores...</span>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>1250</TableCell>
-                  <TableCell><Badge variant="default">Ativo</Badge></TableCell>
-                  <TableCell>2023-10-01</TableCell>
-                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
-                          <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">Desativar</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-                 <TableRow>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="person avatar" />
-                        <AvatarFallback>JP</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">João Paulo</p>
-                        <p className="text-sm text-muted-foreground">joao@boldfy.com.br</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>890</TableCell>
-                  <TableCell><Badge variant="default">Ativo</Badge></TableCell>
-                  <TableCell>2023-11-15</TableCell>
-                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
-                          <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">Desativar</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                  </TableRow>
+                ) : collaborators.length === 0 ? (
+                   <TableRow>
+                    <TableCell colSpan={5} className="text-center">
+                      Nenhum colaborador encontrado.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  collaborators.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
+                            <AvatarFallback>{user.name.substring(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{user.name}</p>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{user.points}</TableCell>
+                      <TableCell><Badge variant={user.status === 'Ativo' ? 'default' : 'destructive'}>{user.status}</Badge></TableCell>
+                      <TableCell>{user.entryDate}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                              <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
+                              <DropdownMenuItem>Editar</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive">Desativar</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
