@@ -2,31 +2,34 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { collection, getDocs, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, ImageIcon, Download, Loader2 } from "lucide-react";
+import { FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
+// This would come from the user's session
+const companyId = "company-123";
 
 type Asset = {
     id: string;
-    title: string;
+    name: string;
     type: string;
     category: 'Posts' | 'Materiais Ricos' | 'Assets de Marca';
-    date: string;
-    imageUrl?: string;
-    dataAiHint?: string;
-    fileUrl: string; // URL from Firebase Storage
+    uploadDate: any; // Firestore timestamp
+    fileUrl: string; 
 };
 
-const getAssetIcon = (type: string, imageUrl?: string) => {
+const getAssetIcon = (type: string, fileUrl?: string) => {
     if (type.startsWith('image/')) {
         return (
              <Image
-                src={imageUrl || 'https://placehold.co/600x400.png'}
+                src={fileUrl || 'https://placehold.co/600x400.png'}
                 alt=""
                 width={300}
                 height={168}
@@ -42,13 +45,13 @@ const AssetCard = ({ asset }: { asset: Asset }) => (
     <Card>
         <CardHeader className="p-0">
             <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg overflow-hidden">
-                 {getAssetIcon(asset.type, asset.imageUrl)}
+                 {getAssetIcon(asset.type, asset.fileUrl)}
             </div>
         </CardHeader>
         <CardContent className="p-4 space-y-1">
-            <CardTitle className="text-base font-semibold">{asset.title}</CardTitle>
+            <CardTitle className="text-base font-semibold">{asset.name}</CardTitle>
             <p className="text-sm text-muted-foreground">{asset.type}</p>
-            <p className="text-xs text-muted-foreground">Adicionado em {asset.date}</p>
+            <p className="text-xs text-muted-foreground">Adicionado em {asset.uploadDate?.toDate().toLocaleDateString() || 'N/A'}</p>
         </CardContent>
         <CardFooter>
             <Button className="w-full" variant="secondary" asChild>
@@ -85,28 +88,25 @@ const AssetGridSkeleton = () => (
 export default function InfluencerBibliotecaPage() {
     const [assets, setAssets] = useState<Asset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { toast } = useToast();
 
     useEffect(() => {
         const fetchAssets = async () => {
             setIsLoading(true);
             try {
-                // MOCK DATA - In a real app, fetch from Firestore
-                const mockAssets: Asset[] = [
-                    { id: "1", title: "Banner LinkedIn - Lançamento", type: "image/png", category: "Posts", date: "15/07/2024", imageUrl: "https://placehold.co/600x400.png", dataAiHint: "corporate banner", fileUrl: "#" },
-                    { id: "2", title: "Guia de Tom de Voz", type: "application/pdf", category: "Assets de Marca", date: "20/06/2024", fileUrl: "#" },
-                    { id: "3", title: "Ebook sobre IA", type: "application/pdf", category: "Materiais Ricos", date: "18/07/2024", fileUrl: "#" },
-                ];
-                await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
-                setAssets(mockAssets);
+                const assetsCollection = collection(db, "companies", companyId, "assets");
+                const assetsSnapshot = await getDocs(assetsCollection);
+                const assetsList = assetsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Asset));
+                setAssets(assetsList);
             } catch (error) {
                 console.error("Failed to fetch assets:", error);
-                // In a real app, show a toast notification
+                 toast({ variant: 'destructive', title: 'Erro ao buscar ativos.' });
             } finally {
                 setIsLoading(false);
             }
         }
         fetchAssets();
-    }, []);
+    }, [toast]);
 
 
   const renderAssets = (category?: Asset['category']) => {

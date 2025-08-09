@@ -2,11 +2,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Users, Trophy, Gift, CheckCircle } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+
+const companyId = "company-123"; // In a real app, this would come from the user's session
 
 type StatCardProps = {
     title: string;
@@ -76,35 +81,44 @@ export default function AdminDashboardPage() {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [recentActivity, setRecentActivity] = useState<Activity[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { toast } = useToast();
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
-            // Simulate fetching data from Firestore
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            try {
+                // Fetch stats and activity from Firestore
+                const collaboratorsQuery = query(collection(db, "companies", companyId, "collaborators"));
+                const collaboratorsSnap = await getDocs(collaboratorsQuery);
 
-            // Mock data - replace with actual Firestore call
-            const mockStats: DashboardStats = {
-                activeCollaborators: 45,
-                totalLicenses: 50,
-                engagement: 82,
-                engagementChange: 5,
-                rewardsRedeemed: 12,
-                missionsCompleted: 153,
-            };
+                const statsData: DashboardStats = {
+                    activeCollaborators: collaboratorsSnap.size,
+                    totalLicenses: 50, // This would likely come from the company document
+                    engagement: 82, // Placeholder
+                    engagementChange: 5, // Placeholder
+                    rewardsRedeemed: 12, // Placeholder
+                    missionsCompleted: 153, // Placeholder
+                };
+                
+                 const activityQuery = query(collection(db, "companies", companyId, "activity"), orderBy("date", "desc"), limit(5));
+                 const activitySnap = await getDocs(activityQuery);
+                 const activityData = activitySnap.docs.map(doc => ({id: doc.id, ...doc.data()})) as Activity[];
 
-             const mockActivity: Activity[] = [
-                { id: "1", user: "Carla Costa", action: "Completou a trilha 'Onboarding de Novos Influenciadores'", date: "2024-07-20" },
-                { id: "2", user: "João Paulo", action: "Resgatou a recompensa 'Vale-presente iFood R$50'", date: "2024-07-19" },
-                { id: "3", user: "Carla Costa", action: "Completou a missão 'Compartilhar Post no LinkedIn'", date: "2024-07-18" },
-            ];
-
-            setStats(mockStats);
-            setRecentActivity(mockActivity);
-            setIsLoading(false);
+                setStats(statsData);
+                setRecentActivity(activityData);
+            } catch (error) {
+                console.error("Error fetching dashboard data: ", error);
+                toast({
+                    variant: 'destructive',
+                    title: 'Erro ao carregar dashboard',
+                    description: 'Não foi possível buscar os dados do dashboard.',
+                });
+            } finally {
+                setIsLoading(false);
+            }
         };
         fetchData();
-    }, []);
+    }, [toast]);
 
 
     if (isLoading || !stats) {
@@ -148,7 +162,7 @@ export default function AdminDashboardPage() {
                                 <TableRow key={activity.id}>
                                     <TableCell className="font-medium">{activity.user}</TableCell>
                                     <TableCell>{activity.action}</TableCell>
-                                    <TableCell>{activity.date}</TableCell>
+                                    <TableCell>{new Date(activity.date).toLocaleDateString()}</TableCell>
                                 </TableRow>
                             ))
                         ) : (

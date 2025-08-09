@@ -24,6 +24,7 @@ type ActionDialogProps = {
   showCancel?: boolean;
   className?: string;
   secondaryAction?: React.ReactNode;
+  formId?: string; // Add formId prop
 };
 
 export function ActionDialog({
@@ -35,7 +36,8 @@ export function ActionDialog({
   onAction,
   showCancel = true,
   className,
-  secondaryAction
+  secondaryAction,
+  formId, // Destructure formId
 }: ActionDialogProps) {
     const [isOpen, setIsOpen] = React.useState(false);
 
@@ -43,8 +45,18 @@ export function ActionDialog({
         if (onAction) {
             onAction();
         }
-        setIsOpen(false);
+        // Don't automatically close if it's a form submission, 
+        // let the parent component handle closing on success.
+        if (!formId) {
+             setIsOpen(false);
+        }
     }
+    
+    const actionButton = (
+      <Button onClick={handleAction} form={formId} type={formId ? 'submit' : 'button'}>
+        {actionText}
+      </Button>
+    );
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -58,7 +70,13 @@ export function ActionDialog({
         <DialogFooter>
             {showCancel && <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>}
             {secondaryAction}
-            <Button onClick={handleAction}>{actionText}</Button>
+            {onAction ? (
+              actionButton
+            ) : (
+                <DialogClose asChild>
+                  {actionButton}
+                </DialogClose>
+            )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,8 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
+
+const companyId = "company-123"; // In a real app, this would come from the user's session
 
 type Collaborator = {
   id: string;
@@ -51,16 +53,17 @@ export default function AdminColaboradoresPage() {
     const fetchCollaborators = async () => {
       setIsLoading(true);
       try {
-        // MOCK DATA - In a real app, this would be fetched from Firestore
-        // e.g., /companies/{companyId}/collaborators and /companies/{companyId} for licenses
-        const mockCollaborators: Collaborator[] = [
-           { id: '1', name: 'Carla Costa', email: 'carla@boldfy.com.br', points: 1250, status: 'Ativo', entryDate: '2023-10-01', avatarUrl: 'https://placehold.co/40x40.png' },
-           { id: '2', name: 'João Paulo', email: 'joao@boldfy.com.br', points: 890, status: 'Ativo', entryDate: '2023-11-15', avatarUrl: 'https://placehold.co/40x40.png' },
-        ];
+        const companyDocRef = doc(db, "companies", companyId);
+        const companyDocSnap = await getDoc(companyDocRef);
+        if(companyDocSnap.exists()) {
+            setTotalLicenses(companyDocSnap.data().licenses || 0);
+        }
+
+        const collaboratorsQuery = collection(db, "companies", companyId, "collaborators");
+        const querySnapshot = await getDocs(collaboratorsQuery);
+        const fetchedCollaborators = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Collaborator[];
+        setCollaborators(fetchedCollaborators);
         
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate fetch delay
-        setCollaborators(mockCollaborators);
-        setTotalLicenses(50); // Mock license data
       } catch (error) {
         console.error("Error fetching collaborators: ", error);
         toast({ variant: "destructive", title: "Erro ao buscar colaboradores."});
@@ -75,6 +78,7 @@ export default function AdminColaboradoresPage() {
   const handleInvite = async () => {
       setIsSubmitting(true);
       // TODO: Implement invite logic (e.g., call a server action or Firebase function)
+      // This would typically involve sending an email and creating a pending user.
       console.log("Sending invite...");
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async operation
       toast({ title: "Convite enviado com sucesso!"});
@@ -159,7 +163,7 @@ export default function AdminColaboradoresPage() {
                       </TableCell>
                       <TableCell>{user.points}</TableCell>
                       <TableCell><Badge variant={user.status === 'Ativo' ? 'default' : 'destructive'}>{user.status}</Badge></TableCell>
-                      <TableCell>{user.entryDate}</TableCell>
+                      <TableCell>{new Date(user.entryDate).toLocaleDateString()}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

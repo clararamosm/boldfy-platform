@@ -2,10 +2,10 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -26,16 +26,15 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // For demonstration, we'll try to log in and redirect based on a mock logic.
-      // In a real app, you'd fetch the user's role from Firestore after login.
-      await signInWithEmailAndPassword(auth, email, password);
-      
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
       toast({
         title: 'Login bem-sucedido!',
         description: 'Redirecionando para o seu dashboard.',
       });
 
-      // Mock redirection logic based on email
+      // Redirect based on email for demo purposes
       if (email.includes('master@')) {
         router.push('/master/dashboard');
       } else if (email.includes('admin@')) {
@@ -45,27 +44,47 @@ export default function LoginPage() {
       }
 
     } catch (error: any) {
-      console.error(error);
-      // In a real app, you might want to create a user if they don't exist.
-      // For this demo, we assume users are pre-created or we show an error.
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-         toast({
-            variant: 'destructive',
-            title: 'Erro no Login',
-            description: 'Credenciais inválidas. Por favor, tente novamente.',
-        });
-      } else if (error.code === 'auth/wrong-password') {
-         toast({
-            variant: 'destructive',
-            title: 'Erro no Login',
-            description: 'Senha incorreta. Por favor, tente novamente.',
-        });
-      }
-      else {
+        // Simple demo logic: if user doesn't exist, create one.
+        // In a real app, this would be a separate "Sign Up" flow.
+        try {
+          const newUserCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const user = newUserCredential.user;
+
+          // Create a user document in Firestore
+          const userRole = email.includes('master@') ? 'master' : email.includes('admin@') ? 'admin' : 'influencer';
+          await setDoc(doc(db, "users", user.uid), {
+            email: user.email,
+            role: userRole,
+            createdAt: new Date(),
+          });
+          
+           toast({
+            title: 'Conta criada com sucesso!',
+            description: 'Redirecionando para o seu dashboard.',
+          });
+
+          // Redirect after creation
+          if (userRole === 'master') {
+            router.push('/master/dashboard');
+          } else if (userRole === 'admin') {
+            router.push('/admin/dashboard');
+          } else {
+            router.push('/influencer/dashboard');
+          }
+
+        } catch (createError: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao criar conta',
+                description: createError.message,
+            });
+        }
+      } else {
         toast({
             variant: 'destructive',
             title: 'Erro no Login',
-            description: 'Ocorreu um erro desconhecido.',
+            description: 'Credenciais inválidas ou ocorreu um erro.',
         });
       }
     } finally {
@@ -110,7 +129,7 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full font-bold" disabled={isLoading}>
-                {isLoading ? <Loader2 className="animate-spin" /> : 'Login'}
+                {isLoading ? <Loader2 className="animate-spin" /> : 'Login ou Criar Conta'}
               </Button>
             </form>
              <div className="mt-6 space-y-2 text-center">

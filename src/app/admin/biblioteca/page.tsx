@@ -1,7 +1,10 @@
 // src/app/admin/biblioteca/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,14 +18,17 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
 
+const companyId = "company-123"; // In a real app, this would come from the user's session
+
 // In a real app, this type would likely be defined in a shared types file.
 type Asset = {
     id: string;
     name: string;
     type: string;
     category: 'Posts' | 'Materiais Ricos' | 'Assets de Marca';
-    uploadDate: string;
-    fileUrl: string; // URL from Firebase Storage
+    uploadDate: any; // Firestore timestamp
+    fileUrl: string; 
+    filePath: string; // To find the file in Storage for deletion
 };
 
 const getAssetIcon = (type: string) => {
@@ -34,31 +40,33 @@ const getAssetIcon = (type: string) => {
 
 
 // AssetForm Component for Create/Edit
-const AssetForm = ({ asset, isSubmitting }: { asset?: Asset, isSubmitting: boolean }) => (
-    <>
-        <div className="space-y-2">
-            <Label htmlFor="asset-name">Nome do Ativo</Label>
-            <Input id="asset-name" name="name" placeholder="Ex: Banner para LinkedIn" defaultValue={asset?.name} required disabled={isSubmitting} />
+const AssetForm = ({ asset, isSubmitting, formRef, fileRef }: { asset?: Asset, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement>, fileRef: React.RefObject<HTMLInputElement> }) => (
+    <form id="asset-form" ref={formRef}>
+        <div className="space-y-4">
+            <div className="space-y-2">
+                <Label htmlFor="asset-name">Nome do Ativo</Label>
+                <Input id="asset-name" name="name" placeholder="Ex: Banner para LinkedIn" defaultValue={asset?.name} required disabled={isSubmitting} />
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="asset-category">Categoria</Label>
+                <Select name="category" defaultValue={asset?.category} required disabled={isSubmitting}>
+                    <SelectTrigger id="asset-category">
+                        <SelectValue placeholder="Selecione uma categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Posts">Posts</SelectItem>
+                        <SelectItem value="Materiais Ricos">Materiais Ricos</SelectItem>
+                        <SelectItem value="Assets de Marca">Assets de Marca</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="asset-file">Arquivo</Label>
+                <Input id="asset-file" name="file" type="file" required={!asset} disabled={isSubmitting} ref={fileRef} />
+                {asset && <p className="text-xs text-muted-foreground">Deixe em branco para manter o arquivo atual.</p>}
+            </div>
         </div>
-        <div className="space-y-2">
-            <Label htmlFor="asset-category">Categoria</Label>
-            <Select name="category" defaultValue={asset?.category} required disabled={isSubmitting}>
-                <SelectTrigger id="asset-category">
-                    <SelectValue placeholder="Selecione uma categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="Posts">Posts</SelectItem>
-                    <SelectItem value="Materiais Ricos">Materiais Ricos</SelectItem>
-                    <SelectItem value="Assets de Marca">Assets de Marca</SelectItem>
-                </SelectContent>
-            </Select>
-        </div>
-        <div className="space-y-2">
-            <Label htmlFor="asset-file">Arquivo</Label>
-            <Input id="asset-file" name="file" type="file" required={!asset} disabled={isSubmitting} />
-            {asset && <p className="text-xs text-muted-foreground">Deixe em branco para manter o arquivo atual.</p>}
-        </div>
-    </>
+    </form>
 );
 
 
@@ -67,56 +75,111 @@ export default function AdminBibliotecaPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
+    const formRef = useRef<HTMLFormElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Fetch assets from Firestore
+    const fetchAssets = async () => {
+        setIsLoading(true);
+        try {
+            const assetsCollection = collection(db, "companies", companyId, "assets");
+            const assetsSnapshot = await getDocs(assetsCollection);
+            const assetsList = assetsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Asset));
+            setAssets(assetsList);
+        } catch (error) {
+            console.error("Error fetching assets: ", error);
+            toast({ variant: "destructive", title: "Erro ao buscar ativos."});
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
     useEffect(() => {
-        const fetchAssets = async () => {
-            setIsLoading(true);
-            try {
-                // MOCK DATA - In a real app, fetch from Firestore collection
-                // e.g., /companies/{companyId}/assets
-                 const mockAssets: Asset[] = [
-                    { id: "1", name: "Banner LinkedIn - Lançamento", type: "image/png", category: "Posts", uploadDate: "2024-07-15", fileUrl: "#" },
-                    { id: "2", name: "Guia de Tom de Voz", type: "application/pdf", category: "Assets de Marca", uploadDate: "2024-06-20", fileUrl: "#" },
-                    { id: "3", name: "Ebook sobre IA", type: "application/pdf", category: "Materiais Ricos", uploadDate: "2024-07-18", fileUrl: "#" },
-                ];
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                setAssets(mockAssets);
-            } catch (error) {
-                console.error("Error fetching assets: ", error);
-                toast({ variant: "destructive", title: "Erro ao buscar ativos."});
-            } finally {
-                setIsLoading(false);
-            }
-        };
         fetchAssets();
-    }, [toast]);
+    }, []);
 
     const handleAction = async (assetId?: string) => {
         setIsSubmitting(true);
-        // TODO: Implement file upload to Storage and data saving to Firestore
-        console.log("Submitting form...", assetId ? `Editing ${assetId}`: 'Creating new');
+        const formData = new FormData(formRef.current!);
+        const file = fileInputRef.current?.files?.[0];
+
         try {
-            await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async operation
+            if (!assetId && !file) {
+                throw new Error("Um arquivo é obrigatório para um novo ativo.");
+            }
+
+            let fileUrl = '';
+            let filePath = '';
+            
+            if (file) {
+                // If editing, delete the old file first
+                if (assetId) {
+                    const oldAsset = assets.find(a => a.id === assetId);
+                    if (oldAsset?.filePath) {
+                        const oldFileRef = ref(storage, oldAsset.filePath);
+                        await deleteObject(oldFileRef).catch(err => console.warn("Old file not found, continuing...", err));
+                    }
+                }
+                
+                filePath = `companies/${companyId}/assets/${Date.now()}-${file.name}`;
+                const storageRef = ref(storage, filePath);
+                const uploadResult = await uploadBytes(storageRef, file);
+                fileUrl = await getDownloadURL(uploadResult.ref);
+            }
+
+            const assetData = {
+                name: formData.get('name') as string,
+                category: formData.get('category') as string,
+                ...(file && { 
+                    fileUrl, 
+                    filePath, 
+                    type: file.type,
+                    uploadDate: serverTimestamp() 
+                }),
+            };
+
+            if (assetId) {
+                // Update
+                const assetDoc = doc(db, "companies", companyId, "assets", assetId);
+                await updateDoc(assetDoc, assetData);
+            } else {
+                // Create
+                await addDoc(collection(db, "companies", companyId, "assets"), assetData);
+            }
+
             toast({
                 title: "Sucesso!",
                 description: `Ativo ${assetId ? 'atualizado' : 'criado'} com sucesso.`,
             });
-            // Here you would refetch the assets list
+            fetchAssets(); // Refetch assets list
         } catch (error) {
             console.error("Error submitting asset:", error);
-            toast({ variant: "destructive", title: "Erro ao salvar ativo."});
+            toast({ variant: "destructive", title: "Erro ao salvar ativo.", description: (error as Error).message });
         } finally {
             setIsSubmitting(false);
         }
     };
     
-    const handleDelete = async (assetId: string) => {
-        // TODO: Implement file deletion from Storage and data from Firestore
-        toast({
-            title: `Ativo ${assetId} excluído.`,
-            description: "A exclusão foi simulada com sucesso.",
-        });
+    const handleDelete = async (asset: Asset) => {
+        if (!confirm(`Tem certeza que deseja excluir o ativo "${asset.name}"?`)) return;
+        
+        try {
+            // Delete file from Storage
+            const fileRef = ref(storage, asset.filePath);
+            await deleteObject(fileRef);
+
+            // Delete doc from Firestore
+            const assetDoc = doc(db, "companies", companyId, "assets", asset.id);
+            await deleteDoc(assetDoc);
+            
+            toast({
+                title: `Ativo excluído.`,
+                description: "O ativo foi removido com sucesso.",
+            });
+            fetchAssets(); // Refetch
+        } catch(error) {
+            console.error("Error deleting asset:", error);
+             toast({ variant: "destructive", title: "Erro ao excluir ativo." });
+        }
     }
 
     const uploadButton = (
@@ -133,8 +196,9 @@ export default function AdminBibliotecaPage() {
             trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar</DropdownMenuItem>}
             actionText={isSubmitting ? "Salvando..." : "Salvar Alterações"}
             onAction={() => handleAction(asset.id)}
+            formId="asset-form"
         >
-            <AssetForm asset={asset} isSubmitting={isSubmitting} />
+            <AssetForm asset={asset} isSubmitting={isSubmitting} formRef={formRef} fileRef={fileInputRef} />
         </ActionDialog>
     );
 
@@ -154,8 +218,9 @@ export default function AdminBibliotecaPage() {
               trigger={uploadButton}
               actionText={isSubmitting ? "Enviando..." : "Fazer Upload"}
               onAction={() => handleAction()}
+              formId="asset-form"
             >
-              <AssetForm isSubmitting={isSubmitting} />
+              <AssetForm isSubmitting={isSubmitting} formRef={formRef} fileRef={fileInputRef} />
             </ActionDialog>
           </CardHeader>
           <CardContent>
@@ -195,7 +260,7 @@ export default function AdminBibliotecaPage() {
                         <TableCell>
                             <Badge variant="outline">{asset.category}</Badge>
                         </TableCell>
-                        <TableCell>{asset.uploadDate}</TableCell>
+                        <TableCell>{asset.uploadDate?.toDate().toLocaleDateString() || 'N/A'}</TableCell>
                         <TableCell>
                             <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -206,7 +271,7 @@ export default function AdminBibliotecaPage() {
                                     <a href={asset.fileUrl} target="_blank" rel="noopener noreferrer">Baixar</a>
                                 </DropdownMenuItem>
                                 <EditAssetButton asset={asset} />
-                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(asset.id)}>
+                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(asset)}>
                                     Excluir
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
