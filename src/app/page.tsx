@@ -3,8 +3,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, AuthErrorCodes } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, AuthErrorCodes } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,73 +28,52 @@ export default function LoginPage() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      
+      const userDocRef = doc(db, "users", user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+           throw new Error("User document not found in Firestore.");
+      }
+      
+      const userRole = userDocSnap.data().role;
 
       toast({
         title: 'Login bem-sucedido!',
         description: 'Redirecionando para o seu dashboard.',
       });
 
-      // Redirect based on email for demo purposes
-      if (email.includes('master@')) {
+      // Redirect based on user role from Firestore
+      if (userRole === 'master') {
         router.push('/master/dashboard');
-      } else if (email.includes('admin@')) {
+      } else if (userRole === 'admin') {
         router.push('/admin/dashboard');
       } else {
         router.push('/influencer/dashboard');
       }
 
     } catch (error: any) {
-      // Check if the error is due to user not found or wrong password
-      if (error.code === AuthErrorCodes.USER_DELETED || error.code === AuthErrorCodes.INVALID_LOGIN_CREDENTIALS) {
-        // Simple demo logic: if user doesn't exist, create one.
-        // In a real app, this would be a separate "Sign Up" flow.
-        try {
-          const newUserCredential = await createUserWithEmailAndPassword(auth, email, password);
-          const user = newUserCredential.user;
-
-          // Create a user document in Firestore
-          const userRole = email.includes('master@') ? 'master' : email.includes('admin@') ? 'admin' : 'influencer';
-          await setDoc(doc(db, "users", user.uid), {
-            email: user.email,
-            role: userRole,
-            createdAt: new Date(),
-            // Add initial data for a new user
-            points: 0,
-            profile: {
-                name: email.split('@')[0],
-                email: email,
-                avatarUrl: `https://placehold.co/100x100.png`
+       let errorMessage = 'Ocorreu um erro desconhecido.';
+        if (error.code) {
+            switch (error.code) {
+                case AuthErrorCodes.USER_DELETED:
+                    errorMessage = 'Este usuário foi excluído.';
+                    break;
+                case AuthErrorCodes.INVALID_LOGIN_CREDENTIALS:
+                    errorMessage = 'Credenciais inválidas. Verifique seu e-mail e senha.';
+                    break;
+                default:
+                    errorMessage = error.message;
             }
-          });
-          
-           toast({
-            title: 'Conta criada com sucesso!',
-            description: 'Redirecionando para o seu dashboard.',
-          });
-
-          // Redirect after creation
-          if (userRole === 'master') {
-            router.push('/master/dashboard');
-          } else if (userRole === 'admin') {
-            router.push('/admin/dashboard');
-          } else {
-            router.push('/influencer/dashboard');
-          }
-
-        } catch (createError: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao criar conta',
-                description: createError.message,
-            });
+        } else {
+            errorMessage = error.toString();
         }
-      } else {
-        toast({
+      
+      toast({
             variant: 'destructive',
             title: 'Erro no Login',
-            description: error.message || 'Credenciais inválidas ou ocorreu um erro.',
+            description: errorMessage,
         });
-      }
     } finally {
       setIsLoading(false);
     }
@@ -137,11 +116,12 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full font-bold" disabled={isLoading}>
-                {isLoading ? <Loader2 className="animate-spin" /> : 'Login ou Criar Conta'}
+                {isLoading ? <Loader2 className="animate-spin" /> : 'Login'}
               </Button>
             </form>
              <div className="mt-6 space-y-2 text-center">
-                <p className="text-sm text-muted-foreground">Para demonstração (use qualquer senha):</p>
+                <p className="text-sm text-muted-foreground">Para demonstração, use um dos e-mails abaixo com qualquer senha.</p>
+                 <p className="text-xs text-muted-foreground">(A criação de conta foi desabilitada por segurança).</p>
                 <div className="flex flex-col gap-2 sm:flex-row">
                     <Button onClick={() => setEmail('clara@boldfy.com.br')} variant="outline" className="w-full text-xs">
                         Logar como Influenciador
