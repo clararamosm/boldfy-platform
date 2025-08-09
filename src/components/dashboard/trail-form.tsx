@@ -13,13 +13,17 @@ import { FileVideo, Plus, Trash2 } from "lucide-react";
 
 export type Trail = {
   name: string;
-  status: 'Ativa' | 'Inativa';
+  status: 'Ativa' | 'Inativa' | 'Arquivada' | 'Rascunho';
   enrolled?: number;
   total?: number;
   topics?: number;
   companies?: number;
   creationDate?: string;
   description?: string;
+  views?: number;
+  uniqueUsers?: number;
+  points?: number;
+  bonus?: number;
 };
 
 type Topic = {
@@ -71,6 +75,16 @@ export const TrailForm = ({ trail }: { trail?: Trail }) => {
           <div className="space-y-2">
             <Label htmlFor="trail-description" className="font-bold text-base">Descrição</Label>
             <Textarea id="trail-description" placeholder="Descreva o objetivo da trilha de aprendizagem." defaultValue={trail?.description || "Prepare novos colaboradores para se tornarem advogados da marca."} />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+                <Label htmlFor="trail-points">Pontos da Trilha</Label>
+                <Input id="trail-points" type="number" placeholder="Ex: 500" defaultValue={trail?.points} />
+            </div>
+             <div className="space-y-2">
+                <Label htmlFor="trail-bonus">Pontos Bônus</Label>
+                <Input id="trail-bonus" type="number" placeholder="Ex: 100" defaultValue={trail?.bonus} />
+            </div>
           </div>
       </div>
       

@@ -18,13 +18,13 @@ type GlobalTrail = Trail & {
 }
 
 const activeGlobalTrails: GlobalTrail[] = [
-    { name: "Cultura da Empresa 101", topics: 4, companies: 12, creationDate: "2023-02-10", status: 'Ativa', description: "Uma introdução à cultura da empresa.", views: 1250, uniqueUsers: 450 },
-    { name: "Dominando Nossos Produtos", topics: 3, companies: 8, creationDate: "2023-04-05", status: 'Ativa', description: "Conheça a fundo os produtos que oferecemos.", views: 890, uniqueUsers: 320 },
+    { name: "Cultura da Empresa 101", topics: 4, creationDate: "2023-02-10", status: 'Ativa', description: "Uma introdução à cultura da empresa.", views: 1250, uniqueUsers: 450, points: 250, bonus: 50 },
+    { name: "Dominando Nossos Produtos", topics: 3, creationDate: "2023-04-05", status: 'Ativa', description: "Conheça a fundo os produtos que oferecemos.", views: 890, uniqueUsers: 320, points: 400, bonus: 0 },
 ];
 
 const inactiveGlobalTrails: GlobalTrail[] = [
-    { name: "Guia de Boas Práticas em Redes Sociais", topics: 5, companies: 0, creationDate: "2023-08-15", status: 'Arquivada', description: "Um guia completo para colaboradores.", views: 2300, uniqueUsers: 950 },
-    { name: "Introdução à IA Generativa", topics: 2, companies: 0, creationDate: "2024-01-20", status: 'Rascunho', description: "Primeiros passos com IA.", views: 0, uniqueUsers: 0 },
+    { name: "Guia de Boas Práticas em Redes Sociais", topics: 5, creationDate: "2023-08-15", status: 'Arquivada', description: "Um guia completo para colaboradores.", views: 2300, uniqueUsers: 950, points: 150, bonus: 0 },
+    { name: "Introdução à IA Generativa", topics: 2, creationDate: "2024-01-20", status: 'Rascunho', description: "Primeiros passos com IA.", views: 0, uniqueUsers: 0, points: 100, bonus: 20 },
 ];
 
 const EditTrailButton = ({ trail }: { trail: Trail }) => (
@@ -72,7 +72,8 @@ export default function MasterConteudoGlobalPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome da Trilha</TableHead>
-                  <TableHead>Tópicos</TableHead>
+                  <TableHead>Pontos</TableHead>
+                  <TableHead>Bônus</TableHead>
                   <TableHead>Visualizações</TableHead>
                   <TableHead>Usuários Únicos</TableHead>
                    <TableHead>Data de Criação</TableHead>
@@ -83,7 +84,8 @@ export default function MasterConteudoGlobalPage() {
                 {activeGlobalTrails.map((trail) => (
                     <TableRow key={trail.name}>
                         <TableCell className="font-medium">{trail.name}</TableCell>
-                        <TableCell>{trail.topics}</TableCell>
+                        <TableCell>{trail.points}</TableCell>
+                        <TableCell>{trail.bonus}</TableCell>
                         <TableCell>{trail.views}</TableCell>
                         <TableCell>{trail.uniqueUsers}</TableCell>
                         <TableCell>{trail.creationDate}</TableCell>
@@ -115,7 +117,8 @@ export default function MasterConteudoGlobalPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nome da Trilha</TableHead>
-                            <TableHead>Tópicos</TableHead>
+                            <TableHead>Pontos</TableHead>
+                            <TableHead>Bônus</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Data de Criação</TableHead>
                             <TableHead><span className="sr-only">Ações</span></TableHead>
@@ -125,7 +128,8 @@ export default function MasterConteudoGlobalPage() {
                         {inactiveGlobalTrails.map((trail) => (
                             <TableRow key={trail.name} className="text-muted-foreground">
                                 <TableCell className="font-medium">{trail.name}</TableCell>
-                                <TableCell>{trail.topics}</TableCell>
+                                <TableCell>{trail.points}</TableCell>
+                                <TableCell>{trail.bonus}</TableCell>
                                 <TableCell>
                                     <Badge variant={trail.status === 'Arquivada' ? 'outline' : 'secondary'}>
                                         {trail.status}

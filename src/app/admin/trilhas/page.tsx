@@ -6,7 +6,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Globe } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Globe, Zap, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,9 +18,14 @@ import { Progress } from "@/components/ui/progress";
 import { Trail, TrailForm } from '@/components/dashboard/trail-form';
 
 const trails: Trail[] = [
-  { name: "Onboarding de Novos Influenciadores", status: "Ativa", enrolled: 45, total: 45, description: "Prepare novos colaboradores para se tornarem advogados da marca." },
-  { name: "Como criar conteúdo viral", status: "Inativa", enrolled: 30, total: 45, description: "Aprenda técnicas para criar posts que engajam." },
+  { name: "Onboarding de Novos Influenciadores", status: "Ativa", enrolled: 45, total: 45, description: "Prepare novos colaboradores para se tornarem advogados da marca.", points: 500, bonus: 100 },
+  { name: "Como criar conteúdo viral", status: "Inativa", enrolled: 30, total: 45, description: "Aprenda técnicas para criar posts que engajam.", points: 300, bonus: 50 },
 ];
+
+const globalTrails = [
+    { name: "Cultura da Empresa 101", points: 250, bonus: 50, active: true },
+    { name: "Dominando Nossos Produtos", points: 400, bonus: 0, active: false }
+]
 
 const EditTrailButton = ({ trail }: { trail: Trail }) => (
   <ActionDialog
@@ -113,6 +118,8 @@ export default function AdminTrilhasPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome</TableHead>
+                       <TableHead>Pontos</TableHead>
+                       <TableHead>Bônus</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Inscritos</TableHead>
                       <TableHead><span className="sr-only">Ações</span></TableHead>
@@ -122,6 +129,8 @@ export default function AdminTrilhasPage() {
                     {trails.map((trail) => (
                         <TableRow key={trail.name} className={trail.status === 'Inativa' ? 'text-muted-foreground' : ''}>
                           <TableCell className="font-medium">{trail.name}</TableCell>
+                          <TableCell>{trail.points}</TableCell>
+                          <TableCell>{trail.bonus}</TableCell>
                           <TableCell><Badge variant={trail.status === 'Ativa' ? 'default' : 'outline'}>{trail.status}</Badge></TableCell>
                           <TableCell>{trail.enrolled} / {trail.total}</TableCell>
                           <TableCell>
@@ -156,38 +165,39 @@ export default function AdminTrilhasPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Nome da Trilha</TableHead>
+                      <TableHead>Pontuação</TableHead>
                       <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                           <Globe className="h-4 w-4 text-muted-foreground" />
-                           Cultura da Empresa 101
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                         <div className="flex items-center space-x-2">
-                            <Switch id="cultura-switch" defaultChecked />
-                            <Label htmlFor="cultura-switch">Ativa</Label>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                     <TableRow>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                           <Globe className="h-4 w-4 text-muted-foreground" />
-                           Dominando Nossos Produtos
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                         <div className="flex items-center space-x-2">
-                            <Switch id="produtos-switch" />
-                            <Label htmlFor="produtos-switch">Inativa</Label>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    {globalTrails.map((trail) => (
+                         <TableRow key={trail.name}>
+                         <TableCell className="font-medium">
+                           <div className="flex items-center gap-2">
+                              <Globe className="h-4 w-4 text-muted-foreground" />
+                              {trail.name}
+                           </div>
+                         </TableCell>
+                         <TableCell>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+                                    <Zap className="h-3 w-3 mr-1"/>
+                                    {trail.points}
+                                </Badge>
+                                <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
+                                    <Star className="h-3 w-3 mr-1"/>
+                                    {trail.bonus} bônus
+                                </Badge>
+                            </div>
+                         </TableCell>
+                         <TableCell>
+                            <div className="flex items-center space-x-2">
+                               <Switch id={`${trail.name}-switch`} defaultChecked={trail.active} />
+                               <Label htmlFor={`${trail.name}-switch`}>{trail.active ? 'Ativa' : 'Inativa'}</Label>
+                           </div>
+                         </TableCell>
+                       </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
