@@ -59,20 +59,20 @@ export default function InfluencerDashboardPage() {
             <CardContent className="space-y-6">
               <div>
                 <div className="mb-2 flex justify-between items-center">
-                  <h3 className="font-semibold">Cultura da Empresa 101</h3>
-                  <span className="text-sm text-muted-foreground">75% Completo</span>
+                  <h3 className="font-semibold">Onboarding de Novos Influenciadores</h3>
+                  <span className="text-sm text-muted-foreground">100% Completo</span>
                 </div>
-                <Progress value={75} />
+                <Progress value={100} />
                 <Button variant="link" size="sm" className="px-0" asChild>
-                    <Link href="/influencer/trilhas">Continuar <ArrowRight className="ml-1 h-4 w-4" /></Link>
+                    <Link href="/influencer/trilhas">Revisar <ArrowRight className="ml-1 h-4 w-4" /></Link>
                 </Button>
               </div>
               <div>
                 <div className="mb-2 flex justify-between items-center">
-                  <h3 className="font-semibold">Dominando Nossos Produtos</h3>
-                  <span className="text-sm text-muted-foreground">30% Completo</span>
+                  <h3 className="font-semibold">Cultura da Empresa 101</h3>
+                  <span className="text-sm text-muted-foreground">75% Completo</span>
                 </div>
-                <Progress value={30} />
+                <Progress value={75} />
                 <Button variant="link" size="sm" className="px-0" asChild>
                     <Link href="/influencer/trilhas">Continuar <ArrowRight className="ml-1 h-4 w-4" /></Link>
                 </Button>

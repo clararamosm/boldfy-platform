@@ -1,15 +1,22 @@
+// src/app/influencer/trilhas/page.tsx
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Star, Zap } from "lucide-react";
+import { Star, Zap, Globe, Building } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-const TrailCard = ({ title, points, bonus, progress, tasksCompleted, tasksTotal, buttonText = "Ver conteúdo", buttonVariant = "default" }) => (
+const TrailCard = ({ title, points, bonus, progress, tasksCompleted, tasksTotal, type, buttonText = "Ver conteúdo", buttonVariant = "default" }) => (
     <Card className="shadow-sm">
         <CardContent className="p-4">
             <div className="flex justify-between items-start mb-2 gap-2">
-                <h3 className="font-semibold">{title}</h3>
+                <div>
+                     <Badge variant="outline" className="mb-2 font-normal">
+                        {type === 'global' ? <Globe className="h-3 w-3 mr-1.5" /> : <Building className="h-3 w-3 mr-1.5" />}
+                        {type === 'global' ? 'Global' : 'Personalizada'}
+                    </Badge>
+                    <h3 className="font-semibold">{title}</h3>
+                </div>
                 <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
                     <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
                         <Zap className="h-3 w-3 mr-1"/>
@@ -60,6 +67,17 @@ export default function TrilhasPage() {
         <div className="space-y-4">
             <h2 className="text-xl font-bold font-headline">Minhas Trilhas</h2>
              <TrailCard 
+                title="Onboarding de Novos Influenciadores" 
+                points={500} 
+                bonus={100} 
+                progress={100}
+                tasksCompleted={2}
+                tasksTotal={2}
+                buttonText="Revisar conteúdo"
+                buttonVariant="secondary"
+                type="personalizada"
+            />
+            <TrailCard 
                 title="Cultura da Empresa 101" 
                 points={500} 
                 bonus={100} 
@@ -67,17 +85,8 @@ export default function TrilhasPage() {
                 tasksCompleted={3}
                 tasksTotal={4}
                 buttonText="Continuar"
-                buttonVariant="secondary"
-            />
-            <TrailCard 
-                title="Dominando Nossos Produtos" 
-                points={800} 
-                bonus={150} 
-                progress={30}
-                tasksCompleted={1}
-                tasksTotal={3}
-                buttonText="Continuar"
-                buttonVariant="secondary"
+                buttonVariant="default"
+                type="global"
             />
         </div>
       </main>
