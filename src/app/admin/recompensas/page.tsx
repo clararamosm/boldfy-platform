@@ -1,3 +1,6 @@
+
+'use client';
+
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +20,12 @@ export default function AdminRecompensasPage() {
       <PlusCircle className="mr-2 h-4 w-4" />
       Adicionar Recompensa
     </Button>
+  );
+
+  const editRewardButton = (
+      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          Editar
+      </DropdownMenuItem>
   );
 
   const rewardForm = (
@@ -110,8 +119,16 @@ export default function AdminRecompensasPage() {
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
-                            <DropdownMenuItem>Ocultar</DropdownMenuItem>
+                            <ActionDialog
+                                title="Editar Recompensa"
+                                description="Atualize os detalhes da recompensa."
+                                trigger={editRewardButton}
+                                actionText="Salvar Alterações"
+                            >
+                                {rewardForm}
+                            </ActionDialog>
+                            <DropdownMenuItem>Desativar</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -127,8 +144,16 @@ export default function AdminRecompensasPage() {
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
-                            <DropdownMenuItem>Ocultar</DropdownMenuItem>
+                            <ActionDialog
+                                title="Editar Recompensa"
+                                description="Atualize os detalhes da recompensa."
+                                trigger={editRewardButton}
+                                actionText="Salvar Alterações"
+                            >
+                                {rewardForm}
+                            </ActionDialog>
+                            <DropdownMenuItem>Desativar</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive">Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
