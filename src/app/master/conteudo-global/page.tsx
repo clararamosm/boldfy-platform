@@ -5,7 +5,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Zap, Star } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { TrailForm, Trail } from "@/components/dashboard/trail-form";
@@ -74,8 +74,7 @@ export default function MasterConteudoGlobalPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome da Trilha</TableHead>
-                  <TableHead>Pontos</TableHead>
-                  <TableHead>Bônus</TableHead>
+                  <TableHead>Pontuação</TableHead>
                   <TableHead>Visualizações</TableHead>
                   <TableHead>Usuários Únicos</TableHead>
                    <TableHead>Data de Criação</TableHead>
@@ -86,8 +85,20 @@ export default function MasterConteudoGlobalPage() {
                 {activeGlobalTrails.map((trail) => (
                     <TableRow key={trail.name}>
                         <TableCell className="font-medium">{trail.name}</TableCell>
-                        <TableCell>{trail.points}</TableCell>
-                        <TableCell>{trail.bonus}</TableCell>
+                         <TableCell>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+                                    <Zap className="h-3 w-3 mr-1"/>
+                                    {trail.points}
+                                </Badge>
+                                {trail.bonus > 0 && (
+                                <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
+                                    <Star className="h-3 w-3 mr-1"/>
+                                    {trail.bonus} bônus
+                                </Badge>
+                                )}
+                            </div>
+                         </TableCell>
                         <TableCell>{trail.views}</TableCell>
                         <TableCell>{trail.uniqueUsers}</TableCell>
                         <TableCell>{trail.creationDate}</TableCell>
@@ -119,8 +130,7 @@ export default function MasterConteudoGlobalPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nome da Trilha</TableHead>
-                            <TableHead>Pontos</TableHead>
-                            <TableHead>Bônus</TableHead>
+                            <TableHead>Pontuação</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Data de Criação</TableHead>
                             <TableHead><span className="sr-only">Ações</span></TableHead>
@@ -130,8 +140,20 @@ export default function MasterConteudoGlobalPage() {
                         {inactiveGlobalTrails.map((trail) => (
                             <TableRow key={trail.name} className="text-muted-foreground">
                                 <TableCell className="font-medium">{trail.name}</TableCell>
-                                <TableCell>{trail.points}</TableCell>
-                                <TableCell>{trail.bonus}</TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+                                            <Zap className="h-3 w-3 mr-1"/>
+                                            {trail.points}
+                                        </Badge>
+                                        {trail.bonus > 0 && (
+                                        <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
+                                            <Star className="h-3 w-3 mr-1"/>
+                                            {trail.bonus} bônus
+                                        </Badge>
+                                        )}
+                                    </div>
+                                </TableCell>
                                 <TableCell>
                                     <Badge variant={trail.status === 'Arquivada' ? 'outline' : 'secondary'}>
                                         {trail.status}
