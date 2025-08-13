@@ -12,55 +12,46 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Shield, User, Star } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+
+type Role = 'master' | 'admin' | 'influencer';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<Role | false>(false);
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const handleTestLogin = async (role: Role) => {
+    setIsLoading(role);
+
+    const credentials = {
+      master: { email: 'master@boldfy.com', password: 'master123', path: '/master/dashboard'},
+      admin: { email: 'admin@empresa.com', password: 'admin123', path: '/admin/dashboard'},
+      influencer: { email: 'influencer@empresa.com', password: 'influencer123', path: '/influencer/dashboard'}
+    };
+
+    const { email, password, path } = credentials[role];
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
       
-      const userDocRef = doc(db, "users", user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (!userDocSnap.exists()) {
-           throw new Error("User document not found in Firestore.");
-      }
-      
-      const userRole = userDocSnap.data().role;
-
       toast({
         title: 'Login bem-sucedido!',
         description: 'Redirecionando para o seu dashboard.',
       });
-
-      // Redirect based on user role from Firestore
-      if (userRole === 'master') {
-        router.push('/master/dashboard');
-      } else if (userRole === 'admin') {
-        router.push('/admin/dashboard');
-      } else {
-        router.push('/influencer/dashboard');
-      }
+      
+      router.push(path);
 
     } catch (error: any) {
        let errorMessage = 'Ocorreu um erro desconhecido.';
         if (error.code) {
             switch (error.code) {
-                case AuthErrorCodes.USER_DELETED:
-                    errorMessage = 'Este usuário foi excluído.';
+                case 'auth/user-not-found':
+                    errorMessage = `Usuário de teste '${email}' não encontrado. Crie-o no seu console do Firebase (Authentication e Firestore) para testar.`;
                     break;
                 case 'auth/invalid-credential':
-                    errorMessage = 'Credenciais inválidas. Verifique seu e-mail e senha.';
+                    errorMessage = 'Credenciais de teste inválidas. Verifique a senha ou crie o usuário no Firebase.';
                     break;
                 default:
                     errorMessage = error.message;
@@ -71,7 +62,7 @@ export default function LoginPage() {
       
       toast({
             variant: 'destructive',
-            title: 'Erro no Login',
+            title: 'Erro no Login de Teste',
             description: errorMessage,
         });
     } finally {
@@ -88,37 +79,47 @@ export default function LoginPage() {
                <Logo />
             </div>
             <CardTitle className="font-headline text-3xl">Boldfy</CardTitle>
-            <CardDescription>Faça login para começar sua jornada como um influenciador da marca.</CardDescription>
+            <CardDescription>Plataforma de gamificação para embaixadores de marca.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="seu@email.com" 
-                  required 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isLoading}
-                />
+          <CardContent className="space-y-4">
+            <div className="relative">
+              <Separator />
+              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center">
+                <span className="bg-card px-2 text-sm text-muted-foreground">Acesso Rápido para Testes</span>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  required 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
-                />
-              </div>
-              <Button type="submit" className="w-full font-bold" disabled={isLoading}>
-                {isLoading ? <Loader2 className="animate-spin" /> : 'Login'}
+            </div>
+            <div className="flex flex-col space-y-2">
+              <Button
+                variant="outline"
+                onClick={() => handleTestLogin('master')}
+                disabled={!!isLoading}
+                className="justify-start"
+              >
+                {isLoading === 'master' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Shield className="mr-2 h-4 w-4" />}
+                Entrar como Master
               </Button>
-            </form>
+              <Button
+                variant="outline"
+                onClick={() => handleTestLogin('admin')}
+                disabled={!!isLoading}
+                className="justify-start"
+              >
+                {isLoading === 'admin' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <User className="mr-2 h-4 w-4" />}
+                Entrar como Admin
+              </Button>
+               <Button
+                variant="outline"
+                onClick={() => handleTestLogin('influencer')}
+                disabled={!!isLoading}
+                className="justify-start"
+              >
+                {isLoading === 'influencer' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4" />}
+                Entrar como Influencer
+              </Button>
+            </div>
+             <p className="text-xs text-muted-foreground text-center pt-2">
+                Certifique-se de que os usuários de teste (ex: master@boldfy.com) foram criados no seu console do Firebase.
+            </p>
           </CardContent>
         </Card>
       </div>
