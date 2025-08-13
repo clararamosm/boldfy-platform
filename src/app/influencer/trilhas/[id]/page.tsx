@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,7 +88,9 @@ const TrailContentSkeleton = () => (
     </Card>
 );
 
-export default function TrailDetailPage({ params }: { params: { id: string } }) {
+export default function TrailDetailPage() {
+    const params = useParams();
+    const trailId = params.id as string;
     const [trailData, setTrailData] = useState<TrailData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [activeItem, setActiveItem] = useState<Topic | Quiz | null>(null);
@@ -126,8 +129,10 @@ export default function TrailDetailPage({ params }: { params: { id: string } }) 
             }
         };
 
-        fetchTrailData();
-    }, [params.id]);
+        if (trailId) {
+            fetchTrailData();
+        }
+    }, [trailId]);
 
 
     const allItems = useMemo(() => {
