@@ -13,6 +13,27 @@ STRIPE_PRICE_ID=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
+## Credenciais de Teste (Desenvolvimento)
+
+Para facilitar os testes, você pode criar os seguintes usuários no seu console do Firebase (Authentication e Firestore) para acessar cada perfil:
+
+*   **Master (Super Admin)**
+    *   **Email**: `master@boldfy.com`
+    *   **Senha**: `master123`
+    *   **Firestore (`/users/{UID}`):** `{ "role": "master" }`
+
+*   **Admin (Administrador da Empresa)**
+    *   **Email**: `admin@empresa.com`
+    *   **Senha**: `admin123`
+    *   **Firestore (`/users/{UID}`):** `{ "role": "admin", "companyId": "ID_DA_EMPRESA_AQUI", "companyName": "Nome da Empresa", ... }`
+
+*   **Influencer (Colaborador)**
+    *   **Email**: `influencer@empresa.com`
+    *   **Senha**: `influencer123`
+    *   **Firestore (`/users/{UID}`):** `{ "role": "influencer", "companyId": "ID_DA_EMPRESA_AQUI", "companyName": "Nome da Empresa", ... }`
+
+---
+
 ## 1. Como Definir o Usuário Master
 
 Para que a aplicação funcione e você possa adicionar empresas, o primeiro passo é criar o usuário **Master**. Este é o superadministrador da plataforma. A criação é um processo manual e seguro, feito em duas etapas no seu console do Firebase.
@@ -24,7 +45,7 @@ Vá para o seu console do Firebase:
 1.  Selecione o seu projeto (`boldfy-app`).
 2.  No menu à esquerda, vá para **Authentication**.
 3.  Clique em **Adicionar usuário**.
-4.  Digite o e-mail que você deseja para o seu usuário Master (ex: `clara@boldfy.com.br`).
+4.  Digite o e-mail que você deseja para o seu usuário Master (ex: `master@boldfy.com`).
 5.  Crie uma senha forte.
 6.  Clique em **Adicionar usuário**.
 
