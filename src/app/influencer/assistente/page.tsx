@@ -9,6 +9,7 @@ import { Header } from "@/components/dashboard/header";
 import { AiAssistantForm } from "@/components/ai-assistant-form";
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 const AssistantPageSkeleton = () => (
      <div className="mx-auto max-w-3xl">
