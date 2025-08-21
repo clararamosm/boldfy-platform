@@ -231,7 +231,7 @@ export async function createCheckoutSession(prevState: CheckoutState, formData: 
     }
 
     const { companyId, companyName, adminEmail, licenses, adminName } = validatedData.data;
-    const origin = headers().get('origin');
+    const origin = headers().get('origin') || 'http://localhost:3000';
     
     try {
         const session = await stripe.checkout.sessions.create({
