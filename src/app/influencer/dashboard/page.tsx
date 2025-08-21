@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 
 type Mission = {
     id: string;
-    title: string;
+    name: string;
     points: number;
-    href: string;
 };
 
 type Trail = {
@@ -36,9 +35,9 @@ type DashboardData = {
 };
 
 
-const MissionItem = ({ title, points, href }: Mission) => (
-    <Link href={href} className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-muted transition-colors">
-        <span className="font-medium">{title}</span>
+const MissionItem = ({ name, points }: Omit<Mission, 'id'>) => (
+    <Link href="/influencer/missoes" className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-muted transition-colors">
+        <span className="font-medium">{name}</span>
         <div className="flex items-center gap-2 text-primary">
             <Zap className="h-4 w-4" />
             <span className="font-bold">{points}</span>
@@ -109,30 +108,40 @@ export default function InfluencerDashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
 
-    const fetchData = useCallback(async (userId: string) => {
+    const fetchData = useCallback(async (user: User) => {
         setIsLoading(true);
         try {
             // Fetch user data
-            const userDocRef = doc(db, "users", userId);
+            const userDocRef = doc(db, "users", user.uid);
             const userDocSnap = await getDoc(userDocRef);
             if (!userDocSnap.exists()) {
                 throw new Error("Usuário não encontrado.");
             }
             const userData = userDocSnap.data();
+            const companyId = userData.companyId;
 
-            // In a real app, fetch dynamic missions and trails
-            const mockData: DashboardData = {
-                points: userData.points || 0,
-                pointsThisWeek: 200, // This would be a calculated value
-                missions: [
-                    { id: '1', title: "Compartilhar post no LinkedIn", points: 100, href: "/influencer/missoes" },
-                ],
-                trails: [
+            // Fetch active missions for the company
+            const missionsQuery = query(
+                collection(db, "companies", companyId, "missions"),
+                where("status", "in", ["Ativa", "Fixa"]),
+                limit(5)
+            );
+            const missionsSnap = await getDocs(missionsQuery);
+            const missionsList = missionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Mission[];
+            
+            // TODO: Fetch user progress on trails to get accurate progress data
+            const mockTrails: Trail[] = [
                     { id: 'onboarding', title: "Onboarding de Novos Influenciadores", progress: 0, href: "/influencer/trilhas/onboarding" },
                     { id: 'cultura', title: "Cultura da Empresa 101", progress: 75, href: "/influencer/trilhas/cultura" },
-                ]
+            ];
+
+            const dashboardData: DashboardData = {
+                points: userData.points || 0,
+                pointsThisWeek: 200, // This would be a calculated value
+                missions: missionsList,
+                trails: mockTrails
             };
-            setData(mockData);
+            setData(dashboardData);
         } catch (error) {
             console.error("Error fetching dashboard data:", error);
             toast({ variant: 'destructive', title: "Erro ao carregar dashboard." });
@@ -144,7 +153,7 @@ export default function InfluencerDashboardPage() {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
             if (user) {
-                fetchData(user.uid);
+                fetchData(user);
             } else {
                 setIsLoading(false);
             }

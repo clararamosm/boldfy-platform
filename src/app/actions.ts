@@ -111,7 +111,7 @@ const InviteAdminSchema = z.object({
   companyName: z.string().min(1, 'Nome da empresa é obrigatório.'),
   adminName: z.string().min(1, 'Nome do admin é obrigatório.'),
   adminEmail: z.string().email('E-mail inválido.'),
-  licenses: z.coerce.number().int().min(5, 'O free trial requer no mínimo 5 licenças.').positive('Número de licenças deve ser positivo.'),
+  licenses: z.coerce.number().int().min(1, 'O número de licenças deve ser no mínimo 1.').positive('Número de licenças deve ser positivo.'),
 });
 
 type InviteAdminState = {
@@ -141,7 +141,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
         const companyRef = doc(collection(db, "companies"));
         const companyId = companyRef.id;
 
-        // 1. Create Auth user (will be passwordless initially, admin will set password)
+        // 1. Create Auth user (will be passwordless initially, admin will set password via link)
         let userRecord;
         try {
             userRecord = await adminAuth.createUser({
@@ -179,16 +179,20 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
             companyId: companyId,
             companyName: companyName,
             points: 0,
-            status: 'Ativo' as const, // User is active during trial
+            status: 'Pendente' as const, // Admin starts as pending until they login/set password
             profile: { name: adminName, email: adminEmail },
             createdAt: serverTimestamp(),
         });
-
+        
+        // Optional: Send a password reset email to the admin so they can set their password.
+        // await adminAuth.generatePasswordResetLink(adminEmail);
+        
         console.log(`Empresa "${companyName}" criada em modo Trial. Admin: "${adminEmail}".`);
         return { success: true };
 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+        console.error("Error in inviteAdmin:", errorMessage);
         return { error: `Erro ao criar empresa: ${errorMessage}` };
     }
 }
@@ -263,5 +267,81 @@ export async function createCheckoutSession(prevState: CheckoutState, formData: 
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
         return { error: `Erro ao criar checkout: ${errorMessage}` };
+    }
+}
+
+
+// --- Invite Collaborator Action (by Company Admin) ---
+
+const InviteCollaboratorSchema = z.object({
+  name: z.string().min(1, 'Nome do colaborador é obrigatório.'),
+  email: z.string().email('E-mail inválido.'),
+  companyId: z.string().min(1, 'ID da empresa é obrigatório.')
+});
+
+type InviteCollaboratorState = {
+    success?: boolean;
+    error?: string;
+};
+
+export async function inviteCollaborator(prevState: InviteCollaboratorState, formData: FormData): Promise<InviteCollaboratorState> {
+    if (!adminAuth) {
+        return { error: "O serviço de autenticação do administrador não está disponível." };
+    }
+
+    const validatedData = InviteCollaboratorSchema.safeParse({
+        name: formData.get('name'),
+        email: formData.get('email'),
+        companyId: formData.get('companyId'),
+    });
+
+    if (!validatedData.success) {
+        return { error: validatedData.error.errors.map(e => e.message).join(', ') };
+    }
+    
+    const { name, email, companyId } = validatedData.data;
+
+    try {
+        // 1. Create Auth user
+        let userRecord;
+        try {
+            userRecord = await adminAuth.createUser({
+                email,
+                emailVerified: false,
+                displayName: name,
+                disabled: false,
+            });
+        } catch (error: any) {
+             if (error.code === 'auth/email-already-exists') {
+                return { error: `Um usuário com o e-mail ${email} já existe.` };
+            }
+            throw error;
+        }
+
+        // 2. Create User document in Firestore
+        const companyDocSnap = await getDoc(doc(db, "companies", companyId));
+        if (!companyDocSnap.exists()) {
+            throw new Error("Empresa não encontrada.");
+        }
+
+        const userDocRef = doc(db, "users", userRecord.uid);
+        await setDoc(userDocRef, {
+            role: 'influencer',
+            companyId: companyId,
+            companyName: companyDocSnap.data()?.companyName || '',
+            points: 0,
+            status: 'Pendente' as const, // User is pending until they set a password
+            profile: { name, email },
+            createdAt: serverTimestamp(),
+        });
+        
+        // You would typically send a password reset/invitation email here
+        // await adminAuth.generatePasswordResetLink(email);
+
+        return { success: true };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+        console.error("Error in inviteCollaborator:", errorMessage);
+        return { error: `Erro ao convidar colaborador: ${errorMessage}` };
     }
 }

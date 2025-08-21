@@ -1,10 +1,11 @@
 // src/app/admin/colaboradores/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, getDocs, doc, getDoc, query } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,14 +18,15 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
+import { inviteCollaborator } from '@/app/actions';
 
 type Collaborator = {
   id: string;
   name: string;
   email: string;
   points: number;
-  status: 'Ativo' | 'Inativo';
-  entryDate: any;
+  status: 'Ativo' | 'Inativo' | 'Pendente';
+  createdAt: any;
   avatarUrl?: string;
 };
 
@@ -44,15 +46,41 @@ const StatCard = ({ title, value, icon: Icon, isLoading }: { title: string, valu
     </Card>
 );
 
+function InviteFormContent() {
+    const { pending } = useFormStatus();
+    return (
+      <div className="space-y-4">
+        <div className="space-y-2">
+            <Label htmlFor="name">Nome do Colaborador</Label>
+            <Input name="name" id="name" placeholder="Ex: Maria Souza" required disabled={pending} />
+        </div>
+        <div className="space-y-2">
+            <Label htmlFor="email">E-mail do Colaborador</Label>
+            <Input name="email" id="email" type="email" placeholder="nome@empresa.com.br" required disabled={pending} />
+        </div>
+      </div>
+    );
+}
+
+const InviteForm = ({ formAction }: { formAction: (payload: FormData) => void }) => {
+    return (
+        <form action={formAction} id="invite-form">
+            <InviteFormContent />
+        </form>
+    );
+};
+
 
 export default function AdminColaboradoresPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [totalLicenses, setTotalLicenses] = useState(0); 
   const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   
+  const [inviteState, formAction] = useActionState(inviteCollaborator, { error: undefined, success: undefined });
+
   const fetchData = useCallback(async (currentCompanyId: string) => {
       setIsLoading(true);
       try {
@@ -62,13 +90,20 @@ export default function AdminColaboradoresPage() {
             setTotalLicenses(companyDocSnap.data().licenses || 0);
         }
 
-        const collaboratorsQuery = query(collection(db, "companies", currentCompanyId, "collaborators"));
+        const collaboratorsQuery = query(collection(db, "users"), where("companyId", "==", currentCompanyId), where("role", "==", "influencer"));
         const querySnapshot = await getDocs(collaboratorsQuery);
-        const fetchedCollaborators = querySnapshot.docs.map(doc => ({ 
-            id: doc.id,
-            ...doc.data(),
-            entryDate: doc.data().entryDate?.toDate() // Convert timestamp
-         }) as Collaborator);
+        const fetchedCollaborators = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              name: data.profile?.name || '',
+              email: data.profile?.email || '',
+              points: data.points || 0,
+              status: data.status || 'Pendente',
+              createdAt: data.createdAt?.toDate(),
+              avatarUrl: data.profile?.avatarUrl
+            }
+        }) as Collaborator[];
         setCollaborators(fetchedCollaborators);
         
       } catch (error) {
@@ -99,25 +134,37 @@ export default function AdminColaboradoresPage() {
     return () => unsubscribe();
   }, [fetchData, toast]);
 
+  useEffect(() => {
+    if (inviteState.success) {
+      toast({ title: "Convite enviado!", description: "O colaborador receberá um e-mail para definir sua senha." });
+      setIsDialogOpen(false);
+      if (companyId) fetchData(companyId);
+    }
+    if (inviteState.error) {
+      toast({ variant: "destructive", title: "Erro ao convidar", description: inviteState.error });
+    }
+  }, [inviteState, toast, companyId, fetchData]);
 
-  const handleInvite = async () => {
-      if (!companyId) return;
-      setIsSubmitting(true);
-      // TODO: Implement invite logic (e.g., call a server action or Firebase function)
-      // This would typically involve sending an email and creating a pending user.
-      console.log("Sending invite...");
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate async operation
-      toast({ title: "Convite enviado com sucesso!"});
-      setIsSubmitting(false);
-      fetchData(companyId);
-  }
 
   const inviteButton = (
-    <Button size="sm" disabled={isSubmitting || !companyId}>
+    <Button size="sm" disabled={isLoading || !companyId || collaborators.length >= totalLicenses}>
       <PlusCircle className="mr-2 h-4 w-4" />
       Convidar Colaborador
     </Button>
   );
+
+  const getStatusBadge = (status: Collaborator['status']) => {
+    switch (status) {
+        case 'Ativo':
+            return <Badge variant="default">Ativo</Badge>;
+        case 'Inativo':
+            return <Badge variant="destructive">Inativo</Badge>;
+        case 'Pendente':
+            return <Badge variant="secondary">Pendente</Badge>;
+        default:
+            return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   return (
     <>
@@ -137,13 +184,21 @@ export default function AdminColaboradoresPage() {
               title="Convidar Colaborador"
               description="Envie um convite por e-mail para um novo colaborador se juntar à plataforma."
               trigger={inviteButton}
-              actionText={isSubmitting ? "Enviando..." : "Enviar Convite"}
-              onAction={handleInvite}
+              actionText="Enviar Convite"
+              formId="invite-form"
+              open={isDialogOpen}
+              onOpenChange={setIsDialogOpen}
             >
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail do Colaborador</Label>
-                <Input id="email" type="email" placeholder="nome@empresa.com.br" disabled={isSubmitting} />
-              </div>
+              <form action={(formData) => {
+                if (companyId) {
+                  formData.append('companyId', companyId);
+                  formAction(formData);
+                } else {
+                  toast({ variant: "destructive", title: "Erro", description: "ID da empresa não encontrado." });
+                }
+              }} id="invite-form">
+                <InviteFormContent />
+              </form>
             </ActionDialog>
           </CardHeader>
           <CardContent>
@@ -189,8 +244,8 @@ export default function AdminColaboradoresPage() {
                         </div>
                       </TableCell>
                       <TableCell>{user.points}</TableCell>
-                      <TableCell><Badge variant={user.status === 'Ativo' ? 'default' : 'destructive'}>{user.status}</Badge></TableCell>
-                      <TableCell>{user.entryDate?.toLocaleDateString() || 'N/A'}</TableCell>
+                      <TableCell>{getStatusBadge(user.status)}</TableCell>
+                      <TableCell>{user.createdAt?.toLocaleDateString() || 'N/A'}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

@@ -56,7 +56,7 @@ Para que a criação de novas empresas funcione automaticamente após o pagament
 1.  Inicie a aplicação localmente (`npm run dev`).
 2.  Inicie o **Stripe CLI** para encaminhar os eventos do webhook para a sua máquina local:
     ```bash
-    stripe listen --forward-to localhost:9002/api/stripe/webhook
+    stripe listen --forward-to localhost:3000/api/stripe/webhook
     ```
 3.  O CLI irá fornecer uma **chave secreta do webhook** (algo como `whsec_...`). Copie essa chave e cole no seu arquivo `.env` como `STRIPE_WEBHOOK_SECRET`.
 4.  No seu **Dashboard do Stripe**, vá para a seção de Desenvolvedores > Webhooks.
