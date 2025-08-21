@@ -27,7 +27,8 @@ export type AlignContentOutput = z.infer<typeof AlignContentOutputSchema>;
 
 // This is the main function that will be exported and called by the server action.
 export async function alignContent(input: AlignContentInput): Promise<AlignContentOutput> {
-  return alignContentFlow.run(input);
+  const result = await alignContentFlow(input);
+  return result;
 }
 
 const prompt = ai.definePrompt({
