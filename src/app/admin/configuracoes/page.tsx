@@ -1,7 +1,7 @@
 // src/app/admin/configuracoes/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useActionState, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useFormStatus } from "react-dom";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
@@ -16,7 +16,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { createCheckoutSession } from "@/app/actions";
 import { getStripe } from "@/lib/stripe-client";
 import { useSearchParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
@@ -35,31 +34,21 @@ type CompanyData = {
     trialEndsAt?: string;
 };
 
-function ActivationForm({ companyData }: { companyData: CompanyData }) {
-    const { pending } = useFormStatus();
-    
+function ActivationButton({ companyData, onClick, isPending }: { companyData: CompanyData, onClick: () => void, isPending: boolean }) {
     if (!companyData) return null;
-
     const isTrial = companyData.status === 'Trial';
 
     return (
-        <div className="space-y-4">
-             <input type="hidden" name="companyId" value={companyData.id} />
-             <input type="hidden" name="companyName" value={companyData.companyName} />
-             <input type="hidden" name="adminEmail" value={companyData.email} />
-             <input type="hidden" name="adminName" value={companyData.adminName} />
-             <input type="hidden" name="licenses" value={companyData.licenses} />
-             <Button type="submit" className="w-full sm:w-auto" disabled={pending}>
-                {pending ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Redirecionando...
-                    </>
-                ) : (
-                    isTrial ? "Iniciar Assinatura com 30 Dias Grátis" : "Ativar Assinatura"
-                )}
-             </Button>
-        </div>
+        <Button onClick={onClick} className="w-full sm:w-auto" disabled={isPending}>
+            {isPending ? (
+                <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Redirecionando...
+                </>
+            ) : (
+                isTrial ? "Iniciar Assinatura com 30 Dias Grátis" : "Ativar Assinatura"
+            )}
+        </Button>
     )
 }
 
@@ -107,9 +96,9 @@ function ConfiguracoesPageContent() {
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-    const [checkoutState, formAction] = useActionState(createCheckoutSession, { error: undefined, sessionId: undefined });
     const searchParams = useSearchParams();
 
     const fetchData = useCallback(async (userId: string) => {
@@ -193,27 +182,37 @@ function ConfiguracoesPageContent() {
         }
     }, [searchParams, toast, currentUserId, fetchData]);
 
-     // Handle Stripe redirect and errors
-    useEffect(() => {
-        if (checkoutState?.sessionId) {
-            const redirectToCheckout = async () => {
-                const stripe = await getStripe();
+    const handleCheckout = async () => {
+        if (!companyData) return;
+        setIsCheckingOut(true);
+
+        try {
+            const response = await fetch('/api/stripe/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companyData })
+            });
+
+            const { sessionId, error } = await response.json();
+
+            if (error) {
+                throw new Error(error);
+            }
+
+            if (sessionId) {
+                 const stripe = await getStripe();
                 if (!stripe) {
                     toast({ variant: 'destructive', title: 'Erro', description: 'Stripe.js não foi carregado.' });
                     return;
                 }
-                await stripe.redirectToCheckout({ sessionId: checkoutState.sessionId! });
+                await stripe.redirectToCheckout({ sessionId });
             }
-            redirectToCheckout();
+        } catch(error) {
+             const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+             toast({ variant: 'destructive', title: 'Erro no Checkout', description: errorMessage });
+             setIsCheckingOut(false);
         }
-        if (checkoutState?.error) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro no Checkout',
-                description: checkoutState.error,
-            });
-        }
-    }, [checkoutState, toast]);
+    }
     
     const handleSaveChanges = async (section: 'branding') => {
         if (!companyData) return;
@@ -283,9 +282,7 @@ function ConfiguracoesPageContent() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                         <form action={formAction}>
-                            <ActivationForm companyData={companyData} />
-                         </form>
+                         <ActivationButton companyData={companyData} onClick={handleCheckout} isPending={isCheckingOut} />
                     </CardContent>
                 </Card>
             )}

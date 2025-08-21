@@ -5,8 +5,6 @@ import { alignContent } from '@/ai/flows/align-content';
 import { z } from 'zod';
 import { doc, getDoc, addDoc, collection, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { stripe } from '@/lib/stripe';
-import { headers } from 'next/headers';
 import { auth as adminAuth } from '@/lib/firebase-admin';
 
 // --- AI Content Alignment Action ---
@@ -196,80 +194,6 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
         return { error: `Erro ao criar empresa: ${errorMessage}` };
     }
 }
-
-
-// --- Stripe Checkout Action (by Company Admin) ---
-
-const CreateCheckoutSessionSchema = z.object({
-  companyId: z.string(),
-  companyName: z.string(),
-  adminEmail: z.string().email(),
-  licenses: z.coerce.number().int().positive(),
-  adminName: z.string()
-});
-
-type CheckoutState = {
-    sessionId?: string;
-    error?: string;
-}
-
-export async function createCheckoutSession(prevState: CheckoutState, formData: FormData): Promise<CheckoutState> {
-    const validatedData = CreateCheckoutSessionSchema.safeParse({
-        companyId: formData.get('companyId'),
-        companyName: formData.get('companyName'),
-        adminEmail: formData.get('adminEmail'),
-        licenses: formData.get('licenses'),
-        adminName: formData.get('adminName')
-    });
-
-    if(!validatedData.success) {
-        return { error: validatedData.error.errors.map(e => e.message).join(', ') };
-    }
-    
-    if (!process.env.STRIPE_PRICE_ID) {
-        return { error: 'A variável de ambiente STRIPE_PRICE_ID não está configurada.' };
-    }
-
-    const { companyId, companyName, adminEmail, licenses, adminName } = validatedData.data;
-    const origin = headers().get('origin') || 'http://localhost:3000';
-    
-    try {
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
-            line_items: [
-                {
-                    price: process.env.STRIPE_PRICE_ID,
-                    quantity: licenses,
-                },
-            ],
-            mode: 'subscription',
-            subscription_data: {
-                trial_period_days: 30,
-            },
-            success_url: `${origin}/admin/configuracoes?payment_success=true&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${origin}/admin/configuracoes?payment_canceled=true`,
-            metadata: {
-                companyId: companyId,
-                companyName,
-                adminEmail,
-                adminName,
-                licenses: licenses.toString()
-            },
-            customer_email: adminEmail
-        });
-
-        if (!session.id) {
-            throw new Error("Could not create Stripe session.");
-        }
-
-        return { sessionId: session.id };
-
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
-        return { error: `Erro ao criar checkout: ${errorMessage}` };
-    }
-}
-
 
 // --- Invite Collaborator Action (by Company Admin) ---
 
