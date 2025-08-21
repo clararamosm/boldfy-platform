@@ -1,4 +1,4 @@
-
+// src/app/admin/recompensas/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -62,7 +62,7 @@ export default function AdminRecompensasPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [companyId, setCompanyId] = useState<string | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const formRef = React.useRef<HTMLFormElement>(null);
+    const formRef = useRef<HTMLFormElement>(null);
 
     const fetchRewards = useCallback(async (currentCompanyId: string) => {
         try {
@@ -242,7 +242,7 @@ export default function AdminRecompensasPage() {
         </ActionDialog>
     );
 
-    const TableSkeleton = ({ cols }) => (
+    const TableSkeleton = ({ cols }: { cols: number }) => (
         <TableRow>
             <TableCell colSpan={cols} className="text-center">
                 <div className="flex justify-center items-center p-4">

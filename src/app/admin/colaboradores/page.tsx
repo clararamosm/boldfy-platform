@@ -185,18 +185,21 @@ export default function AdminColaboradoresPage() {
               description="Envie um convite por e-mail para um novo colaborador se juntar à plataforma."
               trigger={inviteButton}
               actionText="Enviar Convite"
-              formId="invite-form"
-              open={isDialogOpen}
-              onOpenChange={setIsDialogOpen}
-            >
-              <form action={(formData) => {
+              onAction={() => {
                 if (companyId) {
+                  const form = document.getElementById('invite-form') as HTMLFormElement;
+                  const formData = new FormData(form);
                   formData.append('companyId', companyId);
                   formAction(formData);
                 } else {
                   toast({ variant: "destructive", title: "Erro", description: "ID da empresa não encontrado." });
                 }
-              }} id="invite-form">
+              }}
+              formId="invite-form"
+              open={isDialogOpen}
+              onOpenChange={setIsDialogOpen}
+            >
+              <form id="invite-form">
                 <InviteFormContent />
               </form>
             </ActionDialog>

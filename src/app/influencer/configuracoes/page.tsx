@@ -128,28 +128,24 @@ export default function SettingsPage() {
         return () => unsubscribe();
   }, [fetchData]);
 
-  const handleSave = async (section: 'profile' | 'branding') => {
+  const handleSave = async () => {
     if (!currentUserId) return;
     setIsSaving(true);
     try {
         const userDocRef = doc(db, "users", currentUserId);
         
-        let dataToSave = {};
-        if (section === 'profile') {
-            dataToSave = { 
-                profile: { 
-                    name: profile.name,
-                }
-            };
-        } else {
-            dataToSave = { personalBranding: branding };
-        }
+        const dataToSave = {
+            profile: {
+                name: profile.name,
+            },
+            personalBranding: branding
+        };
 
         await setDoc(userDocRef, dataToSave, { merge: true });
 
         toast({
             title: "Sucesso!",
-            description: `Suas configurações de ${section === 'profile' ? 'perfil' : 'branding'} foram salvas.`,
+            description: `Suas configurações de perfil e branding foram salvas.`,
         });
 
     } catch (error) {
@@ -200,12 +196,6 @@ export default function SettingsPage() {
                 <Input id="company" value={profile.company} disabled />
               </div>
             </CardContent>
-            <CardFooter className="border-t px-6 py-4">
-               <Button onClick={() => handleSave('profile')} disabled={isSaving}>
-                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Salvar Alterações
-              </Button>
-            </CardFooter>
           </Card>
 
           {/* Branding Pessoal */}
@@ -244,13 +234,14 @@ export default function SettingsPage() {
                 <Input id="position" placeholder="Ex: Gerente de Marketing" value={branding.position} onChange={e => setBranding({...branding, position: e.target.value})} disabled={isSaving} />
               </div>
             </CardContent>
-             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={() => handleSave('branding')} disabled={isSaving}>
-                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Salvar Branding
-              </Button>
-            </CardFooter>
           </Card>
+          
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar Alterações
+            </Button>
+          </div>
 
           {/* Notificações */}
           <Card>

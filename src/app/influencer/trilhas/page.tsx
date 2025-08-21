@@ -1,4 +1,3 @@
-
 // src/app/influencer/trilhas/page.tsx
 'use client';
 
@@ -11,9 +10,9 @@ import { Progress } from "@/components/ui/progress";
 import { Star, Zap, Globe, Building, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { collection, getDocs } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Mock data structure for a trail fetched from Firestore
 type Trail = {
@@ -78,6 +77,34 @@ const TrailCard = ({ id, name, points, bonus, progress, tasksCompleted, tasksTot
         </Card>
     );
 };
+
+
+const TrailsPageSkeleton = () => (
+    <div className="space-y-4">
+        {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+                <CardContent className="p-4">
+                    <div className="flex justify-between items-start mb-2 gap-2">
+                        <div className="space-y-2">
+                            <Skeleton className="h-5 w-24" />
+                            <Skeleton className="h-6 w-48" />
+                        </div>
+                        <div className="flex gap-2">
+                            <Skeleton className="h-5 w-16" />
+                            <Skeleton className="h-5 w-16" />
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center mb-2">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-10" />
+                    </div>
+                    <Skeleton className="h-2 w-full" />
+                    <Skeleton className="h-10 w-28 mt-4" />
+                </CardContent>
+            </Card>
+        ))}
+    </div>
+);
 
 
 export default function TrilhasPage() {
@@ -149,10 +176,7 @@ export default function TrilhasPage() {
         <div className="space-y-4">
             <h2 className="text-xl font-bold font-headline">Minhas Trilhas</h2>
              {isLoading ? (
-                <div className="flex justify-center items-center p-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    <span className="ml-3 text-muted-foreground">Carregando trilhas...</span>
-                </div>
+                <TrailsPageSkeleton />
             ) : trails.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">Nenhuma trilha disponível no momento.</p>
             ) : (

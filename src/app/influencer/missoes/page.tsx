@@ -1,4 +1,3 @@
-
 // src/app/influencer/missoes/page.tsx
 'use client';
 
@@ -17,6 +16,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { db, auth } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type MissionStatus = 'completa' | 'pendente' | 'agendada';
 
@@ -110,6 +110,31 @@ const MissionCard = ({ name, description, points, status, startDate, endDate }: 
     </Card>
 )};
 
+const MissionsPageSkeleton = () => (
+    <div className="space-y-4">
+        {[...Array(2)].map((_, i) => (
+             <Card key={i}>
+                <CardHeader>
+                    <div className="flex justify-between items-start gap-4">
+                        <div className="space-y-2">
+                             <Skeleton className="h-6 w-56" />
+                             <Skeleton className="h-4 w-72" />
+                        </div>
+                         <Skeleton className="h-5 w-16" />
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-4 w-48" />
+                </CardContent>
+                <CardFooter className="flex justify-end items-center">
+                   <Skeleton className="h-10 w-44" />
+                </CardFooter>
+            </Card>
+        ))}
+    </div>
+)
+
+
 export default function InfluencerMissoesPage() {
     const [missions, setMissions] = useState<Mission[]>([]);
     const [stats, setStats] = useState({ weeklyPoints: 0, fixedProgress: 0, fixedCompleted: 0, fixedTotal: 0 });
@@ -172,11 +197,7 @@ export default function InfluencerMissoesPage() {
 
     const renderMissions = (missionList: Mission[]) => {
         if (isLoading) {
-             return (
-                <div className="flex justify-center items-center p-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-            );
+             return <MissionsPageSkeleton />;
         }
         if (missionList.length === 0) {
             return <p className="text-center text-muted-foreground py-8">Nenhuma missão nesta categoria.</p>;
