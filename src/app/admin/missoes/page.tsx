@@ -86,7 +86,7 @@ const MissionForm = ({ mission, isSubmitting, formRef, isFixed = false }: { miss
                 </div>
             </div>
        )}
-    </>
+    </form>
   );
 }
 
