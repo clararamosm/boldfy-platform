@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -106,7 +105,6 @@ const SettingsSkeleton = () => (
 
 function ConfiguracoesPageContent() {
     const { toast } = useToast();
-    const [language, setLanguage] = useState("pt-br");
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
@@ -253,13 +251,6 @@ function ConfiguracoesPageContent() {
         }
     };
 
-    const handleSaveLanguage = () => {
-        toast({
-            title: "Idioma salvo!",
-            description: `O idioma foi alterado para ${language === 'pt-br' ? 'Português (Brasil)' : 'English (United States)'}.`,
-        });
-    };
-
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         if (companyData) {
@@ -359,27 +350,6 @@ function ConfiguracoesPageContent() {
                 </Button>
             </CardFooter>
           </Card>
-
-            <Card>
-                <CardHeader>
-                <CardTitle>Idioma</CardTitle>
-                <CardDescription>Escolha o idioma de exibição do sistema.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Select value={language} onValueChange={setLanguage} disabled={isReadOnly}>
-                    <SelectTrigger className="w-[280px]">
-                        <SelectValue placeholder="Selecione o idioma" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="pt-br">Português (Brasil)</SelectItem>
-                        <SelectItem value="en-us">English (United States)</SelectItem>
-                    </SelectContent>
-                    </Select>
-                </CardContent>
-                <CardFooter className="border-t px-6 py-4">
-                <Button onClick={handleSaveLanguage} disabled={isReadOnly}>Salvar Idioma</Button>
-                </CardFooter>
-            </Card>
 
             <Card>
                 <CardHeader>

@@ -34,7 +34,6 @@ type BrandingData = {
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const [language, setLanguage] = useState("pt-br");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -121,14 +120,6 @@ export default function SettingsPage() {
     } finally {
         setIsSaving(false);
     }
-  };
-
-
-  const handleSaveLanguage = () => {
-    toast({
-      title: "Idioma salvo!",
-      description: `O idioma foi alterado para ${language === 'pt-br' ? 'Português (Brasil)' : 'English (United States)'}.`,
-    });
   };
 
   if (isLoading) {
@@ -257,28 +248,6 @@ export default function SettingsPage() {
                   {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar Branding
               </Button>
-            </CardFooter>
-          </Card>
-
-           {/* Idioma */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Idioma</CardTitle>
-              <CardDescription>Escolha o idioma de exibição do sistema.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                 <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger className="w-[280px]">
-                    <SelectValue placeholder="Selecione o idioma" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pt-br">Português (Brasil)</SelectItem>
-                    <SelectItem value="en-us">English (United States)</SelectItem>
-                  </SelectContent>
-                </Select>
-            </CardContent>
-            <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSaveLanguage}>Salvar Idioma</Button>
             </CardFooter>
           </Card>
 
