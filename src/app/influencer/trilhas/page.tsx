@@ -1,7 +1,9 @@
+
 // src/app/influencer/trilhas/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,12 +12,13 @@ import { Star, Zap, Globe, Building, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { useToast } from '@/hooks/use-toast';
 
 // Mock data structure for a trail fetched from Firestore
 type Trail = {
     id: string;
-    title: string;
+    name: string;
     points: number;
     bonus: number;
     type: 'global' | 'personalizada';
@@ -26,7 +29,7 @@ type Trail = {
 };
 
 
-const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTotal, type }: Trail) => {
+const TrailCard = ({ id, name, points, bonus, progress, tasksCompleted, tasksTotal, type }: Trail) => {
     let buttonText = "Iniciar Trilha";
     let buttonVariant: "default" | "secondary" = "default";
 
@@ -46,7 +49,7 @@ const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTo
                             {type === 'global' ? <Globe className="h-3 w-3 mr-1.5" /> : <Building className="h-3 w-3 mr-1.5" />}
                             {type === 'global' ? 'Global' : 'Personalizada'}
                         </Badge>
-                        <h3 className="font-semibold">{title}</h3>
+                        <h3 className="font-semibold">{name}</h3>
                     </div>
                     <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 flex-shrink-0">
                         <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
@@ -80,18 +83,18 @@ const TrailCard = ({ id, title, points, bonus, progress, tasksCompleted, tasksTo
 export default function TrilhasPage() {
     const [trails, setTrails] = useState<Trail[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const { toast } = useToast();
 
-     useEffect(() => {
-        const fetchTrails = async () => {
+     const fetchTrails = useCallback(async (user: User) => {
         setIsLoading(true);
         try {
             // Mock fetching logic. In a real app, you'd fetch trails for the company
             // and then merge with the current user's progress data.
              await new Promise(resolve => setTimeout(resolve, 1000));
             const mockFetchedTrails: Trail[] = [
-                { id: "onboarding", title: "Onboarding de Novos Influenciadores", points: 500, bonus: 100, progress: 0, tasksCompleted: 0, tasksTotal: 3, type: "personalizada" },
-                { id: "cultura", title: "Cultura da Empresa 101", points: 250, bonus: 50, progress: 75, tasksCompleted: 3, tasksTotal: 4, type: "global" },
-                { id: "produtos", title: "Dominando Nossos Produtos", points: 400, bonus: 0, progress: 100, tasksCompleted: 5, tasksTotal: 5, type: "global" },
+                { id: "onboarding", name: "Onboarding de Novos Influenciadores", points: 500, bonus: 100, progress: 0, tasksCompleted: 0, tasksTotal: 3, type: "personalizada" },
+                { id: "cultura", name: "Cultura da Empresa 101", points: 250, bonus: 50, progress: 75, tasksCompleted: 3, tasksTotal: 4, type: "global" },
+                { id: "produtos", name: "Dominando Nossos Produtos", points: 400, bonus: 0, progress: 100, tasksCompleted: 5, tasksTotal: 5, type: "global" },
             ];
 
             // Example of how you might fetch from Firestore
@@ -102,14 +105,22 @@ export default function TrilhasPage() {
             setTrails(mockFetchedTrails);
         } catch (error) {
             console.error("Error fetching trails:", error);
-            // Handle error (e.g., show toast)
+            toast({ variant: 'destructive', title: 'Erro ao buscar trilhas.' });
         } finally {
             setIsLoading(false);
         }
-        };
+        }, [toast]);
 
-        fetchTrails();
-    }, []);
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                fetchTrails(user);
+            } else {
+                setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
+    }, [fetchTrails]);
 
 
   return (

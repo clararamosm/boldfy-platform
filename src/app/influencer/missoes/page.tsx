@@ -1,3 +1,4 @@
+
 // src/app/influencer/missoes/page.tsx
 'use client';
 
@@ -11,23 +12,28 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { db, auth } from '@/lib/firebase';
+import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { useToast } from "@/hooks/use-toast";
 
 type MissionStatus = 'completa' | 'pendente' | 'agendada';
 
 type Mission = {
     id: string;
-    title: string;
+    name: string;
     description: string;
     points: number;
     status: MissionStatus;
-    period?: string;
-    type: 'semana' | 'fixa';
+    startDate?: any;
+    endDate?: any;
+    type: 'timed' | 'fixed';
 };
 
-const MissionCard = ({ title, description, points, status, period }: Omit<Mission, 'id' | 'type'>) => {
+const MissionCard = ({ name, description, points, status, startDate, endDate }: Mission) => {
     
-    const [fileUploaded, setFileUploaded] = React.useState(false);
+    const [fileUploaded, setFileUploaded] = useState(false);
 
     const uploadForm = (
         <div className="space-y-2">
@@ -51,7 +57,7 @@ const MissionCard = ({ title, description, points, status, period }: Omit<Missio
             button: (
                  <ActionDialog
                     title="Enviar Comprovação"
-                    description={`Envie um anexo para completar a missão "${title}".`}
+                    description={`Envie um anexo para completar a missão "${name}".`}
                     trigger={<Button><Upload className="mr-2 h-4 w-4" /> Enviar Comprovação</Button>}
                     actionText={fileUploaded ? "Concluir Missão" : "Selecione um arquivo"}
                     showCancel
@@ -74,7 +80,7 @@ const MissionCard = ({ title, description, points, status, period }: Omit<Missio
     <Card>
         <CardHeader>
             <div className="flex justify-between items-start gap-4">
-                <CardTitle className="font-headline text-lg">{title}</CardTitle>
+                <CardTitle className="font-headline text-lg">{name}</CardTitle>
                  <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
                     <Zap className="h-3 w-3 mr-1"/>
                     {points}
@@ -83,10 +89,10 @@ const MissionCard = ({ title, description, points, status, period }: Omit<Missio
              <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
-            {period && (
+            {startDate && endDate && (
                  <div className="text-xs text-muted-foreground flex items-center">
                     <CalendarDays className="h-3 w-3 mr-1.5" />
-                    <span>Período: {period}</span>
+                    <span>Período: {startDate.toDate().toLocaleDateString()} - {endDate.toDate().toLocaleDateString()}</span>
                 </div>
             )}
         </CardContent>
@@ -108,38 +114,61 @@ export default function InfluencerMissoesPage() {
     const [missions, setMissions] = useState<Mission[]>([]);
     const [stats, setStats] = useState({ weeklyPoints: 0, fixedProgress: 0, fixedCompleted: 0, fixedTotal: 0 });
     const [isLoading, setIsLoading] = useState(true);
+    const { toast } = useToast();
 
-    useEffect(() => {
-        const fetchMissions = async () => {
-            setIsLoading(true);
-            // MOCK DATA - In a real app, fetch from Firestore
-            await new Promise(resolve => setTimeout(resolve, 1000));
+    const fetchMissions = useCallback(async (user: User) => {
+        setIsLoading(true);
+        try {
+            const userDocRef = doc(db, "users", user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (!userDocSnap.exists()) throw new Error("User not found.");
             
-            const mockMissions: Mission[] = [
-                { id: 'm1', title: "Compartilhar post no LinkedIn", description: "Ajude a divulgar nosso último artigo sobre as tendências de IA para 2025.", points: 100, status: "pendente", period: "15/07 - 22/07", type: "semana" },
-                { id: 'm2', title: "Gravar vídeo sobre novo feature", description: "Crie um vídeo curto (1 min) explicando a nova funcionalidade XYZ para nossos clientes.", points: 250, status: "agendada", period: "25/07 - 01/08", type: "semana" },
-                { id: 'f1', title: "Atualize seu banner do LinkedIn", description: "Use nosso banner oficial para mostrar que você faz parte do time.", points: 50, status: "completa", type: "fixa" },
-            ];
+            const companyId = userDocSnap.data().companyId;
+            if (!companyId) throw new Error("CompanyId not found for user.");
 
-            const weeklyMissions = mockMissions.filter(m => m.type === 'semana');
-            const fixedMissions = mockMissions.filter(m => m.type === 'fixa');
+            const missionsQuery = query(collection(db, "companies", companyId, "missions"));
+            const missionsSnap = await getDocs(missionsQuery);
+            
+            // TODO: In a real app, status should be determined by user progress, not just from the mission doc.
+            const allMissions = missionsSnap.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                status: 'pendente' // Mock status
+            })) as Mission[];
+            
+            const timedMissions = allMissions.filter(m => m.type === 'timed');
+            const fixedMissions = allMissions.filter(m => m.type === 'fixed');
             const completedFixed = fixedMissions.filter(m => m.status === 'completa').length;
 
-            setMissions(mockMissions);
+            setMissions(allMissions);
             setStats({
                 weeklyPoints: 0, // This would be calculated based on completed missions in the last 7 days
                 fixedCompleted: completedFixed,
                 fixedTotal: fixedMissions.length,
-                fixedProgress: (completedFixed / fixedMissions.length) * 100,
+                fixedProgress: fixedMissions.length > 0 ? (completedFixed / fixedMissions.length) * 100 : 0,
             });
+            
+        } catch(error) {
+            console.error("Error fetching missions: ", error);
+            toast({ variant: 'destructive', title: 'Erro ao buscar missões.', description: (error as Error).message });
+        } finally {
             setIsLoading(false);
-        };
+        }
+    }, [toast]);
 
-        fetchMissions();
-    }, []);
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                fetchMissions(user);
+            } else {
+                setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
+    }, [fetchMissions]);
 
-    const weeklyMissions = missions.filter(m => m.type === 'semana');
-    const fixedMissions = missions.filter(m => m.type === 'fixa');
+    const weeklyMissions = missions.filter(m => m.type === 'timed');
+    const fixedMissions = missions.filter(m => m.type === 'fixed');
 
     const renderMissions = (missionList: Mission[]) => {
         if (isLoading) {

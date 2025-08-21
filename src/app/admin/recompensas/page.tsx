@@ -1,8 +1,9 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -17,9 +18,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
-import { ca } from 'date-fns/locale';
-
-const companyId = "company-123";
 
 type Reward = {
     id: string;
@@ -62,12 +60,13 @@ export default function AdminRecompensasPage() {
     const [monthlyPrize, setMonthlyPrize] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [companyId, setCompanyId] = useState<string | null>(null);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
     const formRef = React.useRef<HTMLFormElement>(null);
 
-
-    const fetchRewards = async () => {
+    const fetchRewards = useCallback(async (currentCompanyId: string) => {
         try {
-            const rewardsCollection = collection(db, "companies", companyId, "rewards");
+            const rewardsCollection = collection(db, "companies", currentCompanyId, "rewards");
             const rewardsSnapshot = await getDocs(rewardsCollection);
             const rewardsList = rewardsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reward));
             setRewards(rewardsList);
@@ -75,11 +74,11 @@ export default function AdminRecompensasPage() {
             console.error("Error fetching rewards:", error);
             toast({ variant: 'destructive', title: 'Erro ao buscar recompensas.' });
         }
-    }
+    }, [toast]);
 
-     const fetchRescues = async () => {
+     const fetchRescues = useCallback(async (currentCompanyId: string) => {
         try {
-            const rescuesCollection = collection(db, "companies", companyId, "rescues");
+            const rescuesCollection = collection(db, "companies", currentCompanyId, "rescues");
             const rescuesSnapshot = await getDocs(rescuesCollection);
             const rescuesList = rescuesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rescue));
             setRescues(rescuesList);
@@ -87,11 +86,11 @@ export default function AdminRecompensasPage() {
             console.error("Error fetching rescues:", error);
             toast({ variant: 'destructive', title: 'Erro ao buscar resgates.' });
         }
-    }
+    }, [toast]);
     
-    const fetchMonthlyPrize = async () => {
+    const fetchMonthlyPrize = useCallback(async (currentCompanyId: string) => {
         try {
-            const companyDocRef = doc(db, "companies", companyId);
+            const companyDocRef = doc(db, "companies", currentCompanyId);
             const companyDoc = await getDoc(companyDocRef);
             if(companyDoc.exists()) {
                 setMonthlyPrize(companyDoc.data()?.monthlyPrize || '');
@@ -99,26 +98,47 @@ export default function AdminRecompensasPage() {
         } catch (error) {
              console.error("Error fetching monthly prize:", error);
         }
-    }
-
-    const fetchData = async () => {
-        setIsLoading(true);
-        await Promise.all([fetchRewards(), fetchRescues(), fetchMonthlyPrize()]);
-        setIsLoading(false);
-    }
-    
-    useEffect(() => {
-        fetchData();
     }, []);
 
+    const fetchData = useCallback(async (currentCompanyId: string) => {
+        setIsLoading(true);
+        await Promise.all([
+            fetchRewards(currentCompanyId), 
+            fetchRescues(currentCompanyId), 
+            fetchMonthlyPrize(currentCompanyId)
+        ]);
+        setIsLoading(false);
+    }, [fetchRewards, fetchRescues, fetchMonthlyPrize]);
+    
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+            if (user) {
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    const userCompanyId = userDocSnap.data().companyId;
+                    setCompanyId(userCompanyId);
+                    fetchData(userCompanyId);
+                } else {
+                     toast({ variant: "destructive", title: "Usuário não encontrado."});
+                     setIsLoading(false);
+                }
+            } else {
+                setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
+    }, [fetchData, toast]);
+
     const handleAction = async (rewardId?: string) => {
-        if(!formRef.current) return;
+        if(!formRef.current || !companyId) return;
 
         setIsSubmitting(true);
         const formData = new FormData(formRef.current);
         const name = formData.get('name') as string;
         const points = Number(formData.get('points'));
-        const stock = formData.get('stock') ? Number(formData.get('stock')) : 'Ilimitado';
+        const stockInput = formData.get('stock') as string;
+        const stock = stockInput && !isNaN(Number(stockInput)) ? Number(stockInput) : 'Ilimitado';
 
         if(!name || !points) {
             toast({ variant: 'destructive', title: 'Campos obrigatórios', description: 'Nome e pontos são obrigatórios.' });
@@ -137,7 +157,8 @@ export default function AdminRecompensasPage() {
                 await addDoc(collection(db, "companies", companyId, "rewards"), rewardData);
                 toast({ title: 'Recompensa criada!' });
             }
-            fetchRewards();
+            fetchRewards(companyId);
+            setIsDialogOpen(false); // Close dialog on success
         } catch (error) {
             console.error("Error saving reward:", error);
             toast({ variant: 'destructive', title: 'Erro ao salvar recompensa.' });
@@ -147,12 +168,13 @@ export default function AdminRecompensasPage() {
     }
 
     const handleToggleStatus = async (reward: Reward) => {
+        if (!companyId) return;
         try {
             const rewardDoc = doc(db, "companies", companyId, "rewards", reward.id);
             const newStatus = reward.status === 'Disponível' ? 'Desativada' : 'Disponível';
             await updateDoc(rewardDoc, { status: newStatus });
             toast({ title: `Status alterado para ${newStatus}` });
-            fetchRewards();
+            fetchRewards(companyId);
         } catch(error) {
              console.error("Error toggling status:", error);
             toast({ variant: 'destructive', title: 'Erro ao alterar status.' });
@@ -160,12 +182,12 @@ export default function AdminRecompensasPage() {
     }
 
     const handleDelete = async (rewardId: string) => {
-        if (!confirm('Tem certeza que deseja excluir esta recompensa?')) return;
+        if (!companyId || !confirm('Tem certeza que deseja excluir esta recompensa?')) return;
         try {
             const rewardDoc = doc(db, "companies", companyId, "rewards", rewardId);
             await deleteDoc(rewardDoc);
             toast({ title: 'Recompensa excluída.' });
-            fetchRewards();
+            fetchRewards(companyId);
         } catch (error) {
             console.error("Error deleting reward:", error);
             toast({ variant: 'destructive', title: 'Erro ao excluir recompensa.' });
@@ -173,11 +195,12 @@ export default function AdminRecompensasPage() {
     }
 
     const handleMarkAsPaid = async (rescueId: string) => {
+        if (!companyId) return;
          try {
             const rescueDoc = doc(db, "companies", companyId, "rescues", rescueId);
             await updateDoc(rescueDoc, { status: 'Pago' });
             toast({ title: 'Resgate marcado como pago.' });
-            fetchRescues();
+            fetchRescues(companyId);
         } catch (error) {
             console.error("Error marking as paid:", error);
             toast({ variant: 'destructive', title: 'Erro ao marcar como pago.' });
@@ -185,6 +208,7 @@ export default function AdminRecompensasPage() {
     }
     
     const handleSaveMonthlyPrize = async () => {
+        if (!companyId) return;
         setIsSubmitting(true);
         try {
             const companyDocRef = doc(db, "companies", companyId);
@@ -199,7 +223,7 @@ export default function AdminRecompensasPage() {
     }
 
     const addRewardButton = (
-        <Button size="sm" disabled={isSubmitting}>
+        <Button size="sm" disabled={isSubmitting || !companyId}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Adicionar Recompensa
         </Button>
@@ -246,6 +270,8 @@ export default function AdminRecompensasPage() {
               actionText={isSubmitting ? "Salvando..." : "Salvar Recompensa"}
               onAction={() => handleAction()}
               formId="reward-form"
+              open={isDialogOpen}
+              onOpenChange={setIsDialogOpen}
             >
               <RewardForm isSubmitting={isSubmitting} formRef={formRef} />
             </ActionDialog>
@@ -262,7 +288,7 @@ export default function AdminRecompensasPage() {
                 <CardContent>
                     <div className="max-w-xs">
                         <Label htmlFor="monthly-prize">Recompensa</Label>
-                        <Select value={monthlyPrize} onValueChange={setMonthlyPrize} disabled={isLoading}>
+                        <Select value={monthlyPrize} onValueChange={setMonthlyPrize} disabled={isLoading || !companyId}>
                             <SelectTrigger id="monthly-prize">
                                 <SelectValue placeholder="Selecione uma recompensa" />
                             </SelectTrigger>
@@ -275,7 +301,7 @@ export default function AdminRecompensasPage() {
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button disabled={isSubmitting} onClick={handleSaveMonthlyPrize}>
+                    <Button disabled={isSubmitting || !companyId} onClick={handleSaveMonthlyPrize}>
                         {isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
                         Salvar Prêmio do Mês
                     </Button>
@@ -298,7 +324,9 @@ export default function AdminRecompensasPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isLoading ? <TableSkeleton cols={5} /> : rewards.map((reward) => (
+                    {isLoading ? <TableSkeleton cols={5} /> : rewards.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-8">Nenhuma recompensa encontrada.</TableCell></TableRow>
+                    ) : rewards.map((reward) => (
                         <TableRow key={reward.id} className={reward.status === 'Desativada' ? 'text-muted-foreground' : ''}>
                           <TableCell className="font-medium">{reward.name}</TableCell>
                           <TableCell>{reward.points}</TableCell>
@@ -341,7 +369,9 @@ export default function AdminRecompensasPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isLoading ? <TableSkeleton cols={5} /> : rescues.map((rescue) => (
+                    {isLoading ? <TableSkeleton cols={5} /> : rescues.length === 0 ? (
+                        <TableRow><TableCell colSpan={5} className="text-center py-8">Nenhum resgate encontrado.</TableCell></TableRow>
+                    ) : rescues.map((rescue) => (
                          <TableRow key={rescue.id}>
                           <TableCell className="font-medium">{rescue.userName}</TableCell>
                           <TableCell>{rescue.rewardName}</TableCell>

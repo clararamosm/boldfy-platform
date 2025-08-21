@@ -1,8 +1,10 @@
+
 // src/app/influencer/recompensas/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where, addDoc, serverTimestamp, writeBatch, orderBy } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -14,9 +16,6 @@ import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ActionDialog } from '@/components/dashboard/action-dialog';
-
-const companyId = "company-123";
-const userId = "user-123"; // In a real app, this comes from auth session
 
 type Reward = {
     id: string;
@@ -44,36 +43,37 @@ type HistoryItem = {
     source?: 'missao' | 'trilha' | 'resgate';
 };
 
-const RewardCard = ({ reward, onRedeem, disabled }: { reward: Reward, onRedeem: () => void, disabled: boolean }) => (
-     <ActionDialog
-        title={`Resgatar ${reward.name}?`}
-        description={`Isso custará ${reward.points.toLocaleString()} pontos. Esta ação não pode ser desfeita.`}
-        trigger={
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                <CardHeader className="p-0">
-                    <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg overflow-hidden">
-                        {reward.imageUrl ? <Image src={reward.imageUrl} alt={reward.name} width={300} height={168} className="w-full h-full object-cover" data-ai-hint="reward gift" /> : <Gift className="h-12 w-12 text-muted-foreground" />}
-                    </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                    <CardTitle className="text-base font-semibold">{reward.name}</CardTitle>
-                </CardContent>
-                <CardFooter className="flex justify-between items-center">
-                    <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
-                        <Zap className="h-3 w-3 mr-1"/>
-                        {reward.points.toLocaleString()}
-                    </Badge>
-                    <Button size="sm" disabled={disabled}>
-                       {disabled ? 'Pontos insuficientes' : 'Resgatar'}
+const RewardCard = ({ reward, onRedeem, disabled, isSubmitting }: { reward: Reward, onRedeem: () => void, disabled: boolean, isSubmitting: boolean }) => (
+     <Card className="hover:shadow-lg transition-shadow flex flex-col">
+        <CardHeader className="p-0">
+            <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg overflow-hidden">
+                {reward.imageUrl ? <Image src={reward.imageUrl} alt={reward.name} width={300} height={168} className="w-full h-full object-cover" data-ai-hint="reward gift" /> : <Gift className="h-12 w-12 text-muted-foreground" />}
+            </div>
+        </CardHeader>
+        <CardContent className="p-4 flex-grow">
+            <CardTitle className="text-base font-semibold">{reward.name}</CardTitle>
+        </CardContent>
+        <CardFooter className="flex justify-between items-center">
+            <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
+                <Zap className="h-3 w-3 mr-1"/>
+                {reward.points.toLocaleString()}
+            </Badge>
+            <ActionDialog
+                title={`Resgatar ${reward.name}?`}
+                description={`Isso custará ${reward.points.toLocaleString()} pontos. Esta ação não pode ser desfeita.`}
+                trigger={
+                    <Button size="sm" disabled={disabled || isSubmitting}>
+                       {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : disabled ? 'Pontos insuficientes' : 'Resgatar'}
                     </Button>
-                </CardFooter>
-            </Card>
-        }
-        actionText="Confirmar Resgate"
-        onAction={onRedeem}
-    >
-       <p>Você tem certeza que quer resgatar esta recompensa?</p>
-    </ActionDialog>
+                }
+                actionText="Confirmar Resgate"
+                onAction={onRedeem}
+                showCancel
+            >
+               <p>Você tem certeza que quer resgatar esta recompensa?</p>
+            </ActionDialog>
+        </CardFooter>
+    </Card>
 );
 
 const getHistoryIcon = (source: HistoryItem['source'], type: HistoryItem['type']) => {
@@ -153,29 +153,40 @@ export default function InfluencerRecompensasPage() {
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [stats, setStats] = useState({ available: 0, gained: 0, spent: 0, redeemed: 0 });
     const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [userInfo, setUserInfo] = useState<{uid: string, companyId: string, name: string} | null>(null);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (user: User) => {
         setIsLoading(true);
         try {
+            const userDocRef = doc(db, "users", user.uid);
+            const userSnap = await getDoc(userDocRef);
+            if (!userSnap.exists()) throw new Error("User data not found.");
+            const userData = userSnap.data();
+            const companyId = userData.companyId;
+
+            if (!companyId) {
+                setIsLoading(false);
+                toast({ variant: 'destructive', title: "Erro", description: "Usuário não está associado a uma empresa." });
+                return;
+            }
+            
+            setUserInfo({ uid: user.uid, companyId, name: userData.profile?.name || 'Colaborador' });
+
             // Fetch Rewards
             const rewardsQuery = query(collection(db, "companies", companyId, "rewards"), where("status", "==", "Disponível"));
             const rewardsSnap = await getDocs(rewardsQuery);
             const rewardsList = rewardsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reward));
             setRewards(rewardsList);
             
-            // Fetch user data (points)
-            const userDocRef = doc(db, "users", userId);
-            const userSnap = await getDoc(userDocRef);
-            const userData = userSnap.data();
-
             // Fetch Rescues for the user
-            const rescuesQuery = query(collection(db, "companies", companyId, "rescues"), where("userId", "==", userId), orderBy("date", "desc"));
+            const rescuesQuery = query(collection(db, "companies", companyId, "rescues"), where("userId", "==", user.uid), orderBy("date", "desc"));
             const rescuesSnap = await getDocs(rescuesQuery);
             const rescuesList = rescuesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rescue));
             setRescues(rescuesList);
 
             // Fetch History for the user
-            const historyQuery = query(collection(db, "users", userId, "pointHistory"), orderBy("date", "desc"));
+            const historyQuery = query(collection(db, "users", user.uid, "pointHistory"), orderBy("date", "desc"));
             const historySnap = await getDocs(historyQuery);
             const historyList = historySnap.docs.map(doc => {
                  const data = doc.data() as Omit<HistoryItem, 'id' | 'icon'>;
@@ -200,30 +211,40 @@ export default function InfluencerRecompensasPage() {
 
         } catch (error) {
             console.error("Error fetching data:", error);
-            toast({ variant: 'destructive', title: "Erro ao carregar dados." });
+            toast({ variant: 'destructive', title: "Erro ao carregar dados.", description: (error as Error).message });
         } finally {
             setIsLoading(false);
         }
     }, [toast]);
     
     useEffect(() => {
-        fetchData();
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                fetchData(user);
+            } else {
+                setIsLoading(false);
+            }
+        });
+        return () => unsubscribe();
     }, [fetchData]);
     
     const handleRedeem = async (reward: Reward) => {
+        if (!userInfo) return;
         if (stats.available < reward.points) {
             toast({ variant: 'destructive', title: "Pontos insuficientes!" });
             return;
         }
 
+        setIsSubmitting(true);
         try {
             const batch = writeBatch(db);
+            const { uid, companyId, name } = userInfo;
 
             // 1. Create a rescue document
             const rescueRef = doc(collection(db, "companies", companyId, "rescues"));
             batch.set(rescueRef, {
-                userId,
-                userName: "Você", // In real app, get from user profile
+                userId: uid,
+                userName: name,
                 rewardId: reward.id,
                 rewardName: reward.name,
                 date: serverTimestamp(),
@@ -231,11 +252,11 @@ export default function InfluencerRecompensasPage() {
             });
 
             // 2. Decrement user points
-            const userRef = doc(db, "users", userId);
+            const userRef = doc(db, "users", uid);
             batch.update(userRef, { points: stats.available - reward.points });
 
             // 3. Add to point history
-            const historyRef = doc(collection(db, "users", userId, "pointHistory"));
+            const historyRef = doc(collection(db, "users", uid, "pointHistory"));
             batch.set(historyRef, {
                 type: 'spend',
                 points: reward.points,
@@ -245,7 +266,7 @@ export default function InfluencerRecompensasPage() {
             });
 
             // 4. (Optional) Decrement stock if not unlimited
-            if (reward.stock !== 'Ilimitado') {
+            if (reward.stock !== 'Ilimitado' && typeof reward.stock === 'number') {
                 const rewardRef = doc(db, "companies", companyId, "rewards", reward.id);
                 batch.update(rewardRef, { stock: reward.stock - 1 });
             }
@@ -253,16 +274,18 @@ export default function InfluencerRecompensasPage() {
             await batch.commit();
 
             toast({ title: "Recompensa resgatada com sucesso!" });
-            fetchData(); // Refresh all data
+            fetchData(auth.currentUser!); // Refresh all data
 
         } catch (error) {
             console.error("Error redeeming reward: ", error);
             toast({ variant: 'destructive', title: "Erro ao resgatar recompensa." });
+        } finally {
+            setIsSubmitting(false);
         }
     }
 
 
-    if (isLoading) {
+    if (isLoading || !userInfo) {
         return (
              <>
                 <Header title="Recompensas" />
@@ -294,7 +317,7 @@ export default function InfluencerRecompensasPage() {
             <TabsContent value="loja" className="mt-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {rewards.length > 0 ? (
-                        rewards.map(reward => <RewardCard key={reward.id} reward={reward} onRedeem={() => handleRedeem(reward)} disabled={stats.available < reward.points} />)
+                        rewards.map(reward => <RewardCard key={reward.id} reward={reward} onRedeem={() => handleRedeem(reward)} disabled={stats.available < reward.points} isSubmitting={isSubmitting} />)
                     ) : (
                         <p className="text-muted-foreground col-span-full text-center py-8">Nenhuma recompensa disponível no momento.</p>
                     )}
