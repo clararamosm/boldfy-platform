@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -94,7 +94,7 @@ const MissionForm = ({ mission, isSubmitting, formRef, isFixed = false }: { miss
     <p className="text-sm text-muted-foreground">Nenhum envio para esta missão ainda.</p>
   );
 
-  const TableSkeleton = ({ cols }) => (
+  const TableSkeleton = ({ cols }: { cols: number }) => (
     <TableRow>
       <TableCell colSpan={cols} className="h-24 text-center">
         <div className="flex justify-center items-center">

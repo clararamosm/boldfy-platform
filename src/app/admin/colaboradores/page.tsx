@@ -62,14 +62,6 @@ function InviteFormContent() {
     );
 }
 
-const InviteForm = ({ formAction }: { formAction: (payload: FormData) => void }) => {
-    return (
-        <form action={formAction} id="invite-form">
-            <InviteFormContent />
-        </form>
-    );
-};
-
 
 export default function AdminColaboradoresPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -78,6 +70,7 @@ export default function AdminColaboradoresPage() {
   const [totalLicenses, setTotalLicenses] = useState(0); 
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   
   const [inviteState, formAction] = useActionState(inviteCollaborator, { error: undefined, success: undefined });
 
@@ -165,6 +158,15 @@ export default function AdminColaboradoresPage() {
             return <Badge variant="outline">{status}</Badge>;
     }
   };
+  
+  const handleFormAction = (formData: FormData) => {
+    if (companyId) {
+        formData.append('companyId', companyId);
+        formAction(formData);
+    } else {
+        toast({ variant: "destructive", title: "Erro", description: "ID da empresa não encontrado." });
+    }
+  }
 
   return (
     <>
@@ -185,21 +187,12 @@ export default function AdminColaboradoresPage() {
               description="Envie um convite por e-mail para um novo colaborador se juntar à plataforma."
               trigger={inviteButton}
               actionText="Enviar Convite"
-              onAction={() => {
-                if (companyId) {
-                  const form = document.getElementById('invite-form') as HTMLFormElement;
-                  const formData = new FormData(form);
-                  formData.append('companyId', companyId);
-                  formAction(formData);
-                } else {
-                  toast({ variant: "destructive", title: "Erro", description: "ID da empresa não encontrado." });
-                }
-              }}
+              onAction={() => formRef.current?.requestSubmit()}
               formId="invite-form"
               open={isDialogOpen}
               onOpenChange={setIsDialogOpen}
             >
-              <form id="invite-form">
+              <form action={handleFormAction} id="invite-form" ref={formRef}>
                 <InviteFormContent />
               </form>
             </ActionDialog>

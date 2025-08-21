@@ -51,9 +51,6 @@ const SettingsSkeleton = () => (
                   <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
                   <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
               </CardContent>
-              <CardFooter className="border-t px-6 py-4">
-                  <Skeleton className="h-10 w-36" />
-              </CardFooter>
           </Card>
            <Card>
               <CardHeader>
@@ -66,10 +63,10 @@ const SettingsSkeleton = () => (
                   <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-20 w-full" /></div>
                   <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
               </CardContent>
-              <CardFooter className="border-t px-6 py-4">
-                  <Skeleton className="h-10 w-36" />
-              </CardFooter>
           </Card>
+           <div className="flex justify-end">
+             <Skeleton className="h-10 w-36" />
+           </div>
         </div>
       </main>
     </>
@@ -137,6 +134,7 @@ export default function SettingsPage() {
         const dataToSave = {
             profile: {
                 name: profile.name,
+                // Email is intentionally not saved here to prevent mismatches with auth
             },
             personalBranding: branding
         };
@@ -172,10 +170,10 @@ export default function SettingsPage() {
           {/* Perfil */}
           <Card>
             <CardHeader>
-              <CardTitle>Perfil</CardTitle>
-              <CardDescription>Gerencie as informações da sua conta.</CardDescription>
+              <CardTitle>Perfil e Branding Pessoal</CardTitle>
+              <CardDescription>Gerencie suas informações e como a IA deve se comunicar em seu nome.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
                   <AvatarImage src="https://placehold.co/100x100.png" data-ai-hint="person avatar" />
@@ -183,31 +181,21 @@ export default function SettingsPage() {
                 </Avatar>
                 <Button variant="outline">Mudar foto</Button>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome</Label>
-                <Input id="name" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} disabled={isSaving} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nome</Label>
+                  <Input id="name" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} disabled={isSaving} />
+                </div>
+                 <div className="space-y-2">
+                  <Label htmlFor="position">Qual sua posição na empresa?</Label>
+                  <Input id="position" placeholder="Ex: Gerente de Marketing" value={branding.position} onChange={e => setBranding({...branding, position: e.target.value})} disabled={isSaving} />
+                </div>
               </div>
-              <div className="space-y-2">
+               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" value={profile.email} disabled />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="company">Empresa</Label>
-                <Input id="company" value={profile.company} disabled />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Branding Pessoal */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Branding Pessoal</CardTitle>
-              <CardDescription>
-                Essas informações ajudarão o assistente de IA a criar conteúdos alinhados com sua voz e expertise.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
+               <div className="space-y-2">
                 <Label htmlFor="voice">Tom de Voz</Label>
                  <Select value={branding.voice} onValueChange={value => setBranding({...branding, voice: value})} disabled={isSaving}>
                   <SelectTrigger id="voice">
@@ -221,7 +209,7 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+               <div className="space-y-2">
                 <Label htmlFor="expertise">Expertises</Label>
                 <Input id="expertise" placeholder="Ex: Marketing Digital, Vendas, Liderança" value={branding.expertise} onChange={e => setBranding({...branding, expertise: e.target.value})} disabled={isSaving} />
               </div>
@@ -229,19 +217,14 @@ export default function SettingsPage() {
                 <Label htmlFor="value">Entrega de Valor</Label>
                 <Textarea id="value" placeholder="O que você oferece de único para sua audiência?" value={branding.value} onChange={e => setBranding({...branding, value: e.target.value})} disabled={isSaving} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="position">Qual sua posição na empresa?</Label>
-                <Input id="position" placeholder="Ex: Gerente de Marketing" value={branding.position} onChange={e => setBranding({...branding, position: e.target.value})} disabled={isSaving} />
-              </div>
             </CardContent>
+             <CardFooter>
+                 <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar Alterações
+                </Button>
+            </CardFooter>
           </Card>
-          
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Salvar Alterações
-            </Button>
-          </div>
 
           {/* Notificações */}
           <Card>

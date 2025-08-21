@@ -102,14 +102,14 @@ const PointHistoryItem = ({ icon, description, date, points, type }: HistoryItem
     </div>
 );
 
-const StatCard = ({ title, value, icon: Icon, isLoading }: {title: string, value: string, icon: React.ElementType, isLoading: boolean}) => (
+const StatCard = ({ title, value, icon: Icon, isLoading }: {title: string, value: string | number, icon: React.ElementType, isLoading: boolean}) => (
     <Card>
         <CardHeader>
             <Icon className="h-6 w-6 text-muted-foreground mb-2" />
             <CardTitle className="text-sm font-medium h-10">{title}</CardTitle>
         </CardHeader>
         <CardContent>
-            {isLoading ? <Skeleton className="h-8 w-24" /> : <p className="text-2xl font-bold font-headline">{value}</p>}
+            {isLoading ? <Skeleton className="h-8 w-24" /> : <p className="text-2xl font-bold font-headline">{typeof value === 'number' ? value.toLocaleString() : value}</p>}
         </CardContent>
     </Card>
 );
@@ -302,10 +302,10 @@ export default function InfluencerRecompensasPage() {
       <Header title="Recompensas" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
          <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-            <StatCard title="Pontos Disponíveis" value={stats.available.toLocaleString()} icon={Zap} isLoading={isLoading} />
-            <StatCard title="Pontos Ganhos (Total)" value={stats.gained.toLocaleString()} icon={TrendingUp} isLoading={isLoading} />
-            <StatCard title="Pontos Gastos (Total)" value={stats.spent.toLocaleString()} icon={TrendingDown} isLoading={isLoading} />
-            <StatCard title="Prêmios Resgatados" value={stats.redeemed.toLocaleString()} icon={Gift} isLoading={isLoading} />
+            <StatCard title="Pontos Disponíveis" value={stats.available} icon={Zap} isLoading={isLoading} />
+            <StatCard title="Pontos Ganhos (Total)" value={stats.gained} icon={TrendingUp} isLoading={isLoading} />
+            <StatCard title="Pontos Gastos (Total)" value={stats.spent} icon={TrendingDown} isLoading={isLoading} />
+            <StatCard title="Prêmios Resgatados" value={stats.redeemed} icon={Gift} isLoading={isLoading} />
         </div>
 
         <Tabs defaultValue="loja">

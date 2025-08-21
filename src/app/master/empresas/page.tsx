@@ -1,7 +1,7 @@
 // src/app/master/empresas/page.tsx
 'use client';
 
-import { useState, useEffect, useRef, useActionState } from 'react';
+import React, { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, updateDoc, orderBy, query } from 'firebase/firestore';
@@ -54,20 +54,12 @@ function CompanyFormContent() {
     );
 }
 
-const CompanyForm = ({ formAction }: { formAction: (payload: FormData) => void }) => {
-    return (
-        <form action={formAction} id="company-form">
-            <CompanyFormContent />
-        </form>
-    );
-};
-
-
 export default function MasterEmpresasPage() {
     const { toast } = useToast();
     const [companies, setCompanies] = useState<Company[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const formRef = useRef<HTMLFormElement>(null);
 
     const [inviteState, formAction] = useActionState(inviteAdmin, { error: undefined, success: undefined });
 
@@ -156,11 +148,14 @@ export default function MasterEmpresasPage() {
                     description="Preencha os dados para criar uma nova empresa. Ela começará com um free trial de 30 dias."
                     trigger={addCompanyButton}
                     actionText="Criar e Convidar Admin"
+                    onAction={() => formRef.current?.requestSubmit()}
                     formId="company-form"
                     open={isDialogOpen}
                     onOpenChange={setIsDialogOpen}
                 >
-                    <CompanyForm formAction={formAction} />
+                    <form ref={formRef} action={formAction} id="company-form">
+                        <CompanyFormContent />
+                    </form>
                 </ActionDialog>
             </CardHeader>
             <CardContent>
