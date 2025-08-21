@@ -32,6 +32,49 @@ type BrandingData = {
 };
 
 
+const SettingsSkeleton = () => (
+    <>
+      <Header title="Configurações" />
+      <main className="flex-1 overflow-auto p-4 md:p-6">
+        <div className="grid gap-6 max-w-4xl mx-auto">
+          <Card>
+              <CardHeader>
+                  <CardTitle><Skeleton className="h-7 w-24" /></CardTitle>
+                  <CardDescription><Skeleton className="h-4 w-72" /></CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  <div className="flex items-center gap-4">
+                      <Skeleton className="h-20 w-20 rounded-full" />
+                      <Skeleton className="h-10 w-28" />
+                  </div>
+                  <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                  <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+                  <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
+              </CardContent>
+              <CardFooter className="border-t px-6 py-4">
+                  <Skeleton className="h-10 w-36" />
+              </CardFooter>
+          </Card>
+           <Card>
+              <CardHeader>
+                   <CardTitle><Skeleton className="h-7 w-40" /></CardTitle>
+                  <CardDescription><Skeleton className="h-4 w-96" /></CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                  <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+                  <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-20 w-full" /></div>
+                  <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
+              </CardContent>
+              <CardFooter className="border-t px-6 py-4">
+                  <Skeleton className="h-10 w-36" />
+              </CardFooter>
+          </Card>
+        </div>
+      </main>
+    </>
+)
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
@@ -122,48 +165,7 @@ export default function SettingsPage() {
   };
 
   if (isLoading) {
-    return (
-      <>
-        <Header title="Configurações" />
-        <main className="flex-1 overflow-auto p-4 md:p-6">
-          <div className="grid gap-6 max-w-4xl mx-auto">
-            <Card>
-                <CardHeader>
-                    <CardTitle><Skeleton className="h-7 w-24" /></CardTitle>
-                    <CardDescription><Skeleton className="h-4 w-72" /></CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center gap-4">
-                        <Skeleton className="h-20 w-20 rounded-full" />
-                        <Skeleton className="h-10 w-28" />
-                    </div>
-                    <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-                    <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-                    <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-                </CardContent>
-                <CardFooter className="border-t px-6 py-4">
-                    <Skeleton className="h-10 w-36" />
-                </CardFooter>
-            </Card>
-             <Card>
-                <CardHeader>
-                     <CardTitle><Skeleton className="h-7 w-40" /></CardTitle>
-                    <CardDescription><Skeleton className="h-4 w-96" /></CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                    <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                    <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-20 w-full" /></div>
-                    <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                </CardContent>
-                <CardFooter className="border-t px-6 py-4">
-                    <Skeleton className="h-10 w-36" />
-                </CardFooter>
-            </Card>
-          </div>
-        </main>
-      </>
-    )
+    return <SettingsSkeleton />
   }
 
   return (
