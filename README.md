@@ -13,25 +13,6 @@ STRIPE_PRICE_ID=price_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
-## Credenciais de Teste (Desenvolvimento)
-
-Para facilitar os testes, você pode criar os seguintes usuários no seu console do Firebase (Authentication e Firestore) para acessar cada perfil:
-
-*   **Master (Super Admin)**
-    *   **Email**: `master@boldfy.com`
-    *   **Senha**: `master123`
-    *   **Firestore (`/users/{UID}`):** `{ "role": "master" }`
-
-*   **Admin (Administrador da Empresa)**
-    *   **Email**: `admin@empresa.com`
-    *   **Senha**: `admin123`
-    *   **Firestore (`/users/{UID}`):** `{ "role": "admin", "companyId": "ID_DA_EMPRESA_AQUI", "companyName": "Nome da Empresa", ... }`
-
-*   **Influencer (Colaborador)**
-    *   **Email**: `influencer@empresa.com`
-    *   **Senha**: `influencer123`
-    *   **Firestore (`/users/{UID}`):** `{ "role": "influencer", "companyId": "ID_DA_EMPRESA_AQUI", "companyName": "Nome da Empresa", ... }`
-
 ---
 
 ## 1. Como Definir o Usuário Master

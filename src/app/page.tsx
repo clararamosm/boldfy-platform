@@ -1,66 +1,126 @@
 // src/app/page.tsx
 'use client';
 
+import { useState, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { signInWithEmailAndPassword, UserCredential } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
-import { Shield, User, Star } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import Link from 'next/link';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+
+  const handleLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const userCredential: UserCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        const role = userData.role;
+
+        switch (role) {
+          case 'master':
+            router.push('/master/dashboard');
+            break;
+          case 'admin':
+            router.push('/admin/dashboard');
+            break;
+          case 'influencer':
+            router.push('/influencer/dashboard');
+            break;
+          default:
+            setError('Perfil de usuário não reconhecido.');
+            await auth.signOut();
+        }
+      } else {
+        setError('Dados do usuário não encontrados. Contate o suporte.');
+        await auth.signOut();
+      }
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('E-mail ou senha inválidos.');
+      } else {
+        setError('Ocorreu um erro ao fazer login. Tente novamente.');
+      }
+      console.error('Login error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
-      <div className="w-full max-w-md">
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-secondary/30">
+      <div className="w-full max-w-sm">
         <Card className="shadow-2xl">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex items-center justify-center">
-               <Logo />
+          <CardHeader className="text-center space-y-4">
+            <div className="mx-auto w-fit">
+              <Logo />
             </div>
-            <CardTitle className="font-headline text-3xl">Boldfy</CardTitle>
-            <CardDescription>Plataforma de gamificação para embaixadores de marca.</CardDescription>
+            <div className="space-y-1">
+                <CardTitle className="font-headline text-3xl">Bem-vindo(a)!</CardTitle>
+                <CardDescription>Faça login para acessar sua conta.</CardDescription>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="relative">
-              <Separator />
-              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center">
-                <span className="bg-card px-2 text-sm text-muted-foreground">Acesso Rápido para Testes</span>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">E-mail</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
               </div>
-            </div>
-            <div className="flex flex-col space-y-2">
-              <Button
-                variant="outline"
-                className="justify-start"
-                asChild
-              >
-                <Link href="/master/dashboard">
-                    <Shield className="mr-2 h-4 w-4" />
-                    Entrar como Master
-                </Link>
+              <div className="space-y-2">
+                <Label htmlFor="password">Senha</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Erro no Login</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Entrar
               </Button>
-              <Button
-                variant="outline"
-                className="justify-start"
-                asChild
-              >
-                 <Link href="/admin/dashboard">
-                    <User className="mr-2 h-4 w-4" />
-                    Entrar como Admin
-                </Link>
-              </Button>
-               <Button
-                variant="outline"
-                className="justify-start"
-                asChild
-              >
-                <Link href="/influencer/dashboard">
-                    <Star className="mr-2 h-4 w-4" />
-                    Entrar como Influencer
-                </Link>
-              </Button>
-            </div>
-             <p className="text-xs text-muted-foreground text-center pt-2">
-                Clique em um perfil para navegar diretamente para o dashboard correspondente.
+            </form>
+             <p className="mt-4 text-center text-xs text-muted-foreground">
+                Esqueceu a senha? Contate o administrador.
             </p>
           </CardContent>
         </Card>
