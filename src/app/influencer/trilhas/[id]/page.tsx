@@ -45,7 +45,7 @@ interface TrailData {
 }
 
 
-const TopicNavItem = ({ topic, isActive, onClick, isCompleted }) => (
+const TopicNavItem = ({ topic, isActive, onClick, isCompleted }: { topic: Topic, isActive: boolean, onClick: () => void, isCompleted: boolean }) => (
     <button
         onClick={onClick}
         className={`flex w-full items-center justify-between text-left p-3 rounded-lg border transition-colors ${isActive ? 'bg-muted border-primary' : 'hover:bg-muted'}`}
@@ -60,7 +60,7 @@ const TopicNavItem = ({ topic, isActive, onClick, isCompleted }) => (
     </button>
 );
 
-const QuizNavItem = ({ quiz, isActive, onClick, isCompleted }) => (
+const QuizNavItem = ({ quiz, isActive, onClick, isCompleted }: { quiz: Quiz, isActive: boolean, onClick: () => void, isCompleted: boolean }) => (
      <button
         onClick={onClick}
         className={`flex w-full items-center justify-between text-left p-3 rounded-lg border transition-colors ${isActive ? 'bg-muted border-primary' : 'hover:bg-muted'}`}
@@ -95,7 +95,7 @@ export default function TrailDetailPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [activeItem, setActiveItem] = useState<Topic | Quiz | null>(null);
     const [completedItems, setCompletedItems] = useState<Set<string>>(new Set());
-    const [quizAnswers, setQuizAnswers] = useState({});
+    const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
     const [quizSubmitted, setQuizSubmitted] = useState(false);
 
     useEffect(() => {
@@ -274,7 +274,7 @@ export default function TrailDetailPage() {
                             <Card>
                                 <CardHeader>
                                     <div className="aspect-video bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                                        <Image src={(activeItem as Topic).videoUrl || 'https://placehold.co/1280x720.png'} alt={activeItem.title} width={1280} height={720} data-ai-hint="video lesson" className="w-full h-full object-cover" />
+                                        <Image src={(activeItem as Topic).videoUrl || 'https://placehold.co/1280x720.png'} alt={activeItem.title} width={1280} height={720} className="w-full h-full object-cover" />
                                     </div>
                                 </CardHeader>
                                 <CardContent>
