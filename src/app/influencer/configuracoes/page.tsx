@@ -134,7 +134,7 @@ export default function SettingsPage() {
         const dataToSave = {
             profile: {
                 name: profile.name,
-                // Email is intentionally not saved here to prevent mismatches with auth
+                email: profile.email
             },
             personalBranding: branding
         };
