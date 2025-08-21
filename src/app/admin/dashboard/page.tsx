@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, limit, orderBy, query, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, where, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
@@ -100,8 +100,14 @@ export default function AdminDashboardPage() {
             const companySnap = await getDoc(companyDocRef);
             const companyData = companySnap.data();
 
-            const collaboratorsQuery = query(collection(db, "companies", companyId, "collaborators"));
+            // Fetch collaborators from the root 'users' collection
+            const collaboratorsQuery = query(
+                collection(db, "users"), 
+                where("companyId", "==", companyId), 
+                where("role", "==", "influencer")
+            );
             const collaboratorsSnap = await getDocs(collaboratorsQuery);
+            const activeCollaboratorsCount = collaboratorsSnap.size;
 
             // Fetch activity from a subcollection in the company document
             const activityQuery = query(collection(companyDocRef, "activity"), orderBy("date", "desc"), limit(5));
@@ -113,7 +119,7 @@ export default function AdminDashboardPage() {
             })) as Activity[];
 
             const statsData: DashboardStats = {
-                activeCollaborators: collaboratorsSnap.size,
+                activeCollaborators: activeCollaboratorsCount,
                 totalLicenses: companyData?.licenses || 0,
                 // Replace these with real data aggregations later
                 engagement: 82, 

@@ -96,7 +96,6 @@ export default function SettingsPage() {
             dataToSave = { 
                 profile: { 
                     name: profile.name,
-                    email: profile.email // email is not editable
                 }
             };
         } else {
