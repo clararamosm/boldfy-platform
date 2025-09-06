@@ -7,12 +7,13 @@ import { signInWithEmailAndPassword, UserCredential } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/logo';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -21,13 +22,16 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async (e: FormEvent) => {
+  const handleLogin = async (e: FormEvent, testUser?: {email: string, pass: string}) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
 
+    const loginEmail = testUser ? testUser.email : email;
+    const loginPassword = testUser ? testUser.pass : password;
+
     try {
-      const userCredential: UserCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential: UserCredential = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
       const user = userCredential.user;
 
       const userDocRef = doc(db, 'users', user.uid);
@@ -67,6 +71,15 @@ export default function LoginPage() {
     }
   };
 
+  const handleTestLogin = (e: FormEvent, role: 'master' | 'admin' | 'influencer') => {
+    const testUsers = {
+        master: { email: 'master@boldfy.com', pass: '123456' },
+        admin: { email: 'admin@boldfy.com', pass: '123456' },
+        influencer: { email: 'influencer@boldfy.com', pass: '123456' },
+    }
+    handleLogin(e, testUsers[role]);
+  }
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-secondary/30">
       <div className="w-full max-w-sm">
@@ -99,6 +112,7 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type="password"
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -123,6 +137,18 @@ export default function LoginPage() {
                 Esqueceu a senha? Contate o administrador.
             </p>
           </CardContent>
+          <CardFooter className="flex-col gap-4">
+            <div className="relative w-full flex items-center">
+              <Separator className="flex-1" />
+              <span className="px-2 text-xs text-muted-foreground">Logins de Teste</span>
+              <Separator className="flex-1" />
+            </div>
+             <div className="grid grid-cols-3 gap-2 w-full">
+                <Button variant="outline" size="sm" onClick={(e) => handleTestLogin(e, 'master')} disabled={isLoading}>Master</Button>
+                <Button variant="outline" size="sm" onClick={(e) => handleTestLogin(e, 'admin')} disabled={isLoading}>Admin</Button>
+                <Button variant="outline" size="sm" onClick={(e) => handleTestLogin(e, 'influencer')} disabled={isLoading}>Influencer</Button>
+             </div>
+          </CardFooter>
         </Card>
       </div>
     </main>
