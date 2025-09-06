@@ -100,15 +100,12 @@ function ConfiguracoesPageContent() {
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const searchParams = useSearchParams();
+    const testUserId = "test-admin-id"; // Hardcoded for test mode
 
     const fetchData = useCallback(async (userId: string) => {
         try {
-            const userDocRef = doc(db, "users", userId);
-            const userDocSnap = await getDoc(userDocRef);
-            if (!userDocSnap.exists()) {
-                throw new Error("Documento do usuário não encontrado.");
-            }
-            const companyId = userDocSnap.data()?.companyId;
+            // In test mode, we might not have a real user doc, so we use a hardcoded company ID
+            const companyId = "zla41D6y8A1Gz0dUnrR7";
             if (!companyId) {
                 throw new Error("ID da empresa não encontrado no perfil do usuário.");
             }
@@ -120,15 +117,15 @@ function ConfiguracoesPageContent() {
                 const data = companyDocSnap.data();
                 setCompanyData({
                     id: companyDocSnap.id,
-                    adminName: data.adminProfile?.name || '',
-                    companyName: data.companyName || '',
-                    email: data.adminProfile?.email || '',
+                    adminName: data.adminProfile?.name || 'Admin Teste',
+                    companyName: data.companyName || 'Empresa Teste',
+                    email: data.adminProfile?.email || 'admin@teste.com',
                     tagline: data.branding?.tagline || '',
                     audience: data.branding?.audience || '',
                     tone: data.branding?.tone || '',
                     messages: data.branding?.messages || '',
-                    status: data.status || 'Inativa',
-                    licenses: data.licenses || 0,
+                    status: data.status || 'Trial',
+                    licenses: data.licenses || 5,
                     trialEndsAt: data.trialEndsAt
                 });
             } else {
@@ -150,19 +147,11 @@ function ConfiguracoesPageContent() {
         }
     }, [toast]);
 
-     // Listen to auth state changes to get the current user ID and fetch data
+     // Use hardcoded ID for test mode
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                setCurrentUserId(user.uid);
-                fetchData(user.uid);
-            } else {
-                setCurrentUserId(null);
-                setIsLoading(false);
-            }
-        });
-        return () => unsubscribe();
-    }, [fetchData]);
+        setCurrentUserId(testUserId);
+        fetchData(testUserId);
+    }, [fetchData, testUserId]);
 
     // Handle toast notifications for payment status
     useEffect(() => {

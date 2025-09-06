@@ -80,6 +80,7 @@ export default function SettingsPage() {
 
   const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
   const [branding, setBranding] = useState<BrandingData>({ voice: 'amigavel', expertise: '', value: '', position: '' });
+  const testUserId = "CqFfA2rff4dzcHD31F81yL3sZtI2"; // Hardcoded for test mode
   
   const fetchData = useCallback(async (userId: string) => {
     setIsLoading(true);
@@ -114,16 +115,9 @@ export default function SettingsPage() {
   }, [toast]);
 
   useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
-            if (user) {
-                setCurrentUserId(user.uid);
-                fetchData(user.uid);
-            } else {
-                setIsLoading(false);
-            }
-        });
-        return () => unsubscribe();
-  }, [fetchData]);
+    setCurrentUserId(testUserId);
+    fetchData(testUserId);
+  }, [fetchData, testUserId]);
 
   const handleSave = async () => {
     if (!currentUserId) return;

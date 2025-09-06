@@ -107,12 +107,13 @@ export default function InfluencerDashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
+    const testUserId = "CqFfA2rff4dzcHD31F81yL3sZtI2"; // Hardcoded for test mode
 
-    const fetchData = useCallback(async (user: User) => {
+    const fetchData = useCallback(async (userId: string) => {
         setIsLoading(true);
         try {
             // Fetch user data
-            const userDocRef = doc(db, "users", user.uid);
+            const userDocRef = doc(db, "users", userId);
             const userDocSnap = await getDoc(userDocRef);
             if (!userDocSnap.exists()) {
                 throw new Error("Usuário não encontrado.");
@@ -151,15 +152,8 @@ export default function InfluencerDashboardPage() {
     }, [toast]);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
-            if (user) {
-                fetchData(user);
-            } else {
-                setIsLoading(false);
-            }
-        });
-        return () => unsubscribe();
-    }, [fetchData]);
+        fetchData(testUserId);
+    }, [fetchData, testUserId]);
 
 
   if (isLoading || !data) {

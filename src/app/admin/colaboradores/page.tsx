@@ -1,7 +1,7 @@
 // src/app/admin/colaboradores/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useActionState } from 'react';
+import React, { useState, useEffect, useCallback, useActionState, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -108,24 +108,11 @@ export default function AdminColaboradoresPage() {
   }, [toast]);
   
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-        if (user) {
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-                const userCompanyId = userDocSnap.data().companyId;
-                setCompanyId(userCompanyId);
-                fetchData(userCompanyId);
-            } else {
-                 toast({ variant: "destructive", title: "Usuário não encontrado no banco de dados."});
-                 setIsLoading(false);
-            }
-        } else {
-            setIsLoading(false);
-        }
-    });
-    return () => unsubscribe();
-  }, [fetchData, toast]);
+    // Hardcoded for test mode
+    const testCompanyId = "zla41D6y8A1Gz0dUnrR7";
+    setCompanyId(testCompanyId);
+    fetchData(testCompanyId);
+  }, [fetchData]);
 
   useEffect(() => {
     if (inviteState.success) {

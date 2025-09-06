@@ -31,34 +31,8 @@ type CompanyData = {
 };
 
 const TrialNotification = () => {
-    const [company, setCompany] = useState<CompanyData | null>(null);
-    const [user, setUser] = useState<User | null>(null);
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-            setUser(currentUser);
-        });
-        return () => unsubscribe();
-    }, []);
-
-    useEffect(() => {
-        if (!user) return;
-        const fetchCompanyData = async () => {
-            const userDocRef = doc(db, 'users', user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-                const companyId = userDocSnap.data().companyId;
-                if (companyId) {
-                    const companyDocRef = doc(db, 'companies', companyId);
-                    const companyDocSnap = await getDoc(companyDocRef);
-                    if (companyDocSnap.exists()) {
-                        setCompany(companyDocSnap.data() as CompanyData);
-                    }
-                }
-            }
-        };
-        fetchCompanyData();
-    }, [user]);
+    const [company, setCompany] = useState<CompanyData | null>({ status: 'Trial', trialEndsAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString() });
+    const [user, setUser] = useState<User | null>(auth.currentUser);
 
     if (!company || company.status !== 'Trial' || !company.trialEndsAt) {
         return null;
@@ -88,27 +62,11 @@ const TrialNotification = () => {
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<UserData | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                const userDocRef = doc(db, "users", currentUser.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    const data = userDocSnap.data();
-                    setUser({
-                        name: data.profile?.name || 'Admin',
-                        email: data.profile?.email || '',
-                        role: data.role || 'Admin',
-                    });
-                }
-            }
-            setIsLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
+    const [user, setUser] = useState<UserData | null>({
+        name: 'Admin Teste',
+        email: 'admin@boldfy.com',
+        role: 'Admin',
+    });
 
   const sidebarContent = (
      <>

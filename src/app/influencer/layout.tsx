@@ -23,27 +23,11 @@ type UserData = {
 };
 
 export default function InfluencerLayout({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<UserData | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                const userDocRef = doc(db, "users", currentUser.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    const data = userDocSnap.data();
-                    setUser({
-                        name: data.profile?.name || 'Influenciador',
-                        email: data.profile?.email || '',
-                        role: data.role || 'influencer',
-                    });
-                }
-            }
-            setIsLoading(false);
-        });
-        return () => unsubscribe();
-    }, []);
+    const [user, setUser] = useState<UserData | null>({
+        name: 'Influencer Teste',
+        email: 'influencer@boldfy.com',
+        role: 'influencer',
+    });
 
   const sidebarContent = (
     <>
