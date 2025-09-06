@@ -73,58 +73,23 @@ export default function InfluencerRankingsPage() {
     const [generalRanking, setGeneralRanking] = useState<UserRanking[]>([]);
     const [monthlyPrize, setMonthlyPrize] = useState({ name: 'Prêmio não definido', id: ''});
     const [isLoading, setIsLoading] = useState(true);
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const testUserId = "user-test-influencer";
 
-     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, user => {
-            setCurrentUser(user);
-        });
-        return () => unsubscribe();
-    }, []);
-
-    const fetchData = useCallback(async (user: User) => {
+    const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (!userDocSnap.exists()) {
-                throw new Error("Usuário não encontrado.");
-            }
-            const companyId = userDocSnap.data().companyId;
-            if (!companyId) {
-                 throw new Error("Usuário não associado a uma empresa.");
-            }
-
-            // Fetch all users from the same company
-            const usersQuery = query(
-                collection(db, "users"), 
-                where("companyId", "==", companyId),
-                orderBy("points", "desc")
-            );
+           // MOCK DATA for test mode
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const fetchedUsers: UserRanking[] = [
+                { id: 'user-1', name: 'Ana Clara', points: 12500, avatarUrl: 'https://picsum.photos/80/80?random=1', isCurrentUser: false },
+                { id: testUserId, name: 'Você', points: 11800, avatarUrl: 'https://picsum.photos/80/80?random=2', isCurrentUser: true },
+                { id: 'user-3', name: 'Marcos Vilela', points: 10500, avatarUrl: 'https://picsum.photos/80/80?random=3', isCurrentUser: false },
+                { id: 'user-4', name: 'Beatriz Costa', points: 9800, avatarUrl: 'https://picsum.photos/80/80?random=4', isCurrentUser: false },
+                { id: 'user-5', name: 'Lucas Martins', points: 8200, avatarUrl: 'https://picsum.photos/80/80?random=5', isCurrentUser: false },
+            ].sort((a, b) => b.points - a.points);
             
-            const querySnapshot = await getDocs(usersQuery);
-            const fetchedUsers = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                name: doc.data().profile?.name || doc.data().name || 'Usuário Anônimo',
-                points: doc.data().points || 0,
-                avatarUrl: doc.data().profile?.avatarUrl || `https://placehold.co/80x80.png`,
-                isCurrentUser: doc.id === user.uid
-            }));
             setGeneralRanking(fetchedUsers);
-
-            // Fetch monthly prize
-            const companyDocRef = doc(db, "companies", companyId);
-            const companyDocSnap = await getDoc(companyDocRef);
-            if (companyDocSnap.exists()) {
-                const prizeId = companyDocSnap.data()?.monthlyPrize;
-                if (prizeId) {
-                    const prizeDocRef = doc(db, "companies", companyId, "rewards", prizeId);
-                    const prizeDocSnap = await getDoc(prizeDocRef);
-                    if (prizeDocSnap.exists()) {
-                        setMonthlyPrize({ name: prizeDocSnap.data()?.name, id: prizeId });
-                    }
-                }
-            }
+            setMonthlyPrize({ name: 'Vale-presente iFood R$100', id: 'prize-1' });
 
         } catch(error) {
             console.error("Error fetching ranking:", error);
@@ -135,12 +100,8 @@ export default function InfluencerRankingsPage() {
     }, [toast]);
     
     useEffect(() => {
-        if (currentUser) {
-            fetchData(currentUser);
-        } else {
-            setIsLoading(false); // If no user, stop loading
-        }
-    }, [currentUser, fetchData]);
+        fetchData();
+    }, [fetchData]);
 
 
     const top3 = generalRanking.slice(0, 3);
@@ -153,14 +114,6 @@ export default function InfluencerRankingsPage() {
                     <PageSkeleton />
                 </main>
             </>
-        )
-    }
-    
-    if (!currentUser) {
-        return (
-             <main className="flex-1 overflow-auto p-4 md:p-6 text-center">
-                <p>Faça login para ver os rankings.</p>
-             </main>
         )
     }
 
