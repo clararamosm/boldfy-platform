@@ -112,7 +112,7 @@ export default function TrilhasPage() {
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
 
-     const fetchTrails = useCallback(async (user: User) => {
+     const fetchTrails = useCallback(async () => {
         setIsLoading(true);
         try {
             // Mock fetching logic. In a real app, you'd fetch trails for the company
@@ -139,14 +139,7 @@ export default function TrilhasPage() {
         }, [toast]);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                fetchTrails(user);
-            } else {
-                setIsLoading(false);
-            }
-        });
-        return () => unsubscribe();
+        fetchTrails();
     }, [fetchTrails]);
 
 
