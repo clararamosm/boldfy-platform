@@ -164,7 +164,7 @@ export default function InfluencerRecompensasPage() {
             
             const mockRewards: Reward[] = [
                 { id: '1', name: 'Vale-presente iFood R$50', points: 5000, imageUrl: 'https://picsum.photos/300/168?random=1', stock: 'Ilimitado', title: 'iFood' },
-                { id: '2', name: 'Fone de Ouvido Bluetooth', points: 7500, imageUrl: 'https://picsum.photos/300/168?random=2', stock: 15, title: 'Headphone' },
+                { id: '2', name: 'Day Off', points: 7500, imageUrl: 'https://picsum.photos/300/168?random=2', stock: 15, title: 'Day Off' },
                 { id: '3', name: 'Caneca Exclusiva Boldfy', points: 1500, imageUrl: 'https://picsum.photos/300/168?random=3', stock: 50, title: 'Mug' },
                 { id: '4', name: 'Mentoria com a Liderança', points: 15000, imageUrl: 'https://picsum.photos/300/168?random=4', stock: 5, title: 'Mentorship' },
             ];
@@ -315,4 +315,3 @@ export default function InfluencerRecompensasPage() {
     </>
   );
 }
-
