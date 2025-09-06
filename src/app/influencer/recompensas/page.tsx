@@ -156,58 +156,41 @@ export default function InfluencerRecompensasPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [userInfo, setUserInfo] = useState<{uid: string, companyId: string, name: string} | null>(null);
 
-    const fetchData = useCallback(async (user: User) => {
+    const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
-            const userDocRef = doc(db, "users", user.uid);
-            const userSnap = await getDoc(userDocRef);
-            if (!userSnap.exists()) throw new Error("User data not found.");
-            const userData = userSnap.data();
-            const companyId = userData.companyId;
-
-            if (!companyId) {
-                setIsLoading(false);
-                toast({ variant: 'destructive', title: "Erro", description: "Usuário não está associado a uma empresa." });
-                return;
-            }
+            // MOCK DATA for test mode
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
-            setUserInfo({ uid: user.uid, companyId, name: userData.profile?.name || 'Colaborador' });
+            const mockRewards: Reward[] = [
+                { id: '1', name: 'Vale-presente iFood R$50', points: 5000, imageUrl: 'https://picsum.photos/300/168?random=1', stock: 'Ilimitado', title: 'iFood' },
+                { id: '2', name: 'Fone de Ouvido Bluetooth', points: 7500, imageUrl: 'https://picsum.photos/300/168?random=2', stock: 15, title: 'Headphone' },
+                { id: '3', name: 'Caneca Exclusiva Boldfy', points: 1500, imageUrl: 'https://picsum.photos/300/168?random=3', stock: 50, title: 'Mug' },
+                { id: '4', name: 'Mentoria com a Liderança', points: 15000, imageUrl: 'https://picsum.photos/300/168?random=4', stock: 5, title: 'Mentorship' },
+            ];
+            setRewards(mockRewards);
 
-            // Fetch Rewards
-            const rewardsQuery = query(collection(db, "companies", companyId, "rewards"), where("status", "==", "Disponível"));
-            const rewardsSnap = await getDocs(rewardsQuery);
-            const rewardsList = rewardsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Reward));
-            setRewards(rewardsList);
+            const mockRescues: Rescue[] = [
+                { id: 'r1', rewardName: 'Camiseta Exclusiva', date: new Date(2024, 6, 15), status: 'Pago' },
+                { id: 'r2', rewardName: 'Acesso a Curso Online', date: new Date(2024, 7, 1), status: 'Pendente' },
+            ];
+            setRescues(mockRescues);
             
-            // Fetch Rescues for the user
-            const rescuesQuery = query(collection(db, "companies", companyId, "rescues"), where("userId", "==", user.uid), orderBy("date", "desc"));
-            const rescuesSnap = await getDocs(rescuesQuery);
-            const rescuesList = rescuesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Rescue));
-            setRescues(rescuesList);
-
-            // Fetch History for the user
-            const historyQuery = query(collection(db, "users", user.uid, "pointHistory"), orderBy("date", "desc"));
-            const historySnap = await getDocs(historyQuery);
-            const historyList = historySnap.docs.map(doc => {
-                 const data = doc.data() as Omit<HistoryItem, 'id' | 'icon'>;
-                 return {
-                    id: doc.id,
-                    ...data,
-                    icon: getHistoryIcon(data.source, data.type)
-                 } as HistoryItem
-            });
-            setHistory(historyList);
-            
-            // Calculate stats
-            const gained = historyList.filter(h => h.type === 'gain').reduce((acc, h) => acc + h.points, 0);
-            const spent = historyList.filter(h => h.type === 'spend').reduce((acc, h) => acc + h.points, 0);
+            const mockHistory: HistoryItem[] = [
+                { id: 'h1', description: 'Completou a Missão "Post no LinkedIn"', points: 100, date: new Date(), type: 'gain', source: 'missao', icon: getHistoryIcon('missao', 'gain') },
+                { id: 'h2', description: 'Completou a Trilha "Cultura da Empresa"', points: 500, date: new Date(Date.now() - 86400000 * 2), type: 'gain', source: 'trilha', icon: getHistoryIcon('trilha', 'gain') },
+                { id: 'h3', description: 'Resgate: Camiseta Exclusiva', points: 2000, date: new Date(Date.now() - 86400000 * 5), type: 'spend', source: 'resgate', icon: getHistoryIcon('resgate', 'spend') },
+            ];
+            setHistory(mockHistory);
 
             setStats({
-                available: userData?.points || 0,
-                gained,
-                spent,
-                redeemed: rescuesList.length
+                available: 11800,
+                gained: 14000,
+                spent: 2200,
+                redeemed: mockRescues.length,
             });
+
+            setUserInfo({ uid: 'test-influencer-id', companyId: 'test-company-id', name: 'Influencer Teste' });
 
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -218,14 +201,7 @@ export default function InfluencerRecompensasPage() {
     }, [toast]);
     
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                fetchData(user);
-            } else {
-                setIsLoading(false);
-            }
-        });
-        return () => unsubscribe();
+        fetchData();
     }, [fetchData]);
     
     const handleRedeem = async (reward: Reward) => {
@@ -237,44 +213,12 @@ export default function InfluencerRecompensasPage() {
 
         setIsSubmitting(true);
         try {
-            const batch = writeBatch(db);
-            const { uid, companyId, name } = userInfo;
-
-            // 1. Create a rescue document
-            const rescueRef = doc(collection(db, "companies", companyId, "rescues"));
-            batch.set(rescueRef, {
-                userId: uid,
-                userName: name,
-                rewardId: reward.id,
-                rewardName: reward.name,
-                date: serverTimestamp(),
-                status: 'Pendente'
-            });
-
-            // 2. Decrement user points
-            const userRef = doc(db, "users", uid);
-            batch.update(userRef, { points: stats.available - reward.points });
-
-            // 3. Add to point history
-            const historyRef = doc(collection(db, "users", uid, "pointHistory"));
-            batch.set(historyRef, {
-                type: 'spend',
-                points: reward.points,
-                description: `Resgate: ${reward.name}`,
-                date: serverTimestamp(),
-                source: 'resgate',
-            });
-
-            // 4. (Optional) Decrement stock if not unlimited
-            if (reward.stock !== 'Ilimitado' && typeof reward.stock === 'number') {
-                const rewardRef = doc(db, "companies", companyId, "rewards", reward.id);
-                batch.update(rewardRef, { stock: reward.stock - 1 });
-            }
-
-            await batch.commit();
+            // MOCK LOGIC for test mode
+             await new Promise(resolve => setTimeout(resolve, 1000));
+             console.log("Redeeming reward:", reward.name);
 
             toast({ title: "Recompensa resgatada com sucesso!" });
-            fetchData(auth.currentUser!); // Refresh all data
+            fetchData(); // Refresh all data
 
         } catch (error) {
             console.error("Error redeeming reward: ", error);
@@ -337,7 +281,7 @@ export default function InfluencerRecompensasPage() {
                                 <div key={rescue.id} className="flex justify-between items-center p-3 rounded-lg hover:bg-muted/50">
                                     <div>
                                         <p className="font-medium">{rescue.rewardName}</p>
-                                        <p className="text-sm text-muted-foreground">{rescue.date?.toDate().toLocaleDateString()}</p>
+                                        <p className="text-sm text-muted-foreground">{rescue.date?.toLocaleDateString()}</p>
                                     </div>
                                     <Badge variant={rescue.status === 'Pendente' ? 'destructive' : 'default'} className={rescue.status === 'Pago' ? "bg-green-600 hover:bg-green-700" : ""}>{rescue.status}</Badge>
                                 </div>
@@ -371,3 +315,4 @@ export default function InfluencerRecompensasPage() {
     </>
   );
 }
+
