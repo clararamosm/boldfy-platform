@@ -13,8 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { db } from '@/lib/firebase';
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -85,23 +84,21 @@ export default function SettingsPage() {
   const fetchData = useCallback(async (userId: string) => {
     setIsLoading(true);
     try {
-      const userDocRef = doc(db, "users", userId);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (userDocSnap.exists()) {
-        const data = userDocSnap.data();
+      // In test mode, we use mock data instead of fetching from Firestore
+       await new Promise(resolve => setTimeout(resolve, 500));
+       
         setProfile({
-          name: data.profile?.name || '',
-          email: data.profile?.email || '',
-          company: data.companyName || 'N/A'
+          name: 'Influencer de Teste',
+          email: 'influencer@teste.com',
+          company: 'Empresa Teste'
         });
         setBranding({
-          voice: data.personalBranding?.voice || 'amigavel',
-          expertise: data.personalBranding?.expertise || '',
-          value: data.personalBranding?.value || '',
-          position: data.personalBranding?.position || '',
+          voice: 'amigavel',
+          expertise: 'Marketing Digital, Vendas',
+          value: 'Dicas práticas para o dia a dia.',
+          position: 'Analista de Marketing',
         });
-      }
+      
     } catch (error) {
       console.error("Error fetching user data:", error);
       toast({
@@ -123,17 +120,10 @@ export default function SettingsPage() {
     if (!currentUserId) return;
     setIsSaving(true);
     try {
-        const userDocRef = doc(db, "users", currentUserId);
+        // In a real app, this would save to Firestore. In test mode, we just show a toast.
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        const dataToSave = {
-            profile: {
-                name: profile.name,
-                email: profile.email
-            },
-            personalBranding: branding
-        };
-
-        await setDoc(userDocRef, dataToSave, { merge: true });
+        console.log("Saving data:", { profile, branding });
 
         toast({
             title: "Sucesso!",

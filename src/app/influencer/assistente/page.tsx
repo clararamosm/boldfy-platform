@@ -2,9 +2,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { AiAssistantForm } from "@/components/ai-assistant-form";
 import { useToast } from '@/hooks/use-toast';
@@ -55,21 +52,15 @@ export default function AiAssistantPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-        if (user) {
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-                const userCompanyId = userDocSnap.data().companyId;
-                setUserInfo({ userId: user.uid, companyId: userCompanyId });
-            } else {
-                 toast({ variant: "destructive", title: "Erro de autenticação", description: "Não foi possível encontrar os dados do seu usuário."});
-            }
-        }
+    // Simulate fetching user info in test mode
+    const fetchUserInfo = async () => {
+        setIsLoading(true);
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate delay
+        setUserInfo({ userId: 'CqFfA2rff4dzcHD31F81yL3sZtI2', companyId: 'zla41D6y8A1Gz0dUnrR7' });
         setIsLoading(false);
-    });
-    return () => unsubscribe();
-  }, [toast]);
+    };
+    fetchUserInfo();
+  }, []);
   
 
   return (
@@ -81,7 +72,7 @@ export default function AiAssistantPage() {
         ) : userInfo ? (
             <AiAssistantForm companyId={userInfo.companyId} userId={userInfo.userId} />
         ) : (
-            <p className="text-center text-muted-foreground">Faça login para usar o assistente.</p>
+            <p className="text-center text-muted-foreground">Ocorreu um erro ao carregar os dados do usuário.</p>
         )}
       </main>
     </>
