@@ -34,7 +34,6 @@ type DashboardData = {
     trails: Trail[];
 };
 
-
 const MissionItem = ({ name, points }: Omit<Mission, 'id'>) => (
     <Link href="/influencer/missoes" className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-muted transition-colors">
         <span className="font-medium">{name}</span>
@@ -72,24 +71,22 @@ const DashboardSkeleton = () => (
                 <Skeleton className="h-4 w-36" />
             </CardContent>
             <CardFooter>
-                 <Skeleton className="h-10 w-40" />
+                <Skeleton className="h-10 w-40" />
             </CardFooter>
         </Card>
-
         <Card className="md:col-span-2 flex flex-col">
             <CardHeader>
                 <CardTitle className="font-headline"><Skeleton className="h-7 w-48" /></CardTitle>
                 <CardDescription><Skeleton className="h-4 w-72" /></CardDescription>
             </CardHeader>
             <CardContent className="flex-grow space-y-4">
-               <Skeleton className="h-8 w-full" />
-               <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
             </CardContent>
             <CardFooter>
-                 <Skeleton className="h-10 w-44" />
+                <Skeleton className="h-10 w-44" />
             </CardFooter>
         </Card>
-
         <Card className="lg:col-span-3">
             <CardHeader>
                 <CardTitle className="font-headline"><Skeleton className="h-7 w-64" /></CardTitle>
@@ -102,12 +99,10 @@ const DashboardSkeleton = () => (
     </div>
 );
 
-
 export default function InfluencerDashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
-    const testUserId = "CqFfA2rff4dzcHD31F81yL3sZtI2"; // Hardcoded for test mode
 
     const fetchData = useCallback(async (userId: string) => {
         setIsLoading(true);
@@ -115,9 +110,11 @@ export default function InfluencerDashboardPage() {
             // Fetch user data
             const userDocRef = doc(db, "users", userId);
             const userDocSnap = await getDoc(userDocRef);
+
             if (!userDocSnap.exists()) {
                 throw new Error("Usuário não encontrado.");
             }
+
             const userData = userDocSnap.data();
             const companyId = userData.companyId;
 
@@ -128,21 +125,26 @@ export default function InfluencerDashboardPage() {
                 limit(5)
             );
             const missionsSnap = await getDocs(missionsQuery);
-            const missionsList = missionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Mission[];
-            
+            const missionsList = missionsSnap.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Mission[];
+
             // TODO: Fetch user progress on trails to get accurate progress data
             const mockTrails: Trail[] = [
-                    { id: 'onboarding', title: "Onboarding de Novos Influenciadores", progress: 0, href: "/influencer/trilhas/onboarding" },
-                    { id: 'cultura', title: "Cultura da Empresa 101", progress: 75, href: "/influencer/trilhas/cultura" },
+                { id: 'onboarding', title: "Onboarding de Novos Influenciadores", progress: 0, href: "/influencer/trilhas/onboarding" },
+                { id: 'cultura', title: "Cultura da Empresa 101", progress: 75, href: "/influencer/trilhas/cultura" },
             ];
 
             const dashboardData: DashboardData = {
                 points: userData.points || 0,
-                pointsThisWeek: 200, // This would be a calculated value
+                pointsThisWeek: 200, // TODO: Calculate from weekly transactions
                 missions: missionsList,
                 trails: mockTrails
             };
+
             setData(dashboardData);
+
         } catch (error) {
             console.error("Error fetching dashboard data:", error);
             toast({ variant: 'destructive', title: "Erro ao carregar dashboard." });
@@ -152,74 +154,81 @@ export default function InfluencerDashboardPage() {
     }, [toast]);
 
     useEffect(() => {
-        fetchData(testUserId);
-    }, [fetchData, testUserId]);
+        const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+            if (user) {
+                fetchData(user.uid);
+            } else {
+                setIsLoading(false);
+                toast({ variant: 'destructive', title: "Usuário não autenticado." });
+            }
+        });
+        return () => unsubscribe();
+    }, [fetchData, toast]);
 
+    if (isLoading || !data) {
+        return (
+            <>
+                <Header title="Dashboard" />
+                <main className="flex-1 overflow-auto p-4 md:p-6">
+                    <DashboardSkeleton />
+                </main>
+            </>
+        )
+    }
 
-  if (isLoading || !data) {
     return (
         <>
             <Header title="Dashboard" />
             <main className="flex-1 overflow-auto p-4 md:p-6">
-                <DashboardSkeleton />
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    <Card className="flex flex-col">
+                        <CardHeader>
+                            <CardDescription>Meus Pontos</CardDescription>
+                            <CardTitle className="font-headline text-5xl">{data.points.toLocaleString()}</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-xs text-muted-foreground">+{data.pointsThisWeek} pontos esta semana</p>
+                        </CardContent>
+                        <CardFooter>
+                            <Button asChild>
+                                <Link href="/influencer/recompensas">Resgatar Recompensas</Link>
+                            </Button>
+                        </CardFooter>
+                    </Card>
+
+                    <Card className="md:col-span-2 flex flex-col">
+                        <CardHeader>
+                            <CardTitle className="font-headline">Missões da Semana</CardTitle>
+                            <CardDescription>Complete as missões disponíveis para ganhar pontos.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex-grow space-y-2">
+                            {data.missions.length > 0 ? (
+                                data.missions.map(mission => <MissionItem key={mission.id} {...mission} />)
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma missão para esta semana.</p>
+                            )}
+                        </CardContent>
+                        <CardFooter>
+                            <Button variant="secondary" asChild>
+                                <Link href="/influencer/missoes">Ver Todas as Missões</Link>
+                            </Button>
+                        </CardFooter>
+                    </Card>
+
+                    <Card className="lg:col-span-3">
+                        <CardHeader>
+                            <CardTitle className="font-headline">Trilhas de Aprendizagem Ativas</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {data.trails.length > 0 ? (
+                                data.trails.map(trail => <TrailItem key={trail.id} {...trail} />)
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma trilha de aprendizagem ativa.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             </main>
         </>
-    )
-  }
-
-  return (
-    <>
-      <Header title="Dashboard" />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="flex flex-col">
-            <CardHeader>
-              <CardDescription>Meus Pontos</CardDescription>
-              <CardTitle className="font-headline text-5xl">{data.points.toLocaleString()}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">+{data.pointsThisWeek} pontos esta semana</p>
-            </CardContent>
-            <CardFooter>
-              <Button asChild>
-                <Link href="/influencer/recompensas">Resgatar Recompensas</Link>
-              </Button>
-            </CardFooter>
-          </Card>
-
-          <Card className="md:col-span-2 flex flex-col">
-            <CardHeader>
-              <CardTitle className="font-headline">Missões da Semana</CardTitle>
-              <CardDescription>Complete as missões disponíveis para ganhar pontos.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow space-y-2">
-                {data.missions.length > 0 ? (
-                    data.missions.map(mission => <MissionItem key={mission.id} {...mission} />)
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">Nenhuma missão para esta semana.</p>
-                )}
-            </CardContent>
-            <CardFooter>
-              <Button variant="secondary" asChild>
-                <Link href="/influencer/missoes">Ver Todas as Missões</Link>
-              </Button>
-            </CardFooter>
-          </Card>
-
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <CardTitle className="font-headline">Trilhas de Aprendizagem Ativas</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                {data.trails.length > 0 ? (
-                    data.trails.map(trail => <TrailItem key={trail.id} {...trail} />)
-                ) : (
-                     <p className="text-sm text-muted-foreground text-center py-4">Nenhuma trilha de aprendizagem ativa.</p>
-                )}
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    </>
-  );
+    );
 }
