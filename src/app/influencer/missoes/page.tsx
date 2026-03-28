@@ -32,7 +32,6 @@ type Mission = {
 };
 
 const MissionCard = ({ name, description, points, status, startDate, endDate }: Mission) => {
-    
     const [fileUploaded, setFileUploaded] = useState(false);
 
     const uploadForm = (
@@ -55,7 +54,7 @@ const MissionCard = ({ name, description, points, status, startDate, endDate }: 
             text: "",
             color: "",
             button: (
-                 <ActionDialog
+                <ActionDialog
                     title="Enviar Comprovação"
                     description={`Envie um anexo para completar a missão "${name}".`}
                     trigger={<Button><Upload className="mr-2 h-4 w-4" /> Enviar Comprovação</Button>}
@@ -75,65 +74,62 @@ const MissionCard = ({ name, description, points, status, startDate, endDate }: 
     }
 
     const currentStatus = statusInfo[status];
-    
-    return (
-    <Card>
-        <CardHeader>
-            <div className="flex justify-between items-start gap-4">
-                <CardTitle className="font-headline text-lg">{name}</CardTitle>
-                 <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
-                    <Zap className="h-3 w-3 mr-1"/>
-                    {points}
-                </Badge>
-            </div>
-             <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-            {startDate && endDate && (
-                 <div className="text-xs text-muted-foreground flex items-center">
-                    <CalendarDays className="h-3 w-3 mr-1.5" />
-                    <span>Período: {startDate.toDate().toLocaleDateString()} - {endDate.toDate().toLocaleDateString()}</span>
-                </div>
-            )}
-        </CardContent>
-        <CardFooter className="flex justify-between items-center">
-            {status !== 'pendente' ? (
-                <div className={`text-sm ${currentStatus.color} flex items-center font-medium`}>
-                    {currentStatus.icon}
-                    {currentStatus.text}
-                </div>
-            ) : (
-                <span/>
-            )}
-            {currentStatus.button}
-        </CardFooter>
-    </Card>
-)};
 
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-start gap-4">
+                    <CardTitle className="font-headline text-lg">{name}</CardTitle>
+                    <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
+                        <Zap className="h-3 w-3 mr-1"/> {points}
+                    </Badge>
+                </div>
+                <CardDescription>{description}</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {startDate && endDate && (
+                    <div className="text-xs text-muted-foreground flex items-center">
+                        <CalendarDays className="h-3 w-3 mr-1.5" />
+                        <span>Período: {startDate.toDate().toLocaleDateString()} - {endDate.toDate().toLocaleDateString()}</span>
+                    </div>
+                )}
+            </CardContent>
+            <CardFooter className="flex justify-between items-center">
+                {status !== 'pendente' ? (
+                    <div className={`text-sm ${currentStatus.color} flex items-center font-medium`}>
+                        {currentStatus.icon}
+                        {currentStatus.text}
+                    </div>
+                ) : (
+                    <span/>
+                )}
+                {currentStatus.button}
+            </CardFooter>
+        </Card>
+    )};
 const MissionsPageSkeleton = () => (
     <div className="space-y-4">
         {[...Array(2)].map((_, i) => (
-             <Card key={i}>
+            <Card key={i}>
                 <CardHeader>
                     <div className="flex justify-between items-start gap-4">
                         <div className="space-y-2">
-                             <Skeleton className="h-6 w-56" />
-                             <Skeleton className="h-4 w-72" />
+                            <Skeleton className="h-6 w-56" />
+                            <Skeleton className="h-4 w-72" />
                         </div>
-                         <Skeleton className="h-5 w-16" />
+                        <Skeleton className="h-5 w-16" />
                     </div>
                 </CardHeader>
                 <CardContent>
                     <Skeleton className="h-4 w-48" />
                 </CardContent>
                 <CardFooter className="flex justify-end items-center">
-                   <Skeleton className="h-10 w-44" />
+                    <Skeleton className="h-10 w-44" />
                 </CardFooter>
             </Card>
         ))}
     </div>
 )
-
 
 export default function InfluencerMissoesPage() {
     const [missions, setMissions] = useState<Mission[]>([]);
@@ -141,38 +137,59 @@ export default function InfluencerMissoesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
 
+    const deriveMissionStatus = (missionDoc: any): MissionStatus => {
+        const adminStatus = missionDoc.status;
+        // If mission is Pendente in admin (awaiting approval), show as agendada to influencer
+        if (adminStatus === 'Pendente') return 'agendada';
+        // If mission is Inativa or Passada, don't show (filtered out)
+        // If mission is Ativa or Fixa, it's available for the influencer
+        if (adminStatus === 'Ativa' || adminStatus === 'Fixa' || adminStatus === 'Agendada') return 'pendente';
+        return 'pendente';
+    };
+
     const fetchMissions = useCallback(async (user: User) => {
         setIsLoading(true);
         try {
             const userDocRef = doc(db, "users", user.uid);
             const userDocSnap = await getDoc(userDocRef);
             if (!userDocSnap.exists()) throw new Error("User not found.");
-            
+
             const companyId = userDocSnap.data().companyId;
             if (!companyId) throw new Error("CompanyId not found for user.");
 
             const missionsQuery = query(collection(db, "companies", companyId, "missions"));
             const missionsSnap = await getDocs(missionsQuery);
-            
-            // TODO: In a real app, status should be determined by user progress, not just from the mission doc.
-            const allMissions = missionsSnap.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                status: 'pendente' // Mock status
-            })) as Mission[];
-            
+
+            const now = new Date();
+            const allMissions = missionsSnap.docs
+                .map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data,
+                        status: deriveMissionStatus(data),
+                    } as Mission;
+                })
+                .filter(m => {
+                    // Only show active/fixed/scheduled missions to influencers (not Inativa or Passada)
+                    const adminStatus = missionsSnap.docs.find(d => d.id === m.id)?.data().status;
+                    if (adminStatus === 'Inativa' || adminStatus === 'Passada') return false;
+                    // For timed missions, only show if end date hasn't passed
+                    if (m.type === 'timed' && m.endDate?.toDate() < now) return false;
+                    return true;
+                });
+
             const timedMissions = allMissions.filter(m => m.type === 'timed');
             const fixedMissions = allMissions.filter(m => m.type === 'fixed');
             const completedFixed = fixedMissions.filter(m => m.status === 'completa').length;
 
             setMissions(allMissions);
             setStats({
-                weeklyPoints: 0, // This would be calculated based on completed missions in the last 7 days
+                weeklyPoints: 0,
                 fixedCompleted: completedFixed,
                 fixedTotal: fixedMissions.length,
                 fixedProgress: fixedMissions.length > 0 ? (completedFixed / fixedMissions.length) * 100 : 0,
             });
-            
         } catch(error) {
             console.error("Error fetching missions: ", error);
             toast({ variant: 'destructive', title: 'Erro ao buscar missões.', description: (error as Error).message });
@@ -194,10 +211,9 @@ export default function InfluencerMissoesPage() {
 
     const weeklyMissions = missions.filter(m => m.type === 'timed');
     const fixedMissions = missions.filter(m => m.type === 'fixed');
-
     const renderMissions = (missionList: Mission[]) => {
         if (isLoading) {
-             return <MissionsPageSkeleton />;
+            return <MissionsPageSkeleton />;
         }
         if (missionList.length === 0) {
             return <p className="text-center text-muted-foreground py-8">Nenhuma missão nesta categoria.</p>;
@@ -209,43 +225,42 @@ export default function InfluencerMissoesPage() {
         )
     }
 
-  return (
-    <>
-      <Header title="Missões" />
-      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
-        <Card>
-            <CardContent className="grid gap-4 md:grid-cols-2 p-4">
-                <div className="p-2">
-                    <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                        <Zap className="h-4 w-4"/>
-                        Pontos de Missões da Semana
-                    </div>
-                    <div className="text-3xl font-bold">{stats.weeklyPoints}</div>
-                </div>
-                <div className="p-2">
-                    <div className="flex items-center justify-between gap-2 text-sm font-medium text-muted-foreground mb-2">
-                        <span>Progresso em Missões Fixas</span>
-                        <span>{stats.fixedCompleted} / {stats.fixedTotal}</span>
-                    </div>
-                    <Progress value={stats.fixedProgress} className="h-2" />
-                     {stats.fixedProgress === 100 && <p className="text-xs text-muted-foreground mt-2">Você completou todas as missões fixas!</p>}
-                </div>
-            </CardContent>
-        </Card>
-        
-        <Tabs defaultValue="semana">
-            <TabsList className="mb-4">
-                <TabsTrigger value="semana">Missões da Semana</TabsTrigger>
-                <TabsTrigger value="fixas">Missões Fixas</TabsTrigger>
-            </TabsList>
-            <TabsContent value="semana">
-                {renderMissions(weeklyMissions)}
-            </TabsContent>
-             <TabsContent value="fixas">
-                 {renderMissions(fixedMissions)}
-            </TabsContent>
-        </Tabs>
-      </main>
-    </>
-  );
+    return (
+        <>
+            <Header title="Missões" />
+            <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
+                <Card>
+                    <CardContent className="grid gap-4 md:grid-cols-2 p-4">
+                        <div className="p-2">
+                            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
+                                <Zap className="h-4 w-4"/> Pontos de Missões da Semana
+                            </div>
+                            <div className="text-3xl font-bold">{stats.weeklyPoints}</div>
+                        </div>
+                        <div className="p-2">
+                            <div className="flex items-center justify-between gap-2 text-sm font-medium text-muted-foreground mb-2">
+                                <span>Progresso em Missões Fixas</span>
+                                <span>{stats.fixedCompleted} / {stats.fixedTotal}</span>
+                            </div>
+                            <Progress value={stats.fixedProgress} className="h-2" />
+                            {stats.fixedProgress === 100 && <p className="text-xs text-muted-foreground mt-2">Você completou todas as missões fixas!</p>}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Tabs defaultValue="semana">
+                    <TabsList className="mb-4">
+                        <TabsTrigger value="semana">Missões da Semana</TabsTrigger>
+                        <TabsTrigger value="fixas">Missões Fixas</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="semana">
+                        {renderMissions(weeklyMissions)}
+                    </TabsContent>
+                    <TabsContent value="fixas">
+                        {renderMissions(fixedMissions)}
+                    </TabsContent>
+                </Tabs>
+            </main>
+        </>
+    );
 }
