@@ -1,57 +1,55 @@
 // src/app/actions.ts
 'use server';
 
-import { alignContent } from '@/ai/flows/align-content';
 import { z } from 'zod';
 import { doc, getDoc, addDoc, collection, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { auth as adminAuth } from '@/lib/firebase-admin';
 
-// --- AI Content Alignment Action ---
+// ---- AI Content Alignment Action ----
 
 async function getCompanyProfile(companyId: string): Promise<string> {
   const companyDocRef = doc(db, "companies", companyId);
   const companyDocSnap = await getDoc(companyDocRef);
 
   if (companyDocSnap.exists()) {
-      const data = companyDocSnap.data();
-      const branding = data.branding;
-      if (branding) {
-        return `
-            Company Name: ${data.companyName || 'N/A'}
-            Tagline: ${branding.tagline || 'N/A'}
-            Target Audience: ${branding.audience || 'N/A'}
-            Tone of Voice: ${branding.tone || 'N/A'}
-            Key Messages: ${branding.messages || 'N/A'}
-        `;
-      }
+    const data = companyDocSnap.data();
+    const branding = data.branding;
+    if (branding) {
+      return `
+        Company Name: ${data.companyName || 'N/A'}
+        Tagline: ${branding.tagline || 'N/A'}
+        Target Audience: ${branding.audience || 'N/A'}
+        Tone of Voice: ${branding.tone || 'N/A'}
+        Key Messages: ${branding.messages || 'N/A'}
+      `;
+    }
   }
   throw new Error('Perfil da empresa não encontrado ou incompleto.');
 }
 
 async function getPersonalBranding(userId: string): Promise<string> {
-    const userDocRef = doc(db, "users", userId);
-    const userDocSnap = await getDoc(userDocRef);
+  const userDocRef = doc(db, "users", userId);
+  const userDocSnap = await getDoc(userDocRef);
 
-    if (userDocSnap.exists()) {
-        const data = userDocSnap.data();
-        const branding = data.personalBranding;
-        if (branding) {
-            return `
-                Tone of Voice: ${branding.voice || 'N/A'}
-                Expertise: ${branding.expertise || 'N/A'}
-                Value Proposition: ${branding.value || 'N/A'}
-                Current Position: ${branding.position || 'N/A'}
-            `;
-        }
+  if (userDocSnap.exists()) {
+    const data = userDocSnap.data();
+    const personalBranding = data.personalBranding;
+    if (personalBranding) {
+      return `
+        Voice Style: ${personalBranding.voice || 'N/A'}
+        Areas of Expertise: ${personalBranding.expertise || 'N/A'}
+        Value Proposition: ${personalBranding.valueProposition || 'N/A'}
+        Current Position: ${personalBranding.position || 'N/A'}
+      `;
     }
-    
-    return `
-        Tone of Voice: Amigável e Inspirador.
-        Expertise: Marketing Digital, Vendas, Liderança.
-        Value Proposition: Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.
-        Current Position: Gerente de Marketing.
-    `;
+  }
+  return `
+    Tone of Voice: Amigável e Inspirador.
+    Expertise: Marketing Digital, Vendas, Liderança.
+    Value Proposition: Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.
+    Current Position: Gerente de Marketing.
+  `;
 }
 
 const AlignContentActionSchema = z.object({
@@ -81,29 +79,42 @@ export async function handleAlignContent(
     });
 
     if (!validatedData.success) {
-      return { error: validatedData.error.errors.map((e) => e.message).join(', ') };
+      return { error: validatedData.error.errors.map(e => e.message).join(', '), alignedContent: null };
     }
 
     const { content, companyId, userId, format, length } = validatedData.data;
+
     const companyProfile = await getCompanyProfile(companyId);
     const personalBranding = await getPersonalBranding(userId);
 
-    const result = await alignContent({ 
-        content, 
+    // Call our Claude API route instead of Genkit
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/ai/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content,
         companyProfile,
         personalBranding,
         format,
-        length
+        length,
+      }),
     });
 
-    return { alignedContent: result.alignedContent, error: null };
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Falha ao gerar conteúdo alinhado.');
+    }
+
+    const data = await response.json();
+    return { alignedContent: data.alignedContent, error: null };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
     return { error: `Ocorreu um erro ao alinhar o conteúdo: ${errorMessage}`, alignedContent: null };
   }
 }
 
-// --- Company & Admin Onboarding Action (by Master) ---
+// ---- Company & Admin Onboarding Action (by Master) ----
 
 const InviteAdminSchema = z.object({
   companyName: z.string().min(1, 'Nome da empresa é obrigatório.'),
@@ -113,89 +124,74 @@ const InviteAdminSchema = z.object({
 });
 
 type InviteAdminState = {
-    success?: boolean;
-    error?: string;
+  success?: boolean;
+  error?: string;
 };
 
 export async function inviteAdmin(prevState: InviteAdminState, formData: FormData): Promise<InviteAdminState> {
-    if (!adminAuth) {
-        return { error: "O serviço de autenticação do administrador não está disponível. Verifique a configuração do servidor." };
-    }
+  if (!adminAuth) {
+    return { error: "O serviço de autenticação do administrador não está disponível. Verifique a configuração do servidor." };
+  }
 
-    const validatedData = InviteAdminSchema.safeParse({
-        companyName: formData.get('companyName'),
-        adminName: formData.get('adminName'),
-        adminEmail: formData.get('adminEmail'),
-        licenses: formData.get('licenses'),
+  const validatedData = InviteAdminSchema.safeParse({
+    companyName: formData.get('companyName'),
+    adminName: formData.get('adminName'),
+    adminEmail: formData.get('adminEmail'),
+    licenses: formData.get('licenses'),
+  });
+
+  if (!validatedData.success) {
+    return { error: validatedData.error.errors.map(e => e.message).join(', ') };
+  }
+
+  const { companyName, adminName, adminEmail, licenses } = validatedData.data;
+
+  try {
+    // 1. Create Company document in Firestore
+    const companyRef = await addDoc(collection(db, "companies"), {
+      companyName: companyName,
+      branding: { tagline: '', audience: '', tone: '', messages: '' },
+      subscription: {
+        plan: 'trial',
+        status: 'trialing',
+        totalLicenses: licenses,
+        usedLicenses: 1,
+        trialEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      },
+      createdAt: serverTimestamp(),
+    });
+    const companyId = companyRef.id;
+
+    // 2. Create Admin user in Firebase Auth
+    const userRecord = await adminAuth.createUser({
+      email: adminEmail,
+      displayName: adminName,
+      password: Math.random().toString(36).slice(-12) + 'A1!',
     });
 
-    if (!validatedData.success) {
-        return { error: validatedData.error.errors.map(e => e.message).join(', ') };
+    // 3. Create User document in Firestore
+    const userDocRef = doc(db, "users", userRecord.uid);
+    await setDoc(userDocRef, {
+      role: 'admin',
+      companyId: companyId,
+      companyName: companyName,
+      points: 0,
+      profile: { name: adminName, email: adminEmail },
+      createdAt: serverTimestamp(),
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+    if ((error as any)?.code === 'auth/email-already-exists') {
+      return { error: `Um usuário com o e-mail ${adminEmail} já existe.` };
     }
-    
-    const { companyName, adminName, adminEmail, licenses } = validatedData.data;
-
-    try {
-        const companyRef = doc(collection(db, "companies"));
-        const companyId = companyRef.id;
-
-        // 1. Create Auth user (will be passwordless initially, admin will set password via link)
-        let userRecord;
-        try {
-            userRecord = await adminAuth.createUser({
-                email: adminEmail,
-                emailVerified: false,
-                displayName: adminName,
-                disabled: false,
-            });
-        } catch (error: any) {
-             if (error.code === 'auth/email-already-exists') {
-                return { error: `Um usuário com o e-mail ${adminEmail} já existe.` };
-            }
-            throw error;
-        }
-
-        // 2. Create Company document with 'Trial' status and trial end date
-        const trialEndDate = new Date();
-        trialEndDate.setDate(trialEndDate.getDate() + 30);
-
-        await setDoc(companyRef, {
-            companyName,
-            adminProfile: { name: adminName, email: adminEmail },
-            licenses,
-            status: 'Trial' as const,
-            createdAt: serverTimestamp(),
-            trialEndsAt: trialEndDate.toISOString(),
-            stripeCustomerId: null,
-            stripeSubscriptionId: null,
-        });
-
-        // 3. Create User document
-        const userDocRef = doc(db, "users", userRecord.uid);
-        await setDoc(userDocRef, {
-            role: 'admin',
-            companyId: companyId,
-            companyName: companyName,
-            points: 0,
-            status: 'Pendente' as const, // Admin starts as pending until they login/set password
-            profile: { name: adminName, email: adminEmail },
-            createdAt: serverTimestamp(),
-        });
-        
-        // Optional: Send a password reset email to the admin so they can set their password.
-        // await adminAuth.generatePasswordResetLink(adminEmail);
-        
-        console.log(`Empresa "${companyName}" criada em modo Trial. Admin: "${adminEmail}".`);
-        return { success: true };
-
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
-        console.error("Error in inviteAdmin:", errorMessage);
-        return { error: `Erro ao criar empresa: ${errorMessage}` };
-    }
+    console.error("Error in inviteAdmin:", errorMessage);
+    return { error: `Erro ao criar empresa e admin: ${errorMessage}` };
+  }
 }
 
-// --- Invite Collaborator Action (by Company Admin) ---
+// ---- Invite Collaborator Action (by Admin) ----
 
 const InviteCollaboratorSchema = z.object({
   name: z.string().min(1, 'Nome do colaborador é obrigatório.'),
@@ -204,68 +200,64 @@ const InviteCollaboratorSchema = z.object({
 });
 
 type InviteCollaboratorState = {
-    success?: boolean;
-    error?: string;
+  success?: boolean;
+  error?: string;
 };
 
 export async function inviteCollaborator(prevState: InviteCollaboratorState, formData: FormData): Promise<InviteCollaboratorState> {
-    if (!adminAuth) {
-        return { error: "O serviço de autenticação do administrador não está disponível." };
-    }
+  if (!adminAuth) {
+    return { error: "O serviço de autenticação do administrador não está disponível." };
+  }
 
-    const validatedData = InviteCollaboratorSchema.safeParse({
-        name: formData.get('name'),
-        email: formData.get('email'),
-        companyId: formData.get('companyId'),
+  const validatedData = InviteCollaboratorSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    companyId: formData.get('companyId'),
+  });
+
+  if (!validatedData.success) {
+    return { error: validatedData.error.errors.map(e => e.message).join(', ') };
+  }
+
+  const { name, email, companyId } = validatedData.data;
+
+  try {
+    // 1. Create Auth user
+    const userRecord = await adminAuth.createUser({
+      email: email,
+      displayName: name,
+      password: Math.random().toString(36).slice(-12) + 'A1!',
     });
 
-    if (!validatedData.success) {
-        return { error: validatedData.error.errors.map(e => e.message).join(', ') };
+    // Handle email already exists
+    if ((userRecord as any)?.code === 'auth/email-already-exists') {
+      return { error: `Um usuário com o e-mail ${email} já existe.` };
     }
-    
-    const { name, email, companyId } = validatedData.data;
 
-    try {
-        // 1. Create Auth user
-        let userRecord;
-        try {
-            userRecord = await adminAuth.createUser({
-                email,
-                emailVerified: false,
-                displayName: name,
-                disabled: false,
-            });
-        } catch (error: any) {
-             if (error.code === 'auth/email-already-exists') {
-                return { error: `Um usuário com o e-mail ${email} já existe.` };
-            }
-            throw error;
-        }
-
-        // 2. Create User document in Firestore
-        const companyDocSnap = await getDoc(doc(db, "companies", companyId));
-        if (!companyDocSnap.exists()) {
-            throw new Error("Empresa não encontrada.");
-        }
-
-        const userDocRef = doc(db, "users", userRecord.uid);
-        await setDoc(userDocRef, {
-            role: 'influencer',
-            companyId: companyId,
-            companyName: companyDocSnap.data()?.companyName || '',
-            points: 0,
-            status: 'Pendente' as const, // User is pending until they set a password
-            profile: { name, email },
-            createdAt: serverTimestamp(),
-        });
-        
-        // You would typically send a password reset/invitation email here
-        // await adminAuth.generatePasswordResetLink(email);
-
-        return { success: true };
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
-        console.error("Error in inviteCollaborator:", errorMessage);
-        return { error: `Erro ao convidar colaborador: ${errorMessage}` };
+    // 2. Create User document in Firestore
+    const companyDocSnap = await getDoc(doc(db, "companies", companyId));
+    if (!companyDocSnap.exists()) {
+      throw new Error("Empresa não encontrada.");
     }
+
+    const userDocRef = doc(db, "users", userRecord.uid);
+    await setDoc(userDocRef, {
+      role: 'influencer',
+      companyId: companyId,
+      companyName: companyDocSnap.data()?.companyName || '',
+      points: 0,
+      status: 'Pendente' as const, // User is pending until they set a password
+      profile: { name, email },
+      createdAt: serverTimestamp(),
+    });
+
+    // You would typically send a password reset/invitation email here
+    // await adminAuth.generatePasswordResetLink(email);
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+    console.error("Error in inviteCollaborator:", errorMessage);
+    return { error: `Erro ao convidar colaborador: ${errorMessage}` };
+  }
 }
