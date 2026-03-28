@@ -13,241 +13,353 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { db, auth } from '@/lib/firebase';
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type ProfileData = {
-  name: string;
-  email: string;
-  company: string;
+    name: string;
+    email: string;
+    company: string;
 };
 
 type BrandingData = {
-  voice: string;
-  expertise: string;
-  value: string;
-  position: string;
+    voice: string;
+    expertise: string;
+    value: string;
+    position: string;
 };
 
-
-const SettingsSkeleton = () => (
-    <>
-      <Header title="Configurações" />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
-        <div className="grid gap-6 max-w-4xl mx-auto">
-          <Card>
-              <CardHeader>
-                  <CardTitle><Skeleton className="h-7 w-24" /></CardTitle>
-                  <CardDescription><Skeleton className="h-4 w-72" /></CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                  <div className="flex items-center gap-4">
-                      <Skeleton className="h-20 w-20 rounded-full" />
-                      <Skeleton className="h-10 w-28" />
-                  </div>
-                  <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-                  <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-                  <div className="space-y-2"><Skeleton className="h-4 w-12" /><Skeleton className="h-10 w-full" /></div>
-              </CardContent>
-          </Card>
-           <Card>
-              <CardHeader>
-                   <CardTitle><Skeleton className="h-7 w-40" /></CardTitle>
-                  <CardDescription><Skeleton className="h-4 w-96" /></CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                  <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                  <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-                  <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-20 w-full" /></div>
-                  <div className="space-y-2"><Skeleton className="h-4 w-24" /><Skeleton className="h-10 w-full" /></div>
-              </CardContent>
-          </Card>
-           <div className="flex justify-end">
-             <Skeleton className="h-10 w-36" />
-           </div>
+function SettingsSkeleton() {
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center gap-4">
+                <Skeleton className="h-16 w-16 rounded-full" />
+                <div className="space-y-2">
+                    <Skeleton className="h-4 w-[200px]" />
+                    <Skeleton className="h-4 w-[150px]" />
+                </div>
+            </div>
+            <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-10 w-full" />
+            </div>
         </div>
-      </main>
-    </>
-)
+    );
+}
 
 export default function SettingsPage() {
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
+    const [branding, setBranding] = useState<BrandingData>({ voice: 'amigavel', expertise: '', value: '', position: '' });
 
-  const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
-  const [branding, setBranding] = useState<BrandingData>({ voice: 'amigavel', expertise: '', value: '', position: '' });
-  const testUserId = "CqFfA2rff4dzcHD31F81yL3sZtI2"; // Hardcoded for test mode
-  
-  const fetchData = useCallback(async (userId: string) => {
-    setIsLoading(true);
-    try {
-      // In test mode, we use mock data instead of fetching from Firestore
-       await new Promise(resolve => setTimeout(resolve, 500));
-       
-        setProfile({
-          name: 'Influencer de Teste',
-          email: 'influencer@teste.com',
-          company: 'Empresa Teste'
+    const fetchData = useCallback(async (userId: string) => {
+        try {
+            setIsLoading(true);
+            const userDocRef = doc(db, 'users', userId);
+            const userSnapshot = await getDoc(userDocRef);
+
+            if (userSnapshot.exists()) {
+                const data = userSnapshot.data();
+                setProfile({
+                    name: data.name || '',
+                    email: data.email || '',
+                    company: data.companyId || '',
+                });
+                setBranding({
+                    voice: data.voice || 'amigavel',
+                    expertise: data.expertise || '',
+                    value: data.value || '',
+                    position: data.position || '',
+                });
+            } else {
+                toast({
+                    title: "Perfil não encontrado",
+                    description: "Não foi possível encontrar os dados do seu perfil.",
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            console.error("Erro ao buscar dados do usuário:", error);
+            toast({
+                title: "Erro ao carregar dados",
+                description: "Ocorreu um erro ao carregar suas configurações. Tente novamente.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
+            if (user) {
+                setCurrentUserId(user.uid);
+                fetchData(user.uid);
+            } else {
+                setCurrentUserId(null);
+                setIsLoading(false);
+                toast({
+                    title: "Usuário não autenticado",
+                    description: "Faça login para acessar as configurações.",
+                    variant: "destructive",
+                });
+            }
         });
-        setBranding({
-          voice: 'amigavel',
-          expertise: 'Marketing Digital, Vendas',
-          value: 'Dicas práticas para o dia a dia.',
-          position: 'Analista de Marketing',
-        });
-      
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-      toast({
-        variant: 'destructive',
-        title: "Erro ao carregar dados",
-        description: "Não foi possível buscar suas informações. Tente novamente.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
 
-  useEffect(() => {
-    setCurrentUserId(testUserId);
-    fetchData(testUserId);
-  }, [fetchData, testUserId]);
+        return () => unsubscribe();
+    }, [fetchData, toast]);
 
-  const handleSave = async () => {
-    if (!currentUserId) return;
-    setIsSaving(true);
-    try {
-        // In a real app, this would save to Firestore. In test mode, we just show a toast.
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        console.log("Saving data:", { profile, branding });
+    const handleSave = async () => {
+        if (!currentUserId) {
+            toast({
+                title: "Erro",
+                description: "Usuário não identificado. Faça login novamente.",
+                variant: "destructive",
+            });
+            return;
+        }
 
-        toast({
-            title: "Sucesso!",
-            description: `Suas configurações de perfil e branding foram salvas.`,
-        });
+        setIsSaving(true);
+        try {
+            const userDocRef = doc(db, 'users', currentUserId);
+            await setDoc(userDocRef, {
+                name: profile.name,
+                email: profile.email,
+                companyId: profile.company,
+                voice: branding.voice,
+                expertise: branding.expertise,
+                value: branding.value,
+                position: branding.position,
+            }, { merge: true });
 
-    } catch (error) {
-        console.error("Error saving settings:", error);
-        toast({
-            variant: 'destructive',
-            title: "Erro ao salvar",
-            description: "Não foi possível salvar suas alterações. Tente novamente.",
-        });
-    } finally {
-        setIsSaving(false);
-    }
-  };
+            toast({
+                title: "Configurações salvas",
+                description: "Suas configurações foram atualizadas com sucesso.",
+            });
+        } catch (error) {
+            console.error("Erro ao salvar configurações:", error);
+            toast({
+                title: "Erro ao salvar",
+                description: "Não foi possível salvar suas configurações. Tente novamente.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
-  if (isLoading) {
-    return <SettingsSkeleton />
-  }
+    return (
+        <div className="flex min-h-screen flex-col">
+            <Header />
+            <main className="flex-1 p-6 md:p-10">
+                <div className="mx-auto max-w-4xl space-y-8">
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
+                        <p className="text-muted-foreground">
+                            Gerencie suas configurações de conta e preferências de marca pessoal.
+                        </p>
+                    </div>
 
-  return (
-    <>
-      <Header title="Configurações" />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
-        <div className="grid gap-6 max-w-4xl mx-auto">
-          {/* Perfil */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Perfil e Branding Pessoal</CardTitle>
-              <CardDescription>Gerencie suas informações e como a IA deve se comunicar em seu nome.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20">
-                  <AvatarImage src="https://placehold.co/100x100.png" data-ai-hint="person avatar" />
-                  <AvatarFallback>{profile.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-                </Avatar>
-                <Button variant="outline">Mudar foto</Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome</Label>
-                  <Input id="name" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} disabled={isSaving} />
+                    {isLoading ? (
+                        <SettingsSkeleton />
+                    ) : (
+                        <>
+                            {/* Perfil */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Perfil</CardTitle>
+                                    <CardDescription>
+                                        Suas informações pessoais e dados de contato.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="flex items-center gap-4">
+                                        <Avatar className="h-16 w-16">
+                                            <AvatarImage src="" alt={profile.name} />
+                                            <AvatarFallback>
+                                                {profile.name
+                                                    .split(' ')
+                                                    .map((n) => n[0])
+                                                    .join('')
+                                                    .toUpperCase()
+                                                    .slice(0, 2)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <Button variant="outline" size="sm">
+                                                Alterar foto
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="name">Nome completo</Label>
+                                            <Input
+                                                id="name"
+                                                value={profile.name}
+                                                onChange={(e) =>
+                                                    setProfile({ ...profile, name: e.target.value })
+                                                }
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="email">E-mail</Label>
+                                            <Input
+                                                id="email"
+                                                type="email"
+                                                value={profile.email}
+                                                onChange={(e) =>
+                                                    setProfile({ ...profile, email: e.target.value })
+                                                }
+                                            />
+                                        </div>
+                                        <div className="space-y-2 md:col-span-2">
+                                            <Label htmlFor="company">Empresa</Label>
+                                            <Input
+                                                id="company"
+                                                value={profile.company}
+                                                onChange={(e) =>
+                                                    setProfile({ ...profile, company: e.target.value })
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Marca Pessoal */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Marca Pessoal</CardTitle>
+                                    <CardDescription>
+                                        Configure sua identidade de marca para geração de conteúdo.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-6">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="voice">Tom de voz</Label>
+                                        <Select
+                                            value={branding.voice}
+                                            onValueChange={(value) =>
+                                                setBranding({ ...branding, voice: value })
+                                            }
+                                        >
+                                            <SelectTrigger id="voice">
+                                                <SelectValue placeholder="Selecione o tom de voz" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="amigavel">Amigável</SelectItem>
+                                                <SelectItem value="profissional">Profissional</SelectItem>
+                                                <SelectItem value="inspirador">Inspirador</SelectItem>
+                                                <SelectItem value="educativo">Educativo</SelectItem>
+                                                <SelectItem value="provocativo">Provocativo</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="expertise">Áreas de expertise</Label>
+                                        <Textarea
+                                            id="expertise"
+                                            placeholder="Ex: Marketing Digital, Vendas, Liderança..."
+                                            value={branding.expertise}
+                                            onChange={(e) =>
+                                                setBranding({ ...branding, expertise: e.target.value })
+                                            }
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="value">Proposta de valor</Label>
+                                        <Textarea
+                                            id="value"
+                                            placeholder="O que você oferece de único para sua audiência?"
+                                            value={branding.value}
+                                            onChange={(e) =>
+                                                setBranding({ ...branding, value: e.target.value })
+                                            }
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="position">Cargo / Posição</Label>
+                                        <Input
+                                            id="position"
+                                            placeholder="Ex: CEO, Diretor de Marketing, Consultor..."
+                                            value={branding.position}
+                                            onChange={(e) =>
+                                                setBranding({ ...branding, position: e.target.value })
+                                            }
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Notificações */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Notificações</CardTitle>
+                                    <CardDescription>
+                                        Configure como e quando deseja receber notificações.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <Label>Notificações por e-mail</Label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Receba atualizações sobre novos conteúdos e análises.
+                                            </p>
+                                        </div>
+                                        <Switch defaultChecked />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <Label>Lembretes de postagem</Label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Seja lembrado quando houver conteúdo pronto para publicar.
+                                            </p>
+                                        </div>
+                                        <Switch defaultChecked />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <Label>Relatórios semanais</Label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Receba um resumo semanal do desempenho dos seus posts.
+                                            </p>
+                                        </div>
+                                        <Switch />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Botão Salvar */}
+                            <div className="flex justify-end">
+                                <Button onClick={handleSave} disabled={isSaving}>
+                                    {isSaving ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Salvando...
+                                        </>
+                                    ) : (
+                                        "Salvar configurações"
+                                    )}
+                                </Button>
+                            </div>
+                        </>
+                    )}
                 </div>
-                 <div className="space-y-2">
-                  <Label htmlFor="position">Qual sua posição na empresa?</Label>
-                  <Input id="position" placeholder="Ex: Gerente de Marketing" value={branding.position} onChange={e => setBranding({...branding, position: e.target.value})} disabled={isSaving} />
-                </div>
-              </div>
-               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" value={profile.email} disabled />
-              </div>
-               <div className="space-y-2">
-                <Label htmlFor="voice">Tom de Voz</Label>
-                 <Select value={branding.voice} onValueChange={value => setBranding({...branding, voice: value})} disabled={isSaving}>
-                  <SelectTrigger id="voice">
-                    <SelectValue placeholder="Selecione um tom" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="amigavel">Amigável</SelectItem>
-                    <SelectItem value="profissional">Profissional</SelectItem>
-                    <SelectItem value="informativo">Informativo</SelectItem>
-                    <SelectItem value="inspirador">Inspirador</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-               <div className="space-y-2">
-                <Label htmlFor="expertise">Expertises</Label>
-                <Input id="expertise" placeholder="Ex: Marketing Digital, Vendas, Liderança" value={branding.expertise} onChange={e => setBranding({...branding, expertise: e.target.value})} disabled={isSaving} />
-              </div>
-               <div className="space-y-2">
-                <Label htmlFor="value">Entrega de Valor</Label>
-                <Textarea id="value" placeholder="O que você oferece de único para sua audiência?" value={branding.value} onChange={e => setBranding({...branding, value: e.target.value})} disabled={isSaving} />
-              </div>
-            </CardContent>
-             <CardFooter>
-                 <Button onClick={handleSave} disabled={isSaving}>
-                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Salvar Alterações
-                </Button>
-            </CardFooter>
-          </Card>
-
-          {/* Notificações */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Notificações</CardTitle>
-              <CardDescription>Gerencie como você recebe as notificações.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="new-missions">Novas Missões</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receba alertas quando novas missões estiverem disponíveis.
-                  </p>
-                </div>
-                <Switch id="new-missions" defaultChecked />
-              </div>
-               <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="new-trails">Novas Trilhas</Label>
-                   <p className="text-sm text-muted-foreground">
-                    Seja notificado sobre novas trilhas de aprendizagem.
-                  </p>
-                </div>
-                <Switch id="new-trails" defaultChecked />
-              </div>
-               <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="points-available">Pontos Disponíveis</Label>
-                   <p className="text-sm text-muted-foreground">
-                    Lembretes mensais sobre seus pontos.
-                  </p>
-                </div>
-                <Switch id="points-available" defaultChecked />
-              </div>
-            </CardContent>
-          </Card>
+            </main>
         </div>
-      </main>
-    </>
-  );
+    );
 }
