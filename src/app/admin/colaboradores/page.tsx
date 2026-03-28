@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
 import { inviteCollaborator } from '@/app/actions';
+import { useRouter } from 'next/navigation';
 
 type Collaborator = {
   id: string;
@@ -31,88 +32,115 @@ type Collaborator = {
 };
 
 const StatCard = ({ title, value, icon: Icon, isLoading }: { title: string, value: string, icon: React.ElementType, isLoading: boolean }) => (
-    <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{title}</CardTitle>
-            <Icon className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-            {isLoading ? (
-                <div className="h-8 w-16 bg-muted rounded animate-pulse mt-1" />
-            ) : (
-                <div className="text-2xl font-bold">{value}</div>
-            )}
-        </CardContent>
-    </Card>
+  <Card>
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <Icon className="h-4 w-4 text-muted-foreground" />
+    </CardHeader>
+    <CardContent>
+      {isLoading ? (
+        <div className="h-8 w-16 bg-muted rounded animate-pulse mt-1" />
+      ) : (
+        <div className="text-2xl font-bold">{value}</div>
+      )}
+    </CardContent>
+  </Card>
 );
 
 function InviteFormContent() {
-    const { pending } = useFormStatus();
-    return (
-      <div className="space-y-4">
-        <div className="space-y-2">
-            <Label htmlFor="name">Nome do Colaborador</Label>
-            <Input name="name" id="name" placeholder="Ex: Maria Souza" required disabled={pending} />
-        </div>
-        <div className="space-y-2">
-            <Label htmlFor="email">E-mail do Colaborador</Label>
-            <Input name="email" id="email" type="email" placeholder="nome@empresa.com.br" required disabled={pending} />
-        </div>
+  const { pending } = useFormStatus();
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="name">Nome do Colaborador</Label>
+        <Input name="name" id="name" placeholder="Ex: Maria Souza" required disabled={pending} />
       </div>
-    );
+      <div className="space-y-2">
+        <Label htmlFor="email">E-mail do Colaborador</Label>
+        <Input name="email" id="email" type="email" placeholder="nome@empresa.com.br" required disabled={pending} />
+      </div>
+    </div>
+  );
 }
-
 
 export default function AdminColaboradoresPage() {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [totalLicenses, setTotalLicenses] = useState(0); 
-  const { toast } = useToast();
+  const [totalLicenses, setTotalLicenses] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
-  
+  const { toast } = useToast();
+  const router = useRouter();
+
   const [inviteState, formAction] = useActionState(inviteCollaborator, { error: undefined, success: undefined });
 
   const fetchData = useCallback(async (currentCompanyId: string) => {
-      setIsLoading(true);
-      try {
-        const companyDocRef = doc(db, "companies", currentCompanyId);
-        const companyDocSnap = await getDoc(companyDocRef);
-        if(companyDocSnap.exists()) {
-            setTotalLicenses(companyDocSnap.data().licenses || 0);
-        }
+    setIsLoading(true);
+    try {
+      const companyDocRef = doc(db, "companies", currentCompanyId);
+      const companyDocSnap = await getDoc(companyDocRef);
+      if(companyDocSnap.exists()) {
+        setTotalLicenses(companyDocSnap.data().licenses || 0);
+      }
 
-        const collaboratorsQuery = query(collection(db, "users"), where("companyId", "==", currentCompanyId), where("role", "==", "influencer"));
-        const querySnapshot = await getDocs(collaboratorsQuery);
-        const fetchedCollaborators = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              name: data.profile?.name || '',
-              email: data.profile?.email || '',
-              points: data.points || 0,
-              status: data.status || 'Pendente',
-              createdAt: data.createdAt?.toDate(),
-              avatarUrl: data.profile?.avatarUrl
-            }
-        }) as Collaborator[];
-        setCollaborators(fetchedCollaborators);
-        
+      const collaboratorsQuery = query(collection(db, "users"), where("companyId", "==", currentCompanyId), where("role", "==", "influencer"));
+      const querySnapshot = await getDocs(collaboratorsQuery);
+      const fetchedCollaborators = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.profile?.name || '',
+          email: data.profile?.email || '',
+          points: data.points || 0,
+          status: data.status || 'Pendente',
+          createdAt: data.createdAt?.toDate(),
+          avatarUrl: data.profile?.avatarUrl
+        }
+      }) as Collaborator[];
+      setCollaborators(fetchedCollaborators);
+
+    } catch (error) {
+      console.error("Error fetching collaborators: ", error);
+      toast({ variant: "destructive", title: "Erro ao buscar colaboradores."});
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  // Real auth: get companyId from logged-in user
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        router.push('/login');
+        return;
+      }
+      try {
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          const userCompanyId = userData.companyId;
+          if (userCompanyId) {
+            setCompanyId(userCompanyId);
+            fetchData(userCompanyId);
+          } else {
+            toast({ variant: "destructive", title: "Empresa não encontrada no perfil do usuário." });
+            setIsLoading(false);
+          }
+        } else {
+          toast({ variant: "destructive", title: "Dados do usuário não encontrados." });
+          setIsLoading(false);
+        }
       } catch (error) {
-        console.error("Error fetching collaborators: ", error);
-        toast({ variant: "destructive", title: "Erro ao buscar colaboradores."});
-      } finally {
+        console.error("Error fetching user data:", error);
+        toast({ variant: "destructive", title: "Erro ao carregar dados do usuário." });
         setIsLoading(false);
       }
-  }, [toast]);
-  
-  useEffect(() => {
-    // Hardcoded for test mode
-    const testCompanyId = "zla41D6y8A1Gz0dUnrR7";
-    setCompanyId(testCompanyId);
-    fetchData(testCompanyId);
-  }, [fetchData]);
+    });
+
+    return () => unsubscribe();
+  }, [fetchData, router, toast]);
 
   useEffect(() => {
     if (inviteState.success) {
@@ -125,7 +153,6 @@ export default function AdminColaboradoresPage() {
     }
   }, [inviteState, toast, companyId, fetchData]);
 
-
   const inviteButton = (
     <Button size="sm" disabled={isLoading || !companyId || collaborators.length >= totalLicenses}>
       <PlusCircle className="mr-2 h-4 w-4" />
@@ -134,55 +161,43 @@ export default function AdminColaboradoresPage() {
   );
 
   const getStatusBadge = (status: Collaborator['status']) => {
-    switch (status) {
-        case 'Ativo':
-            return <Badge variant="default">Ativo</Badge>;
-        case 'Inativo':
-            return <Badge variant="destructive">Inativo</Badge>;
-        case 'Pendente':
-            return <Badge variant="secondary">Pendente</Badge>;
-        default:
-            return <Badge variant="outline">{status}</Badge>;
-    }
+    const variants: Record<string, 'default' | 'secondary' | 'outline'> = {
+      'Ativo': 'default',
+      'Pendente': 'secondary',
+      'Inativo': 'outline',
+    };
+    return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
   };
-  
-  const handleFormAction = (formData: FormData) => {
-    if (companyId) {
-        formData.append('companyId', companyId);
-        formAction(formData);
-    } else {
-        toast({ variant: "destructive", title: "Erro", description: "ID da empresa não encontrado." });
-    }
-  }
 
   return (
     <>
-      <Header title="Colaboradores" />
-      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
-        <div className="grid gap-4 md:grid-cols-2">
-            <StatCard title="Colaboradores Ativos" value={`${collaborators.length}`} icon={UserCheck} isLoading={isLoading} />
-            <StatCard title="Licenças Contratadas" value={`${totalLicenses}`} icon={Users} isLoading={isLoading} />
+      <Header title="Colaboradores" action={
+        <ActionDialog
+          trigger={inviteButton}
+          title="Convidar Novo Colaborador"
+          description="Envie um convite para um novo membro da equipe. Ele receberá um e-mail para criar sua senha."
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+        >
+          <form action={formAction} ref={formRef}>
+            <input type="hidden" name="companyId" value={companyId || ''} />
+            <InviteFormContent />
+            <div className="flex justify-end mt-6">
+              <Button type="submit">Enviar Convite</Button>
+            </div>
+          </form>
+        </ActionDialog>
+      } />
+      <main className="flex-1 overflow-auto p-4 md:p-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
+          <StatCard title="Total de Colaboradores" value={String(collaborators.length)} icon={Users} isLoading={isLoading} />
+          <StatCard title="Colaboradores Ativos" value={String(collaborators.filter(c => c.status === 'Ativo').length)} icon={UserCheck} isLoading={isLoading} />
+          <StatCard title="Licenças Disponíveis" value={`${collaborators.length} / ${totalLicenses}`} icon={Users} isLoading={isLoading} />
         </div>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="font-headline">Gerenciar Colaboradores</CardTitle>
-              <CardDescription>Adicione, edite ou remova colaboradores da plataforma.</CardDescription>
-            </div>
-            <ActionDialog
-              title="Convidar Colaborador"
-              description="Envie um convite por e-mail para um novo colaborador se juntar à plataforma."
-              trigger={inviteButton}
-              actionText="Enviar Convite"
-              onAction={() => formRef.current?.requestSubmit()}
-              formId="invite-form"
-              open={isDialogOpen}
-              onOpenChange={setIsDialogOpen}
-            >
-              <form action={handleFormAction} id="invite-form" ref={formRef}>
-                <InviteFormContent />
-              </form>
-            </ActionDialog>
+          <CardHeader>
+            <CardTitle>Equipe</CardTitle>
+            <CardDescription>Gerencie os colaboradores da sua empresa.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -191,8 +206,8 @@ export default function AdminColaboradoresPage() {
                   <TableHead>Colaborador</TableHead>
                   <TableHead>Pontos</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Data de Entrada</TableHead>
-                  <TableHead><span className="sr-only">Ações</span></TableHead>
+                  <TableHead>Data de Adesão</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -206,7 +221,7 @@ export default function AdminColaboradoresPage() {
                     </TableCell>
                   </TableRow>
                 ) : collaborators.length === 0 ? (
-                   <TableRow>
+                  <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
                       Nenhum colaborador encontrado. Convide o primeiro!
                     </TableCell>
@@ -235,10 +250,10 @@ export default function AdminColaboradoresPage() {
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                              <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
-                              <DropdownMenuItem>Editar</DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive">Desativar</DropdownMenuItem>
+                            <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
+                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive">Desativar</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
