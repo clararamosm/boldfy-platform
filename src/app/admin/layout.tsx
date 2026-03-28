@@ -1,9 +1,8 @@
-// src/app/admin/layout.tsx
 'use client';
 
 import type React from "react";
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
@@ -13,8 +12,9 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User as UserIcon, AlertTriangle, Sparkles } from "lucide-react";
+import { LogOut, User as UserIcon, AlertTriangle, Sparkles, Loader2 } from "lucide-react";
 import { differenceInDays, parseISO } from 'date-fns';
 
 type CompanyStatus = 'Ativa' | 'Inativa' | 'Trial';
@@ -23,110 +23,153 @@ type UserData = {
     name: string;
     email: string;
     role: string;
+    companyId?: string;
 };
 
 type CompanyData = {
     status: CompanyStatus;
-    trialEndsAt?: string;
+    trialEndDate?: string;
+    plan?: string;
 };
 
-const TrialNotification = () => {
-    const [company, setCompany] = useState<CompanyData | null>({ status: 'Trial', trialEndsAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString() });
-    const [user, setUser] = useState<User | null>(auth.currentUser);
+const TrialNotification = ({ companyId }: { companyId: string | undefined }) => {
+    const [companyData, setCompanyData] = useState<CompanyData | null>(null);
 
-    if (!company || company.status !== 'Trial' || !company.trialEndsAt) {
-        return null;
-    }
+    useEffect(() => {
+        if (!companyId) return;
+        const fetchCompany = async () => {
+            const companyDoc = await getDoc(doc(db, 'companies', companyId));
+            if (companyDoc.exists()) {
+                setCompanyData(companyDoc.data() as CompanyData);
+            }
+        };
+        fetchCompany();
+    }, [companyId]);
 
-    const trialEndDate = parseISO(company.trialEndsAt);
-    const remainingDays = differenceInDays(trialEndDate, new Date());
+    if (!companyData || companyData.status !== 'Trial' || !companyData.trialEndDate) return null;
+
+    const daysLeft = differenceInDays(parseISO(companyData.trialEndDate), new Date());
+    if (daysLeft < 0) return null;
 
     const getMessage = () => {
-        if (remainingDays < 0) return "Seu período de teste acabou.";
-        if (remainingDays === 0) return "Seu período de teste acaba hoje!";
-        if (remainingDays === 1) return "Falta 1 dia para o fim do seu período de teste.";
-        return `Faltam ${remainingDays} dias para o fim do seu período de teste.`;
+        if (daysLeft === 0) return 'Seu trial expira hoje! Faça upgrade agora.';
+        if (daysLeft === 1) return 'Seu trial expira amanhã! Faça upgrade agora.';
+        return `Seu trial expira em ${daysLeft} dias. Faça upgrade para não perder acesso.`;
     };
 
     return (
         <div className="bg-yellow-100 border-b border-yellow-200 text-yellow-800 text-sm font-medium text-center p-2.5">
             <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
-                 <AlertTriangle className="h-4 w-4" />
+                <AlertTriangle className="h-4 w-4" />
                 <span>{getMessage()}</span>
-                 <Button size="sm" className="h-7 bg-yellow-400 text-yellow-900 hover:bg-yellow-500" asChild>
+                <Button size="sm" className="h-7 bg-yellow-400 text-yellow-900 hover:bg-yellow-500" asChild>
                     <Link href="/admin/configuracoes">Fazer Upgrade</Link>
-                 </Button>
+                </Button>
             </div>
         </div>
     );
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<UserData | null>({
-        name: 'Admin Teste',
-        email: 'admin@boldfy.com',
-        role: 'Admin',
-    });
+    const [user, setUser] = useState<UserData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [companyId, setCompanyId] = useState<string | undefined>(undefined);
+    const router = useRouter();
 
-  const sidebarContent = (
-     <>
-        <SidebarHeader>
-          <div className="flex items-center gap-2 has-[[data-state=collapsed]]:-ml-1 has-[[data-state=collapsed]]:justify-center">
-            <Logo />
-            <span className="font-headline text-xl font-bold text-foreground group-data-[state=collapsed]:hidden">Boldfy</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <AdminSidebarNav />
-        </SidebarContent>
-        <SidebarFooter className="p-2 mt-auto border-t">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-auto w-full justify-start p-2 group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:w-auto group-data-[state=collapsed]:mx-auto">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8 group-data-[state=collapsed]:h-10 group-data-[state=collapsed]:w-10">
-                    <AvatarFallback>{user?.name?.[0] || 'A'}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col items-start group-data-[state=collapsed]:hidden">
-                    <span className="text-sm font-semibold text-foreground">{user?.name || ''}</span>
-                    <span className="text-xs text-muted-foreground">{user?.role || ''}</span>
-                  </div>
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 mb-2" align="end" side="top">
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.name || ''}</p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {user?.email || ''}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/admin/configuracoes">
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  <span>Configurações</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sair
-                </Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </SidebarFooter>
-      </>
-  );
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
+            if (!firebaseUser) {
+                router.push('/login');
+                return;
+            }
+            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+            if (userDoc.exists()) {
+                const data = userDoc.data() as UserData & { companyId?: string };
+                if (data.role !== 'admin') {
+                    router.push('/login');
+                    return;
+                }
+                setUser({ name: data.name, email: data.email, role: data.role });
+                setCompanyId(data.companyId);
+            } else {
+                router.push('/login');
+            }
+            setLoading(false);
+        });
+        return () => unsubscribe();
+    }, [router]);
 
-  return (
-    <DashboardLayout sidebar={sidebarContent}>
-        <TrialNotification />
-        {children}
-    </DashboardLayout>
-  );
+    const handleLogout = async () => {
+        await signOut(auth);
+        router.push('/login');
+    };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    const sidebarContent = (
+        <>
+            <SidebarHeader>
+                <div className="flex items-center gap-2 has-[[data-state=collapsed]]:-ml-1 has-[[data-state=collapsed]]:justify-center">
+                    <Logo />
+                    <span className="font-headline text-xl font-bold text-foreground group-data-[state=collapsed]:hidden">Boldfy</span>
+                </div>
+            </SidebarHeader>
+            <SidebarContent>
+                <AdminSidebarNav />
+            </SidebarContent>
+            <SidebarFooter>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="w-full justify-start gap-2 px-2">
+                            <Avatar className="h-8 w-8">
+                                <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                    {user?.name?.substring(0, 2).toUpperCase() || 'AD'}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col items-start group-data-[state=collapsed]:hidden">
+                                <span className="text-sm font-medium">{user?.name || ''}</span>
+                                <span className="text-xs text-muted-foreground">{user?.role || ''}</span>
+                            </div>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuLabel>
+                            <div className="flex flex-col">
+                                <span>{user?.name || ''}</span>
+                                <p className="text-xs leading-none text-muted-foreground">
+                                    {user?.email || ''}
+                                </p>
+                            </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                            <Link href="/admin/configuracoes">
+                                <UserIcon className="mr-2 h-4 w-4" />
+                                <span>Configurações</span>
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout}>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Sair
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </SidebarFooter>
+        </>
+    );
+
+    return (
+        <DashboardLayout sidebar={sidebarContent}>
+            <TrialNotification companyId={companyId} />
+            {children}
+        </DashboardLayout>
+    );
 }
+
