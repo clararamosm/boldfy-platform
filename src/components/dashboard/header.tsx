@@ -2,7 +2,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar"
 import type React from 'react';
 
 type HeaderProps = {
-  title: string;
+  title?: string;
   children?: React.ReactNode;
   action?: React.ReactNode;
 }
