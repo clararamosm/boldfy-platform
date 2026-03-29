@@ -14,16 +14,18 @@ if (!admin.apps.length) {
             admin.initializeApp({
                 credential: admin.credential.cert(serviceAccount),
             });
-            db = admin.firestore();
-            auth = admin.auth();
         } catch (error) {
             console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY or initialize Firebase Admin SDK", error);
         }
     } else {
-        console.warn("FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase Admin SDK not initialized.");
+        // Use Application Default Credentials (ADC) - works on Firebase App Hosting
+        console.log("FIREBASE_SERVICE_ACCOUNT_KEY not set. Using Application Default Credentials (ADC).");
+        admin.initializeApp();
     }
-} else {
-    // If already initialized, get the instances
+}
+
+// Get instances (whether initialized with service account key or ADC)
+if (admin.apps.length) {
     db = admin.firestore();
     auth = admin.auth();
 }
