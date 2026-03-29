@@ -2,22 +2,20 @@
 'use server';
 
 import { z } from 'zod';
-import { doc, getDoc, addDoc, collection, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { auth as adminAuth } from '@/lib/firebase-admin';
+import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 // ---- AI Content Alignment Action ----
 
 async function getCompanyProfile(companyId: string): Promise<string> {
-  const companyDocRef = doc(db, "companies", companyId);
-  const companyDocSnap = await getDoc(companyDocRef);
+  const companyDocSnap = await adminDb.collection("companies").doc(companyId).get();
 
-  if (companyDocSnap.exists()) {
+  if (companyDocSnap.exists) {
     const data = companyDocSnap.data();
-    const branding = data.branding;
+    const branding = data?.branding;
     if (branding) {
       return `
-        Company Name: ${data.companyName || 'N/A'}
+        Company Name: ${data?.companyName || 'N/A'}
         Tagline: ${branding.tagline || 'N/A'}
         Target Audience: ${branding.audience || 'N/A'}
         Tone of Voice: ${branding.tone || 'N/A'}
@@ -29,12 +27,11 @@ async function getCompanyProfile(companyId: string): Promise<string> {
 }
 
 async function getPersonalBranding(userId: string): Promise<string> {
-  const userDocRef = doc(db, "users", userId);
-  const userDocSnap = await getDoc(userDocRef);
+  const userDocSnap = await adminDb.collection("users").doc(userId).get();
 
-  if (userDocSnap.exists()) {
+  if (userDocSnap.exists) {
     const data = userDocSnap.data();
-    const personalBranding = data.personalBranding;
+    const personalBranding = data?.personalBranding;
     if (personalBranding) {
       return `
         Voice Style: ${personalBranding.voice || 'N/A'}
@@ -87,7 +84,6 @@ export async function handleAlignContent(
     const companyProfile = await getCompanyProfile(companyId);
     const personalBranding = await getPersonalBranding(userId);
 
-    // Call our Claude API route instead of Genkit
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const response = await fetch(`${baseUrl}/api/ai/generate`, {
       method: 'POST',
@@ -148,7 +144,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
 
   try {
     // 1. Create Company document in Firestore
-    const companyRef = await addDoc(collection(db, "companies"), {
+    const companyRef = await adminDb.collection("companies").add({
       companyName: companyName,
       branding: { tagline: '', audience: '', tone: '', messages: '' },
       subscription: {
@@ -158,7 +154,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
         usedLicenses: 1,
         trialEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       },
-      createdAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
     const companyId = companyRef.id;
 
@@ -170,14 +166,13 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     });
 
     // 3. Create User document in Firestore
-    const userDocRef = doc(db, "users", userRecord.uid);
-    await setDoc(userDocRef, {
+    await adminDb.collection("users").doc(userRecord.uid).set({
       role: 'admin',
       companyId: companyId,
       companyName: companyName,
       points: 0,
       profile: { name: adminName, email: adminEmail },
-      createdAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
 
     return { success: true };
@@ -235,20 +230,19 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     }
 
     // 2. Create User document in Firestore
-    const companyDocSnap = await getDoc(doc(db, "companies", companyId));
-    if (!companyDocSnap.exists()) {
+    const companyDocSnap = await adminDb.collection("companies").doc(companyId).get();
+    if (!companyDocSnap.exists) {
       throw new Error("Empresa não encontrada.");
     }
 
-    const userDocRef = doc(db, "users", userRecord.uid);
-    await setDoc(userDocRef, {
+    await adminDb.collection("users").doc(userRecord.uid).set({
       role: 'influencer',
       companyId: companyId,
       companyName: companyDocSnap.data()?.companyName || '',
       points: 0,
-      status: 'Pendente' as const, // User is pending until they set a password
+      status: 'Pendente' as const,
       profile: { name, email },
-      createdAt: serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
 
     // You would typically send a password reset/invitation email here
