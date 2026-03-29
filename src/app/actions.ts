@@ -236,7 +236,7 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     }
 
     await adminDb.collection("users").doc(userRecord.uid).set({
-      role: 'influencer',
+      role: 'colaborador',
       companyId: companyId,
       companyName: companyDocSnap.data()?.companyName || '',
       points: 0,
