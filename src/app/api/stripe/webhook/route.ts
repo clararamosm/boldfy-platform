@@ -66,7 +66,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
 export async function POST(req: NextRequest) {
     const buf = await req.text();
-    const sig = headers().get('stripe-signature')!;
+    const sig = (await headers()).get('stripe-signature')!;
 
     let event: Stripe.Event;
 
