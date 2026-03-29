@@ -36,7 +36,7 @@ export default function InfluencerLayout({ children }: { children: React.ReactNo
             const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data() as UserData;
-                if (data.role !== 'influencer') {
+                if (data.role !== 'colaborador') {
                     router.push('/login');
                     return;
                 }
