@@ -6,7 +6,7 @@ import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { SidebarHeader, SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
-import { Logo } from "@/components/logo";
+import Logo from "@/components/logo";
 import { InfluencerSidebarNav } from "@/components/dashboard/influencer-sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
