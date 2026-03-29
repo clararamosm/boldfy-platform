@@ -177,10 +177,10 @@ export default function AdminTrilhasPage() {
                                         <Zap className="h-3 w-3 mr-1"/>
                                         {trail.points}
                                     </Badge>
-                                    {trail.bonus > 0 && (
+                                    {(trail.bonus ?? 0) > 0 && (
                                     <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
                                         <Star className="h-3 w-3 mr-1"/>
-                                        {trail.bonus}
+                                        {trail.bonus ?? 0}
                                     </Badge>
                                     )}
                                 </div>
@@ -239,7 +239,7 @@ export default function AdminTrilhasPage() {
                                     <Zap className="h-3 w-3 mr-1"/>
                                     {trail.points}
                                 </Badge>
-                                {trail.bonus > 0 && (
+                                {(trail.bonus ?? 0) > 0 && (
                                 <Badge variant="secondary" className="bg-yellow-400/10 text-yellow-500 hover:bg-yellow-400/20">
                                     <Star className="h-3 w-3 mr-1"/>
                                 </Badge>
