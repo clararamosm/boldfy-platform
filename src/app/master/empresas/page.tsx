@@ -4,13 +4,13 @@
 import React, { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, updateDoc, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, updateDoc, orderBy, query, where } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, LogIn, Loader2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, LogIn, Loader2, Pencil, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -60,6 +60,12 @@ export default function MasterEmpresasPage() {
     const [seatCounts, setSeatCounts] = useState<Record<string, number>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+    const [editCompanyName, setEditCompanyName] = useState("");
+    const [editLicenses, setEditLicenses] = useState(0);
+    const [isEditCompanyOpen, setIsEditCompanyOpen] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [confirmDeleteName, setConfirmDeleteName] = useState("");
     const formRef = useRef<HTMLFormElement>(null);
 
     const [inviteState, formAction] = useActionState(inviteAdmin, { error: undefined, success: undefined });
@@ -146,6 +152,53 @@ export default function MasterEmpresasPage() {
         }
     };
 
+  const handleEditCompanyOpen = (company: Company) => {
+    setEditingCompany(company);
+    setEditCompanyName(company.companyName);
+    setEditLicenses(company.licenses);
+    setIsEditCompanyOpen(true);
+  };
+
+  const handleSaveCompanyEdit = async () => {
+    if (!editingCompany) return;
+    try {
+      await updateDoc(doc(db, "companies", editingCompany.id), {
+        companyName: editCompanyName,
+        licenses: editLicenses,
+      });
+      toast({ title: "Empresa atualizada com sucesso!" });
+      setIsEditCompanyOpen(false);
+      setEditingCompany(null);
+      fetchCompanies();
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro ao atualizar empresa." });
+    }
+  };
+
+  const handleDeleteCompanyConfirm = (company: Company) => {
+    setConfirmDeleteId(company.id);
+    setConfirmDeleteName(company.companyName);
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!confirmDeleteId) return;
+    try {
+      // Delete all users belonging to this company
+      const usersQuery = query(collection(db, "users"), where("companyId", "==", confirmDeleteId));
+      const usersSnap = await getDocs(usersQuery);
+      const deletePromises = usersSnap.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+      // Delete the company document
+      await deleteDoc(doc(db, "companies", confirmDeleteId));
+      toast({ title: "Empresa excluída com sucesso!" });
+      setConfirmDeleteId(null);
+      setConfirmDeleteName("");
+      fetchCompanies();
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro ao excluir empresa." });
+    }
+  };
+
   return (
     <>
       <Header title="Empresas" />
@@ -220,6 +273,14 @@ export default function MasterEmpresasPage() {
                                                 <DropdownMenuItem onClick={() => handleToggleStatus(company)}>
                                                     {company.status === 'Ativa' ? 'Desativar' : 'Ativar'}
                                                 </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleEditCompanyOpen(company)}>
+                                                  <Pencil className="mr-2 h-4 w-4" />
+                                                  Editar Empresa
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteCompanyConfirm(company)}>
+                                                  <Trash2 className="mr-2 h-4 w-4" />
+                                                  Excluir Empresa
+                                                </DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
@@ -230,6 +291,54 @@ export default function MasterEmpresasPage() {
                 </Table>
             </CardContent>
         </Card>
+      {/* Edit Company Dialog */}
+      <ActionDialog
+        open={isEditCompanyOpen}
+        onOpenChange={setIsEditCompanyOpen}
+        title="Editar Empresa"
+        description="Altere o nome e as licenças da empresa."
+      >
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="editCompanyName">Nome da Empresa</Label>
+            <Input
+              id="editCompanyName"
+              value={editCompanyName}
+              onChange={(e) => setEditCompanyName(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="editLicenses">Licenças</Label>
+            <Input
+              id="editLicenses"
+              type="number"
+              min={1}
+              value={editLicenses}
+              onChange={(e) => setEditLicenses(Number(e.target.value))}
+            />
+          </div>
+          <Button onClick={handleSaveCompanyEdit} className="w-full">
+            Salvar Alterações
+          </Button>
+        </div>
+      </ActionDialog>
+
+      {/* Confirm Delete Dialog */}
+      <ActionDialog
+        open={!!confirmDeleteId}
+        onOpenChange={(open) => { if (!open) { setConfirmDeleteId(null); setConfirmDeleteName(""); } }}
+        title="Excluir Empresa"
+        description={`Tem certeza que deseja excluir a empresa "${confirmDeleteName}"? Todos os usuários vinculados também serão removidos. Esta ação não pode ser desfeita.`}
+      >
+        <div className="flex gap-2 justify-end pt-4">
+          <Button variant="outline" onClick={() => { setConfirmDeleteId(null); setConfirmDeleteName(""); }}>
+            Cancelar
+          </Button>
+          <Button variant="destructive" onClick={handleDeleteCompany}>
+            Excluir
+          </Button>
+        </div>
+      </ActionDialog>
       </main>
     </>
   );
