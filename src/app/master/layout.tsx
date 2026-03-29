@@ -6,7 +6,7 @@ import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { SidebarContent, SidebarFooter, SidebarHeader, SidebarTrigger } from "@/components/ui/sidebar";
-import { Logo } from "@/components/logo";
+import Logo from "@/components/logo";
 import { MasterSidebarNav } from "@/components/dashboard/master-sidebar-nav";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
@@ -117,4 +117,3 @@ export default function MasterLayout({ children }: { children: React.ReactNode }
     </DashboardLayout>
   );
 }
-
