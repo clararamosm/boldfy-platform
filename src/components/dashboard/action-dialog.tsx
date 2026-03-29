@@ -22,7 +22,7 @@ type ActionDialogProps = {
   title: string;
   description?: string;
   children: React.ReactNode;
-  actionText: string;
+  actionText?: string;
   onAction?: () => void;
   showCancel?: boolean;
   className?: string;
