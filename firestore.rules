@@ -52,7 +52,7 @@ service cloud.firestore {
                          
         // Influencers can only read data from subcollections (e.g., view assets)
         allow read: if request.auth != null 
-                    && hasRole(request.auth.uid, 'influencer') && getCompanyId(request.auth.uid) == companyId;
+                    && hasRole(request.auth.uid, 'colaborador') && getCompanyId(request.auth.uid) == companyId;
       }
     }
   }
