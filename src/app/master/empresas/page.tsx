@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, updateDoc, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, orderBy, query, where } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,6 +57,7 @@ function CompanyFormContent() {
 export default function MasterEmpresasPage() {
     const { toast } = useToast();
     const [companies, setCompanies] = useState<Company[]>([]);
+    const [seatCounts, setSeatCounts] = useState<Record<string, number>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
@@ -70,6 +71,18 @@ export default function MasterEmpresasPage() {
             const querySnapshot = await getDocs(query(companiesQuery, orderBy("createdAt", "desc")));
             const companiesList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
             setCompanies(companiesList);
+
+            // Fetch seat counts for each company
+            const counts: Record<string, number> = {};
+            for (const comp of companiesList) {
+                const usersQuery = query(
+                    collection(db, "users"),
+                    where("companyId", "==", comp.id)
+                );
+                const usersSnap = await getDocs(usersQuery);
+                counts[comp.id] = usersSnap.size;
+            }
+            setSeatCounts(counts);
         } catch (error) {
             console.error("Error fetching companies:", error);
             toast({ variant: 'destructive', title: 'Erro ao buscar empresas' });
@@ -188,7 +201,7 @@ export default function MasterEmpresasPage() {
                                 <TableRow key={company.id} className={(company.status !== 'Ativa' && company.status !== 'Trial') ? 'text-muted-foreground' : ''}>
                                     <TableCell className="font-medium">{company.companyName}</TableCell>
                                     <TableCell>{getStatusBadge(company.status)}</TableCell>
-                                    <TableCell>0 / {company.licenses}</TableCell>
+                                    <TableCell>{seatCounts[company.id] || 0} / {company.licenses}</TableCell>
                                     <TableCell>{company.adminProfile?.email}</TableCell>
                                     <TableCell>{company.createdAt?.toDate ? format(company.createdAt.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                     <TableCell>
