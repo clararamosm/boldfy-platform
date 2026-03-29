@@ -26,21 +26,18 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
-
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const userRole = userData.role;
-if (userRole === 'master') { router.push('/master/empresas'); }
-else if (userRole === 'admin') { router.push('/admin/dashboard'); }
-else if (userRole === 'colaborador') { router.push('/influencer/dashboard'); }
-else { setError('Perfil de usuário não reconhecido.'); setLoading(false); return; }
-        }
+        if (userRole === 'master') { router.push('/master/empresas'); }
+        else if (userRole === 'admin') { router.push('/admin/dashboard'); }
+        else if (userRole === 'colaborador') { router.push('/influencer/dashboard'); }
+        else { setError('Perfil de usuário não reconhecido.'); setLoading(false); return; }
       } else {
         setError('Perfil de usuário não reconhecido.');
         setLoading(false);
@@ -67,7 +64,6 @@ else { setError('Perfil de usuário não reconhecido.'); setLoading(false); retu
     setError('');
     setResetSuccess(false);
     setResetLoading(true);
-
     try {
       await sendPasswordResetEmail(auth, email);
       setResetSuccess(true);
@@ -91,22 +87,16 @@ else { setError('Perfil de usuário não reconhecido.'); setLoading(false); retu
     }
   };
 
-  const switchToForgotPassword = () => {
-    setMode('forgotPassword');
-    setError('');
-    setResetSuccess(false);
-  };
-
-  const switchToLogin = () => {
-    setMode('login');
-    setError('');
-    setResetSuccess(false);
-  };
+  const switchToForgotPassword = () => { setMode('forgotPassword'); setError(''); setResetSuccess(false); };
+  const switchToLogin = () => { setMode('login'); setError(''); setResetSuccess(false); };
 
   return (
-    <div className="mx-auto mb-4">
-  <LogoFull height={48} />
-</div>      
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4">
+            <LogoFull height={48} />
+          </div>
           <CardTitle className="text-2xl">
             {mode === 'login' ? 'Bem-vindo de volta' : 'Recuperar senha'}
           </CardTitle>
@@ -121,44 +111,17 @@ else { setError('Perfil de usuário não reconhecido.'); setLoading(false); retu
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
-              {error && (
-                <div className="text-sm text-red-500 text-center">{error}</div>
-              )}
+              {error && (<div className="text-sm text-red-500 text-center">{error}</div>)}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Entrando...
-                  </>
-                ) : (
-                  'Entrar'
-                )}
+                {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Entrando...</>) : ('Entrar')}
               </Button>
-              <button
-                type="button"
-                onClick={switchToForgotPassword}
-                className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
-              >
+              <button type="button" onClick={switchToForgotPassword} className="w-full text-sm text-muted-foreground hover:text-primary transition-colors">
                 Esqueci minha senha
               </button>
             </form>
@@ -166,38 +129,18 @@ else { setError('Perfil de usuário não reconhecido.'); setLoading(false); retu
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="reset-email">Email</Label>
-                <Input
-                  id="reset-email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+                <Input id="reset-email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
-              {error && (
-                <div className="text-sm text-red-500 text-center">{error}</div>
-              )}
+              {error && (<div className="text-sm text-red-500 text-center">{error}</div>)}
               {resetSuccess && (
                 <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
                   Email de recuperação enviado! Verifique sua caixa de entrada e a pasta de spam.
                 </div>
               )}
               <Button type="submit" className="w-full" disabled={resetLoading}>
-                {resetLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  'Enviar link de recuperação'
-                )}
+                {resetLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Enviando...</>) : ('Enviar link de recuperação')}
               </Button>
-              <button
-                type="button"
-                onClick={switchToLogin}
-                className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
-              >
+              <button type="button" onClick={switchToLogin} className="w-full text-sm text-muted-foreground hover:text-primary transition-colors">
                 Voltar para o login
               </button>
             </form>
