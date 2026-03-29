@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import { LogoFull } from '@/components/logo';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -103,34 +104,9 @@ else { setError('Perfil de usuário não reconhecido.'); setLoading(false); retu
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 200 60"
-              className="h-12 w-auto mx-auto"
-            >
-              <defs>
-                <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#7C3AED" />
-                  <stop offset="100%" stopColor="#2563EB" />
-                </linearGradient>
-              </defs>
-              <text
-                x="100"
-                y="42"
-                fontFamily="system-ui, -apple-system, sans-serif"
-                fontSize="36"
-                fontWeight="bold"
-                fill="url(#logoGradient)"
-                textAnchor="middle"
-              >
-                Boldfy
-              </text>
-            </svg>
-          </div>
+    <div className="mx-auto mb-4">
+  <LogoFull height={48} />
+</div>      
           <CardTitle className="text-2xl">
             {mode === 'login' ? 'Bem-vindo de volta' : 'Recuperar senha'}
           </CardTitle>
