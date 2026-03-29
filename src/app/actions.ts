@@ -146,6 +146,9 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     // 1. Create Company document in Firestore
     const companyRef = await adminDb.collection("companies").add({
       companyName: companyName,
+      status: 'Ativa',
+      licenses: licenses,
+      adminProfile: { email: adminEmail, name: adminName },
       branding: { tagline: '', audience: '', tone: '', messages: '' },
       subscription: {
         plan: 'trial',
