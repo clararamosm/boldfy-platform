@@ -84,7 +84,7 @@ export default function AdminColaboradoresPage() {
         setTotalLicenses(companyDocSnap.data().licenses || 0);
       }
 
-      const collaboratorsQuery = query(collection(db, "users"), where("companyId", "==", currentCompanyId), where("role", "==", "influencer"));
+      const collaboratorsQuery = query(collection(db, "users"), where("companyId", "==", currentCompanyId), where("role", "==", "colaborador"));
       const querySnapshot = await getDocs(collaboratorsQuery);
       const fetchedCollaborators = querySnapshot.docs.map(doc => {
         const data = doc.data();
