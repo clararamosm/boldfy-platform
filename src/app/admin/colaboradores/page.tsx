@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useActionState, useRef } from 
 import { useFormStatus } from 'react-dom';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, where, updateDoc, deleteDoc } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,6 +69,12 @@ export default function AdminColaboradoresPage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [totalLicenses, setTotalLicenses] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCollaborator, setEditingCollaborator] = useState<Collaborator | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteName, setConfirmDeleteName] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -169,6 +175,75 @@ export default function AdminColaboradoresPage() {
     return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
   };
 
+
+  // --- CRUD Handler Functions ---
+  const refreshCollaborators = async () => {
+    if (!companyId) return;
+    const q = query(
+      collection(db, "users"),
+      where("companyId", "==", companyId),
+      where("role", "==", "colaborador")
+    );
+    const snapshot = await getDocs(q);
+    const collabList = snapshot.docs.map(d => ({
+      id: d.id,
+      ...d.data()
+    })) as Collaborator[];
+    setCollaborators(collabList);
+  };
+
+  const handleEditOpen = (collab: Collaborator) => {
+    setEditingCollaborator(collab);
+    setEditName(collab.name);
+    setEditEmail(collab.email);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingCollaborator) return;
+    try {
+      await updateDoc(doc(db, "users", editingCollaborator.id), {
+        name: editName,
+        email: editEmail,
+      });
+      toast({ title: "Colaborador atualizado com sucesso!" });
+      setIsEditDialogOpen(false);
+      setEditingCollaborator(null);
+      await refreshCollaborators();
+    } catch (error) {
+      toast({ title: "Erro ao atualizar colaborador", variant: "destructive" });
+    }
+  };
+
+  const handleToggleStatus = async (collab: Collaborator) => {
+    const newStatus = collab.status === "Ativo" ? "Inativo" : "Ativo";
+    try {
+      await updateDoc(doc(db, "users", collab.id), { status: newStatus });
+      toast({ title: `Colaborador ${newStatus === "Ativo" ? "ativado" : "desativado"} com sucesso!` });
+      await refreshCollaborators();
+    } catch (error) {
+      toast({ title: "Erro ao alterar status", variant: "destructive" });
+    }
+  };
+
+  const handleRemoveConfirm = (collab: Collaborator) => {
+    setConfirmDeleteId(collab.id);
+    setConfirmDeleteName(collab.name);
+  };
+
+  const handleRemoveCollaborator = async () => {
+    if (!confirmDeleteId) return;
+    try {
+      await deleteDoc(doc(db, "users", confirmDeleteId));
+      toast({ title: "Colaborador removido com sucesso!" });
+      setConfirmDeleteId(null);
+      setConfirmDeleteName("");
+      await refreshCollaborators();
+    } catch (error) {
+      toast({ title: "Erro ao remover colaborador", variant: "destructive" });
+    }
+  };
+
   return (
     <>
       <Header title="Colaboradores" action={
@@ -251,10 +326,11 @@ export default function AdminColaboradoresPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditOpen(user)}>Editar</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">Desativar</DropdownMenuItem>
-                          </DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => handleToggleStatus(user)}>{user.status === "Ativo" ? "Desativar" : "Ativar"}</DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive" onClick={() => handleRemoveConfirm(user)}>Remover</DropdownMenuItem>
+                    </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
@@ -264,6 +340,39 @@ export default function AdminColaboradoresPage() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Edit Collaborator Dialog */}
+        <ActionDialog
+          isOpen={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          title="Editar Colaborador"
+          description="Atualize os dados do colaborador."
+        >
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="editName">Nome</Label>
+              <Input id="editName" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="editEmail">Email</Label>
+              <Input id="editEmail" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+            </div>
+            <Button onClick={handleSaveEdit} className="w-full">Salvar</Button>
+          </div>
+        </ActionDialog>
+
+        {/* Confirm Delete Dialog */}
+        <ActionDialog
+          isOpen={!!confirmDeleteId}
+          onOpenChange={(open) => { if (!open) { setConfirmDeleteId(null); setConfirmDeleteName(""); } }}
+          title="Remover Colaborador"
+          description={`Tem certeza que deseja remover ${confirmDeleteName}? Esta ação não pode ser desfeita.`}
+        >
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => { setConfirmDeleteId(null); setConfirmDeleteName(""); }}>Cancelar</Button>
+            <Button variant="destructive" onClick={handleRemoveCollaborator}>Remover</Button>
+          </div>
+        </ActionDialog>
       </main>
     </>
   );
