@@ -37,7 +37,7 @@ const MissionCard = ({ name, description, points, status, startDate, endDate }: 
     const uploadForm = (
         <div className="space-y-2">
             <Label htmlFor="submission-file" className="sr-only">Arquivo</Label>
-            <Input id="submission-file" type="file" accept="image/*,video/*,.pdf" onChange={(e) => setFileUploaded(e.target.files.length > 0)} />
+            <Input id="submission-file" type="file" accept="image/*,video/*,.pdf" onChange={(e) => setFileUploaded((e.target.files?.length ?? 0) > 0)} />
             <p className="text-xs text-muted-foreground pt-1">Envie uma imagem, vídeo ou PDF como comprovação.</p>
         </div>
     );
