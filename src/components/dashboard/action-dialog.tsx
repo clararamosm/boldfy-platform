@@ -99,9 +99,11 @@ export function ActionDialog({
           {showCancel && <DialogClose asChild><Button variant="outline">Cancelar</Button></DialogClose>}
           {secondaryAction}
           {onAction && !formId && <Button onClick={onAction}>{actionText}</Button>}
-          {formId && <Button type="submit" form={formId}>{actionText}</Button>}
+          {formId && onAction && <Button type="button" onClick={onAction}>{actionText}</Button>}
+          {formId && !onAction && <Button type="submit" form={formId}>{actionText}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
