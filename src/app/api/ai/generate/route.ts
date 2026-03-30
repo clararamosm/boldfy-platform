@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ai } from "@/ai/genkit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,14 +10,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Content is required" },
         { status: 400 }
-      );
-    }
-
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "API key not configured" },
-        { status: 500 }
       );
     }
 
@@ -55,42 +48,19 @@ Rules:
 - Write in the same language as the original content
 - Return ONLY the aligned content, no explanations or metadata`;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: `Please align the following content with the brand voice:\n\n${content}`,
-          },
-        ],
-      }),
+    const { text } = await ai.generate({
+      system: systemPrompt,
+      prompt: `Please align the following content with the brand voice:\n\n${content}`,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error("Claude API error:", errorData);
+    if (!text) {
       return NextResponse.json(
         { error: "Failed to generate content" },
-        { status: response.status }
+        { status: 500 }
       );
     }
 
-    const data = await response.json();
-    const alignedContent =
-      data.content?.[0]?.type === "text"
-        ? data.content[0].text
-        : "Failed to extract content from response";
-
-    return NextResponse.json({ alignedContent });
+    return NextResponse.json({ alignedContent: text });
   } catch (error) {
     console.error("AI Generate error:", error);
     return NextResponse.json(
