@@ -4,6 +4,58 @@
 import { z } from 'zod';
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import nodemailer from 'nodemailer';
+
+// ---- Email Invitation Helper ----
+
+async function sendInvitationEmail({ to, name, companyName, role, resetLink }: {
+  to: string;
+  name: string;
+  companyName: string;
+  role: string;
+  resetLink: string;
+}) {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.SMTP_EMAIL,
+      pass: process.env.SMTP_PASSWORD,
+    },
+  });
+
+  const appUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://boldfy-platform--boldfy-app.us-central1.hosted.app';
+
+  await transporter.sendMail({
+    from: `"Boldfy" <${process.env.SMTP_EMAIL}>`,
+    to,
+    subject: `Você foi convidado para a ${companyName} na Boldfy!`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <h1 style="color: #7C3AED; margin: 0;">Boldfy</h1>
+          <p style="color: #6B7280; margin-top: 5px;">Plataforma de Gamificação para Colaboradores</p>
+        </div>
+        <h2 style="color: #1F2937;">Olá, ${name}!</h2>
+        <p style="color: #4B5563; line-height: 1.6;">
+          Você foi convidado como <strong>${role}</strong> na empresa <strong>${companyName}</strong> 
+          na plataforma Boldfy.
+        </p>
+        <p style="color: #4B5563; line-height: 1.6;">
+          Para começar, clique no botão abaixo para criar sua senha e acessar sua conta:
+        </p>
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${resetLink}" 
+             style="background-color: #7C3AED; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+            Criar Minha Senha e Acessar
+          </a>
+        </div>
+        <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin-top: 30px;">
+          Se você não esperava este convite, pode ignorar este e-mail com segurança.
+        </p>
+      </div>
+    `,
+  });
+}
 
 // ---- AI Content Alignment Action ----
 
@@ -178,6 +230,16 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    // 4. Generate password reset link and send invitation email
+    const resetLink = await adminAuth.generatePasswordResetLink(adminEmail);
+    await sendInvitationEmail({
+      to: adminEmail,
+      name: adminName,
+      companyName: companyName,
+      role: 'Administrador',
+      resetLink,
+    });
+
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
@@ -248,8 +310,15 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // You would typically send a password reset/invitation email here
-    // await adminAuth.generatePasswordResetLink(email);
+    // Generate password reset link and send invitation email
+    const resetLink = await adminAuth.generatePasswordResetLink(email);
+    await sendInvitationEmail({
+      to: email,
+      name: name,
+      companyName: companyDocSnap.data()?.companyName || '',
+      role: 'Colaborador',
+      resetLink,
+    });
 
     return { success: true };
   } catch (error) {
