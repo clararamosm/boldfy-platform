@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, deleteDoc, doc, updateDoc, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, updateDoc, orderBy, query, where, writeBatch } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -183,19 +183,32 @@ export default function MasterEmpresasPage() {
   const handleDeleteCompany = async () => {
     if (!confirmDeleteId) return;
     try {
+      const batch = writeBatch(db);
+      const companyRef = doc(db, "companies", confirmDeleteId);
+
+      // Delete all subcollections of this company
+      const subcollections = ["rewards", "missions", "trilhas", "assets"];
+      for (const sub of subcollections) {
+        const subSnap = await getDocs(collection(companyRef, sub));
+        subSnap.docs.forEach(d => batch.delete(d.ref));
+      }
+
       // Delete all users belonging to this company
       const usersQuery = query(collection(db, "users"), where("companyId", "==", confirmDeleteId));
       const usersSnap = await getDocs(usersQuery);
-      const deletePromises = usersSnap.docs.map(d => deleteDoc(d.ref));
-      await Promise.all(deletePromises);
-      // Delete the company document
-      await deleteDoc(doc(db, "companies", confirmDeleteId));
-      toast({ title: "Empresa excluída com sucesso!" });
+      usersSnap.docs.forEach(d => batch.delete(d.ref));
+
+      // Delete the company document itself
+      batch.delete(companyRef);
+
+      await batch.commit();
+      toast({ title: "Empresa e todos os dados excluídos com sucesso!" });
       setConfirmDeleteId(null);
       setConfirmDeleteName("");
       fetchCompanies();
     } catch (error) {
-      toast({ variant: "destructive", title: "Erro ao excluir empresa." });
+      console.error("Error deleting company:", error);
+      toast({ variant: "destructive", title: "Erro ao excluir empresa e seus dados." });
     }
   };
 
@@ -328,7 +341,7 @@ export default function MasterEmpresasPage() {
         open={!!confirmDeleteId}
         onOpenChange={(open) => { if (!open) { setConfirmDeleteId(null); setConfirmDeleteName(""); } }}
         title="Excluir Empresa"
-        description={`Tem certeza que deseja excluir a empresa "${confirmDeleteName}"? Todos os usuários vinculados também serão removidos. Esta ação não pode ser desfeita.`}
+        description={`Tem certeza que deseja excluir a empresa "${confirmDeleteName}"? TODOS os dados serão permanentemente removidos: recompensas, missões, trilhas, biblioteca e usuários vinculados. Esta ação não pode ser desfeita.`}
       >
         <div className="flex gap-2 justify-end pt-4">
           <Button variant="outline" onClick={() => { setConfirmDeleteId(null); setConfirmDeleteName(""); }}>
