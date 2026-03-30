@@ -185,10 +185,18 @@ export default function AdminColaboradoresPage() {
       where("role", "==", "colaborador")
     );
     const snapshot = await getDocs(q);
-    const collabList = snapshot.docs.map(d => ({
-      id: d.id,
-      ...d.data()
-    })) as Collaborator[];
+    const collabList = snapshot.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        name: data.profile?.name || '',
+        email: data.profile?.email || '',
+        points: data.points || 0,
+        status: data.status || 'Pendente',
+        createdAt: data.createdAt?.toDate(),
+        avatarUrl: data.profile?.avatarUrl
+      };
+    }) as Collaborator[];
     setCollaborators(collabList);
   };
 
@@ -203,8 +211,8 @@ export default function AdminColaboradoresPage() {
     if (!editingCollaborator) return;
     try {
       await updateDoc(doc(db, "users", editingCollaborator.id), {
-        name: editName,
-        email: editEmail,
+        'profile.name': editName,
+        'profile.email': editEmail,
       });
       toast({ title: "Colaborador atualizado com sucesso!" });
       setIsEditDialogOpen(false);
@@ -343,7 +351,7 @@ export default function AdminColaboradoresPage() {
 
         {/* Edit Collaborator Dialog */}
         <ActionDialog
-          isOpen={isEditDialogOpen}
+          open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
           title="Editar Colaborador"
           description="Atualize os dados do colaborador."
@@ -363,7 +371,7 @@ export default function AdminColaboradoresPage() {
 
         {/* Confirm Delete Dialog */}
         <ActionDialog
-          isOpen={!!confirmDeleteId}
+          open={!!confirmDeleteId}
           onOpenChange={(open) => { if (!open) { setConfirmDeleteId(null); setConfirmDeleteName(""); } }}
           title="Remover Colaborador"
           description={`Tem certeza que deseja remover ${confirmDeleteName}? Esta ação não pode ser desfeita.`}
