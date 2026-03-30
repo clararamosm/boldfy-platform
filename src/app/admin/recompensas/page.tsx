@@ -268,7 +268,7 @@ export default function AdminRecompensasPage() {
               description="Cadastre uma nova recompensa na loja para seus colaboradores."
               trigger={addRewardButton}
               actionText={isSubmitting ? "Salvando..." : "Salvar Recompensa"}
-              onAction={() => formRef.current?.requestSubmit()}
+              onAction={() => handleAction()}
               formId="reward-form"
               open={isDialogOpen}
               onOpenChange={setIsDialogOpen}
@@ -396,3 +396,4 @@ export default function AdminRecompensasPage() {
     </>
   );
 }
+f
