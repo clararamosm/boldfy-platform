@@ -11,3 +11,7 @@ env:
     value: AIzaSyCMsKoPYaIZsSv_xzAJ0ymWNqECgLDVxiE
   - variable: NEXT_PUBLIC_BASE_URL
     value: https://boldfy-platform--boldfy-app.us-central1.hosted.app
+  - variable: SMTP_EMAIL
+    secret: SMTP_EMAIL
+  - variable: SMTP_PASSWORD
+    secret: SMTP_PASSWORD
