@@ -9,3 +9,5 @@ runConfig:
 env:
   - variable: GOOGLE_GENAI_API_KEY
     value: AIzaSyCMsKoPYaIZsSv_xzAJ0ymWNqECgLDVxiE
+  - variable: NEXT_PUBLIC_BASE_URL
+    value: https://boldfy-platform--boldfy-app.us-central1.hosted.app
