@@ -1,7 +1,7 @@
 'use client';
 
 import type React from "react";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -12,9 +12,9 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User as UserIcon, AlertTriangle, Sparkles, Loader2 } from "lucide-react";
+import { LogOut, User as UserIcon, AlertTriangle, Sparkles, Loader2, ArrowLeft, Shield } from "lucide-react";
 import { differenceInDays, parseISO } from 'date-fns';
 
 type CompanyStatus = 'Ativa' | 'Inativa' | 'Trial';
@@ -70,11 +70,14 @@ const TrialNotification = ({ companyId }: { companyId: string | undefined }) => 
     );
 };
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
     const [companyId, setCompanyId] = useState<string | undefined>(undefined);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const [isMaster, setIsMaster] = useState(false);
+    const [masterCompanyName, setMasterCompanyName] = useState('');
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
@@ -85,19 +88,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data() as UserData & { companyId?: string };
-                if (data.role !== 'admin') {
+                if (data.role !== 'admin' && data.role !== 'master') {
                     router.push('/login');
                     return;
                 }
                 setUser({ name: data.name, email: data.email, role: data.role });
-                setCompanyId(data.companyId);
+                // Master: usar companyId da URL; Admin: usar do doc
+                if (data.role === 'master') {
+                    const urlCompanyId = searchParams.get('companyId');
+                    if (urlCompanyId) {
+                        setCompanyId(urlCompanyId);
+                        setIsMaster(true);
+                        // Buscar nome da empresa para o banner
+                        const compDoc = await getDoc(doc(db, 'companies', urlCompanyId));
+                        if (compDoc.exists()) {
+                            setMasterCompanyName(compDoc.data().companyName || '');
+                        }
+                    } else {
+                        router.push('/master/empresas');
+                        return;
+                    }
+                } else {
+                    setCompanyId(data.companyId);
+                }
             } else {
                 router.push('/login');
             }
             setLoading(false);
         });
         return () => unsubscribe();
-    }, [router]);
+    }, [router, searchParams]);
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -167,9 +187,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     return (
         <DashboardLayout sidebar={sidebarContent}>
+            {isMaster && (
+              <div className="bg-purple-600 text-white px-4 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  <span className="text-sm font-medium">Modo Master — Visualizando: {masterCompanyName}</span>
+                </div>
+                <Link href="/master/empresas">
+                  <Button variant="ghost" size="sm" className="text-white hover:bg-purple-700 h-7 text-xs">
+                    <ArrowLeft className="h-3 w-3 mr-1" />
+                    Voltar ao Painel Master
+                  </Button>
+                </Link>
+              </div>
+            )}
             <TrialNotification companyId={companyId} />
             {children}
         </DashboardLayout>
     );
 }
 
+
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-purple-600" /></div>}>
+            <AdminLayoutInner>{children}</AdminLayoutInner>
+        </Suspense>
+    );
+}
