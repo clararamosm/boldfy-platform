@@ -5,6 +5,9 @@ import { Toaster } from "@/components/ui/toaster";
 export const metadata: Metadata = {
   title: 'Boldfy',
   description: 'Gamified employee engagement and brand advocacy platform.',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
