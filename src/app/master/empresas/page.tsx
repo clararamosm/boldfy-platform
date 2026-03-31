@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { inviteAdmin } from '@/app/actions';
+import { deleteCompany } from '@/app/deleteCompanyAction';
 
 type Company = {
     id: string;
@@ -183,26 +184,11 @@ export default function MasterEmpresasPage() {
   const handleDeleteCompany = async () => {
     if (!confirmDeleteId) return;
     try {
-      const batch = writeBatch(db);
-      const companyRef = doc(db, "companies", confirmDeleteId);
-
-      // Delete all subcollections of this company
-      const subcollections = ["rewards", "missions", "trilhas", "assets"];
-      for (const sub of subcollections) {
-        const subSnap = await getDocs(collection(companyRef, sub));
-        subSnap.docs.forEach(d => batch.delete(d.ref));
+      const result = await deleteCompany(confirmDeleteId);
+      if (result.error) {
+        throw new Error(result.error);
       }
-
-      // Delete all users belonging to this company
-      const usersQuery = query(collection(db, "users"), where("companyId", "==", confirmDeleteId));
-      const usersSnap = await getDocs(usersQuery);
-      usersSnap.docs.forEach(d => batch.delete(d.ref));
-
-      // Delete the company document itself
-      batch.delete(companyRef);
-
-      await batch.commit();
-      toast({ title: "Empresa e todos os dados excluídos com sucesso!" });
+      toast({ title: "Empresa e todos os dados excluidos com sucesso!" });
       setConfirmDeleteId(null);
       setConfirmDeleteName("");
       fetchCompanies();
