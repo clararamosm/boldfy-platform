@@ -23,24 +23,30 @@ type UserRanking = {
   isCurrentUser?: boolean;
 };
 
-const PodiumCard = ({ rank, user, highlight = false }: { rank: number, user: UserRanking, highlight?: boolean }) => (
-  <Card className={`flex flex-col items-center p-4 text-center ${highlight ? 'bg-secondary' : ''} h-full`}>
-    <div className="relative">
-      <Avatar className="w-20 h-20 border-4 border-primary">
-        <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
-        <AvatarFallback>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
-      </Avatar>
-      {rank === 1 && <Crown className="absolute -top-3 left-1/2 -translate-x-1/2 h-8 w-8 text-yellow-500" />}
-    </div>
-    <div className="flex flex-col flex-grow justify-center mt-4 items-center">
-      <h3 className="font-semibold text-lg">{user.name}</h3>
-      <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0 mt-1">
-        <Zap className="h-3 w-3 mr-1"/> {user.points.toLocaleString()}
-      </Badge>
-      <p className="font-bold text-lg mt-1">{rank}º Lugar</p>
-    </div>
-  </Card>
-);
+const PodiumCard = ({ rank, user, highlight = false }: { rank: number, user: UserRanking, highlight?: boolean }) => {
+  const isZeroPoints = user.points === 0;
+
+  return (
+    <Card className={`flex flex-col items-center p-4 text-center ${highlight ? 'bg-secondary' : ''} ${isZeroPoints ? 'opacity-50 grayscale border-gray-300 bg-gray-50' : ''} h-full`}>
+      <div className="relative">
+        <Avatar className={`w-20 h-20 border-4 ${isZeroPoints ? 'border-gray-300' : 'border-primary'}`}>
+          <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
+          <AvatarFallback className={isZeroPoints ? 'bg-gray-200 text-gray-400' : ''}>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
+        </Avatar>
+        {rank === 1 && !isZeroPoints && <Crown className="absolute -top-3 left-1/2 -translate-x-1/2 h-8 w-8 text-yellow-500" />}
+        {rank === 1 && isZeroPoints && <Crown className="absolute -top-3 left-1/2 -translate-x-1/2 h-8 w-8 text-gray-400" />}
+      </div>
+      <div className="flex flex-col flex-grow justify-center mt-4 items-center">
+        <h3 className={`font-semibold text-lg ${isZeroPoints ? 'text-gray-400' : ''}`}>{user.name}</h3>
+        <Badge variant="secondary" className={`whitespace-nowrap shrink-0 mt-1 ${isZeroPoints ? 'bg-gray-100 text-gray-400' : 'bg-primary/10 text-primary'}`}>
+          <Zap className="h-3 w-3 mr-1"/>
+          {user.points.toLocaleString()}
+        </Badge>
+        <p className={`font-bold text-lg mt-1 ${isZeroPoints ? 'text-gray-400' : ''}`}>{rank}º Lugar</p>
+      </div>
+    </Card>
+  );
+};
 
 const PageSkeleton = () => (
   <>
@@ -110,14 +116,13 @@ export default function RankingsPage() {
         orderBy('points', 'desc')
       );
       const usersSnapshot = await getDocs(usersQuery);
-
       const rankings: UserRanking[] = usersSnapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         return {
           id: docSnap.id,
-          name: data.name || 'Sem nome',
+          name: data.name || data.profile?.name || 'Sem nome',
           points: data.points || 0,
-          avatarUrl: data.avatarUrl,
+          avatarUrl: data.avatarUrl || data.profile?.avatarUrl,
           isCurrentUser: docSnap.id === userId,
         };
       });
@@ -141,6 +146,7 @@ export default function RankingsPage() {
       } catch {
         setMonthlyPrize({ name: 'Prêmio não definido' });
       }
+
     } catch (error) {
       console.error("Erro ao buscar dados do ranking:", error);
       toast({
@@ -194,6 +200,7 @@ export default function RankingsPage() {
         </div>
       );
     }
+
     if (top3.length === 2) {
       return (
         <div className="grid gap-4 md:grid-cols-2 max-w-2xl mx-auto items-stretch">
@@ -202,6 +209,7 @@ export default function RankingsPage() {
         </div>
       );
     }
+
     if (top3.length === 1) {
       return (
         <div className="max-w-sm mx-auto">
@@ -209,6 +217,7 @@ export default function RankingsPage() {
         </div>
       );
     }
+
     return (
       <Card>
         <CardContent className="p-4 text-center text-muted-foreground">
@@ -265,25 +274,29 @@ export default function RankingsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {generalRanking.map((user, index) => (
-                  <TableRow key={user.id} className={user.isCurrentUser ? 'bg-secondary' : ''}>
-                    <TableCell className="font-medium w-[80px]">{index + 1}º</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
-                          <AvatarFallback>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <span className={user.isCurrentUser ? 'font-bold' : ''}>{user.isCurrentUser ? 'Você' : user.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
-                        <Zap className="h-3 w-3 mr-1"/> {user.points.toLocaleString()}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {generalRanking.map((user, index) => {
+                  const isZeroPoints = user.points === 0;
+                  return (
+                    <TableRow key={user.id} className={`${user.isCurrentUser ? 'bg-secondary' : ''} ${isZeroPoints ? 'opacity-50' : ''}`}>
+                      <TableCell className={`font-medium w-[80px] ${isZeroPoints ? 'text-gray-400' : ''}`}>{index + 1}º</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className={`h-8 w-8 ${isZeroPoints ? 'grayscale opacity-60' : ''}`}>
+                            <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
+                            <AvatarFallback className={isZeroPoints ? 'bg-gray-200 text-gray-400' : ''}>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span className={`${user.isCurrentUser ? 'font-bold' : ''} ${isZeroPoints ? 'text-gray-400' : ''}`}>{user.isCurrentUser ? 'Você' : user.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="secondary" className={`whitespace-nowrap shrink-0 ${isZeroPoints ? 'bg-gray-100 text-gray-400' : 'bg-primary/10 text-primary'}`}>
+                          <Zap className="h-3 w-3 mr-1"/>
+                          {user.points.toLocaleString()}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
