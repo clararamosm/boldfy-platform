@@ -30,29 +30,29 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink }: {
     to,
     subject: `Você foi convidado para a ${companyName} na Boldfy!`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #7C3AED; margin: 0;">Boldfy</h1>
-          <p style="color: #6B7280; margin-top: 5px;">Plataforma de Gamificação para Colaboradores</p>
-        </div>
-        <h2 style="color: #1F2937;">Olá, ${name}!</h2>
-        <p style="color: #4B5563; line-height: 1.6;">
-          Você foi convidado como <strong>${role}</strong> na empresa <strong>${companyName}</strong> 
-          na plataforma Boldfy.
-        </p>
-        <p style="color: #4B5563; line-height: 1.6;">
-          Para começar, clique no botão abaixo para criar sua senha e acessar sua conta:
-        </p>
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${resetLink}" 
-             style="background-color: #7C3AED; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-            Criar Minha Senha e Acessar
-          </a>
-        </div>
-        <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin-top: 30px;">
-          Se você não esperava este convite, pode ignorar este e-mail com segurança.
-        </p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="text-align: center; margin-bottom: 30px;">
+        <h1 style="color: #7C3AED; margin: 0;">Boldfy</h1>
+        <p style="color: #6B7280; margin-top: 5px;">Plataforma de Gamificação para Colaboradores</p>
       </div>
+      <h2 style="color: #1F2937;">Olá, ${name}!</h2>
+      <p style="color: #4B5563; line-height: 1.6;">
+        Você foi convidado como <strong>${role}</strong> na empresa <strong>${companyName}</strong>
+        na plataforma Boldfy.
+      </p>
+      <p style="color: #4B5563; line-height: 1.6;">
+        Para começar, clique no botão abaixo para criar sua senha e acessar sua conta:
+      </p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${resetLink}"
+           style="background-color: #7C3AED; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+          Criar Minha Senha e Acessar
+        </a>
+      </div>
+      <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin-top: 30px;">
+        Se você não esperava este convite, pode ignorar este e-mail com segurança.
+      </p>
+    </div>
     `,
   });
 }
@@ -67,11 +67,11 @@ async function getCompanyProfile(companyId: string): Promise<string> {
     const branding = data?.branding;
     if (branding) {
       return `
-        Company Name: ${data?.companyName || 'N/A'}
-        Tagline: ${branding.tagline || 'N/A'}
-        Target Audience: ${branding.audience || 'N/A'}
-        Tone of Voice: ${branding.tone || 'N/A'}
-        Key Messages: ${branding.messages || 'N/A'}
+      Company Name: ${data?.companyName || 'N/A'}
+      Tagline: ${branding.tagline || 'N/A'}
+      Target Audience: ${branding.audience || 'N/A'}
+      Tone of Voice: ${branding.tone || 'N/A'}
+      Key Messages: ${branding.messages || 'N/A'}
       `;
     }
   }
@@ -86,18 +86,18 @@ async function getPersonalBranding(userId: string): Promise<string> {
     const personalBranding = data?.personalBranding;
     if (personalBranding) {
       return `
-        Voice Style: ${personalBranding.voice || 'N/A'}
-        Areas of Expertise: ${personalBranding.expertise || 'N/A'}
-        Value Proposition: ${personalBranding.valueProposition || 'N/A'}
-        Current Position: ${personalBranding.position || 'N/A'}
+      Voice Style: ${personalBranding.voice || 'N/A'}
+      Areas of Expertise: ${personalBranding.expertise || 'N/A'}
+      Value Proposition: ${personalBranding.valueProposition || 'N/A'}
+      Current Position: ${personalBranding.position || 'N/A'}
       `;
     }
   }
   return `
-    Tone of Voice: Amigável e Inspirador.
-    Expertise: Marketing Digital, Vendas, Liderança.
-    Value Proposition: Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.
-    Current Position: Gerente de Marketing.
+  Tone of Voice: Amigável e Inspirador.
+  Expertise: Marketing Digital, Vendas, Liderança.
+  Value Proposition: Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.
+  Current Position: Gerente de Marketing.
   `;
 }
 
@@ -223,6 +223,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     // 3. Create User document in Firestore
     await adminDb.collection("users").doc(userRecord.uid).set({
       role: 'admin',
+      name: adminName,
       companyId: companyId,
       companyName: companyName,
       points: 0,
@@ -282,40 +283,58 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
   const { name, email, companyId } = validatedData.data;
 
   try {
-    // 1. Create Auth user
-    const userRecord = await adminAuth.createUser({
-      email: email,
-      displayName: name,
-      password: Math.random().toString(36).slice(-12) + 'A1!',
-    });
-
-    // Handle email already exists
-    if ((userRecord as any)?.code === 'auth/email-already-exists') {
-      return { error: `Um usuário com o e-mail ${email} já existe.` };
-    }
-
-    // 2. Create User document in Firestore
+    // 1. Get company data first (to validate and get companyName)
     const companyDocSnap = await adminDb.collection("companies").doc(companyId).get();
     if (!companyDocSnap.exists) {
       throw new Error("Empresa não encontrada.");
     }
+    const companyData = companyDocSnap.data();
+    const companyName = companyData?.companyName || '';
 
+    // 2. Check license availability
+    const currentLicenses = companyData?.licenses || 0;
+    const usersQuery = await adminDb.collection("users")
+      .where("companyId", "==", companyId)
+      .where("role", "==", "colaborador")
+      .get();
+
+    if (usersQuery.size >= currentLicenses) {
+      return { error: `Limite de licenças atingido (${currentLicenses}). Não é possível convidar mais colaboradores.` };
+    }
+
+    // 3. Create Auth user
+    let userRecord;
+    try {
+      userRecord = await adminAuth.createUser({
+        email: email,
+        displayName: name,
+        password: Math.random().toString(36).slice(-12) + 'A1!',
+      });
+    } catch (authError: any) {
+      if (authError?.code === 'auth/email-already-exists') {
+        return { error: `Um usuário com o e-mail ${email} já existe.` };
+      }
+      throw authError;
+    }
+
+    // 4. Create User document in Firestore
     await adminDb.collection("users").doc(userRecord.uid).set({
       role: 'colaborador',
+      name: name,
       companyId: companyId,
-      companyName: companyDocSnap.data()?.companyName || '',
+      companyName: companyName,
       points: 0,
-      status: 'Pendente' as const,
+      status: 'Ativo',
       profile: { name, email },
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // Generate password reset link and send invitation email
+    // 5. Generate password reset link and send invitation email
     const resetLink = await adminAuth.generatePasswordResetLink(email);
     await sendInvitationEmail({
       to: email,
       name: name,
-      companyName: companyDocSnap.data()?.companyName || '',
+      companyName: companyName,
       role: 'Colaborador',
       resetLink,
     });
