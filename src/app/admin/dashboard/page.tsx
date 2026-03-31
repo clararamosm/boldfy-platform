@@ -98,7 +98,7 @@ export default function AdminDashboardPage() {
         getDocs(query(
           collection(db, "users"),
           where("companyId", "==", companyId),
-          where("role", "==", "influencer")
+          where("role", "==", "colaborador")
         )),
         getDocs(collection(db, "companies", companyId, "missions")),
         getDocs(collection(db, "companies", companyId, "trails")),
