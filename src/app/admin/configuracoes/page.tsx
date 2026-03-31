@@ -1,9 +1,10 @@
 // src/app/admin/configuracoes/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, auth, storage } from "@/lib/firebase";
 import { Header } from "@/components/dashboard/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Camera } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getStripe } from "@/lib/stripe-client";
 import { useSearchParams } from "next/navigation";
@@ -24,6 +25,7 @@ type CompanyData = {
     adminName: string;
     companyName: string;
     email: string;
+    adminPhotoURL?: string;
     tagline: string;
     audience: string;
     tone: string;
@@ -86,6 +88,8 @@ function ConfiguracoesPageContent() {
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
     const searchParams = useSearchParams();
@@ -175,6 +179,27 @@ function ConfiguracoesPageContent() {
         }
     }
 
+
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !companyData) return;
+        setIsUploadingPhoto(true);
+        try {
+            const fileRef = storageRef(storage, `companies/${companyData.id}/admin-photo`);
+            await uploadBytes(fileRef, file);
+            const downloadURL = await getDownloadURL(fileRef);
+            const companyDocRef = doc(db, "companies", companyData.id);
+            await setDoc(companyDocRef, { adminPhotoURL: downloadURL }, { merge: true });
+            setCompanyData(prev => prev ? { ...prev, adminPhotoURL: downloadURL } : prev);
+            toast({ title: "Foto atualizada!", description: "Sua foto de perfil foi salva com sucesso." });
+        } catch (error) {
+            console.error("Error uploading photo: ", error);
+            toast({ variant: "destructive", title: "Erro no upload", description: "N\u00e3o foi poss\u00edvel atualizar a foto." });
+        } finally {
+            setIsUploadingPhoto(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
     const handleSaveChanges = async (section: 'branding') => {
         if (!companyData) return;
         setIsSaving(true);
@@ -243,11 +268,34 @@ function ConfiguracoesPageContent() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex items-center gap-4">
+                            <div className="relative">
                                 <Avatar className="h-20 w-20">
-                                    <AvatarImage src="https://placehold.co/100x100.png" data-ai-hint="person avatar" />
-                                    <AvatarFallback>{companyData.adminName?.[0] || 'A'}</AvatarFallback>
+                                    <AvatarImage src={companyData.adminPhotoURL || ""} />
+                                    <AvatarFallback className="text-2xl">{companyData.adminName?.[0] || 'A'}</AvatarFallback>
                                 </Avatar>
-                                <Button variant="outline" disabled={isReadOnly}>Mudar foto</Button>
+                                {isUploadingPhoto && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
+                                        <Loader2 className="h-6 w-6 animate-spin text-white" />
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handlePhotoUpload}
+                                />
+                                <Button
+                                    variant="outline"
+                                    disabled={isReadOnly || isUploadingPhoto}
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <Camera className="h-4 w-4 mr-2" />
+                                    {isUploadingPhoto ? "Enviando..." : "Mudar foto"}
+                                </Button>
+                            </div>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="adminName">Nome do Admin</Label>
