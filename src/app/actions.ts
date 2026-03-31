@@ -49,6 +49,10 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink }: {
           Criar Minha Senha e Acessar
         </a>
       </div>
+      <p style="color: #666; font-size: 14px; margin-top: 20px; padding: 15px; background-color: #f3e8ff; border-radius: 8px;">
+        <strong>Depois de criar sua senha:</strong><br/>
+        Acesse a plataforma em <a href="${appUrl}/login" style="color: #bd58e7;">${appUrl}/login</a> e faça login com seu e-mail e a senha que acabou de criar.
+      </p>
       <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin-top: 30px;">
         Se você não esperava este convite, pode ignorar este e-mail com segurança.
       </p>
@@ -232,7 +236,8 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     });
 
     // 4. Generate password reset link and send invitation email
-    const resetLink = await adminAuth.generatePasswordResetLink(adminEmail);
+    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+    const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
     await sendInvitationEmail({
       to: adminEmail,
       name: adminName,
@@ -330,7 +335,8 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     });
 
     // 5. Generate password reset link and send invitation email
-    const resetLink = await adminAuth.generatePasswordResetLink(email);
+    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
     await sendInvitationEmail({
       to: email,
       name: name,
