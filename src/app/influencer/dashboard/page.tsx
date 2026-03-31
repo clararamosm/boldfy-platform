@@ -1,234 +1,318 @@
 // src/app/influencer/dashboard/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
 import { db, auth } from '@/lib/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import {
+    collection, getDocs, getDoc, doc, query, where, orderBy, limit
+} from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowRight, Zap, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import Link from 'next/link';
+import {
+    Trophy, Target, BookOpen, Gift, ChevronRight, Star, TrendingUp
+} from 'lucide-react';
 
+// ---- Types ----
 type Mission = {
     id: string;
-    name: string;
+    title: string;
     points: number;
+    status: string;
 };
 
 type Trail = {
     id: string;
     title: string;
+    totalPhases: number;
+    completedPhases: number;
     progress: number;
-    href: string;
+};
+
+type Reward = {
+    id: string;
+    title: string;
+    pointsCost: number;
 };
 
 type DashboardData = {
+    userName: string;
     points: number;
-    pointsThisWeek: number;
-    missions: Mission[];
+    activeMissions: Mission[];
     trails: Trail[];
+    availableRewards: number;
+    completedTrails: number;
+    totalTrails: number;
 };
 
-const MissionItem = ({ name, points }: Omit<Mission, 'id'>) => (
-    <Link href="/influencer/missoes" className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-muted transition-colors">
-        <span className="font-medium">{name}</span>
-        <div className="flex items-center gap-2 text-primary">
-            <Zap className="h-4 w-4" />
-            <span className="font-bold">{points}</span>
+// ---- Sub-components ----
+const MissionItem = ({ title, points }: { title: string; points: number }) => (
+    <Link href="/influencer/missoes" className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors">
+        <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
+                <Target className="h-4 w-4 text-amber-600" />
+            </div>
+            <span className="text-sm font-medium">{title}</span>
+        </div>
+        <div className="flex items-center gap-2">
+            <span className="text-xs text-amber-600 font-medium">+{points} pts</span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
     </Link>
 );
 
-const TrailItem = ({ title, progress, href }: Trail) => (
-    <div>
-        <div className="mb-2 flex justify-between items-center">
-            <h3 className="font-semibold">{title}</h3>
-            <span className="text-sm text-muted-foreground">{progress}% Completo</span>
+const TrailItem = ({ title, progress }: { title: string; progress: number }) => (
+    <Link href="/influencer/trilhas" className="block p-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors">
+        <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                    <BookOpen className="h-4 w-4 text-blue-600" />
+                </div>
+                <span className="text-sm font-medium">{title}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">{progress}%</span>
         </div>
-        <Progress value={progress} />
-        <Button variant="link" size="sm" className="px-0" asChild>
-            <Link href={href}>
-                {progress > 0 && progress < 100 ? 'Continuar' : 'Iniciar Trilha'}
-                <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-        </Button>
-    </div>
+        <Progress value={progress} className="h-2" />
+    </Link>
 );
 
 const DashboardSkeleton = () => (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="flex flex-col">
-            <CardHeader>
-                <CardDescription><Skeleton className="h-4 w-20" /></CardDescription>
-                <CardTitle><Skeleton className="h-12 w-32" /></CardTitle>
-            </CardHeader>
-            <CardContent>
-                <Skeleton className="h-4 w-36" />
-            </CardContent>
-            <CardFooter>
-                <Skeleton className="h-10 w-40" />
-            </CardFooter>
-        </Card>
-        <Card className="md:col-span-2 flex flex-col">
-            <CardHeader>
-                <CardTitle className="font-headline"><Skeleton className="h-7 w-48" /></CardTitle>
-                <CardDescription><Skeleton className="h-4 w-72" /></CardDescription>
-            </CardHeader>
-            <CardContent className="flex-grow space-y-4">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-            </CardContent>
-            <CardFooter>
-                <Skeleton className="h-10 w-44" />
-            </CardFooter>
-        </Card>
-        <Card className="lg:col-span-3">
-            <CardHeader>
-                <CardTitle className="font-headline"><Skeleton className="h-7 w-64" /></CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="space-y-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-2 w-full" /><Skeleton className="h-6 w-32" /></div>
-                <div className="space-y-2"><Skeleton className="h-4 w-48" /><Skeleton className="h-2 w-full" /><Skeleton className="h-6 w-32" /></div>
-            </CardContent>
-        </Card>
+    <div className="space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(i => (
+                <Card key={i}>
+                    <CardContent className="p-4">
+                        <Skeleton className="h-4 w-20 mb-2" />
+                        <Skeleton className="h-8 w-16" />
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+            <Card><CardContent className="p-6"><Skeleton className="h-40" /></CardContent></Card>
+            <Card><CardContent className="p-6"><Skeleton className="h-40" /></CardContent></Card>
+        </div>
     </div>
 );
 
+// ---- Main Component ----
 export default function InfluencerDashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
 
-    const fetchData = useCallback(async (userId: string) => {
-        setIsLoading(true);
-        try {
-            // Fetch user data
-            const userDocRef = doc(db, "users", userId);
-            const userDocSnap = await getDoc(userDocRef);
-
-            if (!userDocSnap.exists()) {
-                throw new Error("Usuário não encontrado.");
-            }
-
-            const userData = userDocSnap.data();
-            const companyId = userData.companyId;
-
-            // Fetch active missions for the company
-            const missionsQuery = query(
-                collection(db, "companies", companyId, "missions"),
-                where("status", "in", ["Ativa", "Fixa"]),
-                limit(5)
-            );
-            const missionsSnap = await getDocs(missionsQuery);
-            const missionsList = missionsSnap.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })) as Mission[];
-
-            // TODO: Fetch user progress on trails to get accurate progress data
-            const mockTrails: Trail[] = [
-                { id: 'onboarding', title: "Onboarding de Novos Influenciadores", progress: 0, href: "/influencer/trilhas/onboarding" },
-                { id: 'cultura', title: "Cultura da Empresa 101", progress: 75, href: "/influencer/trilhas/cultura" },
-            ];
-
-            const dashboardData: DashboardData = {
-                points: userData.points || 0,
-                pointsThisWeek: 200, // TODO: Calculate from weekly transactions
-                missions: missionsList,
-                trails: mockTrails
-            };
-
-            setData(dashboardData);
-
-        } catch (error) {
-            console.error("Error fetching dashboard data:", error);
-            toast({ variant: 'destructive', title: "Erro ao carregar dashboard." });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-            if (user) {
-                fetchData(user.uid);
-            } else {
+            if (!user) return;
+
+            try {
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+
+                if (!userDocSnap.exists()) return;
+
+                const userData = userDocSnap.data();
+                const companyId = userData.companyId;
+                if (!companyId) return;
+
+                // Fetch missions, trails, rewards, and trail progress in parallel
+                const [missionsSnap, trailsSnap, rewardsSnap, progressSnap] = await Promise.all([
+                    getDocs(query(
+                        collection(db, "companies", companyId, "missions"),
+                        where("status", "==", "Ativa"),
+                        limit(5)
+                    )),
+                    getDocs(query(
+                        collection(db, "companies", companyId, "trails"),
+                        where("active", "==", true),
+                        orderBy("order", "asc")
+                    )),
+                    getDocs(collection(db, "companies", companyId, "rewards")),
+                    getDocs(collection(db, "users", user.uid, "trailProgress"))
+                ]);
+
+                // Process missions
+                const missions: Mission[] = missionsSnap.docs.map(d => ({
+                    id: d.id,
+                    title: d.data().title || d.data().name || 'Sem titulo',
+                    points: d.data().points || 0,
+                    status: d.data().status || ''
+                }));
+
+                // Process trail progress map
+                const progressMap: Record<string, number[]> = {};
+                progressSnap.docs.forEach(d => {
+                    progressMap[d.id] = d.data().completedPhases || [];
+                });
+
+                // Process trails with real progress
+                const trails: Trail[] = trailsSnap.docs.map(d => {
+                    const tData = d.data();
+                    const totalPhases = (tData.phases || []).length;
+                    const completed = progressMap[d.id] || [];
+                    const completedCount = completed.length;
+                    const progress = totalPhases > 0 ? Math.round((completedCount / totalPhases) * 100) : 0;
+                    return {
+                        id: d.id,
+                        title: tData.title || 'Sem titulo',
+                        totalPhases,
+                        completedPhases: completedCount,
+                        progress
+                    };
+                });
+
+                const completedTrails = trails.filter(t => t.progress === 100).length;
+
+                setData({
+                    userName: userData.profile?.name || userData.name || user.displayName || 'Colaborador',
+                    points: userData.points || 0,
+                    activeMissions: missions,
+                    trails,
+                    availableRewards: rewardsSnap.docs.length,
+                    completedTrails,
+                    totalTrails: trails.length
+                });
+            } catch (err) {
+                console.error('Dashboard error:', err);
+                toast({
+                    title: "Erro ao carregar dashboard",
+                    description: "Tente novamente mais tarde.",
+                    variant: "destructive"
+                });
+            } finally {
                 setIsLoading(false);
-                toast({ variant: 'destructive', title: "Usuário não autenticado." });
             }
         });
-        return () => unsubscribe();
-    }, [fetchData, toast]);
 
-    if (isLoading || !data) {
+        return () => unsubscribe();
+    }, [toast]);
+
+    if (isLoading) {
         return (
-            <>
-                <Header title="Dashboard" />
-                <main className="flex-1 overflow-auto p-4 md:p-6">
+            <div>
+                <Header title="Dashboard" subtitle="Carregando..." />
+                <div className="p-6">
                     <DashboardSkeleton />
-                </main>
-            </>
-        )
+                </div>
+            </div>
+        );
+    }
+
+    if (!data) {
+        return (
+            <div>
+                <Header title="Dashboard" subtitle="Erro ao carregar dados" />
+                <div className="p-6 text-center text-muted-foreground">
+                    Nenhum dado encontrado. Verifique sua conta.
+                </div>
+            </div>
+        );
     }
 
     return (
-        <>
-            <Header title="Dashboard" />
-            <main className="flex-1 overflow-auto p-4 md:p-6">
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    <Card className="flex flex-col">
-                        <CardHeader>
-                            <CardDescription>Meus Pontos</CardDescription>
-                            <CardTitle className="font-headline text-5xl">{data.points.toLocaleString()}</CardTitle>
+        <div>
+            <Header
+                title={`Ola, ${data.userName}!`}
+                subtitle="Acompanhe seu progresso e conquistas"
+            />
+            <div className="p-6 space-y-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                                <Trophy className="h-4 w-4 text-amber-500" />
+                                <span className="text-xs font-medium">Pontos</span>
+                            </div>
+                            <p className="text-2xl font-bold">{data.points}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                                <Target className="h-4 w-4 text-green-500" />
+                                <span className="text-xs font-medium">Missoes Ativas</span>
+                            </div>
+                            <p className="text-2xl font-bold">{data.activeMissions.length}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                                <BookOpen className="h-4 w-4 text-blue-500" />
+                                <span className="text-xs font-medium">Trilhas</span>
+                            </div>
+                            <p className="text-2xl font-bold">{data.completedTrails}/{data.totalTrails}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                                <Gift className="h-4 w-4 text-purple-500" />
+                                <span className="text-xs font-medium">Recompensas</span>
+                            </div>
+                            <p className="text-2xl font-bold">{data.availableRewards}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Content Grid */}
+                <div className="grid md:grid-cols-2 gap-6">
+                    {/* Active Missions */}
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg">Missoes Ativas</CardTitle>
+                                <Link href="/influencer/missoes" className="text-xs text-primary hover:underline">
+                                    Ver todas
+                                </Link>
+                            </div>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-xs text-muted-foreground">+{data.pointsThisWeek} pontos esta semana</p>
-                        </CardContent>
-                        <CardFooter>
-                            <Button asChild>
-                                <Link href="/influencer/recompensas">Resgatar Recompensas</Link>
-                            </Button>
-                        </CardFooter>
-                    </Card>
-
-                    <Card className="md:col-span-2 flex flex-col">
-                        <CardHeader>
-                            <CardTitle className="font-headline">Missões da Semana</CardTitle>
-                            <CardDescription>Complete as missões disponíveis para ganhar pontos.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex-grow space-y-2">
-                            {data.missions.length > 0 ? (
-                                data.missions.map(mission => <MissionItem key={mission.id} {...mission} />)
+                            {data.activeMissions.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-4">
+                                    Nenhuma missao ativa no momento
+                                </p>
                             ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma missão para esta semana.</p>
+                                <div className="space-y-1">
+                                    {data.activeMissions.slice(0, 4).map(m => (
+                                        <MissionItem key={m.id} title={m.title} points={m.points} />
+                                    ))}
+                                </div>
                             )}
                         </CardContent>
-                        <CardFooter>
-                            <Button variant="secondary" asChild>
-                                <Link href="/influencer/missoes">Ver Todas as Missões</Link>
-                            </Button>
-                        </CardFooter>
                     </Card>
 
-                    <Card className="lg:col-span-3">
-                        <CardHeader>
-                            <CardTitle className="font-headline">Trilhas de Aprendizagem Ativas</CardTitle>
+                    {/* Trails Progress */}
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg">Trilhas de Aprendizado</CardTitle>
+                                <Link href="/influencer/trilhas" className="text-xs text-primary hover:underline">
+                                    Ver todas
+                                </Link>
+                            </div>
                         </CardHeader>
-                        <CardContent className="space-y-6">
-                            {data.trails.length > 0 ? (
-                                data.trails.map(trail => <TrailItem key={trail.id} {...trail} />)
+                        <CardContent>
+                            {data.trails.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-4">
+                                    Nenhuma trilha disponivel
+                                </p>
                             ) : (
-                                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma trilha de aprendizagem ativa.</p>
+                                <div className="space-y-3">
+                                    {data.trails.slice(0, 4).map(t => (
+                                        <TrailItem key={t.id} title={t.title} progress={t.progress} />
+                                    ))}
+                                </div>
                             )}
                         </CardContent>
                     </Card>
                 </div>
-            </main>
-        </>
+            </div>
+        </div>
     );
 }
