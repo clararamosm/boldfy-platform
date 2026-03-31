@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,9 @@ interface SidebarNavProps {
 
 export function SidebarNav({ items }: SidebarNavProps) {
   const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const companyId = searchParams.get('companyId');
+    const buildHref = (href: string) => companyId ? `${href}?companyId=${companyId}` : href;
   const [bouncingItem, setBouncingItem] = useState<string | null>(null);
 
   const handleDisabledClick = (href: string) => {
@@ -76,7 +79,7 @@ export function SidebarNav({ items }: SidebarNavProps) {
                   "justify-start font-medium group-data-[state=collapsed]:w-auto group-data-[state=collapsed]:justify-center group-data-[state=collapsed]:-ml-1",
                 )}
               >
-                <Link href={item.href}>
+                <Link href={buildHref(item.href)}>
                   <item.icon className="h-4 w-4" />
                   <span className="flex items-center gap-2">
                     {item.title}
