@@ -11,17 +11,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useCallback } from "react";
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { db, auth } from '@/lib/firebase';
-import { Loader2 } from "lucide-react";
+import { db, auth, storage } from '@/lib/firebase';
+import { Loader2, Camera } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type ProfileData = {
     name: string;
     email: string;
     company: string;
+  photoURL?: string;
 };
 
 type BrandingData = {
@@ -121,6 +123,36 @@ export default function SettingsPage() {
         return () => unsubscribe();
     }, [fetchData, toast]);
 
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const user = auth.currentUser;
+    if (!user) return;
+    setIsUploadingPhoto(true);
+    try {
+      const fileRef = storageRef(storage, `users/${user.uid}/profile-photo`);
+      uploadBytes(fileRef, file).then(() => {
+        getDownloadURL(fileRef).then((downloadURL) => {
+          const userDocRef = doc(db, "users", user.uid);
+          setDoc(userDocRef, { photoURL: downloadURL }, { merge: true }).then(() => {
+            setProfile(prev => prev ? { ...prev, photoURL: downloadURL } : prev);
+            toast({ title: "Foto atualizada!", description: "Sua foto de perfil foi salva com sucesso." });
+            setIsUploadingPhoto(false);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          });
+        });
+      });
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      toast({ variant: "destructive", title: "Erro no upload", description: "N\u00e3o foi poss\u00edvel atualizar a foto." });
+      setIsUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
     const handleSave = async () => {
         if (!currentUserId) {
             toast({
@@ -185,21 +217,25 @@ export default function SettingsPage() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
-                                    <div className="flex items-center gap-4">
-                                        <Avatar className="h-16 w-16">
-                                            <AvatarImage src="" alt={profile.name} />
-                                            <AvatarFallback>
-                                                {profile.name
-                                                    .split(' ')
-                                                    .map((n) => n[0])
-                                                    .join('')
-                                                    .toUpperCase()
-                                                    .slice(0, 2)}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                                                        <div className="flex items-center gap-4">
+                                        <div className="relative">
+                                            <Avatar className="h-16 w-16">
+                                                <AvatarImage src={profile?.photoURL || ""} />
+                                                <AvatarFallback>
+                                                    {profile?.name?.[0]?.toUpperCase() || "U"}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            {isUploadingPhoto && (
+                                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
+                                                    <Loader2 className="h-6 w-6 animate-spin text-white" />
+                                                </div>
+                                            )}
+                                        </div>
                                         <div>
-                                            <Button variant="outline" size="sm">
-                                                Alterar foto
+                                            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+                                            <Button variant="outline" size="sm" disabled={isUploadingPhoto} onClick={() => fileInputRef.current?.click()}>
+                                                <Camera className="h-4 w-4 mr-2" />
+                                                {isUploadingPhoto ? "Enviando..." : "Alterar foto"}
                                             </Button>
                                         </div>
                                     </div>
