@@ -15,6 +15,7 @@ import {
   Play, BookOpen, HelpCircle, Wrench, Target,
   ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2
 } from 'lucide-react';
+import { Header } from '@/components/dashboard/header';
 import type { Sessao, Trilha, ProgressoTrilha, ModuloModo } from '@/types/trilhas';
 
 const MODO_ICONS: Record<ModuloModo, any> = {
@@ -136,11 +137,9 @@ export default function ColaboradorTrilhasPage() {
   // RENDER
   // ============================================================
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Trilhas de Aprendizagem</h2>
-        <p className="text-muted-foreground">Evolua suas habilidades e ganhe pontos</p>
-      </div>
+    <>
+      <Header title="Trilhas" />
+      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
@@ -252,6 +251,7 @@ export default function ColaboradorTrilhasPage() {
           </div>
         ))
       )}
-    </div>
+      </main>
+    </>
   );
 }
