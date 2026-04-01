@@ -6,7 +6,7 @@ import {
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, Timestamp, getDoc, setDoc, writeBatch
 } from 'firebase/firestore';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,7 +46,12 @@ const MODO_CONFIG: Record<ModuloModo, { temPontuacao: boolean; pontosPadrao: num
 };
 
 export default function AdminTrilhasPage() {
-  const [user] = useAuthState(auth);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
+  }, []);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('global');
