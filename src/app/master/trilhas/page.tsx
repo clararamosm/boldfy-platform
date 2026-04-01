@@ -29,6 +29,7 @@ import type {
   Sessao, Trilha, Modulo, ModuloModo, QuestaoDesafio, MissaoGatilho,
   TrilhaAnalytics, MODO_LABELS, MODO_CONFIG, FIRESTORE_PATHS
 } from '@/types/trilhas';
+import { Header } from '@/components/dashboard/header';
 
 // ============================================================
 // CONSTANTES LOCAIS (evita import de const de types em client)
@@ -667,7 +668,9 @@ export default function MasterTrilhasPage() {
   // MAIN RETURN
   // ============================================================
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <>
+      <Header title="Trilhas" />
+      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
       {viewMode === 'sessions' && renderSessionsView()}
       {viewMode === 'trails' && renderTrailsView()}
       {viewMode === 'builder' && renderBuilderView()}
@@ -884,6 +887,7 @@ export default function MasterTrilhasPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </main>
+    </>
   );
 }
