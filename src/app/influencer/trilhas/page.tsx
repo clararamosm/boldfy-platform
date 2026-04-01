@@ -1,502 +1,251 @@
-// src/app/influencer/trilhas/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import {
-  collection, getDocs, doc, getDoc, setDoc, updateDoc, Timestamp, increment
+  collection, doc, getDocs, getDoc, query, orderBy
 } from 'firebase/firestore';
-import { Header } from "@/components/dashboard/header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
-  BookOpen, Video, HelpCircle, Loader2, ChevronDown, ChevronUp,
-  CheckCircle2, Circle, Play, ArrowLeft, Trophy
+  Play, BookOpen, HelpCircle, Wrench, Target,
+  ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2
 } from 'lucide-react';
+import type { Sessao, Trilha, ProgressoTrilha, ModuloModo } from '@/types/trilhas';
 
-// ---- Types ----
-interface QuizQuestion {
-  question: string;
-  options: string[];
-  correctAnswer: number;
+const MODO_ICONS: Record<ModuloModo, any> = {
+  aula: Play, leitura: BookOpen, desafio: HelpCircle,
+  faca_voce_mesmo: Wrench, missao_conteudo: Target,
+};
+
+interface SessionWithTrails {
+  session: Sessao;
+  trails: (Trilha & { progress?: ProgressoTrilha })[];
 }
 
-interface Phase {
-  title: string;
-  type: 'texto' | 'video' | 'quiz';
-  content: string;
-  quiz?: QuizQuestion[];
-  order: number;
-}
-
-interface Trail {
-  id: string;
-  title: string;
-  description: string;
-  phases: Phase[];
-  pointsReward: number;
-  active: boolean;
-  order: number;
-}
-
-interface TrailProgress {
-  completedPhases: number[];
-  startedAt: any;
-  completedAt?: any;
-}
-
-// ---- Component ----
-export default function TrilhasPage() {
-  const [trails, setTrails] = useState<Trail[]>([]);
-  const [progressMap, setProgressMap] = useState<Record<string, TrailProgress>>({});
-  const [isLoading, setIsLoading] = useState(true);
+export default function ColaboradorTrilhasPage() {
+  const [user] = useAuthState(auth);
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sessionsWithTrails, setSessionsWithTrails] = useState<SessionWithTrails[]>([]);
+  const [stats, setStats] = useState({ total: 0, emProgresso: 0, concluidas: 0, pontos: 0 });
+  const router = useRouter();
 
-  // View states
-  const [selectedTrail, setSelectedTrail] = useState<Trail | null>(null);
-  const [activePhaseIndex, setActivePhaseIndex] = useState<number | null>(null);
-
-  // Quiz state
-  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({});
-  const [quizSubmitted, setQuizSubmitted] = useState(false);
-  const [quizScore, setQuizScore] = useState(0);
-
-  const { toast } = useToast();
-
-  // ---- Auth + Load ----
+  // Get company ID
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user: User | null) => {
-      if (!user) return;
-      setUserId(user.uid);
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const userData = userDoc.data();
-        if (userData?.companyId) {
-          setCompanyId(userData.companyId);
-        }
-      } catch (err) {
-        console.error('Error loading user:', err);
-      }
-    });
-    return () => unsub();
-  }, []);
+    if (!user) return;
+    const fetch = async () => {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists()) setCompanyId(userDoc.data().companyId || null);
+    };
+    fetch();
+  }, [user]);
 
-  const loadData = useCallback(async () => {
-    if (!companyId || !userId) return;
-    setIsLoading(true);
+  // Load all available trails (global activated + company custom)
+  const loadTrails = useCallback(async () => {
+    if (!companyId || !user) return;
+    setLoading(true);
     try {
-      const trailsRef = collection(db, 'companies', companyId, 'trails');
-      const trailsSnap = await getDocs(trailsRef);
-      const trailsData = trailsSnap.docs
-        .map(d => ({ id: d.id, ...d.data(), phases: d.data().phases || [] }) as Trail)
-        .filter(t => t.active)
-        .sort((a, b) => (a.order || 0) - (b.order || 0));
-      setTrails(trailsData);
+      const allSessions: SessionWithTrails[] = [];
 
-      const progressRef = collection(db, 'users', userId, 'trailProgress');
-      const progressSnap = await getDocs(progressRef);
-      const pMap: Record<string, TrailProgress> = {};
-      progressSnap.docs.forEach(d => {
-        pMap[d.id] = d.data() as TrailProgress;
+      // 1. Load activated global trails
+      const actSnap = await getDocs(collection(db, `companies/${companyId}/activatedGlobalTrails`));
+      const activatedBySession: Record<string, string[]> = {};
+      actSnap.docs.forEach(d => {
+        const data = d.data();
+        const sessId = data.sessionId;
+        if (!activatedBySession[sessId]) activatedBySession[sessId] = [];
+        activatedBySession[sessId].push(d.id);
       });
-      setProgressMap(pMap);
+
+      // Load global sessions that have activated trails
+      for (const [sessId, trailIds] of Object.entries(activatedBySession)) {
+        const sessDoc = await getDoc(doc(db, 'globalSessions', sessId));
+        if (!sessDoc.exists()) continue;
+        const session = { id: sessDoc.id, ...sessDoc.data() } as Sessao;
+
+        const trails: Trilha[] = [];
+        for (const tid of trailIds) {
+          const tDoc = await getDoc(doc(db, `globalSessions/${sessId}/trails`, tid));
+          if (tDoc.exists()) trails.push({ id: tDoc.id, ...tDoc.data() } as Trilha);
+        }
+        if (trails.length > 0) {
+          trails.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+          allSessions.push({ session, trails });
+        }
+      }
+
+      // 2. Load company custom sessions + trails
+      const compSessSnap = await getDocs(
+        query(collection(db, `companies/${companyId}/sessions`), orderBy('ordem', 'asc'))
+      );
+      for (const sessDoc of compSessSnap.docs) {
+        const session = { id: sessDoc.id, ...sessDoc.data() } as Sessao;
+        const trailSnap = await getDocs(
+          query(collection(db, `companies/${companyId}/sessions/${sessDoc.id}/trails`), orderBy('ordem', 'asc'))
+        );
+        const trails = trailSnap.docs.map(d => ({ id: d.id, ...d.data() } as Trilha)).filter(t => t.ativa);
+        if (trails.length > 0) allSessions.push({ session, trails });
+      }
+
+      // 3. Load user progress for all trails
+      const progressSnap = await getDocs(collection(db, `users/${user.uid}/trailProgress`));
+      const progressMap: Record<string, ProgressoTrilha> = {};
+      progressSnap.docs.forEach(d => { progressMap[d.id] = d.data() as ProgressoTrilha; });
+
+      // Merge progress into trails
+      let totalTrails = 0, inProgress = 0, completed = 0, totalPts = 0;
+      const merged = allSessions.map(sw => ({
+        ...sw,
+        trails: sw.trails.map(t => {
+          totalTrails++;
+          const prog = progressMap[t.id];
+          if (prog) {
+            if (prog.concluida) { completed++; totalPts += prog.pontosGanhos || 0; }
+            else { inProgress++; totalPts += prog.pontosGanhos || 0; }
+          }
+          return { ...t, progress: prog };
+        }),
+      }));
+
+      setSessionsWithTrails(merged);
+      setStats({ total: totalTrails, emProgresso: inProgress, concluidas: completed, pontos: totalPts });
     } catch (err) {
-      console.error('Error loading data:', err);
-      toast({ title: 'Erro', description: 'Erro ao carregar trilhas', variant: 'destructive' });
+      console.error('Erro ao carregar trilhas:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [companyId, userId, toast]);
+  }, [companyId, user]);
 
-  useEffect(() => {
-    if (companyId && userId) loadData();
-  }, [companyId, userId, loadData]);
+  useEffect(() => { if (companyId) loadTrails(); }, [companyId, loadTrails]);
 
-  // ---- Progress helpers ----
-  const getProgress = (trailId: string, totalPhases: number) => {
-    const prog = progressMap[trailId];
-    if (!prog || totalPhases === 0) return 0;
-    return Math.round((prog.completedPhases.length / totalPhases) * 100);
+  const openTrail = (trail: Trilha) => {
+    router.push(`/influencer/trilhas/${trail.id}`);
   };
 
-  const isPhaseCompleted = (trailId: string, phaseIndex: number) => {
-    return progressMap[trailId]?.completedPhases?.includes(phaseIndex) || false;
-  };
-
-  const isTrailCompleted = (trail: Trail) => {
-    const prog = progressMap[trail.id];
-    return prog?.completedPhases?.length === trail.phases.length && trail.phases.length > 0;
-  };
-
-  // ---- Complete phase ----
-  const completePhase = async (trail: Trail, phaseIndex: number) => {
-    if (!userId || !companyId) return;
-    const progressRef = doc(db, 'users', userId, 'trailProgress', trail.id);
-    const existing = progressMap[trail.id];
-
-    try {
-      if (existing) {
-        if (existing.completedPhases.includes(phaseIndex)) return;
-        const newCompleted = [...existing.completedPhases, phaseIndex];
-        const isFullyComplete = newCompleted.length === trail.phases.length;
-
-        await updateDoc(progressRef, {
-          completedPhases: newCompleted,
-          ...(isFullyComplete ? { completedAt: Timestamp.now() } : {}),
-        });
-
-        if (isFullyComplete && trail.pointsReward > 0) {
-          const userRef = doc(db, 'users', userId);
-          await updateDoc(userRef, { points: increment(trail.pointsReward) });
-          toast({ title: 'Trilha Completa!', description: `Voce ganhou ${trail.pointsReward} pontos!` });
-        }
-      } else {
-        const newCompleted = [phaseIndex];
-        const isFullyComplete = newCompleted.length === trail.phases.length;
-
-        await setDoc(progressRef, {
-          completedPhases: newCompleted,
-          startedAt: Timestamp.now(),
-          ...(isFullyComplete ? { completedAt: Timestamp.now() } : {}),
-        });
-
-        if (isFullyComplete && trail.pointsReward > 0) {
-          const userRef = doc(db, 'users', userId);
-          await updateDoc(userRef, { points: increment(trail.pointsReward) });
-          toast({ title: 'Trilha Completa!', description: `Voce ganhou ${trail.pointsReward} pontos!` });
-        }
-      }
-      loadData();
-    } catch (err) {
-      console.error('Error completing phase:', err);
-      toast({ title: 'Erro', description: 'Erro ao salvar progresso', variant: 'destructive' });
-    }
-  };
-
-  // ---- Quiz submit ----
-  const handleQuizSubmit = (trail: Trail, phaseIndex: number) => {
-    const phase = trail.phases[phaseIndex];
-    if (!phase.quiz) return;
-    let correct = 0;
-    phase.quiz.forEach((q, i) => {
-      if (quizAnswers[i] === q.correctAnswer) correct++;
-    });
-    setQuizScore(correct);
-    setQuizSubmitted(true);
-    const passingScore = Math.ceil(phase.quiz.length * 0.7);
-    if (correct >= passingScore) {
-      completePhase(trail, phaseIndex);
-      toast({ title: 'Aprovado!', description: `${correct}/${phase.quiz.length} corretas` });
-    } else {
-      toast({
-        title: 'Tente novamente',
-        description: `${correct}/${phase.quiz.length} corretas. Precisa de ${passingScore} para passar.`,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  // ---- Phase type icon ----
-  const phaseIcon = (type: string) => {
-    switch (type) {
-      case 'texto': return <BookOpen className="h-4 w-4" />;
-      case 'video': return <Video className="h-4 w-4" />;
-      case 'quiz': return <HelpCircle className="h-4 w-4" />;
-      default: return <Circle className="h-4 w-4" />;
-    }
-  };
-
-  // ---- Loading ----
-  if (isLoading) {
-    return (
-      <div className="flex flex-col gap-6 p-6">
-        <Header title="Trilhas de Aprendizado" subtitle="Continue aprendendo e ganhando pontos" />
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </div>
-    );
-  }
-
-  // ---- Phase detail view ----
-  if (selectedTrail && activePhaseIndex !== null) {
-    const phase = selectedTrail.phases[activePhaseIndex];
-    const completed = isPhaseCompleted(selectedTrail.id, activePhaseIndex);
-
-    return (
-      <div className="flex flex-col gap-6 p-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => { setActivePhaseIndex(null); setQuizAnswers({}); setQuizSubmitted(false); }}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
-          </Button>
-          <div>
-            <h2 className="text-lg font-semibold">{phase.title || `Fase ${activePhaseIndex + 1}`}</h2>
-            <p className="text-sm text-muted-foreground">{selectedTrail.title}</p>
-          </div>
-          {completed && <Badge className="bg-green-100 text-green-800">Concluida</Badge>}
-        </div>
-
-        <Card>
-          <CardContent className="pt-6">
-            {phase.type === 'texto' && (
-              <div className="space-y-4">
-                <div className="prose max-w-none whitespace-pre-wrap">{phase.content}</div>
-                {!completed && (
-                  <Button onClick={() => completePhase(selectedTrail, activePhaseIndex)} className="w-full">
-                    <CheckCircle2 className="h-4 w-4 mr-2" /> Marcar como concluida
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {phase.type === 'video' && (
-              <div className="space-y-4">
-                {phase.content && (
-                  <div className="aspect-video rounded-lg overflow-hidden bg-black">
-                    <iframe
-                      src={phase.content.replace('watch?v=', 'embed/')}
-                      className="w-full h-full"
-                      allowFullScreen
-                    />
-                  </div>
-                )}
-                {!completed && (
-                  <Button onClick={() => completePhase(selectedTrail, activePhaseIndex)} className="w-full">
-                    <CheckCircle2 className="h-4 w-4 mr-2" /> Marcar como concluida
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {phase.type === 'quiz' && phase.quiz && (
-              <div className="space-y-6">
-                {phase.quiz.map((q, qIdx) => (
-                  <div key={qIdx} className="space-y-3">
-                    <p className="font-medium">{qIdx + 1}. {q.question}</p>
-                    <div className="space-y-2">
-                      {q.options.map((opt, oIdx) => {
-                        const isSelected = quizAnswers[qIdx] === oIdx;
-                        const isCorrect = quizSubmitted && oIdx === q.correctAnswer;
-                        const isWrong = quizSubmitted && isSelected && oIdx !== q.correctAnswer;
-                        return (
-                          <div
-                            key={oIdx}
-                            onClick={() => { if (!quizSubmitted) setQuizAnswers({ ...quizAnswers, [qIdx]: oIdx }); }}
-                            className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                              isCorrect ? 'border-green-500 bg-green-50' :
-                              isWrong ? 'border-red-500 bg-red-50' :
-                              isSelected ? 'border-primary bg-primary/5' :
-                              'border-border hover:border-primary/50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
-                                isSelected ? 'border-primary' : 'border-muted-foreground'
-                              }`}>
-                                {isSelected && <div className="h-2 w-2 rounded-full bg-primary" />}
-                              </div>
-                              <span className="text-sm">{opt}</span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
-
-                {!quizSubmitted ? (
-                  <Button
-                    onClick={() => handleQuizSubmit(selectedTrail, activePhaseIndex)}
-                    disabled={Object.keys(quizAnswers).length < (phase.quiz?.length || 0)}
-                    className="w-full"
-                  >
-                    Enviar Respostas
-                  </Button>
-                ) : (
-                  <div className="text-center space-y-2">
-                    <p className="font-medium">
-                      Resultado: {quizScore}/{phase.quiz.length} corretas
-                    </p>
-                    {!isPhaseCompleted(selectedTrail.id, activePhaseIndex) && (
-                      <Button onClick={() => { setQuizAnswers({}); setQuizSubmitted(false); }} variant="outline">
-                        Tentar Novamente
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // ---- Trail detail view (phases list) ----
-  if (selectedTrail) {
-    const progress = getProgress(selectedTrail.id, selectedTrail.phases.length);
-    const completed = isTrailCompleted(selectedTrail);
-
-    return (
-      <div className="flex flex-col gap-6 p-6">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => setSelectedTrail(null)}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
-          </Button>
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold">{selectedTrail.title}</h2>
-            <p className="text-sm text-muted-foreground">{selectedTrail.description}</p>
-          </div>
-          {completed && (
-            <Badge className="bg-green-100 text-green-800">
-              <Trophy className="h-3 w-3 mr-1" /> Completa
-            </Badge>
-          )}
-        </div>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardDescription>Progresso da Trilha</CardDescription>
-              <span className="text-sm font-medium">{progress}%</span>
-            </div>
-            <Progress value={progress} className="h-2" />
-          </CardHeader>
-        </Card>
-
-        <div className="space-y-2">
-          {selectedTrail.phases.map((phase, idx) => {
-            const phaseCompleted = isPhaseCompleted(selectedTrail.id, idx);
-            return (
-              <Card
-                key={idx}
-                className={`cursor-pointer transition-colors hover:bg-muted/50 ${phaseCompleted ? 'opacity-75' : ''}`}
-                onClick={() => { setActivePhaseIndex(idx); setQuizAnswers({}); setQuizSubmitted(false); }}
-              >
-                <CardContent className="flex items-center gap-4 py-4">
-                  <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                    phaseCompleted ? 'bg-green-100 text-green-600' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {phaseCompleted ? <CheckCircle2 className="h-4 w-4" /> : <span className="text-sm font-medium">{idx + 1}</span>}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{phase.title || `Fase ${idx + 1}`}</p>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      {phaseIcon(phase.type)}
-                      <span className="capitalize">{phase.type}</span>
-                      {phase.type === 'quiz' && phase.quiz && <span> - {phase.quiz.length} pergunta(s)</span>}
-                    </div>
-                  </div>
-                  <Play className="h-4 w-4 text-muted-foreground" />
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        {completed && selectedTrail.pointsReward > 0 && (
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="flex items-center gap-3 py-4">
-              <Trophy className="h-6 w-6 text-green-600" />
-              <div>
-                <p className="font-medium text-green-800">Trilha Concluida!</p>
-                <p className="text-sm text-green-600">Voce ganhou {selectedTrail.pointsReward} pontos</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    );
-  }
-
-  // ---- Main trails list ----
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <Header title="Trilhas de Aprendizado" subtitle="Continue aprendendo e ganhando pontos" />
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold">Trilhas de Aprendizagem</h2>
+        <p className="text-muted-foreground">Evolua suas habilidades e ganhe pontos</p>
+      </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Trilhas Disponiveis</CardDescription>
-            <CardTitle className="text-2xl">{trails.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Concluidas</CardDescription>
-            <CardTitle className="text-2xl">{trails.filter(t => isTrailCompleted(t)).length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Em Andamento</CardDescription>
-            <CardTitle className="text-2xl">
-              {trails.filter(t => progressMap[t.id] && !isTrailCompleted(t)).length}
-            </CardTitle>
-          </CardHeader>
-        </Card>
+      <div className="grid grid-cols-4 gap-4">
+        <Card><CardContent className="pt-6 text-center">
+          <BookOpen className="w-6 h-6 mx-auto mb-2 text-purple-500" />
+          <p className="text-2xl font-bold">{stats.total}</p>
+          <p className="text-xs text-muted-foreground">Total Trilhas</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 text-center">
+          <Clock className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
+          <p className="text-2xl font-bold">{stats.emProgresso}</p>
+          <p className="text-xs text-muted-foreground">Em Progresso</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 text-center">
+          <CheckCircle2 className="w-6 h-6 mx-auto mb-2 text-green-500" />
+          <p className="text-2xl font-bold">{stats.concluidas}</p>
+          <p className="text-xs text-muted-foreground">Concluidas</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 text-center">
+          <Star className="w-6 h-6 mx-auto mb-2 text-amber-500" />
+          <p className="text-2xl font-bold">{stats.pontos}</p>
+          <p className="text-xs text-muted-foreground">Pontos Ganhos</p>
+        </CardContent></Card>
       </div>
 
-      {/* Trail cards */}
-      {trails.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-10 text-muted-foreground">
-            <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Nenhuma trilha disponivel no momento.</p>
-            <p className="text-sm">Aguarde novas trilhas serem criadas pela equipe.</p>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-purple-500" /></div>
+      ) : sessionsWithTrails.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <FolderOpen className="w-12 h-12 text-muted-foreground mb-4" />
+            <p className="text-lg font-medium">Nenhuma trilha disponivel</p>
+            <p className="text-muted-foreground">Seu administrador ainda nao ativou trilhas para sua empresa</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {trails.map((trail) => {
-            const progress = getProgress(trail.id, trail.phases.length);
-            const completed = isTrailCompleted(trail);
-            const started = !!progressMap[trail.id];
+        sessionsWithTrails.map(({ session, trails }) => (
+          <div key={session.id} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <FolderOpen className="w-5 h-5 text-purple-500" />
+              <h3 className="text-lg font-semibold">{session.titulo}</h3>
+              <Badge variant="outline">{trails.length} trilha{trails.length !== 1 ? 's' : ''}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground ml-7">{session.descricao}</p>
 
-            return (
-              <Card
-                key={trail.id}
-                className={`cursor-pointer transition-all hover:shadow-md ${completed ? 'border-green-200' : ''}`}
-                onClick={() => setSelectedTrail(trail)}
-              >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{trail.title}</CardTitle>
-                    {completed ? (
-                      <Badge className="bg-green-100 text-green-800">
-                        <CheckCircle2 className="h-3 w-3 mr-1" /> Concluida
-                      </Badge>
-                    ) : started ? (
-                      <Badge variant="outline">Em andamento</Badge>
-                    ) : (
-                      <Badge variant="secondary">Nova</Badge>
-                    )}
-                  </div>
-                  <CardDescription>{trail.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{trail.phases.length} fases</span>
-                    <span className="font-medium">{trail.pointsReward} pts</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Progresso</span>
-                      <span>{progress}%</span>
-                    </div>
-                    <Progress value={progress} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-7">
+              {trails.map(trail => {
+                const progress = trail.progress;
+                const totalModulos = trail.modulos?.length || 0;
+                const completedModulos = progress?.modulosCompletos?.length || 0;
+                const percentual = totalModulos > 0 ? Math.round((completedModulos / totalModulos) * 100) : 0;
+                const isConcluida = progress?.concluida || false;
+
+                return (
+                  <Card
+                    key={trail.id}
+                    className={`cursor-pointer hover:shadow-md transition-shadow ${isConcluida ? 'border-green-200 bg-green-50/30' : ''}`}
+                    onClick={() => openTrail(trail)}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">{trail.titulo}</CardTitle>
+                        {isConcluida && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                      </div>
+                      <CardDescription className="line-clamp-2">{trail.descricao}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex gap-2 flex-wrap">
+                        <Badge variant="secondary" className="text-xs">
+                          {totalModulos} modulo{totalModulos !== 1 ? 's' : ''}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          <Trophy className="w-3 h-3 mr-1" />{trail.pontuacaoTotal || 0} pts
+                        </Badge>
+                        {trail.tempoEstimadoMin > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            <Clock className="w-3 h-3 mr-1" />{trail.tempoEstimadoMin} min
+                          </Badge>
+                        )}
+                      </div>
+
+                      {progress && !isConcluida && (
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{completedModulos}/{totalModulos} modulos</span>
+                            <span>{percentual}%</span>
+                          </div>
+                          <Progress value={percentual} className="h-2" />
+                        </div>
+                      )}
+
+                      {isConcluida && (
+                        <div className="flex items-center gap-2 text-sm text-green-600">
+                          <Trophy className="w-4 h-4" />
+                          <span>{progress?.pontosGanhos || 0} pontos conquistados</span>
+                        </div>
+                      )}
+
+                      {!progress && (
+                        <Button variant="outline" size="sm" className="w-full">
+                          Comecar Trilha <ChevronRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        ))
       )}
     </div>
   );
