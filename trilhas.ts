@@ -28,16 +28,22 @@ export interface Modulo {
   titulo: string;
   modo: ModuloModo;
   ordem: number;
+
   // Modo: aula
   videoUrl?: string;
+  materialPdfUrl?: string; // URL do PDF/apresentacao de apoio
+
   // Modo: leitura
   conteudoHtml?: string;
+
   // Modo: desafio
   questoes?: QuestaoDesafio[];
-  pontuacaoBase?: number;    // pontos por acerto >= 60%
-  pontuacaoBonus?: number;   // bonus extra se > 80%
+  pontuacaoBase?: number;  // pontos por acerto >= 60%
+  pontuacaoBonus?: number; // bonus extra se > 80%
+
   // Modo: faca_voce_mesmo
   instrucaoCard?: string;
+
   // Modo: missao_conteudo
   missaoGatilho?: MissaoGatilho;
 }
@@ -52,10 +58,12 @@ export interface Trilha {
   ativa: boolean;
   pontuacaoTotal: number;
   pontuacaoBonus: number;
+  pontuacaoBonusTrilha: number; // bonus por completar a trilha inteira
   tempoEstimadoMin: number;
   modulos: Modulo[];
   criadaEm: Timestamp;
   atualizadaEm?: Timestamp;
+
   // Campo para trilhas de empresa (custom)
   isGlobal?: boolean;
   globalTrailId?: string; // referencia a trilha global original
@@ -148,17 +156,17 @@ export const MODO_ICONS: Record<ModuloModo, string> = {
 
 // --- Helper: pontuacao por modo ---
 export const MODO_CONFIG: Record<ModuloModo, { temPontuacao: boolean; pontosPadrao: number; pontosBonus: number }> = {
-  aula: { temPontuacao: true, pontosPadrao: 80, pontosBonus: 20 },
-  leitura: { temPontuacao: true, pontosPadrao: 40, pontosBonus: 20 },
+  aula: { temPontuacao: true, pontosPadrao: 80, pontosBonus: 0 },
+  leitura: { temPontuacao: true, pontosPadrao: 40, pontosBonus: 0 },
   desafio: { temPontuacao: true, pontosPadrao: 100, pontosBonus: 50 },
   faca_voce_mesmo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
-  missao_conteudo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
+  missao_conteudo: { temPontuacao: true, pontosPadrao: 50, pontosBonus: 0 },
 };
 
 // --- Constantes de Scoring do Desafio ---
 export const DESAFIO_THRESHOLDS = {
-  MINIMO_PARA_PONTOS: 0.6,    // 60% - minimo para ganhar pontos base
-  BONUS_THRESHOLD: 0.8,        // 80% - acima disso ganha bonus
+  MINIMO_PARA_PONTOS: 0.6, // 60% - minimo para ganhar pontos base
+  BONUS_THRESHOLD: 0.8,     // 80% - acima disso ganha bonus
 };
 
 // --- Caminhos Firestore ---
@@ -166,10 +174,14 @@ export const FIRESTORE_PATHS = {
   // Global (Master)
   globalSessions: 'globalSessions',
   globalTrails: (sessionId: string) => `globalSessions/${sessionId}/trails`,
+
   // Empresa
   companySessions: (companyId: string) => `companies/${companyId}/sessions`,
-  companyTrails: (companyId: string, sessionId: string) => `companies/${companyId}/sessions/${sessionId}/trails`,
-  companyActivatedTrails: (companyId: string) => `companies/${companyId}/activatedGlobalTrails`,
+  companyTrails: (companyId: string, sessionId: string) =>
+    `companies/${companyId}/sessions/${sessionId}/trails`,
+  companyActivatedTrails: (companyId: string) =>
+    `companies/${companyId}/activatedGlobalTrails`,
+
   // Progresso do colaborador
   userTrailProgress: (userId: string) => `users/${userId}/trailProgress`,
 };
