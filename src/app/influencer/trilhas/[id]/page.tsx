@@ -6,7 +6,7 @@ import {
   collection, doc, getDocs, getDoc, setDoc, updateDoc,
   query, orderBy, Timestamp, where, addDoc
 } from 'firebase/firestore';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { useParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,12 @@ const DESAFIO_FAIXA_BONUS = 0.8;
 export default function TrilhaFullscreenPage() {
   const { id } = useParams();
   const router = useRouter();
-  const [user] = useAuthState(auth);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
+  }, []);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [trail, setTrail] = useState<Trilha | null>(null);
   const [progress, setProgress] = useState<ProgressoTrilha | null>(null);
