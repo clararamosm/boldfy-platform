@@ -1,564 +1,599 @@
-// src/app/admin/trilhas/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, getDoc, Timestamp } from 'firebase/firestore';
-import { Header } from "@/components/dashboard/header";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, GripVertical, BookOpen, Video, HelpCircle, Loader2, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
+  query, orderBy, Timestamp, getDoc, setDoc, writeBatch
+} from 'firebase/firestore';
+import { useAuthState } from 'react-firebase-hooks/auth';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+  DialogFooter, DialogDescription
+} from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from '@/components/ui/select';
+import {
+  Plus, Pencil, Trash2, ChevronRight, Globe, Building2,
+  Play, BookOpen, HelpCircle, Wrench, Target, BarChart3,
+  ArrowLeft, Loader2, Eye, Save, FolderOpen, ToggleLeft
+} from 'lucide-react';
+import type { Sessao, Trilha, Modulo, ModuloModo, QuestaoDesafio, TrilhaAnalytics } from '@/types/trilhas';
 
-// ---- Types ----
-type PhaseType = 'texto' | 'video' | 'quiz';
+const MODO_LABELS: Record<ModuloModo, string> = {
+  aula: 'Aula (Video)', leitura: 'Leitura', desafio: 'Desafio (Quiz)',
+  faca_voce_mesmo: 'Faca Voce Mesmo', missao_conteudo: 'Missao de Conteudo',
+};
+const MODO_ICONS: Record<ModuloModo, any> = {
+  aula: Play, leitura: BookOpen, desafio: HelpCircle,
+  faca_voce_mesmo: Wrench, missao_conteudo: Target,
+};
+const MODO_CONFIG: Record<ModuloModo, { temPontuacao: boolean; pontosPadrao: number; pontosBonus: number }> = {
+  aula: { temPontuacao: true, pontosPadrao: 80, pontosBonus: 20 },
+  leitura: { temPontuacao: true, pontosPadrao: 40, pontosBonus: 20 },
+  desafio: { temPontuacao: true, pontosPadrao: 100, pontosBonus: 50 },
+  faca_voce_mesmo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
+  missao_conteudo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
+};
 
-interface QuizQuestion {
-  question: string;
-  options: string[];
-  correctAnswer: number;
-}
-
-interface Phase {
-  id?: string;
-  title: string;
-  type: PhaseType;
-  content: string; // URL for video, text content for texto, ignored for quiz
-  quiz?: QuizQuestion[];
-  order: number;
-}
-
-interface Trail {
-  id: string;
-  title: string;
-  description: string;
-  phases: Phase[];
-  pointsReward: number;
-  active: boolean;
-  order: number;
-  createdAt: any;
-}
-
-// ---- Component ----
 export default function AdminTrilhasPage() {
-  const [trails, setTrails] = useState<Trail[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [user] = useAuthState(auth);
   const [companyId, setCompanyId] = useState<string | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingTrail, setEditingTrail] = useState<Trail | null>(null);
-  const [expandedTrail, setExpandedTrail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('global');
 
-  // Form state
-  const [formTitle, setFormTitle] = useState('');
-  const [formDescription, setFormDescription] = useState('');
-  const [formPoints, setFormPoints] = useState(100);
-  const [formActive, setFormActive] = useState(true);
-  const [formPhases, setFormPhases] = useState<Phase[]>([]);
+  // Global trails data
+  const [globalSessions, setGlobalSessions] = useState<Sessao[]>([]);
+  const [globalTrailsBySession, setGlobalTrailsBySession] = useState<Record<string, Trilha[]>>({});
+  const [activatedTrailIds, setActivatedTrailIds] = useState<Set<string>>(new Set());
+  const [togglingTrail, setTogglingTrail] = useState<string | null>(null);
 
-  const { toast } = useToast();
+  // Company custom trails
+  const [companySessions, setCompanySessions] = useState<Sessao[]>([]);
+  const [companyTrails, setCompanyTrails] = useState<Trilha[]>([]);
+  const [selectedSession, setSelectedSession] = useState<Sessao | null>(null);
 
-  // ---- Auth + Load ----
+  // Builder state (simplified)
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [editingTrail, setEditingTrail] = useState<Trilha | null>(null);
+  const [trailForm, setTrailForm] = useState({ titulo: '', descricao: '', tempoEstimadoMin: 30 });
+  const [modulos, setModulos] = useState<Modulo[]>([]);
+  const [moduloDialogOpen, setModuloDialogOpen] = useState(false);
+  const [editingModuloIdx, setEditingModuloIdx] = useState<number | null>(null);
+  const [moduloForm, setModuloForm] = useState<Partial<Modulo>>({ titulo: '', modo: 'aula' });
+  const [questoes, setQuestoes] = useState<QuestaoDesafio[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  // Session dialog
+  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
+  const [sessionForm, setSessionForm] = useState({ titulo: '', descricao: '' });
+
+  // Analytics
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [analyticsTrail, setAnalyticsTrail] = useState<TrilhaAnalytics | null>(null);
+
+  // ============================================================
+  // Get company ID from user doc
+  // ============================================================
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user: User | null) => {
-      if (!user) return;
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const userData = userDoc.data();
-        if (userData?.companyId) {
-          setCompanyId(userData.companyId);
-        }
-      } catch (err) {
-        console.error('Error loading user:', err);
+    if (!user) return;
+    const fetchCompany = async () => {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists()) {
+        setCompanyId(userDoc.data().companyId || null);
       }
-    });
-    return () => unsub();
-  }, []);
+    };
+    fetchCompany();
+  }, [user]);
 
-  const loadTrails = useCallback(async () => {
+  // ============================================================
+  // Load global sessions + trails + activated status
+  // ============================================================
+  const loadGlobalData = useCallback(async () => {
     if (!companyId) return;
-    setIsLoading(true);
+    setLoading(true);
     try {
-      const trailsRef = collection(db, 'companies', companyId, 'trails');
-      const snapshot = await getDocs(trailsRef);
-      const data = snapshot.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        phases: d.data().phases || [],
-      })) as Trail[];
-      data.sort((a, b) => (a.order || 0) - (b.order || 0));
-      setTrails(data);
+      // 1. Load global sessions
+      const sessSnap = await getDocs(query(collection(db, 'globalSessions'), orderBy('ordem', 'asc')));
+      const sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() } as Sessao)).filter(s => s.ativa);
+      setGlobalSessions(sessions);
+
+      // 2. Load trails for each session
+      const trailsMap: Record<string, Trilha[]> = {};
+      for (const sess of sessions) {
+        const trailSnap = await getDocs(
+          query(collection(db, `globalSessions/${sess.id}/trails`), orderBy('ordem', 'asc'))
+        );
+        trailsMap[sess.id] = trailSnap.docs.map(d => ({ id: d.id, ...d.data() } as Trilha)).filter(t => t.ativa);
+      }
+      setGlobalTrailsBySession(trailsMap);
+
+      // 3. Load which trails are activated for this company
+      const actSnap = await getDocs(collection(db, `companies/${companyId}/activatedGlobalTrails`));
+      const actIds = new Set(actSnap.docs.map(d => d.id));
+      setActivatedTrailIds(actIds);
     } catch (err) {
-      console.error('Error loading trails:', err);
-      toast({ title: 'Erro', description: 'Erro ao carregar trilhas', variant: 'destructive' });
+      console.error('Erro ao carregar trilhas globais:', err);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, [companyId, toast]);
+  }, [companyId]);
+
+  // ============================================================
+  // Load company custom sessions + trails
+  // ============================================================
+  const loadCompanyData = useCallback(async () => {
+    if (!companyId) return;
+    try {
+      const sessSnap = await getDocs(
+        query(collection(db, `companies/${companyId}/sessions`), orderBy('ordem', 'asc'))
+      );
+      const sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() } as Sessao));
+      setCompanySessions(sessions);
+    } catch (err) {
+      console.error('Erro ao carregar sessoes da empresa:', err);
+    }
+  }, [companyId]);
 
   useEffect(() => {
-    if (companyId) loadTrails();
-  }, [companyId, loadTrails]);
-
-  // ---- Form helpers ----
-  const resetForm = () => {
-    setFormTitle('');
-    setFormDescription('');
-    setFormPoints(100);
-    setFormActive(true);
-    setFormPhases([]);
-    setEditingTrail(null);
-  };
-
-  const openCreateDialog = () => {
-    resetForm();
-    setIsDialogOpen(true);
-  };
-
-  const openEditDialog = (trail: Trail) => {
-    setEditingTrail(trail);
-    setFormTitle(trail.title);
-    setFormDescription(trail.description);
-    setFormPoints(trail.pointsReward);
-    setFormActive(trail.active);
-    setFormPhases(trail.phases.map((p, i) => ({ ...p, order: i })));
-    setIsDialogOpen(true);
-  };
-
-  // ---- Phase management ----
-  const addPhase = (type: PhaseType) => {
-    const newPhase: Phase = {
-      title: '',
-      type,
-      content: '',
-      order: formPhases.length,
-      ...(type === 'quiz' ? { quiz: [{ question: '', options: ['', '', '', ''], correctAnswer: 0 }] } : {}),
-    };
-    setFormPhases([...formPhases, newPhase]);
-  };
-
-  const updatePhase = (index: number, field: string, value: any) => {
-    const updated = [...formPhases];
-    (updated[index] as any)[field] = value;
-    setFormPhases(updated);
-  };
-
-  const removePhase = (index: number) => {
-    setFormPhases(formPhases.filter((_, i) => i !== index));
-  };
-
-  // Quiz question management
-  const addQuizQuestion = (phaseIndex: number) => {
-    const updated = [...formPhases];
-    if (!updated[phaseIndex].quiz) updated[phaseIndex].quiz = [];
-    updated[phaseIndex].quiz!.push({ question: '', options: ['', '', '', ''], correctAnswer: 0 });
-    setFormPhases(updated);
-  };
-
-  const updateQuizQuestion = (phaseIndex: number, qIndex: number, field: string, value: any) => {
-    const updated = [...formPhases];
-    (updated[phaseIndex].quiz![qIndex] as any)[field] = value;
-    setFormPhases(updated);
-  };
-
-  const updateQuizOption = (phaseIndex: number, qIndex: number, optIndex: number, value: string) => {
-    const updated = [...formPhases];
-    updated[phaseIndex].quiz![qIndex].options[optIndex] = value;
-    setFormPhases(updated);
-  };
-
-  const removeQuizQuestion = (phaseIndex: number, qIndex: number) => {
-    const updated = [...formPhases];
-    updated[phaseIndex].quiz = updated[phaseIndex].quiz!.filter((_, i) => i !== qIndex);
-    setFormPhases(updated);
-  };
-
-  // ---- CRUD ----
-  const handleSave = async () => {
-    if (!companyId || !formTitle.trim()) {
-      toast({ title: 'Erro', description: 'Preencha o titulo da trilha', variant: 'destructive' });
-      return;
+    if (companyId) {
+      loadGlobalData();
+      loadCompanyData();
     }
-    if (formPhases.length === 0) {
-      toast({ title: 'Erro', description: 'Adicione pelo menos uma fase', variant: 'destructive' });
-      return;
-    }
+  }, [companyId, loadGlobalData, loadCompanyData]);
 
-    setIsSubmitting(true);
+  // ============================================================
+  // Toggle global trail activation for this company
+  // ============================================================
+  const toggleGlobalTrail = async (trail: Trilha, sessionId: string) => {
+    if (!companyId || !user) return;
+    setTogglingTrail(trail.id);
     try {
+      const docRef = doc(db, `companies/${companyId}/activatedGlobalTrails`, trail.id);
+      if (activatedTrailIds.has(trail.id)) {
+        // Deactivate
+        await deleteDoc(docRef);
+        setActivatedTrailIds(prev => { const next = new Set(prev); next.delete(trail.id); return next; });
+      } else {
+        // Activate - store reference to global trail
+        await setDoc(docRef, {
+          trailId: trail.id,
+          sessionId: sessionId,
+          titulo: trail.titulo,
+          ativadaEm: Timestamp.now(),
+          ativadaPor: user.uid,
+        });
+        setActivatedTrailIds(prev => { const next = new Set(prev); next.add(trail.id); return next; });
+      }
+    } catch (err) {
+      console.error('Erro ao alterar trilha:', err);
+    } finally {
+      setTogglingTrail(null);
+    }
+  };
+
+  // ============================================================
+  // Company Session CRUD
+  // ============================================================
+  const saveCompanySession = async () => {
+    if (!companyId || !sessionForm.titulo.trim()) return;
+    setSaving(true);
+    try {
+      await addDoc(collection(db, `companies/${companyId}/sessions`), {
+        titulo: sessionForm.titulo,
+        descricao: sessionForm.descricao,
+        ordem: companySessions.length + 1,
+        ativa: true,
+        criadaEm: Timestamp.now(),
+      });
+      setSessionDialogOpen(false);
+      setSessionForm({ titulo: '', descricao: '' });
+      loadCompanyData();
+    } catch (err) {
+      console.error('Erro ao criar sessao:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ============================================================
+  // Company Trail Builder
+  // ============================================================
+  const openBuilder = (session: Sessao, trail?: Trilha) => {
+    setSelectedSession(session);
+    if (trail) {
+      setEditingTrail(trail);
+      setTrailForm({ titulo: trail.titulo, descricao: trail.descricao, tempoEstimadoMin: trail.tempoEstimadoMin || 30 });
+      setModulos(trail.modulos || []);
+    } else {
+      setEditingTrail(null);
+      setTrailForm({ titulo: '', descricao: '', tempoEstimadoMin: 30 });
+      setModulos([]);
+    }
+    setBuilderOpen(true);
+  };
+
+  const saveCompanyTrail = async () => {
+    if (!companyId || !selectedSession || !trailForm.titulo.trim()) return;
+    setSaving(true);
+    try {
+      let total = 0, bonus = 0;
+      modulos.forEach(m => {
+        if (m.modo === 'aula') { total += 80; bonus += 20; }
+        else if (m.modo === 'leitura') { total += 40; bonus += 20; }
+        else if (m.modo === 'desafio') { total += (m.pontuacaoBase || 100); bonus += (m.pontuacaoBonus || 50); }
+      });
+
       const trailData = {
-        title: formTitle.trim(),
-        description: formDescription.trim(),
-        phases: formPhases.map((p, i) => ({
-          title: p.title,
-          type: p.type,
-          content: p.content,
-          order: i,
-          ...(p.type === 'quiz' ? { quiz: p.quiz } : {}),
-        })),
-        pointsReward: formPoints,
-        active: formActive,
-        order: editingTrail ? editingTrail.order : trails.length,
+        sessionId: selectedSession.id,
+        titulo: trailForm.titulo,
+        descricao: trailForm.descricao,
+        ordem: 0,
+        ativa: true,
+        pontuacaoTotal: total,
+        pontuacaoBonus: bonus,
+        tempoEstimadoMin: trailForm.tempoEstimadoMin,
+        modulos: modulos.map((m, i) => ({ ...m, ordem: i })),
+        atualizadaEm: Timestamp.now(),
       };
 
+      const path = `companies/${companyId}/sessions/${selectedSession.id}/trails`;
       if (editingTrail) {
-        await updateDoc(doc(db, 'companies', companyId, 'trails', editingTrail.id), trailData);
-        toast({ title: 'Sucesso', description: 'Trilha atualizada!' });
+        await updateDoc(doc(db, path, editingTrail.id), trailData);
       } else {
-        await addDoc(collection(db, 'companies', companyId, 'trails'), {
-          ...trailData,
-          createdAt: Timestamp.now(),
-        });
-        toast({ title: 'Sucesso', description: 'Trilha criada!' });
+        await addDoc(collection(db, path), { ...trailData, criadaEm: Timestamp.now() });
       }
-
-      setIsDialogOpen(false);
-      resetForm();
-      loadTrails();
+      setBuilderOpen(false);
+      loadCompanyData();
     } catch (err) {
-      console.error('Error saving trail:', err);
-      toast({ title: 'Erro', description: 'Erro ao salvar trilha', variant: 'destructive' });
+      console.error('Erro ao salvar trilha:', err);
     } finally {
-      setIsSubmitting(false);
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (trailId: string) => {
-    if (!companyId) return;
-    try {
-      await deleteDoc(doc(db, 'companies', companyId, 'trails', trailId));
-      toast({ title: 'Sucesso', description: 'Trilha excluida!' });
-      loadTrails();
-    } catch (err) {
-      console.error('Error deleting trail:', err);
-      toast({ title: 'Erro', description: 'Erro ao excluir trilha', variant: 'destructive' });
+  // Modulo helpers
+  const openModuloDialog = (idx?: number) => {
+    if (idx !== undefined && modulos[idx]) {
+      setEditingModuloIdx(idx);
+      const m = modulos[idx];
+      setModuloForm({ titulo: m.titulo, modo: m.modo, videoUrl: m.videoUrl, conteudoHtml: m.conteudoHtml, instrucaoCard: m.instrucaoCard, pontuacaoBase: m.pontuacaoBase, pontuacaoBonus: m.pontuacaoBonus });
+      setQuestoes(m.questoes || []);
+    } else {
+      setEditingModuloIdx(null);
+      setModuloForm({ titulo: '', modo: 'aula' });
+      setQuestoes([]);
     }
+    setModuloDialogOpen(true);
   };
 
-  const toggleActive = async (trail: Trail) => {
-    if (!companyId) return;
-    try {
-      await updateDoc(doc(db, 'companies', companyId, 'trails', trail.id), { active: !trail.active });
-      loadTrails();
-    } catch (err) {
-      console.error('Error toggling trail:', err);
-    }
+  const saveModulo = () => {
+    if (!moduloForm.titulo?.trim()) return;
+    const modo = moduloForm.modo as ModuloModo;
+    const m: Modulo = {
+      id: editingModuloIdx !== null ? modulos[editingModuloIdx].id : `mod_${Date.now()}`,
+      titulo: moduloForm.titulo || '', modo, ordem: editingModuloIdx ?? modulos.length,
+      videoUrl: modo === 'aula' ? moduloForm.videoUrl : undefined,
+      conteudoHtml: modo === 'leitura' ? moduloForm.conteudoHtml : undefined,
+      questoes: modo === 'desafio' ? questoes : undefined,
+      pontuacaoBase: MODO_CONFIG[modo].temPontuacao ? (moduloForm.pontuacaoBase || MODO_CONFIG[modo].pontosPadrao) : undefined,
+      pontuacaoBonus: MODO_CONFIG[modo].temPontuacao ? (moduloForm.pontuacaoBonus || MODO_CONFIG[modo].pontosBonus) : undefined,
+      instrucaoCard: (modo === 'faca_voce_mesmo' || modo === 'missao_conteudo') ? moduloForm.instrucaoCard : undefined,
+      missaoGatilho: modo === 'missao_conteudo' ? { tipo: 'postar_linkedin', instrucoes: moduloForm.instrucaoCard || '' } : undefined,
+    };
+    if (editingModuloIdx !== null) { const u = [...modulos]; u[editingModuloIdx] = m; setModulos(u); }
+    else { setModulos([...modulos, m]); }
+    setModuloDialogOpen(false);
   };
 
-  // ---- Phase type icon ----
-  const phaseIcon = (type: PhaseType) => {
-    switch (type) {
-      case 'texto': return <BookOpen className="h-4 w-4" />;
-      case 'video': return <Video className="h-4 w-4" />;
-      case 'quiz': return <HelpCircle className="h-4 w-4" />;
-    }
-  };
+  const addQuestao = () => setQuestoes([...questoes, { pergunta: '', opcoes: ['','','',''], respostaCorreta: 0 }]);
+  const updateQuestao = (qi: number, field: string, val: any) => { const u = [...questoes]; if (field === 'pergunta') u[qi].pergunta = val; else u[qi].respostaCorreta = val; setQuestoes(u); };
+  const updateOpcao = (qi: number, oi: number, val: string) => { const u = [...questoes]; u[qi].opcoes[oi] = val; setQuestoes(u); };
 
-  // ---- Render ----
-  if (isLoading) {
+  // ============================================================
+  // MAIN RETURN
+  // ============================================================
+  if (builderOpen) {
     return (
-      <div className="flex flex-col gap-6 p-6">
-        <Header title="Trilhas de Aprendizado" subtitle="Gerencie as trilhas de capacitacao da sua equipe" />
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="p-6 max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => setBuilderOpen(false)}>
+            <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
+          </Button>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold">{editingTrail ? 'Editar Trilha' : 'Nova Trilha'}</h2>
+            <p className="text-muted-foreground">Sessao: {selectedSession?.titulo}</p>
+          </div>
+          <Button onClick={saveCompanyTrail} disabled={saving} className="bg-purple-600 hover:bg-purple-700">
+            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Salvar
+          </Button>
         </div>
+
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div><Label>Titulo</Label><Input value={trailForm.titulo} onChange={e => setTrailForm({...trailForm, titulo: e.target.value})} placeholder="Nome da trilha" /></div>
+            <div><Label>Descricao</Label><Textarea value={trailForm.descricao} onChange={e => setTrailForm({...trailForm, descricao: e.target.value})} /></div>
+            <div><Label>Tempo Estimado (min)</Label><Input type="number" value={trailForm.tempoEstimadoMin} onChange={e => setTrailForm({...trailForm, tempoEstimadoMin: parseInt(e.target.value)||0})} /></div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Modulos ({modulos.length})</CardTitle>
+            <Button size="sm" onClick={() => openModuloDialog()} className="bg-purple-600 hover:bg-purple-700">
+              <Plus className="w-4 h-4 mr-2" /> Adicionar
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {modulos.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">Nenhum modulo. Clique em Adicionar.</p>
+            ) : (
+              <div className="space-y-2">
+                {modulos.map((m, i) => {
+                  const Icon = MODO_ICONS[m.modo];
+                  return (
+                    <div key={m.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                      <span className="text-sm text-gray-400 w-6">{i + 1}</span>
+                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                        <Icon className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{m.titulo}</p>
+                        <p className="text-xs text-muted-foreground">{MODO_LABELS[m.modo]}</p>
+                      </div>
+                      {MODO_CONFIG[m.modo].temPontuacao && <Badge variant="secondary">{m.pontuacaoBase || 0} pts</Badge>}
+                      <Button variant="ghost" size="icon" onClick={() => openModuloDialog(i)}><Pencil className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setModulos(modulos.filter((_,idx) => idx !== i))}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* MODULO DIALOG (builder) */}
+        <Dialog open={moduloDialogOpen} onOpenChange={setModuloDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>{editingModuloIdx !== null ? 'Editar Modulo' : 'Novo Modulo'}</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div><Label>Titulo</Label><Input value={moduloForm.titulo} onChange={e => setModuloForm({...moduloForm, titulo: e.target.value})} /></div>
+              <div><Label>Modo</Label>
+                <Select value={moduloForm.modo} onValueChange={(v: ModuloModo) => setModuloForm({...moduloForm, modo: v, pontuacaoBase: MODO_CONFIG[v].pontosPadrao, pontuacaoBonus: MODO_CONFIG[v].pontosBonus})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{(Object.keys(MODO_LABELS) as ModuloModo[]).map(m => (<SelectItem key={m} value={m}>{MODO_LABELS[m]}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+              {moduloForm.modo === 'aula' && (<div><Label>URL do Video</Label><Input value={moduloForm.videoUrl} onChange={e => setModuloForm({...moduloForm, videoUrl: e.target.value})} /></div>)}
+              {moduloForm.modo === 'leitura' && (<div><Label>Conteudo</Label><Textarea value={moduloForm.conteudoHtml} onChange={e => setModuloForm({...moduloForm, conteudoHtml: e.target.value})} rows={6} /></div>)}
+              {moduloForm.modo === 'desafio' && (
+                <div className="space-y-3">
+                  <div className="flex justify-between"><Label>Questoes ({questoes.length})</Label><Button size="sm" variant="outline" onClick={addQuestao}><Plus className="w-3 h-3 mr-1" /> Add</Button></div>
+                  {questoes.map((q, qi) => (
+                    <Card key={qi} className="p-3 space-y-2">
+                      <Input value={q.pergunta} onChange={e => updateQuestao(qi, 'pergunta', e.target.value)} placeholder="Pergunta..." />
+                      {q.opcoes.map((o, oi) => (
+                        <div key={oi} className="flex items-center gap-2">
+                          <input type="radio" name={`q${qi}`} checked={q.respostaCorreta === oi} onChange={() => updateQuestao(qi, 'respostaCorreta', oi)} />
+                          <Input value={o} onChange={e => updateOpcao(qi, oi, e.target.value)} placeholder={`Opcao ${oi+1}`} className="flex-1" />
+                        </div>
+                      ))}
+                    </Card>
+                  ))}
+                </div>
+              )}
+              {(moduloForm.modo === 'faca_voce_mesmo' || moduloForm.modo === 'missao_conteudo') && (
+                <div><Label>Instrucoes</Label><Textarea value={moduloForm.instrucaoCard} onChange={e => setModuloForm({...moduloForm, instrucaoCard: e.target.value})} rows={4} /></div>
+              )}
+              {MODO_CONFIG[moduloForm.modo as ModuloModo]?.temPontuacao && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div><Label>Pts Base</Label><Input type="number" value={moduloForm.pontuacaoBase} onChange={e => setModuloForm({...moduloForm, pontuacaoBase: parseInt(e.target.value)||0})} /></div>
+                  <div><Label>Pts Bonus</Label><Input type="number" value={moduloForm.pontuacaoBonus} onChange={e => setModuloForm({...moduloForm, pontuacaoBonus: parseInt(e.target.value)||0})} /></div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setModuloDialogOpen(false)}>Cancelar</Button>
+              <Button onClick={saveModulo} className="bg-purple-600 hover:bg-purple-700">{editingModuloIdx !== null ? 'Salvar' : 'Adicionar'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
 
+  // ============================================================
+  // MAIN VIEW (Tabs: Global + Custom)
+  // ============================================================
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <Header title="Trilhas de Aprendizado" subtitle="Gerencie as trilhas de capacitacao da sua equipe" />
-        <Button onClick={openCreateDialog}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Trilha
-        </Button>
+        <div>
+          <h2 className="text-2xl font-bold">Trilhas de Aprendizagem</h2>
+          <p className="text-muted-foreground">Ative trilhas globais ou crie trilhas personalizadas</p>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total de Trilhas</CardDescription>
-            <CardTitle className="text-2xl">{trails.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Trilhas Ativas</CardDescription>
-            <CardTitle className="text-2xl">{trails.filter(t => t.active).length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total de Fases</CardDescription>
-            <CardTitle className="text-2xl">{trails.reduce((acc, t) => acc + (t.phases?.length || 0), 0)}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-purple-500" /></div>
+      ) : (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="global" className="flex items-center gap-2">
+              <Globe className="w-4 h-4" /> Trilhas Globais
+            </TabsTrigger>
+            <TabsTrigger value="custom" className="flex items-center gap-2">
+              <Building2 className="w-4 h-4" /> Trilhas da Empresa
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Trails list */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Trilhas</CardTitle>
-          <CardDescription>Clique em uma trilha para ver suas fases</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {trails.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground">
-              <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhuma trilha criada ainda.</p>
-              <p className="text-sm">Clique em &quot;Nova Trilha&quot; para comecar.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {trails.map((trail) => (
-                <div key={trail.id} className="border rounded-lg">
-                  <div
-                    className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50"
-                    onClick={() => setExpandedTrail(expandedTrail === trail.id ? null : trail.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="font-medium">{trail.title}</p>
-                        <p className="text-sm text-muted-foreground">{trail.description}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={trail.active ? "default" : "secondary"}>
-                        {trail.active ? 'Ativa' : 'Inativa'}
-                      </Badge>
-                      <Badge variant="outline">{trail.phases?.length || 0} fases</Badge>
-                      <Badge variant="outline">{trail.pointsReward} pts</Badge>
-                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEditDialog(trail); }}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); toggleActive(trail); }}>
-                        {trail.active ? 'Desativar' : 'Ativar'}
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(trail.id); }}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      {expandedTrail === trail.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </div>
-                  </div>
-
-                  {/* Expanded phases */}
-                  {expandedTrail === trail.id && trail.phases && trail.phases.length > 0 && (
-                    <div className="border-t px-4 pb-4">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-12">#</TableHead>
-                            <TableHead>Fase</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Detalhes</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {trail.phases.map((phase, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell>{idx + 1}</TableCell>
-                              <TableCell className="font-medium">{phase.title || `Fase ${idx + 1}`}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  {phaseIcon(phase.type)}
-                                  <span className="capitalize">{phase.type}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-muted-foreground text-sm">
-                                {phase.type === 'quiz' && phase.quiz ? `${phase.quiz.length} pergunta(s)` : ''}
-                                {phase.type === 'video' ? phase.content?.substring(0, 50) : ''}
-                                {phase.type === 'texto' ? `${(phase.content || '').length} caracteres` : ''}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Create/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) { setIsDialogOpen(false); resetForm(); } }}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingTrail ? 'Editar Trilha' : 'Nova Trilha'}</DialogTitle>
-            <DialogDescription>{editingTrail ? 'Edite os dados da trilha' : 'Crie uma nova trilha de aprendizado'}</DialogDescription>
-          </DialogHeader>
-        <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-          {/* Basic info */}
-          <div className="space-y-4">
-            <div>
-              <Label>Titulo da Trilha *</Label>
-              <Input value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="Ex: Onboarding Comercial" />
-            </div>
-            <div>
-              <Label>Descricao</Label>
-              <Input value={formDescription} onChange={(e) => setFormDescription(e.target.value)} placeholder="Descricao breve da trilha" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Pontos ao Completar</Label>
-                <Input type="number" value={formPoints} onChange={(e) => setFormPoints(Number(e.target.value))} min={0} />
-              </div>
-              <div>
-                <Label>Status</Label>
-                <Select value={formActive ? 'true' : 'false'} onValueChange={(v) => setFormActive(v === 'true')}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="true">Ativa</SelectItem>
-                    <SelectItem value="false">Inativa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Phases */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <Label className="text-base font-semibold">Fases da Trilha ({formPhases.length})</Label>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={() => addPhase('texto')}>
-                  <BookOpen className="h-3 w-3 mr-1" /> Texto
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => addPhase('video')}>
-                  <Video className="h-3 w-3 mr-1" /> Video
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => addPhase('quiz')}>
-                  <HelpCircle className="h-3 w-3 mr-1" /> Quiz
-                </Button>
-              </div>
-            </div>
-
-            {formPhases.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Adicione fases clicando nos botoes acima
-              </p>
-            )}
-
-            <div className="space-y-4">
-              {formPhases.map((phase, pIdx) => (
-                <Card key={pIdx} className="border-l-4 border-l-primary">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {phaseIcon(phase.type)}
-                        <span className="text-sm font-medium capitalize">Fase {pIdx + 1} - {phase.type}</span>
-                      </div>
-                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => removePhase(pIdx)}>
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
+          {/* TAB: Global Trails */}
+          <TabsContent value="global" className="space-y-4 mt-4">
+            {globalSessions.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Globe className="w-12 h-12 text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">Nenhuma trilha global disponivel</p>
+                  <p className="text-muted-foreground">O administrador master ainda nao criou trilhas globais</p>
+                </CardContent>
+              </Card>
+            ) : (
+              globalSessions.map(session => (
+                <Card key={session.id}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <FolderOpen className="w-5 h-5 text-purple-500" />
+                      {session.titulo}
+                    </CardTitle>
+                    <CardDescription>{session.descricao}</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <Label>Titulo da Fase</Label>
-                      <Input value={phase.title} onChange={(e) => updatePhase(pIdx, 'title', e.target.value)} placeholder="Ex: Introducao ao produto" />
-                    </div>
-
-                    {phase.type === 'texto' && (
-                      <div>
-                        <Label>Conteudo</Label>
-                        <Textarea
-                          className="min-h-[100px]"
-                          value={phase.content}
-                          onChange={(e) => updatePhase(pIdx, 'content', e.target.value)}
-                          placeholder="Digite o conteudo da fase..."
-                        />
-                      </div>
-                    )}
-
-                    {phase.type === 'video' && (
-                      <div>
-                        <Label>URL do Video</Label>
-                        <Input value={phase.content} onChange={(e) => updatePhase(pIdx, 'content', e.target.value)} placeholder="https://youtube.com/watch?v=..." />
-                      </div>
-                    )}
-
-                    {phase.type === 'quiz' && (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <Label>Perguntas ({phase.quiz?.length || 0})</Label>
-                          <Button size="sm" variant="outline" onClick={() => addQuizQuestion(pIdx)}>
-                            <Plus className="h-3 w-3 mr-1" /> Pergunta
-                          </Button>
-                        </div>
-
-                        {phase.quiz?.map((q, qIdx) => (
-                          <Card key={qIdx} className="bg-muted/30">
-                            <CardContent className="pt-4 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <Label>Pergunta {qIdx + 1}</Label>
-                                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => removeQuizQuestion(pIdx, qIdx)}>
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                              <Input
-                                value={q.question}
-                                onChange={(e) => updateQuizQuestion(pIdx, qIdx, 'question', e.target.value)}
-                                placeholder="Digite a pergunta..."
-                              />
-                              <div className="space-y-2">
-                                {q.options.map((opt, oIdx) => (
-                                  <div key={oIdx} className="flex items-center gap-2">
-                                    <input
-                                      type="radio"
-                                      name={`q-${pIdx}-${qIdx}`}
-                                      checked={q.correctAnswer === oIdx}
-                                      onChange={() => updateQuizQuestion(pIdx, qIdx, 'correctAnswer', oIdx)}
-                                      className="h-4 w-4"
-                                    />
-                                    <Input
-                                      value={opt}
-                                      onChange={(e) => updateQuizOption(pIdx, qIdx, oIdx, e.target.value)}
-                                      placeholder={`Opcao ${oIdx + 1}`}
-                                      className="flex-1"
-                                    />
+                  <CardContent>
+                    {(globalTrailsBySession[session.id] || []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma trilha nesta sessao</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {(globalTrailsBySession[session.id] || []).map(trail => {
+                          const isActive = activatedTrailIds.has(trail.id);
+                          const isToggling = togglingTrail === trail.id;
+                          return (
+                            <div key={trail.id} className={`flex items-center justify-between p-3 rounded-lg border ${isActive ? 'bg-purple-50 border-purple-200' : 'bg-gray-50'}`}>
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                <div>
+                                  <p className="font-medium text-sm">{trail.titulo}</p>
+                                  <p className="text-xs text-muted-foreground">{trail.descricao}</p>
+                                  <div className="flex gap-2 mt-1">
+                                    <Badge variant="secondary">{trail.modulos?.length || 0} modulos</Badge>
+                                    <Badge variant="secondary">{trail.pontuacaoTotal || 0} pts</Badge>
+                                    <Badge variant="outline">{trail.tempoEstimadoMin || 0} min</Badge>
                                   </div>
-                                ))}
+                                </div>
                               </div>
-                              <p className="text-xs text-muted-foreground">Selecione o radio da resposta correta</p>
-                            </CardContent>
-                          </Card>
-                        ))}
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="icon" onClick={() => {
+                                  setAnalyticsTrail({ trailId: trail.id, titulo: trail.titulo, totalInscritos: 0, emProgresso: 0, concluidos: 0, naoIniciados: 0, pontuacaoMedia: 0, taxaConclusao: 0 });
+                                  setAnalyticsOpen(true);
+                                }}>
+                                  <BarChart3 className="w-4 h-4 text-blue-500" />
+                                </Button>
+                                <div className="flex items-center gap-2">
+                                  {isToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                                    <Switch checked={isActive} onCheckedChange={() => toggleGlobalTrail(trail, session.id)} />
+                                  )}
+                                  <span className="text-xs text-muted-foreground w-16">{isActive ? 'Ativada' : 'Desativada'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          </div>
+              ))
+            )}
+          </TabsContent>
 
-          {/* Save button */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              {editingTrail ? 'Salvar Alteracoes' : 'Criar Trilha'}
-            </Button>
+          {/* TAB: Custom Company Trails */}
+          <TabsContent value="custom" className="space-y-4 mt-4">
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => { setSessionForm({ titulo: '', descricao: '' }); setSessionDialogOpen(true); }}>
+                <FolderOpen className="w-4 h-4 mr-2" /> Nova Sessao
+              </Button>
+            </div>
+
+            {companySessions.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Building2 className="w-12 h-12 text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">Nenhuma sessao personalizada</p>
+                  <p className="text-muted-foreground mb-4">Crie sessoes e trilhas exclusivas da sua empresa</p>
+                  <Button variant="outline" onClick={() => { setSessionForm({ titulo: '', descricao: '' }); setSessionDialogOpen(true); }}>
+                    <Plus className="w-4 h-4 mr-2" /> Criar Sessao
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              companySessions.map(session => (
+                <Card key={session.id}>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Building2 className="w-5 h-5 text-blue-500" />
+                        {session.titulo}
+                      </CardTitle>
+                      <CardDescription>{session.descricao}</CardDescription>
+                    </div>
+                    <Button size="sm" onClick={() => openBuilder(session)} className="bg-purple-600 hover:bg-purple-700">
+                      <Plus className="w-4 h-4 mr-2" /> Nova Trilha
+                    </Button>
+                  </CardHeader>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {/* SESSION DIALOG */}
+      <Dialog open={sessionDialogOpen} onOpenChange={setSessionDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Nova Sessao</DialogTitle><DialogDescription>Crie uma sessao personalizada</DialogDescription></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Titulo</Label><Input value={sessionForm.titulo} onChange={e => setSessionForm({...sessionForm, titulo: e.target.value})} /></div>
+            <div><Label>Descricao</Label><Textarea value={sessionForm.descricao} onChange={e => setSessionForm({...sessionForm, descricao: e.target.value})} /></div>
           </div>
-        </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSessionDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={saveCompanySession} disabled={saving} className="bg-purple-600 hover:bg-purple-700">
+              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ANALYTICS DIALOG */}
+      <Dialog open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Analytics: {analyticsTrail?.titulo}</DialogTitle>
+            <DialogDescription>Metricas de engajamento</DialogDescription>
+          </DialogHeader>
+          {analyticsTrail && (
+            <div className="grid grid-cols-2 gap-4">
+              <Card><CardContent className="pt-4 text-center">
+                <p className="text-2xl font-bold text-blue-600">{analyticsTrail.totalInscritos}</p>
+                <p className="text-xs text-muted-foreground">Total Disponiveis</p>
+              </CardContent></Card>
+              <Card><CardContent className="pt-4 text-center">
+                <p className="text-2xl font-bold text-yellow-600">{analyticsTrail.emProgresso}</p>
+                <p className="text-xs text-muted-foreground">Em Progresso</p>
+              </CardContent></Card>
+              <Card><CardContent className="pt-4 text-center">
+                <p className="text-2xl font-bold text-green-600">{analyticsTrail.concluidos}</p>
+                <p className="text-xs text-muted-foreground">Concluidos</p>
+              </CardContent></Card>
+              <Card><CardContent className="pt-4 text-center">
+                <p className="text-2xl font-bold text-gray-500">{analyticsTrail.naoIniciados}</p>
+                <p className="text-xs text-muted-foreground">Nao Iniciados</p>
+              </CardContent></Card>
+              <Card className="col-span-2"><CardContent className="pt-4 text-center">
+                <p className="text-2xl font-bold text-purple-600">{analyticsTrail.pontuacaoMedia.toFixed(1)}</p>
+                <p className="text-xs text-muted-foreground">Pontuacao Media</p>
+              </CardContent></Card>
+            </div>
+          )}
+          <DialogFooter><Button variant="outline" onClick={() => setAnalyticsOpen(false)}>Fechar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
