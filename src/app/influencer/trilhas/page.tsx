@@ -5,7 +5,7 @@ import { db, auth } from '@/lib/firebase';
 import {
   collection, doc, getDocs, getDoc, query, orderBy
 } from 'firebase/firestore';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,12 @@ interface SessionWithTrails {
 }
 
 export default function ColaboradorTrilhasPage() {
-  const [user] = useAuthState(auth);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsubscribe();
+  }, []);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionsWithTrails, setSessionsWithTrails] = useState<SessionWithTrails[]>([]);
