@@ -28,6 +28,7 @@ import {
   ArrowLeft, Loader2, Eye, Save, FolderOpen, ToggleLeft
 } from 'lucide-react';
 import type { Sessao, Trilha, Modulo, ModuloModo, QuestaoDesafio, TrilhaAnalytics } from '@/types/trilhas';
+import { Header } from '@/components/dashboard/header';
 
 const MODO_LABELS: Record<ModuloModo, string> = {
   aula: 'Aula (Video)', leitura: 'Leitura', desafio: 'Desafio (Quiz)',
@@ -309,7 +310,7 @@ export default function AdminTrilhasPage() {
   // ============================================================
   if (builderOpen) {
     return (
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={() => setBuilderOpen(false)}>
             <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
@@ -421,12 +422,9 @@ export default function AdminTrilhasPage() {
   // MAIN VIEW (Tabs: Global + Custom)
   // ============================================================
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Trilhas de Aprendizagem</h2>
-          <p className="text-muted-foreground">Ative trilhas globais ou crie trilhas personalizadas</p>
-        </div>
+    <>
+      <Header title="Trilhas" />
+      <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
       </div>
 
       {loading ? (
@@ -601,6 +599,7 @@ export default function AdminTrilhasPage() {
           <DialogFooter><Button variant="outline" onClick={() => setAnalyticsOpen(false)}>Fechar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </main>
+    </>
   );
 }
