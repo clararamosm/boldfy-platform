@@ -1,5 +1,4 @@
 'use client';
-      toast({ title: 'Trilha salva com sucesso!' });
 
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
@@ -747,6 +746,7 @@ export default function MasterTrilhasPage() {
 
             {/* MODO: AULA */}
             {moduloForm.modo === 'aula' && (
+              <>
               <div>
                 <Label>URL do Video (YouTube)</Label>
                 <Input value={moduloForm.videoUrl} onChange={e => setModuloForm({...moduloForm, videoUrl: e.target.value})} placeholder="Cole o link do YouTube aqui" />
@@ -760,6 +760,7 @@ export default function MasterTrilhasPage() {
                   onChange={(e) => setModuloForm({...moduloForm, materialPdfUrl: e.target.value})}
                 />
               </div>
+              </>
             )}
 
             {/* MODO: LEITURA */}
