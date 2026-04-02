@@ -40,7 +40,7 @@ export default function InfluencerLayout({ children }: { children: React.ReactNo
                     router.push('/login');
                     return;
                 }
-                setUser({ name: data.name, email: data.email, role: data.role });
+                setUser({ name: data.profile?.name || data.name || '', email: data.profile?.email || data.email || '', role: data.role });
             } else {
                 router.push('/login');
             }
