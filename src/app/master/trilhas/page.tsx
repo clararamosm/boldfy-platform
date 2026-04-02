@@ -112,6 +112,7 @@ export default function MasterTrilhasPage() {
       setSessions(data);
     } catch (err) {
       console.error('Erro ao carregar sessoes:', err);
+      toast({ variant: 'destructive', title: 'Erro ao carregar sessoes', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     } finally {
       setLoading(false);
     }
@@ -130,6 +131,7 @@ export default function MasterTrilhasPage() {
       return snap.docs.map(d => ({ id: d.id, ...d.data() } as Trilha));
     } catch (err) {
       console.error('Erro ao carregar trilhas:', err);
+      toast({ variant: 'destructive', title: 'Erro ao carregar trilhas', description: err instanceof Error ? err.message : 'Erro desconhecido' });
       return [];
     }
   }, []);
@@ -170,10 +172,12 @@ export default function MasterTrilhasPage() {
           criadaEm: Timestamp.now(),
         });
       }
+      toast({ title: 'Sessao salva com sucesso!' });
       setSessionDialogOpen(false);
       loadSessions();
     } catch (err) {
       console.error('Erro ao salvar sessao:', err);
+      toast({ variant: 'destructive', title: 'Erro ao salvar sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     } finally {
       setSaving(false);
     }
@@ -188,9 +192,11 @@ export default function MasterTrilhasPage() {
       trailsSnap.docs.forEach(d => batch.delete(d.ref));
       batch.delete(doc(db, 'globalSessions', sessionId));
       await batch.commit();
+      toast({ title: 'Sessao excluida com sucesso!' });
       loadSessions();
     } catch (err) {
       console.error('Erro ao excluir sessao:', err);
+      toast({ variant: 'destructive', title: 'Erro ao excluir sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     }
   };
 
@@ -200,9 +206,11 @@ export default function MasterTrilhasPage() {
         ativa: !session.ativa,
         atualizadaEm: Timestamp.now(),
       });
+      toast({ title: 'Status alterado com sucesso!' });
       loadSessions();
     } catch (err) {
       console.error('Erro ao alterar status:', err);
+      toast({ variant: 'destructive', title: 'Erro ao alterar status', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     }
   };
 
@@ -231,12 +239,13 @@ export default function MasterTrilhasPage() {
     let total = 0;
     let bonus = 0;
     mods.forEach(m => {
-      if (m.modo === 'aula') { total += 80; bonus += 20; }
-      else if (m.modo === 'leitura') { total += 40; bonus += 20; }
+      if (m.modo === 'aula') { total += (m.pontuacaoBase || 80); }
+      else if (m.modo === 'leitura') { total += (m.pontuacaoBase || 40); }
       else if (m.modo === 'desafio') {
         total += (m.pontuacaoBase || 100);
         bonus += (m.pontuacaoBonus || 50);
       }
+      else if (m.modo === 'missao_conteudo') { total += (m.pontuacaoBase || 50); }
     });
     return { total, bonus };
   };
@@ -275,12 +284,13 @@ export default function MasterTrilhasPage() {
         );
       }
       setViewMode('trails');
+      toast({ title: 'Trilha salva com sucesso!' });
       // Reload trails for this session
       const updatedTrails = await loadTrails(selectedSession.id);
       setTrails(updatedTrails);
     } catch (err) {
       console.error('Erro ao salvar trilha:', err);
-      toast({ variant: 'destructive', title: 'Erro ao salvar', description: error instanceof Error ? error.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: 'Erro ao salvar trilha', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     } finally {
       setSaving(false);
     }
@@ -290,10 +300,12 @@ export default function MasterTrilhasPage() {
     if (!selectedSession || !confirm('Excluir esta trilha?')) return;
     try {
       await deleteDoc(doc(db, `globalSessions/${selectedSession.id}/trails`, trailId));
+      toast({ title: 'Trilha excluida com sucesso!' });
       const updatedTrails = await loadTrails(selectedSession.id);
       setTrails(updatedTrails);
     } catch (err) {
       console.error('Erro ao excluir trilha:', err);
+      toast({ variant: 'destructive', title: 'Erro ao excluir trilha', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     }
   };
 
