@@ -135,7 +135,7 @@ export default function TrilhaFullscreenPage() {
 
         // Load progress
         const progSnap = await getDoc(
-          doc(db, 'companies', companyId, 'collaborators', user.uid, 'trailProgress', id as string)
+          doc(db, 'users', user.uid, 'trailProgress', id as string)
         );
         if (progSnap.exists()) {
           const p = progSnap.data() as ProgressoTrilha;
@@ -156,7 +156,7 @@ export default function TrilhaFullscreenPage() {
             iniciadaEm: Timestamp.now(),
           };
           await setDoc(
-            doc(db, 'companies', companyId, 'collaborators', user.uid, 'trailProgress', id as string),
+            doc(db, 'users', user.uid, 'trailProgress', id as string),
             initial
           );
           setProgress(initial);
@@ -209,7 +209,7 @@ export default function TrilhaFullscreenPage() {
     setSaving(true);
     try {
       await setDoc(
-        doc(db, 'companies', companyId, 'collaborators', user.uid, 'trailProgress', id as string),
+        doc(db, 'users', user.uid, 'trailProgress', id as string),
         updatedProgress,
         { merge: true }
       );
