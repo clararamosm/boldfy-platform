@@ -74,11 +74,12 @@ export default function SettingsPage() {
 
             if (userSnapshot.exists()) {
                 const data = userSnapshot.data();
-                setProfile({
-                    name: data.name || '',
-                    email: data.email || '',
-                    company: data.companyId || '',
-                });
+          setProfile({
+            name: data.profile?.name || data.name || '',
+            email: data.profile?.email || data.email || '',
+            company: data.companyName || '',
+            photoURL: data.photoURL || '',
+          });
                 setBranding({
                     voice: data.voice || 'amigavel',
                     expertise: data.expertise || '',
@@ -167,9 +168,6 @@ export default function SettingsPage() {
         try {
             const userDocRef = doc(db, 'users', currentUserId);
             await setDoc(userDocRef, {
-                name: profile.name,
-                email: profile.email,
-                companyId: profile.company,
                 voice: branding.voice,
                 expertise: branding.expertise,
                 value: branding.value,
@@ -245,9 +243,9 @@ export default function SettingsPage() {
                                             <Input
                                                 id="name"
                                                 value={profile.name}
-                                                onChange={(e) =>
-                                                    setProfile({ ...profile, name: e.target.value })
-                                                }
+                                                readOnly
+                                                disabled
+                                                className="bg-muted cursor-not-allowed"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -256,9 +254,9 @@ export default function SettingsPage() {
                                                 id="email"
                                                 type="email"
                                                 value={profile.email}
-                                                onChange={(e) =>
-                                                    setProfile({ ...profile, email: e.target.value })
-                                                }
+                                                readOnly
+                                                disabled
+                                                className="bg-muted cursor-not-allowed"
                                             />
                                         </div>
                                         <div className="space-y-2 md:col-span-2">
@@ -266,10 +264,11 @@ export default function SettingsPage() {
                                             <Input
                                                 id="company"
                                                 value={profile.company}
-                                                onChange={(e) =>
-                                                    setProfile({ ...profile, company: e.target.value })
-                                                }
+                                                readOnly
+                                                disabled
+                                                className="bg-muted cursor-not-allowed"
                                             />
+                                            <p className="text-xs text-muted-foreground">Estes campos são gerenciados pelo administrador da sua empresa.</p>
                                         </div>
                                     </div>
                                 </CardContent>
