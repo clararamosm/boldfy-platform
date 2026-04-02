@@ -262,7 +262,7 @@ export default function AdminTrilhasPage() {
         pontuacaoTotal: total,
         pontuacaoBonus: bonus,
         tempoEstimadoMin: trailForm.tempoEstimadoMin,
-        modulos: modulos.map((m, i) => ({ ...m, ordem: i })),
+        modulos: modulos.map((m, i) => Object.fromEntries(Object.entries({ ...m, ordem: i }).filter(([_, v]) => v !== undefined))),
         atualizadaEm: Timestamp.now(),
       };
 
