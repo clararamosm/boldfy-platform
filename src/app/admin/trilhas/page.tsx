@@ -132,6 +132,7 @@ export default function AdminTrilhasPage() {
       setActivatedTrailIds(actIds);
     } catch (err) {
       console.error('Erro ao carregar trilhas globais:', err);
+      toast({ variant: 'destructive', title: 'Erro ao carregar trilhas', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     } finally {
       setLoading(false);
     }
@@ -150,6 +151,7 @@ export default function AdminTrilhasPage() {
       setCompanySessions(sessions);
     } catch (err) {
       console.error('Erro ao carregar sessoes da empresa:', err);
+      toast({ variant: 'destructive', title: 'Erro ao carregar sessoes', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     }
   }, [companyId]);
 
@@ -183,8 +185,10 @@ export default function AdminTrilhasPage() {
         });
         setActivatedTrailIds(prev => { const next = new Set(prev); next.add(trail.id); return next; });
       }
+      toast({ title: 'Trilha alterada com sucesso!' });
     } catch (err) {
       console.error('Erro ao alterar trilha:', err);
+      toast({ variant: 'destructive', title: 'Erro ao alterar trilha', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     } finally {
       setTogglingTrail(null);
     }
@@ -204,11 +208,13 @@ export default function AdminTrilhasPage() {
         ativa: true,
         criadaEm: Timestamp.now(),
       });
+      toast({ title: 'Sessao criada com sucesso!' });
       setSessionDialogOpen(false);
       setSessionForm({ titulo: '', descricao: '' });
       loadCompanyData();
     } catch (err) {
       console.error('Erro ao criar sessao:', err);
+      toast({ variant: 'destructive', title: 'Erro ao criar sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     } finally {
       setSaving(false);
     }
@@ -241,9 +247,10 @@ export default function AdminTrilhasPage() {
     try {
       let total = 0, bonus = 0;
       modulos.forEach(m => {
-        if (m.modo === 'aula') { total += 80; bonus += 20; }
-        else if (m.modo === 'leitura') { total += 40; bonus += 20; }
+        if (m.modo === 'aula') { total += (m.pontuacaoBase || 80); }
+        else if (m.modo === 'leitura') { total += (m.pontuacaoBase || 40); }
         else if (m.modo === 'desafio') { total += (m.pontuacaoBase || 100); bonus += (m.pontuacaoBonus || 50); }
+      else if (m.modo === 'missao_conteudo') { total += (m.pontuacaoBase || 50); }
       });
 
       const trailData = {
