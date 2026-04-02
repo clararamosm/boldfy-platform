@@ -92,7 +92,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                     router.push('/login');
                     return;
                 }
-                setUser({ name: data.name, email: data.email, role: data.role });
+                setUser({ name: data.profile?.name || data.name || '', email: data.profile?.email || data.email || '', role: data.role });
                 // Master: usar companyId da URL; Admin: usar do doc
                 if (data.role === 'master') {
                     const urlCompanyId = searchParams.get('companyId');
