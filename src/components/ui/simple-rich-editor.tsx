@@ -2,10 +2,6 @@
 
 import React, { useRef, useCallback } from 'react';
 import { Bold, Italic, Underline, Highlighter, Palette } from 'lucide-react';
-import { cn } from '@/lib/utils';'use client';
-
-import React, { useRef, useCallback } from 'react';
-import { Bold, Italic, Underline, Highlighter, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SimpleRichEditorProps {
