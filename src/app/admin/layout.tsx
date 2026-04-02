@@ -154,6 +154,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                             </Avatar>
                             <div className="flex flex-col items-start group-data-[state=collapsed]:hidden">
                                 <span className="text-sm font-medium">{user?.name || ''}</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[140px]">{user?.email || ''}</span>
                                 <span className="text-xs text-muted-foreground">{user?.role || ''}</span>
                             </div>
                         </Button>
