@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { Bold, Italic, Underline, Highlighter, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -11,19 +11,38 @@ interface SimpleRichEditorProps {
   className?: string;
 }
 
-export function SimpleRichEditor({ value, onChange, placeholder = 'Digite o conteudo aqui...', className }: SimpleRichEditorProps) {
+export function SimpleRichEditor({
+  value,
+  onChange,
+  placeholder = 'Digite o conteudo aqui...',
+  className
+}: SimpleRichEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const colorRef = useRef<HTMLInputElement>(null);
+  const isInternalChange = useRef(false);
+
+  // Only set innerHTML when value changes externally (not from user typing)
+  useEffect(() => {
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
+    }
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value]);
 
   const execCmd = useCallback((command: string, val?: string) => {
     document.execCommand(command, false, val);
     if (editorRef.current) {
+      isInternalChange.current = true;
       onChange(editorRef.current.innerHTML);
     }
   }, [onChange]);
 
   const handleInput = useCallback(() => {
     if (editorRef.current) {
+      isInternalChange.current = true;
       onChange(editorRef.current.innerHTML);
     }
   }, [onChange]);
@@ -34,7 +53,12 @@ export function SimpleRichEditor({ value, onChange, placeholder = 'Digite o cont
     document.execCommand('insertText', false, text);
   }, []);
 
-  const ToolbarBtn = ({ onClick, active, title, children }: { onClick: () => void; active?: boolean; title: string; children: React.ReactNode }) => (
+  const ToolbarBtn = ({ onClick, active, title, children }: {
+    onClick: () => void;
+    active?: boolean;
+    title: string;
+    children: React.ReactNode
+  }) => (
     <button
       type="button"
       onMouseDown={(e) => { e.preventDefault(); onClick(); }}
@@ -85,7 +109,6 @@ export function SimpleRichEditor({ value, onChange, placeholder = 'Digite o cont
         className="min-h-[200px] p-3 text-sm focus:outline-none prose prose-sm max-w-none"
         onInput={handleInput}
         onPaste={handlePaste}
-        dangerouslySetInnerHTML={{ __html: value }}
         data-placeholder={placeholder}
       />
     </div>
