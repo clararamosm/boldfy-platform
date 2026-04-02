@@ -170,7 +170,22 @@ export default function TrilhaFullscreenPage() {
   }, [user, companyId, id]);
 
   // Computed values
-  const sortedModules = useMemo(() => trail?.modulos || [], [trail]);
+  const sortedModules = useMemo(() => {
+    return (trail?.modulos || []).map((m: any) => ({
+      ...m,
+      tipo: m.tipo || m.modo,
+      conteudo: m.conteudo || {
+        texto: m.conteudoHtml,
+        videoUrl: m.videoUrl,
+        materialPdfUrl: m.materialPdfUrl,
+        pontuacaoBase: m.pontuacaoBase,
+        pontuacaoBonus: m.pontuacaoBonus,
+        questoes: m.questoes,
+        instrucao: m.instrucao,
+        exemplos: m.exemplos,
+      },
+    }));
+  }, [trail]);
   const completedCount = useMemo(() => progress?.modulosCompletos?.length || 0, [progress]);
   const totalModules = sortedModules.length;
   const progressPercent = totalModules > 0 ? Math.round((completedCount / totalModules) * 100) : 0;
