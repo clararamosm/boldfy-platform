@@ -91,13 +91,30 @@ export default function TrilhaFullscreenPage() {
       try {
         let trailData: Trilha | null = null;
 
-        // Try global trail first
-        const globalSnap = await getDoc(doc(db, 'globalSessions_trails', id as string));
-        if (globalSnap.exists()) {
-          trailData = { id: globalSnap.id, ...globalSnap.data() } as Trilha;
+        // 1. Try activated global trail: look up sessionId from activatedGlobalTrails
+        const actDoc = await getDoc(doc(db, `companies/${companyId}/activatedGlobalTrails`, id as string));
+        if (actDoc.exists()) {
+          const sessionId = actDoc.data().sessionId;
+          if (sessionId) {
+            const globalSnap = await getDoc(doc(db, `globalSessions/${sessionId}/trails`, id as string));
+            if (globalSnap.exists()) {
+              trailData = { id: globalSnap.id, ...globalSnap.data() } as Trilha;
+            }
+          }
         }
 
-        // Try company custom trail
+        // 2. Try company custom trail (search through company sessions)
+        if (!trailData) {
+          const sessSnap = await getDocs(collection(db, `companies/${companyId}/sessions`));
+          for (const sessDoc of sessSnap.docs) {
+            const tDoc = await getDoc(doc(db, `companies/${companyId}/sessions/${sessDoc.id}/trails`, id as string));
+            if (tDoc.exists()) {
+              trailData = { id: tDoc.id, ...tDoc.data() } as Trilha;
+              break;
+            }
+          }
+        }
+
         if (!trailData) {
           const customSnap = await getDoc(doc(db, 'companies', companyId, 'trails', id as string));
           if (customSnap.exists()) {
