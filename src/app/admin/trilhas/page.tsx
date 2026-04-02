@@ -68,7 +68,7 @@ export default function AdminTrilhasPage() {
 
   // Company custom trails
   const [companySessions, setCompanySessions] = useState<Sessao[]>([]);
-  const [companyTrails, setCompanyTrails] = useState<Trilha[]>([]);
+  const [companyTrailsBySession, setCompanyTrailsBySession] = useState<Record<string, Trilha[]>>({});
   const [selectedSession, setSelectedSession] = useState<Sessao | null>(null);
 
   // Builder state (simplified)
@@ -149,6 +149,16 @@ export default function AdminTrilhasPage() {
       );
       const sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() } as Sessao));
       setCompanySessions(sessions);
+
+      // Load trails for each session
+      const trailsBySession: Record<string, Trilha[]> = {};
+      for (const sess of sessions) {
+        const trailsSnap = await getDocs(
+          query(collection(db, `companies/${companyId}/sessions/${sess.id}/trails`), orderBy('ordem', 'asc'))
+        );
+        trailsBySession[sess.id] = trailsSnap.docs.map(d => ({ id: d.id, ...d.data() } as Trilha));
+      }
+      setCompanyTrailsBySession(trailsBySession);
     } catch (err) {
       console.error('Erro ao carregar sessoes da empresa:', err);
       toast({ variant: 'destructive', title: 'Erro ao carregar sessoes', description: err instanceof Error ? err.message : 'Erro desconhecido' });
@@ -247,10 +257,11 @@ export default function AdminTrilhasPage() {
     try {
       let total = 0, bonus = 0;
       modulos.forEach(m => {
-        if (m.modo === 'aula') { total += (m.pontuacaoBase || 80); }
-        else if (m.modo === 'leitura') { total += (m.pontuacaoBase || 40); }
-        else if (m.modo === 'desafio') { total += (m.pontuacaoBase || 100); bonus += (m.pontuacaoBonus || 50); }
-      else if (m.modo === 'missao_conteudo') { total += (m.pontuacaoBase || 50); }
+        const cfg = MODO_CONFIG[m.modo];
+        if (cfg && cfg.temPontuacao) {
+          total += (m.pontuacaoBase || cfg.pontosPadrao);
+          bonus += (m.pontuacaoBonus || cfg.pontosBonus);
+        }
       });
 
       const trailData = {
@@ -547,7 +558,9 @@ export default function AdminTrilhasPage() {
                 </CardContent>
               </Card>
             ) : (
-              companySessions.map(session => (
+              companySessions.map(session => {
+                const sessionTrails = companyTrailsBySession[session.id] || [];
+                return (
                 <Card key={session.id}>
                   <CardHeader className="flex flex-row items-center justify-between">
                     <div>
@@ -561,8 +574,45 @@ export default function AdminTrilhasPage() {
                       <Plus className="w-4 h-4 mr-2" /> Nova Trilha
                     </Button>
                   </CardHeader>
+                  <CardContent>
+                    {sessionTrails.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">Nenhuma trilha nesta sessao. Clique em &quot;Nova Trilha&quot; para criar.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {sessionTrails.map(trail => (
+                          <div key={trail.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                            <div className="flex-1">
+                              <p className="font-medium">{trail.titulo}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="secondary"><Zap className="w-3 h-3 mr-1" />{trail.pontuacaoTotal || 0} pts</Badge>
+                                <Badge variant="outline">{(trail.modulos || []).length} modulos</Badge>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => openBuilder(session, trail)}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={async () => {
+                                if (!companyId || !confirm('Excluir esta trilha?')) return;
+                                try {
+                                  await deleteDoc(doc(db, `companies/${companyId}/sessions/${session.id}/trails`, trail.id));
+                                  loadCompanyData();
+                                  toast({ title: 'Trilha excluida com sucesso' });
+                                } catch (err) {
+                                  toast({ variant: 'destructive', title: 'Erro ao excluir', description: err instanceof Error ? err.message : 'Erro' });
+                                }
+                              }}>
+                                <Trash2 className="w-4 h-4 text-red-500" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
                 </Card>
-              ))
+                );
+              })
             )}
           </TabsContent>
         </Tabs>
