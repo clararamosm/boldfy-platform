@@ -16,7 +16,7 @@ import {
   Play, BookOpen, HelpCircle, Wrench, Target,
   ArrowLeft, ArrowRight, Loader2, CheckCircle2,
   Trophy, X, Eye, Rocket, Clock, Star, AlertCircle,
-  ChevronLeft, ChevronRight, Menu, Lock, SkipForward
+  ChevronLeft, ChevronRight, Menu, Lock, SkipForward, Zap
 } from 'lucide-react';
 import type {
   Trilha, Modulo, ModuloModo, ProgressoTrilha, QuestaoDesafio
@@ -473,7 +473,7 @@ export default function TrilhaFullscreenPage() {
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div className="space-y-1">
                   <div className="flex items-center justify-center gap-1 text-2xl font-bold text-primary">
-                    <Star className="h-5 w-5" />
+                    <Zap className="h-5 w-5 text-yellow-500" />
                     {trail.pontuacaoTotal || 0}
                   </div>
                   <p className="text-xs text-muted-foreground">Pontos disponiveis</p>
@@ -624,8 +624,8 @@ export default function TrilhaFullscreenPage() {
             <Badge variant="secondary">
               <Star className="h-3 w-3 mr-1" />
               {currentModule.tipo === 'desafio'
-                ? (currentModule.conteudo?.pontuacaoBase || 0) + ' pts'
-                : (currentModule.pontuacao || 0) + ' pts'}
+                ? (currentModule.conteudo?.pontuacaoBase || 0) + ' pontos'
+                : (currentModule.pontuacao || 0) + ' pontos'}
             </Badge>
           )}
           {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
