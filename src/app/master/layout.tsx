@@ -85,9 +85,9 @@ export default function MasterLayout({ children }: { children: React.ReactNode }
                   {user?.name?.substring(0, 2).toUpperCase() || 'MA'}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex flex-col items-start group-data-[state=collapsed]:hidden">
-                <span className="text-sm font-medium">{user?.name || ''}</span>
-                <span className="text-xs text-muted-foreground">{user?.email || ''}</span>
+              <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
+                <span className="text-sm font-medium truncate max-w-[150px]">{(user?.name || '').split(' ')[0]}</span>
+                <span className="text-xs text-muted-foreground truncate max-w-[150px]">Master</span>
               </div>
             </Button>
           </DropdownMenuTrigger>
