@@ -71,6 +71,12 @@ export default function AdminTrilhasPage() {
   const [companyTrailsBySession, setCompanyTrailsBySession] = useState<Record<string, Trilha[]>>({});
   const [selectedSession, setSelectedSession] = useState<Sessao | null>(null);
 
+  // Session editing (company)
+  const [editSessionDialogOpen, setEditSessionDialogOpen] = useState(false);
+  const [editingCompanySession, setEditingCompanySession] = useState<Sessao | null>(null);
+  const [editSessionForm, setEditSessionForm] = useState({ titulo: '', descricao: '' });
+  const [togglingSession, setTogglingSession] = useState<string | null>(null);
+
   // Builder state (simplified)
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editingTrail, setEditingTrail] = useState<Trilha | null>(null);
@@ -230,6 +236,59 @@ export default function AdminTrilhasPage() {
     }
   };
 
+  const updateCompanySession = async () => {
+    if (!companyId || !editingCompanySession || !editSessionForm.titulo.trim()) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, `companies/${companyId}/sessions`, editingCompanySession.id), {
+        titulo: editSessionForm.titulo,
+        descricao: editSessionForm.descricao,
+        atualizadaEm: Timestamp.now(),
+      });
+      toast({ title: 'Sessao atualizada com sucesso!' });
+      setEditSessionDialogOpen(false);
+      loadCompanyData();
+    } catch (err) {
+      console.error('Erro ao atualizar sessao:', err);
+      toast({ variant: 'destructive', title: 'Erro ao atualizar sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleCompanySessionActive = async (session: Sessao) => {
+    if (!companyId) return;
+    setTogglingSession(session.id);
+    try {
+      await updateDoc(doc(db, `companies/${companyId}/sessions`, session.id), {
+        ativa: !session.ativa,
+        atualizadaEm: Timestamp.now(),
+      });
+      toast({ title: `Sessao ${session.ativa ? 'desativada' : 'ativada'} com sucesso!` });
+      loadCompanyData();
+    } catch (err) {
+      console.error('Erro ao alterar sessao:', err);
+      toast({ variant: 'destructive', title: 'Erro ao alterar sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+    } finally {
+      setTogglingSession(null);
+    }
+  };
+
+  const toggleCompanyTrailActive = async (trail: Trilha, sessionId: string) => {
+    if (!companyId) return;
+    try {
+      await updateDoc(doc(db, `companies/${companyId}/sessions/${sessionId}/trails`, trail.id), {
+        ativa: !trail.ativa,
+        atualizadaEm: Timestamp.now(),
+      });
+      toast({ title: `Trilha ${trail.ativa ? 'desativada' : 'ativada'} com sucesso!` });
+      loadCompanyData();
+    } catch (err) {
+      console.error('Erro ao alterar trilha:', err);
+      toast({ variant: 'destructive', title: 'Erro ao alterar trilha', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+    }
+  };
+
   // ============================================================
   // Company Trail Builder
   // ============================================================
@@ -384,7 +443,7 @@ export default function AdminTrilhasPage() {
                         <p className="font-medium text-sm">{m.titulo}</p>
                         <p className="text-xs text-muted-foreground">{MODO_LABELS[m.modo]}</p>
                       </div>
-                      {MODO_CONFIG[m.modo].temPontuacao && <Badge variant="secondary">{m.pontuacaoBase || 0} pts</Badge>}
+                      {MODO_CONFIG[m.modo].temPontuacao && <Badge variant="secondary"><Zap className="w-3 h-3 mr-1 text-yellow-500" />{m.pontuacaoBase || 0} pontos</Badge>}
                       <Button variant="ghost" size="icon" onClick={() => openModuloDialog(i)}><Pencil className="w-4 h-4" /></Button>
                       <Button variant="ghost" size="icon" onClick={() => setModulos(modulos.filter((_,idx) => idx !== i))}><Trash2 className="w-4 h-4 text-red-500" /></Button>
                     </div>
@@ -435,8 +494,8 @@ export default function AdminTrilhasPage() {
               )}
               {MODO_CONFIG[moduloForm.modo as ModuloModo]?.temPontuacao && (
                 <div className="grid grid-cols-2 gap-4">
-                  <div><Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pts Base</Label><Input type="number" value={moduloForm.pontuacaoBase} onChange={e => setModuloForm({...moduloForm, pontuacaoBase: parseInt(e.target.value)||0})} /></div>
-                  {moduloForm.modo === 'desafio' && (<div><Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pts Bonus</Label><Input type="number" value={moduloForm.pontuacaoBonus} onChange={e => setModuloForm({...moduloForm, pontuacaoBonus: parseInt(e.target.value)||0})} /></div>)}
+                  <div><Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pontos Base</Label><Input type="number" value={moduloForm.pontuacaoBase} onChange={e => setModuloForm({...moduloForm, pontuacaoBase: parseInt(e.target.value)||0})} /></div>
+                  {moduloForm.modo === 'desafio' && (<div><Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pontos Bonus</Label><Input type="number" value={moduloForm.pontuacaoBonus} onChange={e => setModuloForm({...moduloForm, pontuacaoBonus: parseInt(e.target.value)||0})} /></div>)}
                 </div>
               )}
             </div>
@@ -502,14 +561,14 @@ export default function AdminTrilhasPage() {
                           return (
                             <div key={trail.id} className={`flex items-center justify-between p-3 rounded-lg border ${isActive ? 'bg-purple-50 border-purple-200' : 'bg-gray-50'}`}>
                               <div className="flex items-center gap-3 flex-1">
-                                <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                <div className={`w-2.5 h-2.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
                                 <div>
                                   <p className="font-medium text-sm">{trail.titulo}</p>
-                                  <p className="text-xs text-muted-foreground">{trail.descricao}</p>
+                                  <p className="text-xs text-muted-foreground line-clamp-1">{trail.descricao}</p>
                                   <div className="flex gap-2 mt-1">
-                                    <Badge variant="secondary">{trail.modulos?.length || 0} modulos</Badge>
-                                    <Badge variant="secondary">{trail.pontuacaoTotal || 0} pts</Badge>
-                                    <Badge variant="outline">{trail.tempoEstimadoMin || 0} min</Badge>
+                                    <Badge variant="secondary" className="text-xs">{trail.modulos?.length || 0} modulos</Badge>
+                                    <Badge variant="secondary" className="text-xs"><Zap className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} pontos</Badge>
+                                    <Badge variant="outline" className="text-xs">{trail.tempoEstimadoMin || 0} min</Badge>
                                   </div>
                                 </div>
                               </div>
@@ -560,19 +619,36 @@ export default function AdminTrilhasPage() {
             ) : (
               companySessions.map(session => {
                 const sessionTrails = companyTrailsBySession[session.id] || [];
+                const isSessionToggling = togglingSession === session.id;
                 return (
                 <Card key={session.id}>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <div>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
+                        <div className={`w-2.5 h-2.5 rounded-full ${session.ativa ? 'bg-green-500' : 'bg-gray-300'}`} />
                         <Building2 className="w-5 h-5 text-blue-500" />
                         {session.titulo}
                       </CardTitle>
-                      <CardDescription>{session.descricao}</CardDescription>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
+                          {isSessionToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                            <Switch checked={session.ativa} onCheckedChange={() => toggleCompanySessionActive(session)} />
+                          )}
+                          <span className="text-xs text-muted-foreground w-16">{session.ativa ? 'Ativa' : 'Inativa'}</span>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => {
+                          setEditingCompanySession(session);
+                          setEditSessionForm({ titulo: session.titulo, descricao: session.descricao });
+                          setEditSessionDialogOpen(true);
+                        }}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" onClick={() => openBuilder(session)} className="bg-purple-600 hover:bg-purple-700">
+                          <Plus className="w-4 h-4 mr-2" /> Nova Trilha
+                        </Button>
+                      </div>
                     </div>
-                    <Button size="sm" onClick={() => openBuilder(session)} className="bg-purple-600 hover:bg-purple-700">
-                      <Plus className="w-4 h-4 mr-2" /> Nova Trilha
-                    </Button>
+                    <CardDescription>{session.descricao}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     {sessionTrails.length === 0 ? (
@@ -580,15 +656,26 @@ export default function AdminTrilhasPage() {
                     ) : (
                       <div className="space-y-2">
                         {sessionTrails.map(trail => (
-                          <div key={trail.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                            <div className="flex-1">
-                              <p className="font-medium">{trail.titulo}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="secondary"><Zap className="w-3 h-3 mr-1" />{trail.pontuacaoTotal || 0} pts</Badge>
-                                <Badge variant="outline">{(trail.modulos || []).length} modulos</Badge>
+                          <div key={trail.id} className={`flex items-center justify-between p-3 rounded-lg border ${trail.ativa ? 'bg-purple-50 border-purple-200' : 'bg-gray-50'}`}>
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className={`w-2.5 h-2.5 rounded-full ${trail.ativa ? 'bg-green-500' : 'bg-gray-300'}`} />
+                              <div>
+                                <p className="font-medium text-sm">{trail.titulo}</p>
+                                <p className="text-xs text-muted-foreground line-clamp-1">{trail.descricao}</p>
+                                <div className="flex gap-2 mt-1">
+                                  <Badge variant="secondary" className="text-xs">{(trail.modulos || []).length} modulos</Badge>
+                                  <Badge variant="secondary" className="text-xs"><Zap className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} pontos</Badge>
+                                  <Badge variant="outline" className="text-xs">{trail.tempoEstimadoMin || 0} min</Badge>
+                                </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => {
+                                setAnalyticsTrail({ trailId: trail.id, titulo: trail.titulo, totalInscritos: 0, emProgresso: 0, concluidos: 0, naoIniciados: 0, pontuacaoMedia: 0, taxaConclusao: 0 });
+                                setAnalyticsOpen(true);
+                              }}>
+                                <BarChart3 className="w-4 h-4 text-blue-500" />
+                              </Button>
                               <Button variant="ghost" size="icon" onClick={() => openBuilder(session, trail)}>
                                 <Pencil className="w-4 h-4" />
                               </Button>
@@ -604,6 +691,8 @@ export default function AdminTrilhasPage() {
                               }}>
                                 <Trash2 className="w-4 h-4 text-red-500" />
                               </Button>
+                              <Switch checked={trail.ativa} onCheckedChange={() => toggleCompanyTrailActive(trail, session.id)} />
+                              <span className="text-xs text-muted-foreground w-16">{trail.ativa ? 'Ativada' : 'Desativada'}</span>
                             </div>
                           </div>
                         ))}
@@ -630,6 +719,23 @@ export default function AdminTrilhasPage() {
             <Button variant="outline" onClick={() => setSessionDialogOpen(false)}>Cancelar</Button>
             <Button onClick={saveCompanySession} disabled={saving} className="bg-purple-600 hover:bg-purple-700">
               {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* EDIT SESSION DIALOG (company) */}
+      <Dialog open={editSessionDialogOpen} onOpenChange={setEditSessionDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar Sessao</DialogTitle><DialogDescription>Atualize os dados da sessao</DialogDescription></DialogHeader>
+          <div className="space-y-4">
+            <div><Label>Titulo</Label><Input value={editSessionForm.titulo} onChange={e => setEditSessionForm({...editSessionForm, titulo: e.target.value})} /></div>
+            <div><Label>Descricao</Label><Textarea value={editSessionForm.descricao} onChange={e => setEditSessionForm({...editSessionForm, descricao: e.target.value})} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditSessionDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={updateCompanySession} disabled={saving} className="bg-purple-600 hover:bg-purple-700">
+              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
