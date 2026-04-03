@@ -59,7 +59,7 @@ const MissionItem = ({ title, points }: { title: string; points: number }) => (
             <span className="text-sm font-medium">{title}</span>
         </div>
         <div className="flex items-center gap-2">
-            <span className="text-xs text-amber-600 font-medium">+{points} pts</span>
+            <span className="text-xs text-amber-600 font-medium">+{points} pontos</span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
     </Link>
