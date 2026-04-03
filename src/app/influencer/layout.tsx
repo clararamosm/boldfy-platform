@@ -83,12 +83,9 @@ export default function InfluencerLayout({ children }: { children: React.ReactNo
                                 </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
-                                <span className="text-sm font-medium truncate max-w-[150px]">{user?.name || ''}</span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[150px]">{user?.email || ''}</span>
-                                <span className="inline-flex items-center mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                                  {user?.role === 'admin' ? 'Admin' : user?.role === 'colaborador' ? 'Colaborador' : user?.role || ''}
-                                </span>
-                            </div>
+                <span className="text-sm font-medium truncate max-w-[150px]">{(user?.name || '').split(' ')[0]}</span>
+                <span className="text-xs text-muted-foreground truncate max-w-[150px]">Colaborador</span>
+              </div>
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
