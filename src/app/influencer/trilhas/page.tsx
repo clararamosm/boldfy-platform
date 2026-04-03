@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Play, BookOpen, HelpCircle, Wrench, Target,
-  ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2
+  ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2, Zap
 } from 'lucide-react';
 import { Header } from '@/components/dashboard/header';
 import type { Sessao, Trilha, ProgressoTrilha, ModuloModo } from '@/types/trilhas';
@@ -212,7 +212,7 @@ export default function ColaboradorTrilhasPage() {
                           {totalModulos} modulo{totalModulos !== 1 ? 's' : ''}
                         </Badge>
                         <Badge variant="secondary" className="text-xs">
-                          <Trophy className="w-3 h-3 mr-1" />{trail.pontuacaoTotal || 0} pts
+                          <Zap className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} pontos
                         </Badge>
                         {trail.tempoEstimadoMin > 0 && (
                           <Badge variant="outline" className="text-xs">
