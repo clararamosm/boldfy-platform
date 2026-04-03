@@ -530,7 +530,7 @@ export default function MasterTrilhasPage() {
                       <p className="text-sm text-muted-foreground">{trail.descricao}</p>
                       <div className="flex gap-2 mt-1">
                         <Badge variant="secondary">{trail.modulos?.length || 0} modulos</Badge>
-                        <Badge variant="secondary">{trail.pontuacaoTotal || 0} pts</Badge>
+                        <Badge variant="secondary">{trail.pontuacaoTotal || 0} pontos</Badge>
                         {trail.pontuacaoBonus > 0 && (
                           <Badge variant="outline" className="text-yellow-600">+{trail.pontuacaoBonus} bonus</Badge>
                         )}
@@ -665,7 +665,7 @@ export default function MasterTrilhasPage() {
                         <p className="text-xs text-muted-foreground">{MODO_LABELS_LOCAL[modulo.modo]}</p>
                       </div>
                       {MODO_CONFIG_LOCAL[modulo.modo].temPontuacao && (
-                        <Badge variant="secondary">{modulo.pontuacaoBase || 0} pts</Badge>
+                        <Badge variant="secondary">{modulo.pontuacaoBase || 0} pontos</Badge>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => openModuloDialog(index)}>
                         <Pencil className="w-4 h-4" />
