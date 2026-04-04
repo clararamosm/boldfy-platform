@@ -1,19 +1,21 @@
 // src/app/colaborador/biblioteca/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, query, doc, getDoc, where, orderBy, Timestamp, deleteDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { collection, getDocs, query, doc, getDoc, orderBy, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Download, Star, ClipboardCopy, Check, Trash2, Loader2 } from "lucide-react";
+import { FileText, Download, Star, ClipboardCopy, Check, Trash2, ChevronLeft, ChevronRight, Sparkles, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { toggleStarContent } from '@/app/actions';
+
+const ITEMS_PER_PAGE = 15;
 
 type Asset = {
     id: string;
@@ -34,6 +36,10 @@ type GeneratedContent = {
     createdAt: any;
 };
 
+// ─── Section selector ────────────────────────────────────────────
+type Section = 'conteudos' | 'assets';
+
+// ─── Asset helpers ───────────────────────────────────────────────
 const getAssetIcon = (type: string, fileUrl?: string) => {
     if (type.startsWith('image/')) {
         return (
@@ -72,6 +78,7 @@ const AssetCard = ({ asset }: { asset: Asset }) => (
     </Card>
 );
 
+// ─── Generated content card ─────────────────────────────────────
 const GeneratedContentCard = ({
     item,
     userId,
@@ -141,6 +148,7 @@ const GeneratedContentCard = ({
     );
 };
 
+// ─── Skeletons ──────────────────────────────────────────────────
 const AssetGridSkeleton = () => (
      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {[...Array(4)].map((_, i) => (
@@ -161,6 +169,75 @@ const AssetGridSkeleton = () => (
     </div>
 );
 
+const ContentGridSkeleton = () => (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {[...Array(6)].map((_, i) => (
+            <Card key={i}>
+                <CardHeader className="pb-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/3 mt-1" />
+                </CardHeader>
+                <CardContent className="pb-2">
+                    <Skeleton className="h-32 w-full rounded-md" />
+                </CardContent>
+                <CardFooter>
+                    <Skeleton className="h-8 w-full" />
+                </CardFooter>
+            </Card>
+        ))}
+    </div>
+);
+
+// ─── Pagination component ───────────────────────────────────────
+const Pagination = ({
+    currentPage,
+    totalPages,
+    totalItems,
+    onPageChange,
+}: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    onPageChange: (page: number) => void;
+}) => {
+    if (totalPages <= 1) return null;
+
+    const start = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+    const end = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+
+    return (
+        <div className="flex items-center justify-between pt-4">
+            <p className="text-sm text-muted-foreground">
+                {start}-{end} de {totalItems}
+            </p>
+            <div className="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onPageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Anterior
+                </Button>
+                <span className="text-sm text-muted-foreground px-2">
+                    {currentPage} / {totalPages}
+                </span>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onPageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                >
+                    Próximo
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+            </div>
+        </div>
+    );
+};
+
+// ─── Main page ──────────────────────────────────────────────────
 export default function ColaboradorBibliotecaPage() {
     const [assets, setAssets] = useState<Asset[]>([]);
     const [generatedContent, setGeneratedContent] = useState<GeneratedContent[]>([]);
@@ -168,8 +245,12 @@ export default function ColaboradorBibliotecaPage() {
     const [isLoadingContent, setIsLoadingContent] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
     const [companyId, setCompanyId] = useState<string | null>(null);
+    const [activeSection, setActiveSection] = useState<Section>('conteudos');
+    const [contentPage, setContentPage] = useState(1);
+    const [starredPage, setStarredPage] = useState(1);
     const { toast } = useToast();
 
+    // ── Data fetching ────────────────────────────────────────────
     const fetchAssets = useCallback(async (cId: string) => {
         setIsLoading(true);
         try {
@@ -188,7 +269,6 @@ export default function ColaboradorBibliotecaPage() {
     const fetchGeneratedContent = useCallback(async (uid: string) => {
         setIsLoadingContent(true);
         try {
-            // Fetch all content, filter client-side for 30-day window (starred = permanent)
             const contentRef = collection(db, 'users', uid, 'generatedContent');
             const q = query(contentRef, orderBy('createdAt', 'desc'));
             const snapshot = await getDocs(q);
@@ -200,7 +280,6 @@ export default function ColaboradorBibliotecaPage() {
             snapshot.docs.forEach(d => {
                 const data = d.data();
                 const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
-                // Keep starred items forever, others only for 30 days
                 if (data.starred || createdAt >= thirtyDaysAgo) {
                     items.push({ id: d.id, ...data } as GeneratedContent);
                 }
@@ -237,6 +316,7 @@ export default function ColaboradorBibliotecaPage() {
         return () => unsubscribe();
     }, [fetchAssets, fetchGeneratedContent, toast]);
 
+    // ── Handlers ─────────────────────────────────────────────────
     const handleStarToggle = async (contentId: string, starred: boolean) => {
         if (!userId) return;
         const result = await toggleStarContent(userId, contentId, starred);
@@ -258,6 +338,27 @@ export default function ColaboradorBibliotecaPage() {
         }
     };
 
+    // ── Derived data with pagination ────────────────────────────
+    const starredItems = useMemo(() => generatedContent.filter(i => i.starred), [generatedContent]);
+
+    const allContentTotalPages = Math.ceil(generatedContent.length / ITEMS_PER_PAGE) || 1;
+    const starredTotalPages = Math.ceil(starredItems.length / ITEMS_PER_PAGE) || 1;
+
+    // Reset page if out of bounds after deletion/toggle
+    const safeContentPage = Math.min(contentPage, allContentTotalPages);
+    const safeStarredPage = Math.min(starredPage, starredTotalPages);
+
+    const paginatedContent = useMemo(() => {
+        const start = (safeContentPage - 1) * ITEMS_PER_PAGE;
+        return generatedContent.slice(start, start + ITEMS_PER_PAGE);
+    }, [generatedContent, safeContentPage]);
+
+    const paginatedStarred = useMemo(() => {
+        const start = (safeStarredPage - 1) * ITEMS_PER_PAGE;
+        return starredItems.slice(start, start + ITEMS_PER_PAGE);
+    }, [starredItems, safeStarredPage]);
+
+    // ── Render helpers ──────────────────────────────────────────
     const renderAssets = (category?: Asset['category']) => {
         if (isLoading) return <AssetGridSkeleton />;
         const filteredAssets = category ? assets.filter(asset => asset.category === category) : assets;
@@ -271,23 +372,11 @@ export default function ColaboradorBibliotecaPage() {
         );
     };
 
-    const renderGeneratedContent = (filter: 'all' | 'starred') => {
-        if (isLoadingContent) return <AssetGridSkeleton />;
-        const filtered = filter === 'starred'
-            ? generatedContent.filter(item => item.starred)
-            : generatedContent;
-        if (filtered.length === 0) {
-            return (
-                <p className="text-muted-foreground text-center py-8">
-                    {filter === 'starred'
-                        ? 'Nenhum conteúdo favoritado. Use a estrela para salvar seus melhores conteúdos.'
-                        : 'Nenhum conteúdo gerado ainda. Use o Assistente IA para criar captions.'}
-                </p>
-            );
-        }
+    const renderContentGrid = (items: GeneratedContent[]) => {
+        if (items.length === 0) return null;
         return (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filtered.map(item => (
+                {items.map(item => (
                     <GeneratedContentCard
                         key={item.id}
                         item={item}
@@ -300,49 +389,122 @@ export default function ColaboradorBibliotecaPage() {
         );
     };
 
-    const starredCount = generatedContent.filter(i => i.starred).length;
-
+    // ── UI ───────────────────────────────────────────────────────
     return (
         <>
             <Header title="Biblioteca" />
             <main className="flex-1 overflow-auto p-4 md:p-6">
-                <Tabs defaultValue="meus-conteudos">
-                    <TabsList className="mb-4">
-                        <TabsTrigger value="meus-conteudos">
-                            Meus Conteúdos {generatedContent.length > 0 && `(${generatedContent.length})`}
-                        </TabsTrigger>
-                        <TabsTrigger value="favoritos">
-                            Favoritos {starredCount > 0 && `(${starredCount})`}
-                        </TabsTrigger>
-                        <TabsTrigger value="todos">Todos os Assets</TabsTrigger>
-                        <TabsTrigger value="posts">Posts</TabsTrigger>
-                        <TabsTrigger value="materiais-ricos">Materiais Ricos</TabsTrigger>
-                        <TabsTrigger value="assets-marca">Assets de Marca</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="meus-conteudos">
-                        <div className="mb-4">
-                            <p className="text-sm text-muted-foreground">
+                {/* Section switcher */}
+                <div className="flex gap-2 mb-6">
+                    <Button
+                        variant={activeSection === 'conteudos' ? 'default' : 'outline'}
+                        onClick={() => setActiveSection('conteudos')}
+                        className="gap-2"
+                    >
+                        <Sparkles className="h-4 w-4" />
+                        Meus Conteúdos
+                        {generatedContent.length > 0 && (
+                            <span className="ml-1 text-xs bg-primary-foreground/20 rounded-full px-2 py-0.5">
+                                {generatedContent.length}
+                            </span>
+                        )}
+                    </Button>
+                    <Button
+                        variant={activeSection === 'assets' ? 'default' : 'outline'}
+                        onClick={() => setActiveSection('assets')}
+                        className="gap-2"
+                    >
+                        <FolderOpen className="h-4 w-4" />
+                        Assets de Marca
+                        {assets.length > 0 && (
+                            <span className="ml-1 text-xs bg-primary-foreground/20 rounded-full px-2 py-0.5">
+                                {assets.length}
+                            </span>
+                        )}
+                    </Button>
+                </div>
+
+                {/* ── Section: Meus Conteúdos ─────────────────────── */}
+                {activeSection === 'conteudos' && (
+                    <Tabs defaultValue="todos-conteudos">
+                        <TabsList className="mb-4">
+                            <TabsTrigger value="todos-conteudos">
+                                Todos {generatedContent.length > 0 && `(${generatedContent.length})`}
+                            </TabsTrigger>
+                            <TabsTrigger value="favoritos">
+                                Favoritos {starredItems.length > 0 && `(${starredItems.length})`}
+                            </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="todos-conteudos">
+                            <p className="text-sm text-muted-foreground mb-4">
                                 Conteúdos gerados pelo Assistente IA. Favorite com a estrela para manter permanentemente — os demais expiram em 30 dias.
                             </p>
-                        </div>
-                        {renderGeneratedContent('all')}
-                    </TabsContent>
-                    <TabsContent value="favoritos">
-                        {renderGeneratedContent('starred')}
-                    </TabsContent>
-                    <TabsContent value="todos">
-                        {renderAssets()}
-                    </TabsContent>
-                    <TabsContent value="posts">
-                        {renderAssets('Posts')}
-                    </TabsContent>
-                    <TabsContent value="materiais-ricos">
-                        {renderAssets('Materiais Ricos')}
-                    </TabsContent>
-                    <TabsContent value="assets-marca">
-                        {renderAssets('Assets de Marca')}
-                    </TabsContent>
-                </Tabs>
+                            {isLoadingContent ? (
+                                <ContentGridSkeleton />
+                            ) : generatedContent.length === 0 ? (
+                                <p className="text-muted-foreground text-center py-8">
+                                    Nenhum conteúdo gerado ainda. Use o Assistente IA para criar captions.
+                                </p>
+                            ) : (
+                                <>
+                                    {renderContentGrid(paginatedContent)}
+                                    <Pagination
+                                        currentPage={safeContentPage}
+                                        totalPages={allContentTotalPages}
+                                        totalItems={generatedContent.length}
+                                        onPageChange={setContentPage}
+                                    />
+                                </>
+                            )}
+                        </TabsContent>
+
+                        <TabsContent value="favoritos">
+                            {isLoadingContent ? (
+                                <ContentGridSkeleton />
+                            ) : starredItems.length === 0 ? (
+                                <p className="text-muted-foreground text-center py-8">
+                                    Nenhum conteúdo favoritado. Use a estrela para salvar seus melhores conteúdos.
+                                </p>
+                            ) : (
+                                <>
+                                    {renderContentGrid(paginatedStarred)}
+                                    <Pagination
+                                        currentPage={safeStarredPage}
+                                        totalPages={starredTotalPages}
+                                        totalItems={starredItems.length}
+                                        onPageChange={setStarredPage}
+                                    />
+                                </>
+                            )}
+                        </TabsContent>
+                    </Tabs>
+                )}
+
+                {/* ── Section: Assets de Marca ────────────────────── */}
+                {activeSection === 'assets' && (
+                    <Tabs defaultValue="todos-assets">
+                        <TabsList className="mb-4">
+                            <TabsTrigger value="todos-assets">Todos</TabsTrigger>
+                            <TabsTrigger value="posts">Posts</TabsTrigger>
+                            <TabsTrigger value="materiais-ricos">Materiais Ricos</TabsTrigger>
+                            <TabsTrigger value="assets-marca">Assets de Marca</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="todos-assets">
+                            {renderAssets()}
+                        </TabsContent>
+                        <TabsContent value="posts">
+                            {renderAssets('Posts')}
+                        </TabsContent>
+                        <TabsContent value="materiais-ricos">
+                            {renderAssets('Materiais Ricos')}
+                        </TabsContent>
+                        <TabsContent value="assets-marca">
+                            {renderAssets('Assets de Marca')}
+                        </TabsContent>
+                    </Tabs>
+                )}
             </main>
         </>
     );
