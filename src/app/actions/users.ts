@@ -23,7 +23,7 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink }: {
     },
   });
 
-  const appUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://boldfy-platform--boldfy-app.us-central1.hosted.app';
+  const appUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br';
 
   await transporter.sendMail({
     from: `"Boldfy" <${process.env.SMTP_EMAIL}>`,

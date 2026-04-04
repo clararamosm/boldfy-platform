@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br';
   const settingsUrl = `${baseUrl}/colaborador/configuracoes`;
 
   // Handle LinkedIn error response (user denied access, etc.)
