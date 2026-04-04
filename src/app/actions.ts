@@ -166,6 +166,19 @@ export async function handleAlignContent(
     }
 
     const data = await response.json();
+
+    // Save generated content to user's generatedContent subcollection (non-blocking)
+    if (data.alignedContent && userId) {
+      adminDb.collection('users').doc(userId).collection('generatedContent').add({
+        input: content,
+        output: data.alignedContent,
+        format,
+        length,
+        starred: false,
+        createdAt: FieldValue.serverTimestamp(),
+      }).catch(err => console.error('Error saving generated content:', err));
+    }
+
     return { alignedContent: data.alignedContent, error: null };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
@@ -361,6 +374,18 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
     console.error("Error in inviteCollaborator:", errorMessage);
     return { error: `Erro ao convidar colaborador: ${errorMessage}` };
+  }
+}
+
+// ---- Toggle Star on Generated Content ----
+
+export async function toggleStarContent(userId: string, contentId: string, starred: boolean): Promise<{ success?: boolean; error?: string }> {
+  try {
+    await adminDb.collection('users').doc(userId).collection('generatedContent').doc(contentId).update({ starred });
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+    return { error: errorMessage };
   }
 }
 

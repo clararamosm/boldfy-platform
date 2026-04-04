@@ -55,6 +55,11 @@ service cloud.firestore {
       match /pointsHistory/{historyId} {
         allow read, create: if request.auth.uid == userId;
       }
+
+      // Generated content from AI assistant
+      match /generatedContent/{contentId} {
+        allow read, delete: if request.auth.uid == userId;
+      }
     }
 
     // Rules for the 'companies' collection
