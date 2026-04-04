@@ -7,3 +7,4 @@ export { handleAlignContent, toggleStarContent } from './actions/content';
 export { submitMissionProof, completeMissionSelf, reviewMissionProof } from './actions/missions';
 export { redeemReward, markRescueAsPaid } from './actions/rewards';
 export { getCompanyRanking, recalculatePoints, type RankedUser } from './actions/points';
+export { createScheduledPost, updateScheduledPost, deleteScheduledPost, getScheduledPosts, type ScheduledPost } from './actions/posts';

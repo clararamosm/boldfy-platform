@@ -7,13 +7,14 @@ import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Download, Star, ClipboardCopy, Check, Trash2, ChevronLeft, ChevronRight, Sparkles, FolderOpen } from "lucide-react";
+import { FileText, Download, Star, ClipboardCopy, Check, Trash2, ChevronLeft, ChevronRight, Sparkles, FolderOpen, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { toggleStarContent } from '@/app/actions';
+import { useRouter } from 'next/navigation';
 
 const ITEMS_PER_PAGE = 15;
 
@@ -84,11 +85,13 @@ const GeneratedContentCard = ({
     userId,
     onStarToggle,
     onDelete,
+    onUseLegenda,
 }: {
     item: GeneratedContent;
     userId: string;
     onStarToggle: (id: string, starred: boolean) => void;
     onDelete: (id: string) => void;
+    onUseLegenda: (content: string) => void;
 }) => {
     const [isCopied, setIsCopied] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
@@ -135,10 +138,18 @@ const GeneratedContentCard = ({
                     <p className="text-sm whitespace-pre-line">{item.output}</p>
                 </div>
             </CardContent>
-            <CardFooter className="gap-2">
+            <CardFooter className="gap-2 flex-wrap">
                 <Button variant="secondary" size="sm" className="flex-1" onClick={handleCopy}>
                     {isCopied ? <Check className="mr-1 h-3 w-3" /> : <ClipboardCopy className="mr-1 h-3 w-3" />}
                     {isCopied ? 'Copiado' : 'Copiar'}
+                </Button>
+                <Button
+                    size="sm"
+                    className="flex-1 bg-[#0A66C2] hover:bg-[#004182] text-white"
+                    onClick={() => onUseLegenda(item.output)}
+                >
+                    <ArrowRight className="mr-1 h-3 w-3" />
+                    Usar legenda
                 </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => onDelete(item.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
@@ -249,6 +260,12 @@ export default function ColaboradorBibliotecaPage() {
     const [contentPage, setContentPage] = useState(1);
     const [starredPage, setStarredPage] = useState(1);
     const { toast } = useToast();
+    const router = useRouter();
+
+    const handleUseLegenda = (content: string) => {
+        const params = new URLSearchParams({ caption: content });
+        router.push(`/colaborador/calendario/novo?${params.toString()}`);
+    };
 
     // ── Data fetching ────────────────────────────────────────────
     const fetchAssets = useCallback(async (cId: string) => {
@@ -383,6 +400,7 @@ export default function ColaboradorBibliotecaPage() {
                         userId={userId!}
                         onStarToggle={handleStarToggle}
                         onDelete={handleDeleteContent}
+                        onUseLegenda={handleUseLegenda}
                     />
                 ))}
             </div>

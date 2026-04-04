@@ -1,7 +1,7 @@
 'use client';
 
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, BarChart3, Zap, Cog, Linkedin, Newspaper } from "lucide-react";
+import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, BarChart3, Zap, Cog, Linkedin, Newspaper, CalendarDays } from "lucide-react";
 import { usePathname } from 'next/navigation';
 import { Header } from './header';
 
@@ -13,6 +13,7 @@ const colaboradorNavItems = [
     { title: "Recompensas", href: "/colaborador/recompensas", icon: Gift },
     { title: "Biblioteca", href: "/colaborador/biblioteca", icon: Library },
     { title: "Assistente de Conteúdo", href: "/colaborador/assistente", icon: Sparkles },
+    { title: "Calendário", href: "/colaborador/calendario", icon: CalendarDays },
     { title: "LinkedIn Track", href: "/colaborador/linkedin-track", icon: Linkedin, badge: "Em breve", disabled: true },
     { title: "LinkedIn Feed", href: "/colaborador/linkedin-feed", icon: Newspaper, badge: "Em breve", disabled: true },
     { title: "Configurações", href: "/colaborador/configuracoes", icon: Cog },
