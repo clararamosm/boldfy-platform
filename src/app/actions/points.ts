@@ -40,7 +40,7 @@ export async function getCompanyRanking(userId: string): Promise<{
           id: doc.id,
           name: data.profile?.name || data.name || 'Sem nome',
           points: data.points || 0,
-          avatarUrl: data.profile?.avatarUrl || data.avatarUrl || undefined,
+          avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture || data.avatarUrl || undefined,
         };
       })
       .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));

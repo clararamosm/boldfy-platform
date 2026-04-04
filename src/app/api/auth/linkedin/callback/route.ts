@@ -91,9 +91,24 @@ export async function GET(request: NextRequest) {
       throw new Error('Usuário não encontrado no sistema.');
     }
 
-    await userRef.update({
+    // Save LinkedIn connection + sync profile photo from LinkedIn
+    const updateData: Record<string, unknown> = {
       linkedinConnection: connectionData,
-    });
+    };
+
+    // Use LinkedIn photo as the collaborator's profile photo
+    if (profile.picture) {
+      updateData.photoURL = profile.picture;
+      // Also update profile.avatarUrl for rankings / admin views
+      const existingData = userDoc.data()!;
+      const existingProfile = existingData.profile || {};
+      updateData.profile = {
+        ...existingProfile,
+        avatarUrl: profile.picture,
+      };
+    }
+
+    await userRef.update(updateData);
 
     // 6. Redirect back to settings with success
     const redirectUrl = new URL(settingsUrl);

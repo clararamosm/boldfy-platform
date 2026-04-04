@@ -11,13 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { db, auth, storage } from '@/lib/firebase';
-import { Loader2, Camera, Linkedin, ExternalLink, Unlink, CheckCircle2, AlertCircle } from "lucide-react";
+import { db, auth } from '@/lib/firebase';
+import { Loader2, Linkedin, ExternalLink, Unlink, CheckCircle2, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { getLinkedInAuthUrl, disconnectLinkedIn } from "@/app/actions/linkedin";
@@ -201,35 +200,7 @@ function SettingsPageContent() {
         return Date.now() < linkedinConnection.tokenExpiresAt - bufferMs;
     }, [linkedinConnection]);
 
-    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const user = auth.currentUser;
-    if (!user) return;
-    setIsUploadingPhoto(true);
-    try {
-      const fileRef = storageRef(storage, `users/${user.uid}/profile-photo`);
-      uploadBytes(fileRef, file).then(() => {
-        getDownloadURL(fileRef).then((downloadURL) => {
-          const userDocRef = doc(db, "users", user.uid);
-          setDoc(userDocRef, { photoURL: downloadURL }, { merge: true }).then(() => {
-            setProfile(prev => prev ? { ...prev, photoURL: downloadURL } : prev);
-            toast({ title: "Foto atualizada!", description: "Sua foto de perfil foi salva com sucesso." });
-            setIsUploadingPhoto(false);
-            if (fileInputRef.current) fileInputRef.current.value = "";
-          });
-        });
-      });
-    } catch (error) {
-      console.error("Error uploading photo:", error);
-      toast({ variant: "destructive", title: "Erro no upload", description: "N\u00e3o foi poss\u00edvel atualizar a foto." });
-      setIsUploadingPhoto(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
+    // Photo is now synced automatically from LinkedIn when connecting
 
     const handleSave = async () => {
         if (!currentUserId) {
@@ -294,26 +265,19 @@ function SettingsPageContent() {
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
-                                                                        <div className="flex items-center gap-4">
-                                        <div className="relative">
-                                            <Avatar className="h-16 w-16">
-                                                <AvatarImage src={profile?.photoURL || ""} />
-                                                <AvatarFallback>
-                                                    {profile?.name?.[0]?.toUpperCase() || "U"}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            {isUploadingPhoto && (
-                                                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full">
-                                                    <Loader2 className="h-6 w-6 animate-spin text-white" />
-                                                </div>
-                                            )}
-                                        </div>
+                                    <div className="flex items-center gap-4">
+                                        <Avatar className="h-16 w-16">
+                                            <AvatarImage src={profile?.photoURL || ""} />
+                                            <AvatarFallback>
+                                                {profile?.name?.[0]?.toUpperCase() || "U"}
+                                            </AvatarFallback>
+                                        </Avatar>
                                         <div>
-                                            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                                            <Button variant="outline" size="sm" disabled={isUploadingPhoto} onClick={() => fileInputRef.current?.click()}>
-                                                <Camera className="h-4 w-4 mr-2" />
-                                                {isUploadingPhoto ? "Enviando..." : "Alterar foto"}
-                                            </Button>
+                                            {!profile?.photoURL && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Conecte seu LinkedIn abaixo para sincronizar sua foto de perfil.
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="grid gap-4 md:grid-cols-2">

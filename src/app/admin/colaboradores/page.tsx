@@ -101,7 +101,7 @@ export default function AdminColaboradoresPage() {
           points: data.points || 0,
           status: data.status || 'Pendente',
           createdAt: data.createdAt?.toDate(),
-          avatarUrl: data.profile?.avatarUrl
+          avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture
         }
       }) as Collaborator[];
       setCollaborators(fetchedCollaborators);
@@ -194,7 +194,7 @@ export default function AdminColaboradoresPage() {
         points: data.points || 0,
         status: data.status || 'Pendente',
         createdAt: data.createdAt?.toDate(),
-        avatarUrl: data.profile?.avatarUrl
+        avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture
       };
     }) as Collaborator[];
     setCollaborators(collabList);
