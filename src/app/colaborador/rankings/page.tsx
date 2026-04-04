@@ -5,21 +5,17 @@ import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Crown, Trophy, Gift, Calendar, Zap, Loader2 } from "lucide-react";
+import { Crown, Trophy, Gift, Calendar, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import React, { useState, useEffect, useCallback } from 'react';
-import { db, auth } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, getDoc, doc, where } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getCompanyRanking, type RankedUser } from "@/app/actions";
 
-type UserRanking = {
-  id: string;
-  name: string;
-  points: number;
-  avatarUrl?: string;
+type UserRanking = RankedUser & {
   isCurrentUser?: boolean;
 };
 
@@ -33,8 +29,7 @@ const PodiumCard = ({ rank, user, highlight = false }: { rank: number, user: Use
           <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
           <AvatarFallback className={isZeroPoints ? 'bg-gray-200 text-gray-400' : ''}>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
-        {rank === 1 && !isZeroPoints && <Crown className="absolute -top-3 left-1/2 -translate-x-1/2 h-8 w-8 text-yellow-500" />}
-        {rank === 1 && isZeroPoints && <Crown className="absolute -top-3 left-1/2 -translate-x-1/2 h-8 w-8 text-gray-400" />}
+        {rank === 1 && <Crown className={`absolute -top-3 left-1/2 -translate-x-1/2 h-8 w-8 ${isZeroPoints ? 'text-gray-400' : 'text-yellow-500'}`} />}
       </div>
       <div className="flex flex-col flex-grow justify-center mt-4 items-center">
         <h3 className={`font-semibold text-lg ${isZeroPoints ? 'text-gray-400' : ''}`}>{user.name}</h3>
@@ -74,7 +69,7 @@ const PageSkeleton = () => (
 
 export default function RankingsPage() {
   const [generalRanking, setGeneralRanking] = useState<UserRanking[]>([]);
-  const [monthlyPrize, setMonthlyPrize] = useState<{ name: string }>({ name: 'Prêmio não definido' });
+  const [monthlyPrizeName, setMonthlyPrizeName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { toast } = useToast();
@@ -82,71 +77,22 @@ export default function RankingsPage() {
   const fetchData = useCallback(async (userId: string) => {
     setIsLoading(true);
     try {
-      // Get the current user's document to find their companyId
-      const userDocRef = doc(db, 'users', userId);
-      const userDocSnap = await getDoc(userDocRef);
+      const result = await getCompanyRanking(userId);
 
-      if (!userDocSnap.exists()) {
-        toast({
-          variant: 'destructive',
-          title: "Erro",
-          description: "Usuário não encontrado.",
-        });
+      if (result.error) {
+        toast({ variant: 'destructive', title: "Erro", description: result.error });
         setIsLoading(false);
         return;
       }
 
-      const userData = userDocSnap.data();
-      const companyId = userData.companyId;
-
-      if (!companyId) {
-        toast({
-          variant: 'destructive',
-          title: "Erro",
-          description: "Empresa não associada ao usuário.",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Fetch all users with the same companyId, ordered by points descending
-      const usersQuery = query(
-        collection(db, 'users'),
-        where('companyId', '==', companyId),
-        orderBy('points', 'desc')
-      );
-      const usersSnapshot = await getDocs(usersQuery);
-      const rankings: UserRanking[] = usersSnapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          name: data.name || data.profile?.name || 'Sem nome',
-          points: data.points || 0,
-          avatarUrl: data.avatarUrl || data.profile?.avatarUrl,
-          isCurrentUser: docSnap.id === userId,
-        };
-      });
+      // Add isCurrentUser flag
+      const rankings: UserRanking[] = result.ranking.map(user => ({
+        ...user,
+        isCurrentUser: user.id === userId,
+      }));
 
       setGeneralRanking(rankings);
-
-      // Try to fetch monthly prize from company rewards
-      try {
-        const rewardsSnapshot = await getDocs(collection(db, 'companies', companyId, 'rewards'));
-        const activeReward = rewardsSnapshot.docs.find((rewardDoc) => {
-          const rewardData = rewardDoc.data();
-          return rewardData.active === true;
-        });
-
-        if (activeReward) {
-          const rewardData = activeReward.data();
-          setMonthlyPrize({ name: rewardData.name || 'Prêmio não definido' });
-        } else {
-          setMonthlyPrize({ name: 'Prêmio não definido' });
-        }
-      } catch {
-        setMonthlyPrize({ name: 'Prêmio não definido' });
-      }
-
+      setMonthlyPrizeName(result.monthlyPrizeName);
     } catch (error) {
       console.error("Erro ao buscar dados do ranking:", error);
       toast({
@@ -227,6 +173,10 @@ export default function RankingsPage() {
     );
   };
 
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const currentDay = now.getDate();
+
   return (
     <>
       <Header title="Rankings" />
@@ -242,15 +192,17 @@ export default function RankingsPage() {
                 <Gift className="h-6 w-6" />
               </div>
               <div className="flex-grow text-center sm:text-left">
-                <p className="font-bold">Prêmio do Mês: {monthlyPrize.name}!</p>
+                <p className="font-bold">
+                  Prêmio do Mês: {monthlyPrizeName || 'Prêmio não definido'}
+                </p>
                 <p className="text-sm text-muted-foreground">O top 1 do ranking este mês ganha esta recompensa.</p>
               </div>
               <div className="w-full sm:w-48 text-center sm:text-right">
                 <div className="flex items-center justify-center sm:justify-end gap-2 text-xs text-muted-foreground mb-1">
                   <Calendar className="h-3 w-3" />
-                  <span>{new Date().getDate()} de {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()} dias</span>
+                  <span>{currentDay} de {daysInMonth} dias</span>
                 </div>
-                <Progress value={(new Date().getDate() / new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()) * 100} className="h-2" />
+                <Progress value={(currentDay / daysInMonth) * 100} className="h-2" />
               </div>
             </div>
           </CardContent>
@@ -274,7 +226,13 @@ export default function RankingsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {generalRanking.map((user, index) => {
+                {generalRanking.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      Nenhum participante no ranking ainda.
+                    </TableCell>
+                  </TableRow>
+                ) : generalRanking.map((user, index) => {
                   const isZeroPoints = user.points === 0;
                   return (
                     <TableRow key={user.id} className={`${user.isCurrentUser ? 'bg-secondary' : ''} ${isZeroPoints ? 'opacity-50' : ''}`}>
