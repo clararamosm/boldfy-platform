@@ -441,7 +441,7 @@ export default function TrilhaFullscreenPage() {
         <div className="text-center space-y-4">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
           <p className="text-lg font-semibold">Trilha nao encontrada</p>
-          <Button onClick={() => router.push('/influencer/trilhas')}>
+          <Button onClick={() => router.push('/colaborador/trilhas')}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Trilhas
           </Button>
         </div>
@@ -455,7 +455,7 @@ export default function TrilhaFullscreenPage() {
     return (
       <div className="fixed inset-0 bg-background z-50 overflow-auto">
         <div className="max-w-2xl mx-auto px-4 py-12">
-          <Button variant="ghost" onClick={() => router.push('/influencer/trilhas')} className="mb-8">
+          <Button variant="ghost" onClick={() => router.push('/colaborador/trilhas')} className="mb-8">
             <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Trilhas
           </Button>
 
@@ -569,7 +569,7 @@ export default function TrilhaFullscreenPage() {
                   <Button
                     variant="outline"
                     className="mt-2 border-blue-300 text-blue-700"
-                    onClick={() => router.push('/influencer/missoes')}
+                    onClick={() => router.push('/colaborador/missoes')}
                   >
                     Ver Missoes
                   </Button>
@@ -580,7 +580,7 @@ export default function TrilhaFullscreenPage() {
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => router.push('/influencer/trilhas')}
+                  onClick={() => router.push('/colaborador/trilhas')}
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Trilhas
                 </Button>
@@ -605,7 +605,7 @@ export default function TrilhaFullscreenPage() {
           <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(!sidebarOpen)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => router.push('/influencer/trilhas')}>
+          <Button variant="ghost" size="sm" onClick={() => router.push('/colaborador/trilhas')}>
             <X className="h-5 w-5" />
           </Button>
           <span className="text-sm font-medium hidden sm:inline">{trail.titulo}</span>

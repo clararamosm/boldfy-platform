@@ -1,4 +1,4 @@
-// src/app/influencer/dashboard/page.tsx
+// src/app/colaborador/dashboard/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -51,7 +51,7 @@ type DashboardData = {
 
 // ---- Sub-components ----
 const MissionItem = ({ title, points }: { title: string; points: number }) => (
-    <Link href="/influencer/missoes" className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors">
+    <Link href="/colaborador/missoes" className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors">
         <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
                 <Target className="h-4 w-4 text-amber-600" />
@@ -66,7 +66,7 @@ const MissionItem = ({ title, points }: { title: string; points: number }) => (
 );
 
 const TrailItem = ({ title, progress }: { title: string; progress: number }) => (
-    <Link href="/influencer/trilhas" className="block p-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors">
+    <Link href="/colaborador/trilhas" className="block p-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors">
         <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
@@ -267,7 +267,7 @@ export default function InfluencerDashboardPage() {
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg">Missoes Ativas</CardTitle>
-                                <Link href="/influencer/missoes" className="text-xs text-primary hover:underline">
+                                <Link href="/colaborador/missoes" className="text-xs text-primary hover:underline">
                                     Ver todas
                                 </Link>
                             </div>
@@ -292,7 +292,7 @@ export default function InfluencerDashboardPage() {
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg">Trilhas de Aprendizado</CardTitle>
-                                <Link href="/influencer/trilhas" className="text-xs text-primary hover:underline">
+                                <Link href="/colaborador/trilhas" className="text-xs text-primary hover:underline">
                                     Ver todas
                                 </Link>
                             </div>

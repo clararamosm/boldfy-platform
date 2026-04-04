@@ -1,4 +1,4 @@
-// src/app/influencer/biblioteca/page.tsx
+// src/app/colaborador/biblioteca/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';

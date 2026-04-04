@@ -7,7 +7,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { SidebarHeader, SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
 import Logo from "@/components/logo";
-import { InfluencerSidebarNav } from "@/components/dashboard/influencer-sidebar-nav";
+import { ColaboradorSidebarNav } from "@/components/dashboard/colaborador-sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
@@ -22,7 +22,7 @@ type UserData = {
     role: string;
 };
 
-export default function InfluencerLayout({ children }: { children: React.ReactNode }) {
+export default function ColaboradorLayout({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
@@ -71,7 +71,7 @@ export default function InfluencerLayout({ children }: { children: React.ReactNo
                 </div>
             </SidebarHeader>
             <SidebarContent>
-                <InfluencerSidebarNav />
+                <ColaboradorSidebarNav />
             </SidebarContent>
             <SidebarFooter>
                 <DropdownMenu>
@@ -79,7 +79,7 @@ export default function InfluencerLayout({ children }: { children: React.ReactNo
                         <Button variant="ghost" className="w-full justify-start gap-2 px-2">
                             <Avatar className="h-8 w-8">
                                 <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                    {user?.name?.substring(0, 2).toUpperCase() || 'IN'}
+                                    {user?.name?.substring(0, 2).toUpperCase() || 'CO'}
                                 </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
@@ -99,7 +99,7 @@ export default function InfluencerLayout({ children }: { children: React.ReactNo
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>
-                            <Link href="/influencer/configuracoes">
+                            <Link href="/colaborador/configuracoes">
                                 <UserIcon className="mr-2 h-4 w-4" />
                                 <span>Configurações</span>
                             </Link>

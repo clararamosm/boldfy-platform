@@ -1,4 +1,4 @@
-// src/app/influencer/configuracoes/page.tsx
+// src/app/colaborador/configuracoes/page.tsx
 'use client';
 
 import { Header } from "@/components/dashboard/header";

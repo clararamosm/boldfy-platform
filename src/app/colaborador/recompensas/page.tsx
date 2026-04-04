@@ -1,4 +1,4 @@
-// src/app/influencer/recompensas/page.tsx
+// src/app/colaborador/recompensas/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';

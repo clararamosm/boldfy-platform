@@ -1,6 +1,6 @@
 'use server';
 
-import { db as adminDb } from '@/lib/firebase-admin';
+import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 
 // ---- Delete Company Action (by Master) ----
 
@@ -38,13 +38,27 @@ export async function deleteCompany(
       }
     }
 
-    // Delete users associated with this company
+    // Delete users associated with this company (Firestore + Auth)
     const usersSnapshot = await adminDb
       .collection("users")
       .where("companyId", "==", companyId)
       .get();
 
-    const deleteUserPromises = usersSnapshot.docs.map((doc) => doc.ref.delete());
+    const deleteUserPromises = usersSnapshot.docs.map(async (userDoc) => {
+      // Delete from Firebase Auth first
+      try {
+        if (adminAuth) {
+          await adminAuth.deleteUser(userDoc.id);
+        }
+      } catch (authError: any) {
+        // User might not exist in Auth, continue with Firestore deletion
+        if (authError?.code !== 'auth/user-not-found') {
+          console.warn(`Warning: Could not delete Auth user ${userDoc.id}:`, authError?.message);
+        }
+      }
+      // Delete from Firestore
+      await userDoc.ref.delete();
+    });
     await Promise.all(deleteUserPromises);
 
     // Delete the company document itself

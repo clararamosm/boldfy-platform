@@ -130,7 +130,7 @@ export default function ColaboradorTrilhasPage() {
   useEffect(() => { if (companyId) loadTrails(); }, [companyId, loadTrails]);
 
   const openTrail = (trail: Trilha) => {
-    router.push(`/influencer/trilhas/${trail.id}`);
+    router.push(`/colaborador/trilhas/${trail.id}`);
   };
 
   // ============================================================

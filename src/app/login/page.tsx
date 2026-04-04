@@ -36,7 +36,7 @@ export default function LoginPage() {
         const userRole = userData.role;
         if (userRole === 'master') { router.push('/master/empresas'); }
         else if (userRole === 'admin') { router.push('/admin/dashboard'); }
-        else if (userRole === 'colaborador') { router.push('/influencer/dashboard'); }
+        else if (userRole === 'colaborador') { router.push('/colaborador/dashboard'); }
         else { setError('Perfil de usuário não reconhecido.'); setLoading(false); return; }
       } else {
         setError('Perfil de usuário não reconhecido.');

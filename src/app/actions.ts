@@ -235,15 +235,17 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // 4. Generate password reset link and send invitation email
+    // 4. Generate password reset link and send invitation email (non-blocking)
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
     const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
-    await sendInvitationEmail({
+    sendInvitationEmail({
       to: adminEmail,
       name: adminName,
       companyName: companyName,
       role: 'Administrador',
       resetLink,
+    }).catch((emailError) => {
+      console.error("Error sending admin invitation email:", emailError);
     });
 
     return { success: true };
@@ -334,15 +336,17 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // 5. Generate password reset link and send invitation email
+    // 5. Generate password reset link and send invitation email (non-blocking)
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
     const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
-    await sendInvitationEmail({
+    sendInvitationEmail({
       to: email,
       name: name,
       companyName: companyName,
       role: 'Colaborador',
       resetLink,
+    }).catch((emailError) => {
+      console.error("Error sending collaborator invitation email:", emailError);
     });
 
     return { success: true };

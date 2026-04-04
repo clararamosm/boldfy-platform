@@ -1,4 +1,4 @@
-// src/app/influencer/assistente/page.tsx
+// src/app/colaborador/assistente/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
