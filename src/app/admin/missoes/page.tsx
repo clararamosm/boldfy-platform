@@ -6,10 +6,10 @@ import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon, ChevronDown, Loader2, Sparkles, CheckCircle2, Clock, History, FileCheck, Trash2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Calendar as CalendarIcon, ChevronDown, Loader2, Sparkles, CheckCircle2, Clock, History, FileCheck, Trash2, XCircle, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
@@ -18,7 +18,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from '@/hooks/use-toast';
+import { reviewMissionProof } from "@/app/actions";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -28,10 +32,23 @@ type Mission = {
   description: string;
   points: number;
   type: 'fixed' | 'timed';
+  completionMode?: 'auto' | 'proof';
   startDate?: any;
   endDate?: any;
   createdAt?: any;
   pendingSubmissions?: number;
+}
+
+type Submission = {
+  id: string;
+  missionId: string;
+  missionName: string;
+  userId: string;
+  userName: string;
+  proofUrl: string;
+  proofFileName: string;
+  status: string;
+  submittedAt: any;
 }
 
 type DerivedStatus = 'ativa' | 'agendada' | 'encerrada';
@@ -41,6 +58,8 @@ type AISuggestion = {
   description: string;
   points: number;
   selected: boolean;
+  type: 'fixed' | 'timed';
+  completionMode: 'auto' | 'proof';
   startDate?: Date;
   endDate?: Date;
 };
@@ -73,27 +92,44 @@ const MissionForm = ({ mission, isSubmitting, formRef, isFixed = false }: { miss
   const [endDate, setEndDate] = useState<Date | undefined>(
     mission?.endDate?.toDate ? mission.endDate.toDate() : mission?.endDate ? new Date(mission.endDate) : undefined
   );
+  const [completionMode, setCompletionMode] = useState<string>(mission?.completionMode || 'proof');
 
   return (
     <form id="mission-form" ref={formRef} className="space-y-4">
       <input type="hidden" name="startDate" value={startDate?.toISOString() || ''} />
       <input type="hidden" name="endDate" value={endDate?.toISOString() || ''} />
+      <input type="hidden" name="completionMode" value={completionMode} />
       <div className="space-y-2">
-        <Label htmlFor="mission-name">Nome da Missão</Label>
+        <Label htmlFor="mission-name">Nome da Missao</Label>
         <Input id="mission-name" name="name" placeholder={isFixed ? "Ex: Atualize seu banner do LinkedIn" : "Ex: Compartilhar post no LinkedIn"} disabled={isSubmitting} defaultValue={mission?.name} required/>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="mission-description">Descrição</Label>
+        <Label htmlFor="mission-description">Descricao</Label>
         <Textarea id="mission-description" name="description" placeholder="Descreva o que o colaborador precisa fazer." disabled={isSubmitting} defaultValue={mission?.description} required />
       </div>
       <div className="space-y-2">
         <Label htmlFor="mission-points">Pontos</Label>
         <Input id="mission-points" name="points" type="number" placeholder="Ex: 100" disabled={isSubmitting} defaultValue={mission?.points} required/>
       </div>
+      <div className="space-y-2">
+        <Label>Modo de Conclusao</Label>
+        <Select value={completionMode} onValueChange={setCompletionMode}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione o modo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="proof">Com comprovacao (admin aprova)</SelectItem>
+            <SelectItem value="auto">Auto-conclusao (sem comprovacao)</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {completionMode === 'auto' ? 'O colaborador conclui com um clique. Pontos sao dados automaticamente.' : 'O colaborador envia um arquivo e o admin precisa aprovar.'}
+        </p>
+      </div>
       {!isFixed && (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Data de Início</Label>
+            <Label>Data de Inicio</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSubmitting}>
@@ -107,7 +143,7 @@ const MissionForm = ({ mission, isSubmitting, formRef, isFixed = false }: { miss
             </Popover>
           </div>
           <div className="space-y-2">
-            <Label>Data de Término</Label>
+            <Label>Data de Termino</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSubmitting}>
@@ -146,6 +182,7 @@ const MissionTable = ({
   formRef,
   onEdit,
   onDelete,
+  onOpenReview,
   cols,
 }: {
   missions: Mission[];
@@ -156,6 +193,7 @@ const MissionTable = ({
   formRef: React.RefObject<HTMLFormElement | null>;
   onEdit: (missionId: string, isFixed: boolean) => void;
   onDelete: (missionId: string) => void;
+  onOpenReview: () => void;
   cols: number;
 }) => {
   const showPeriod = status !== 'ativa' || missions.some(m => m.type === 'timed');
@@ -166,20 +204,21 @@ const MissionTable = ({
         <TableRow>
           <TableHead>Nome</TableHead>
           <TableHead>Tipo</TableHead>
-          {showPeriod && <TableHead>Período</TableHead>}
+          <TableHead>Modo</TableHead>
+          {showPeriod && <TableHead>Periodo</TableHead>}
           <TableHead>Pontos</TableHead>
           <TableHead>Status</TableHead>
           {status === 'ativa' && <TableHead>Envios</TableHead>}
-          <TableHead><span className="sr-only">Ações</span></TableHead>
+          <TableHead><span className="sr-only">Acoes</span></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {isLoading ? <TableSkeleton cols={cols} /> : missions.length === 0 ? (
           <TableRow>
             <TableCell colSpan={cols} className="text-center py-8 text-muted-foreground">
-              {status === 'ativa' ? 'Nenhuma missão ativa no momento.' :
-               status === 'agendada' ? 'Nenhuma missão agendada.' :
-               'Nenhuma missão no histórico.'}
+              {status === 'ativa' ? 'Nenhuma missao ativa no momento.' :
+               status === 'agendada' ? 'Nenhuma missao agendada.' :
+               'Nenhuma missao no historico.'}
             </TableCell>
           </TableRow>
         ) : missions.map((mission) => {
@@ -195,7 +234,12 @@ const MissionTable = ({
               <TableCell className="font-medium">{mission.name}</TableCell>
               <TableCell>
                 <Badge variant="outline" className="text-xs">
-                  {mission.type === 'fixed' ? 'Fixa' : 'Temporária'}
+                  {mission.type === 'fixed' ? 'Fixa' : 'Temporaria'}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className={`text-xs ${mission.completionMode === 'auto' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
+                  {mission.completionMode === 'auto' ? 'Auto' : 'Comprovacao'}
                 </Badge>
               </TableCell>
               {showPeriod && (
@@ -212,7 +256,7 @@ const MissionTable = ({
               {status === 'ativa' && (
                 <TableCell>
                   {(mission.pendingSubmissions || 0) > 0 ? (
-                    <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                    <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 cursor-pointer hover:bg-yellow-200 transition-colors" onClick={onOpenReview}>
                       <FileCheck className="h-3 w-3 mr-1" />
                       {mission.pendingSubmissions} pendente{(mission.pendingSubmissions || 0) > 1 ? 's' : ''}
                     </Badge>
@@ -229,10 +273,10 @@ const MissionTable = ({
                   <DropdownMenuContent align="end">
                     {status !== 'encerrada' && (
                       <ActionDialog
-                        title="Editar Missão"
-                        description="Atualize os detalhes desta missão."
+                        title="Editar Missao"
+                        description="Atualize os detalhes desta missao."
                         trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar</DropdownMenuItem>}
-                        actionText="Salvar Alterações"
+                        actionText="Salvar Alteracoes"
                         onAction={() => onEdit(mission.id, mission.type === 'fixed')}
                         formId="mission-form"
                       >
@@ -267,6 +311,12 @@ export default function AdminMissoesPage() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
 
+  // Review sheet state
+  const [reviewSheetOpen, setReviewSheetOpen] = useState(false);
+  const [pendingSubmissions, setPendingSubmissions] = useState<Submission[]>([]);
+  const [isReviewing, setIsReviewing] = useState(false);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, string>>({});
+
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement | null>(null);
 
@@ -276,13 +326,27 @@ export default function AdminMissoesPage() {
       const missionsSnapshot = await getDocs(collection(db, "companies", currentCompanyId, "missions"));
       const missions = missionsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }) as Mission);
 
-      // Fetch pending submission counts for active missions
+      // Fetch pending submission counts and full data for review
       const submissionsSnapshot = await getDocs(collection(db, "companies", currentCompanyId, "missionSubmissions"));
       const pendingCounts: Record<string, number> = {};
+      const pendingSubs: Submission[] = [];
+      const missionMap = Object.fromEntries(missions.map(m => [m.id, m.name]));
+
       submissionsSnapshot.docs.forEach(d => {
         const data = d.data();
         if (data.status === 'pending') {
           pendingCounts[data.missionId] = (pendingCounts[data.missionId] || 0) + 1;
+          pendingSubs.push({
+            id: d.id,
+            missionId: data.missionId,
+            missionName: missionMap[data.missionId] || 'Missao desconhecida',
+            userId: data.userId,
+            userName: data.userName,
+            proofUrl: data.proofUrl,
+            proofFileName: data.proofFileName,
+            status: data.status,
+            submittedAt: data.submittedAt,
+          });
         }
       });
 
@@ -292,6 +356,7 @@ export default function AdminMissoesPage() {
       }));
 
       setAllMissions(enriched);
+      setPendingSubmissions(pendingSubs);
     } catch(error) {
       console.error("Error fetching missions:", error);
       toast({ variant: 'destructive', title: 'Erro ao buscar missões.' });
@@ -334,6 +399,7 @@ export default function AdminMissoesPage() {
       description: formData.get('description'),
       points: Number(formData.get('points')),
       type: isFixed ? 'fixed' : 'timed',
+      completionMode: formData.get('completionMode') || 'proof',
     };
 
     if (!isFixed) {
@@ -402,6 +468,8 @@ export default function AdminMissoesPage() {
       const suggestions: AISuggestion[] = (data.missions || []).map((m: any) => ({
         ...m,
         selected: false,
+        type: 'timed' as const,
+        completionMode: 'proof' as const,
         startDate: undefined,
         endDate: undefined,
       }));
@@ -422,6 +490,10 @@ export default function AdminMissoesPage() {
     setAiSuggestions(prev => prev.map((s, i) => i === index ? { ...s, [field]: date } : s));
   };
 
+  const updateSuggestionField = (index: number, field: string, value: any) => {
+    setAiSuggestions(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+  };
+
   const handleSaveAISuggestions = async () => {
     if (!companyId) return;
     const selected = aiSuggestions.filter(s => s.selected);
@@ -430,24 +502,28 @@ export default function AdminMissoesPage() {
       return;
     }
 
-    const missingDates = selected.some(s => !s.startDate || !s.endDate);
-    if (missingDates) {
-      toast({ variant: 'destructive', title: 'Defina as datas de início e término de todas as missões selecionadas.' });
+    const timedWithoutDates = selected.some(s => s.type === 'timed' && (!s.startDate || !s.endDate));
+    if (timedWithoutDates) {
+      toast({ variant: 'destructive', title: 'Defina as datas de inicio e termino das missoes temporarias selecionadas.' });
       return;
     }
 
     setIsSubmitting(true);
     try {
       for (const s of selected) {
-        await addDoc(collection(db, "companies", companyId, "missions"), {
+        const missionDoc: any = {
           name: s.name,
           description: s.description,
           points: s.points,
-          type: 'timed',
-          startDate: s.startDate,
-          endDate: s.endDate,
+          type: s.type,
+          completionMode: s.completionMode,
           createdAt: serverTimestamp(),
-        });
+        };
+        if (s.type === 'timed') {
+          missionDoc.startDate = s.startDate;
+          missionDoc.endDate = s.endDate;
+        }
+        await addDoc(collection(db, "companies", companyId, "missions"), missionDoc);
       }
       toast({ title: `${selected.length} missão(ões) criada(s) com sucesso!` });
       setAiDialogOpen(false);
@@ -461,17 +537,42 @@ export default function AdminMissoesPage() {
     }
   };
 
+  // ---- Review Submissions ----
+  const handleReview = async (submissionId: string, action: 'approve' | 'reject') => {
+    if (!companyId) return;
+    setIsReviewing(true);
+    try {
+      const result = await reviewMissionProof(
+        submissionId,
+        companyId,
+        action,
+        action === 'reject' ? feedbackMap[submissionId] : undefined
+      );
+      if (result.error) {
+        toast({ variant: 'destructive', title: 'Erro', description: result.error });
+        return;
+      }
+      toast({ title: action === 'approve' ? 'Comprovacao aprovada!' : 'Comprovacao rejeitada.' });
+      setFeedbackMap(prev => { const next = {...prev}; delete next[submissionId]; return next; });
+      fetchMissions(companyId);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro ao avaliar comprovacao.' });
+    } finally {
+      setIsReviewing(false);
+    }
+  };
+
   return (
     <>
-      <Header title="Missões" />
+      <Header title="Missoes" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         {/* Actions bar */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {totalPending > 0 && (
-              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
+              <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 cursor-pointer hover:bg-yellow-200 transition-colors" onClick={() => setReviewSheetOpen(true)}>
                 <FileCheck className="h-3 w-3 mr-1" />
-                {totalPending} comprovação(ões) pendente(s)
+                {totalPending} comprovacao(oes) pendente(s)
               </Badge>
             )}
           </div>
@@ -560,7 +661,8 @@ export default function AdminMissoesPage() {
                   formRef={formRef}
                   onEdit={handleAction}
                   onDelete={handleDelete}
-                  cols={7}
+                  onOpenReview={() => setReviewSheetOpen(true)}
+                  cols={8}
                 />
               </CardContent>
             </Card>
@@ -582,7 +684,8 @@ export default function AdminMissoesPage() {
                   formRef={formRef}
                   onEdit={handleAction}
                   onDelete={handleDelete}
-                  cols={6}
+                  onOpenReview={() => setReviewSheetOpen(true)}
+                  cols={7}
                 />
               </CardContent>
             </Card>
@@ -604,7 +707,8 @@ export default function AdminMissoesPage() {
                   formRef={formRef}
                   onEdit={handleAction}
                   onDelete={handleDelete}
-                  cols={6}
+                  onOpenReview={() => setReviewSheetOpen(true)}
+                  cols={7}
                 />
               </CardContent>
             </Card>
@@ -613,12 +717,12 @@ export default function AdminMissoesPage() {
 
         {/* AI Suggestions Dialog */}
         <ActionDialog
-          title="Gerar Missões com IA"
-          description="A IA analisa o contexto da sua empresa e sugere missões relevantes. Selecione as que deseja criar e defina as datas."
+          title="Gerar Missoes com IA"
+          description="A IA analisa o contexto da sua empresa e sugere missoes. Selecione, configure o tipo e modo, e defina datas se necessario."
           trigger={<span />}
           open={aiDialogOpen}
           onOpenChange={(open) => { setAiDialogOpen(open); if (!open) setAiSuggestions([]); }}
-          actionText={isSubmitting ? "Salvando..." : `Criar ${aiSuggestions.filter(s => s.selected).length} missão(ões)`}
+          actionText={isSubmitting ? "Salvando..." : `Criar ${aiSuggestions.filter(s => s.selected).length} missao(oes)`}
           onAction={handleSaveAISuggestions}
           showCancel
         >
@@ -626,10 +730,10 @@ export default function AdminMissoesPage() {
             {aiLoading ? (
               <div className="flex flex-col items-center justify-center py-8 gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Analisando o contexto da empresa e gerando sugestões...</p>
+                <p className="text-sm text-muted-foreground">Analisando o contexto da empresa e gerando sugestoes...</p>
               </div>
             ) : aiSuggestions.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">Nenhuma sugestão gerada. Tente novamente.</p>
+              <p className="text-center text-muted-foreground py-8">Nenhuma sugestao gerada. Tente novamente.</p>
             ) : (
               aiSuggestions.map((suggestion, index) => (
                 <Card
@@ -651,35 +755,51 @@ export default function AdminMissoesPage() {
                   <CardContent className="pb-3">
                     <p className="text-sm text-muted-foreground">{suggestion.description}</p>
                     {suggestion.selected && (
-                      <div className="grid grid-cols-2 gap-3 mt-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Início</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" className="w-full justify-start text-left font-normal h-8 text-xs">
-                                <CalendarIcon className="mr-1.5 h-3 w-3" />
-                                {suggestion.startDate ? format(suggestion.startDate, "dd/MM/yyyy", { locale: ptBR }) : 'Selecione'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar mode="single" selected={suggestion.startDate} onSelect={(d) => updateSuggestionDate(index, 'startDate', d)} locale={ptBR} initialFocus />
-                            </PopoverContent>
-                          </Popover>
+                      <div className="space-y-3 mt-3" onClick={(e) => e.stopPropagation()}>
+                        {/* Type + Mode toggles */}
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs whitespace-nowrap">Temporaria</Label>
+                            <Switch checked={suggestion.type === 'timed'} onCheckedChange={(v) => updateSuggestionField(index, 'type', v ? 'timed' : 'fixed')} />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs whitespace-nowrap">Comprovacao</Label>
+                            <Switch checked={suggestion.completionMode === 'proof'} onCheckedChange={(v) => updateSuggestionField(index, 'completionMode', v ? 'proof' : 'auto')} />
+                          </div>
                         </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Término</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" className="w-full justify-start text-left font-normal h-8 text-xs">
-                                <CalendarIcon className="mr-1.5 h-3 w-3" />
-                                {suggestion.endDate ? format(suggestion.endDate, "dd/MM/yyyy", { locale: ptBR }) : 'Selecione'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar mode="single" selected={suggestion.endDate} onSelect={(d) => updateSuggestionDate(index, 'endDate', d)} locale={ptBR} initialFocus />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
+                        {/* Dates - only for timed */}
+                        {suggestion.type === 'timed' && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Inicio</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className="w-full justify-start text-left font-normal h-8 text-xs">
+                                    <CalendarIcon className="mr-1.5 h-3 w-3" />
+                                    {suggestion.startDate ? format(suggestion.startDate, "dd/MM/yyyy", { locale: ptBR }) : 'Selecione'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                  <Calendar mode="single" selected={suggestion.startDate} onSelect={(d) => updateSuggestionDate(index, 'startDate', d)} locale={ptBR} initialFocus />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Termino</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" size="sm" className="w-full justify-start text-left font-normal h-8 text-xs">
+                                    <CalendarIcon className="mr-1.5 h-3 w-3" />
+                                    {suggestion.endDate ? format(suggestion.endDate, "dd/MM/yyyy", { locale: ptBR }) : 'Selecione'}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                  <Calendar mode="single" selected={suggestion.endDate} onSelect={(d) => updateSuggestionDate(index, 'endDate', d)} locale={ptBR} initialFocus />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -688,6 +808,97 @@ export default function AdminMissoesPage() {
             )}
           </div>
         </ActionDialog>
+
+        {/* Review Submissions Sheet */}
+        <Sheet open={reviewSheetOpen} onOpenChange={setReviewSheetOpen}>
+          <SheetContent side="right" className="sm:max-w-lg w-full overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Comprovacoes Pendentes</SheetTitle>
+              <SheetDescription>
+                Revise as comprovacoes enviadas pelos colaboradores.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="space-y-4 mt-6">
+              {pendingSubmissions.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  Nenhuma comprovacao pendente.
+                </p>
+              ) : (
+                pendingSubmissions.map((sub) => (
+                  <Card key={sub.id}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        {sub.missionName}
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Enviado por: {sub.userName}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Proof preview */}
+                      {sub.proofUrl && (
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Comprovacao:</Label>
+                          {sub.proofFileName?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                            <img
+                              src={sub.proofUrl}
+                              alt="Comprovacao"
+                              className="rounded-md border max-h-48 w-full object-contain"
+                            />
+                          ) : (
+                            <a
+                              href={sub.proofUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary underline flex items-center gap-1"
+                            >
+                              <Eye className="h-3 w-3" />
+                              {sub.proofFileName || 'Ver arquivo'}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                      {/* Feedback input */}
+                      <div className="space-y-1">
+                        <Label className="text-xs">Feedback (opcional, para rejeicao):</Label>
+                        <Textarea
+                          placeholder="Motivo da rejeicao..."
+                          className="h-16 text-xs"
+                          value={feedbackMap[sub.id] || ''}
+                          onChange={(e) =>
+                            setFeedbackMap((prev) => ({ ...prev, [sub.id]: e.target.value }))
+                          }
+                          disabled={isReviewing}
+                        />
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2 pt-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() => handleReview(sub.id, 'reject')}
+                        disabled={isReviewing}
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Rejeitar
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => handleReview(sub.id, 'approve')}
+                        disabled={isReviewing}
+                      >
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Aprovar
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
       </main>
     </>
   );

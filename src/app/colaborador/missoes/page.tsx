@@ -18,7 +18,7 @@ import { collection, query, getDocs, doc, getDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { submitMissionProof } from "@/app/actions";
+import { submitMissionProof, completeMissionSelf } from "@/app/actions";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -33,6 +33,7 @@ type Mission = {
     startDate?: any;
     endDate?: any;
     type: 'timed' | 'fixed';
+    completionMode?: 'auto' | 'proof';
     submissionFeedback?: string;
 };
 
@@ -43,7 +44,7 @@ const formatDate = (d: any) => {
 };
 
 // ---- Sub-components ----
-const MissionCard = ({ mission, onSubmitProof, isSubmitting }: { mission: Mission, onSubmitProof: (missionId: string, file: File) => Promise<void>, isSubmitting: boolean }) => {
+const MissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: { mission: Mission, onSubmitProof: (missionId: string, file: File) => Promise<void>, onAutoComplete: (missionId: string) => Promise<void>, isSubmitting: boolean }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -103,14 +104,19 @@ const MissionCard = ({ mission, onSubmitProof, isSubmitting }: { mission: Missio
         },
         pendente: {
             icon: null,
-            text: "",
+            text: mission.completionMode === 'auto' ? "" : "",
             color: "",
-            button: (
+            button: mission.completionMode === 'auto' ? (
+                <Button onClick={() => onAutoComplete(mission.id)} disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                    Concluir
+                </Button>
+            ) : (
                 <ActionDialog
-                    title="Enviar Comprovação"
-                    description={`Envie um anexo para completar a missão "${mission.name}".`}
-                    trigger={<Button><Upload className="mr-2 h-4 w-4" /> Enviar Comprovação</Button>}
-                    actionText={selectedFile ? "Enviar Comprovação" : "Selecione um arquivo"}
+                    title="Enviar Comprovacao"
+                    description={`Envie um anexo para completar a missao "${mission.name}".`}
+                    trigger={<Button><Upload className="mr-2 h-4 w-4" /> Enviar Comprovacao</Button>}
+                    actionText={selectedFile ? "Enviar Comprovacao" : "Selecione um arquivo"}
                     onAction={handleSubmit}
                     showCancel
                     open={dialogOpen}
@@ -119,7 +125,7 @@ const MissionCard = ({ mission, onSubmitProof, isSubmitting }: { mission: Missio
                     <div className="space-y-2">
                         <Label htmlFor={`file-${mission.id}`} className="sr-only">Arquivo</Label>
                         <Input id={`file-${mission.id}`} type="file" accept="image/*,video/*,.pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} disabled={isSubmitting} />
-                        <p className="text-xs text-muted-foreground">Envie uma imagem, vídeo ou PDF como comprovação.</p>
+                        <p className="text-xs text-muted-foreground">Envie uma imagem, video ou PDF como comprovacao.</p>
                     </div>
                 </ActionDialog>
             )
@@ -287,13 +293,14 @@ export default function ColaboradorMissoesPage() {
 
                 const mission: Mission = {
                     id: docSnap.id,
-                    name: data.name || 'Sem título',
+                    name: data.name || 'Sem titulo',
                     description: data.description || '',
                     points: data.points || 0,
                     status,
                     startDate: data.startDate || null,
                     endDate: data.endDate || null,
                     type: data.type || 'fixed',
+                    completionMode: data.completionMode || 'proof',
                     submissionFeedback,
                 };
 
@@ -377,6 +384,30 @@ export default function ColaboradorMissoesPage() {
         }
     };
 
+    const handleAutoComplete = async (missionId: string) => {
+        if (!userInfo) return;
+        setIsSubmitting(true);
+        try {
+            const result = await completeMissionSelf(
+                userInfo.uid,
+                missionId,
+                userInfo.companyId,
+                userInfo.name
+            );
+            if (result.error) {
+                toast({ variant: 'destructive', title: 'Erro', description: result.error });
+                return;
+            }
+            toast({ title: 'Missao concluida!', description: 'Pontos adicionados ao seu saldo.' });
+            fetchMissions(auth.currentUser!);
+        } catch (error) {
+            console.error("Error auto-completing mission:", error);
+            toast({ variant: 'destructive', title: 'Erro ao concluir missao.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const weeklyMissions = missions.filter(m => m.type === 'timed');
     const fixedMissions = missions.filter(m => m.type === 'fixed');
 
@@ -388,7 +419,7 @@ export default function ColaboradorMissoesPage() {
         return (
             <div className="space-y-4">
                 {missionList.map(mission => (
-                    <MissionCard key={mission.id} mission={mission} onSubmitProof={handleSubmitProof} isSubmitting={isSubmitting} />
+                    <MissionCard key={mission.id} mission={mission} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} />
                 ))}
             </div>
         );
@@ -449,7 +480,7 @@ export default function ColaboradorMissoesPage() {
                         ) : (
                             <div className="space-y-4">
                                 {historyMissions.map(mission => (
-                                    <MissionCard key={mission.id} mission={mission} onSubmitProof={handleSubmitProof} isSubmitting={isSubmitting} />
+                                    <MissionCard key={mission.id} mission={mission} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} />
                                 ))}
                             </div>
                         )}

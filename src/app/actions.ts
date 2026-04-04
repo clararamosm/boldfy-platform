@@ -558,6 +558,94 @@ export async function submitMissionProof(
   }
 }
 
+export async function completeMissionSelf(
+  userId: string,
+  missionId: string,
+  companyId: string,
+  userName: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    // 1. Validate mission exists and is auto-complete
+    const missionDoc = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missions')
+      .doc(missionId)
+      .get();
+
+    if (!missionDoc.exists) {
+      return { error: 'Missão não encontrada.' };
+    }
+
+    const missionData = missionDoc.data()!;
+    if (missionData.completionMode !== 'auto') {
+      return { error: 'Esta missão requer comprovação.' };
+    }
+
+    // 2. Check for duplicate completion
+    const existingSnap = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missionSubmissions')
+      .where('missionId', '==', missionId)
+      .where('userId', '==', userId)
+      .where('status', 'in', ['pending', 'approved'])
+      .get();
+
+    if (!existingSnap.empty) {
+      return { error: 'Você já concluiu esta missão.' };
+    }
+
+    // 3. Atomic batch: create submission + award points + history
+    const missionPoints = missionData.points || 0;
+    const batch = adminDb.batch();
+
+    const subRef = adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missionSubmissions')
+      .doc();
+
+    batch.set(subRef, {
+      missionId,
+      userId,
+      userName,
+      proofUrl: null,
+      proofFileName: null,
+      status: 'approved',
+      submittedAt: FieldValue.serverTimestamp(),
+      reviewedAt: FieldValue.serverTimestamp(),
+      adminFeedback: null,
+      autoCompleted: true,
+    });
+
+    const userRef = adminDb.collection('users').doc(userId);
+    batch.update(userRef, {
+      points: FieldValue.increment(missionPoints),
+    });
+
+    const historyRef = adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('pointsHistory')
+      .doc();
+    batch.set(historyRef, {
+      description: `Missão concluída: ${missionData.name || 'Missão'}`,
+      date: FieldValue.serverTimestamp(),
+      points: missionPoints,
+      type: 'gain',
+      source: 'missao',
+    });
+
+    await batch.commit();
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in completeMissionSelf:', msg);
+    return { error: msg };
+  }
+}
+
 export async function reviewMissionProof(
   submissionId: string,
   companyId: string,
