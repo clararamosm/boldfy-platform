@@ -23,9 +23,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
 import {
-  Plus, Pencil, Trash2, ChevronRight, Globe, Building2,
+  Plus, Pencil, Trash2, ChevronRight, ChevronDown, Globe, Building2,
   Play, BookOpen, HelpCircle, Wrench, Target, BarChart3,
-  ArrowLeft, Loader2, Eye, Save, FolderOpen, ToggleLeft, Zap
+  ArrowLeft, Loader2, Eye, Save, FolderOpen, GripVertical, ToggleLeft, Zap
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { SimpleRichEditor } from '@/components/ui/simple-rich-editor';
@@ -80,7 +80,7 @@ export default function AdminTrilhasPage() {
   // Builder state (simplified)
   const [builderOpen, setBuilderOpen] = useState(false);
   const [editingTrail, setEditingTrail] = useState<Trilha | null>(null);
-  const [trailForm, setTrailForm] = useState({ titulo: '', descricao: '', tempoEstimadoMin: 30 });
+  const [trailForm, setTrailForm] = useState({ titulo: '', descricao: '', tempoEstimadoMin: 30, pontuacaoBonusTrilha: 0 });
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [moduloDialogOpen, setModuloDialogOpen] = useState(false);
   const [editingModuloIdx, setEditingModuloIdx] = useState<number | null>(null);
@@ -296,11 +296,11 @@ export default function AdminTrilhasPage() {
     setSelectedSession(session);
     if (trail) {
       setEditingTrail(trail);
-      setTrailForm({ titulo: trail.titulo, descricao: trail.descricao, tempoEstimadoMin: trail.tempoEstimadoMin || 30 });
+      setTrailForm({ titulo: trail.titulo, descricao: trail.descricao, tempoEstimadoMin: trail.tempoEstimadoMin || 30, pontuacaoBonusTrilha: trail.pontuacaoBonusTrilha || 0 });
       setModulos(trail.modulos || []);
     } else {
       setEditingTrail(null);
-      setTrailForm({ titulo: '', descricao: '', tempoEstimadoMin: 30 });
+      setTrailForm({ titulo: '', descricao: '', tempoEstimadoMin: 30, pontuacaoBonusTrilha: 0 });
       setModulos([]);
     }
     setBuilderOpen(true);
@@ -331,6 +331,7 @@ export default function AdminTrilhasPage() {
         ativa: true,
         pontuacaoTotal: total,
         pontuacaoBonus: bonus,
+        pontuacaoBonusTrilha: trailForm.pontuacaoBonusTrilha || 0,
         tempoEstimadoMin: trailForm.tempoEstimadoMin,
         modulos: modulos.map((m, i) => Object.fromEntries(Object.entries({ ...m, ordem: i }).filter(([_, v]) => v !== undefined))),
         atualizadaEm: Timestamp.now(),
@@ -354,6 +355,14 @@ export default function AdminTrilhasPage() {
   };
 
   // Modulo helpers
+  const moveModulo = (index: number, direction: 'up' | 'down') => {
+    const newModulos = [...modulos];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newModulos.length) return;
+    [newModulos[index], newModulos[targetIndex]] = [newModulos[targetIndex], newModulos[index]];
+    setModulos(newModulos);
+  };
+
   const openModuloDialog = (idx?: number) => {
     if (idx !== undefined && modulos[idx]) {
       setEditingModuloIdx(idx);
@@ -395,6 +404,14 @@ export default function AdminTrilhasPage() {
   // MAIN RETURN
   // ============================================================
   if (builderOpen) {
+    let total = 0, bonus = 0;
+    modulos.forEach(m => {
+      const cfg = MODO_CONFIG[m.modo];
+      if (cfg && cfg.temPontuacao) {
+        total += (m.pontuacaoBase || cfg.pontosPadrao);
+        bonus += (m.pontuacaoBonus || cfg.pontosBonus);
+      }
+    });
     return (
     <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         <div className="flex items-center gap-4">
@@ -412,30 +429,78 @@ export default function AdminTrilhasPage() {
         </div>
 
         <Card>
-          <CardContent className="pt-6 space-y-4">
-            <div><Label>Titulo</Label><Input value={trailForm.titulo} onChange={e => setTrailForm({...trailForm, titulo: e.target.value})} placeholder="Nome da trilha" /></div>
-            <div><Label>Descricao</Label><Textarea value={trailForm.descricao} onChange={e => setTrailForm({...trailForm, descricao: e.target.value})} /></div>
-            <div><Label>Tempo Estimado (min)</Label><Input type="number" value={trailForm.tempoEstimadoMin} onChange={e => setTrailForm({...trailForm, tempoEstimadoMin: parseInt(e.target.value)||0})} /></div>
+          <CardHeader>
+            <CardTitle>Informacoes da Trilha</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label>Titulo</Label>
+              <Input value={trailForm.titulo} onChange={e => setTrailForm({...trailForm, titulo: e.target.value})} placeholder="Nome da trilha" />
+            </div>
+            <div>
+              <Label>Descricao</Label>
+              <Textarea value={trailForm.descricao} onChange={e => setTrailForm({...trailForm, descricao: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tempo Estimado (min)</Label>
+                <Input type="number" value={trailForm.tempoEstimadoMin} onChange={e => setTrailForm({...trailForm, tempoEstimadoMin: parseInt(e.target.value)||0})} />
+              </div>
+              <div>
+                <Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pontuacao por Completar</Label>
+                <Input type="number" value={trailForm.pontuacaoBonusTrilha || 0} onChange={e => setTrailForm({...trailForm, pontuacaoBonusTrilha: parseInt(e.target.value) || 0})} placeholder="Ex: 200" />
+              </div>
+            </div>
           </CardContent>
         </Card>
 
+        {/* Score Summary */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card><CardContent className="pt-6 text-center">
+            <div className="flex items-center justify-center gap-1 mb-1"><Zap className="w-5 h-5 text-yellow-500" /><p className="text-2xl font-bold text-purple-600">{total}</p></div>
+            <p className="text-sm text-muted-foreground">Pontuacao Total</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-6 text-center">
+            <div className="flex items-center justify-center gap-1 mb-1"><Zap className="w-5 h-5 text-yellow-500" /><p className="text-2xl font-bold text-yellow-600">+{bonus}</p></div>
+            <p className="text-sm text-muted-foreground">Bonus Possivel</p>
+          </CardContent></Card>
+          <Card><CardContent className="pt-6 text-center">
+            <p className="text-2xl font-bold mb-1">{modulos.length}</p>
+            <p className="text-sm text-muted-foreground">Modulos</p>
+          </CardContent></Card>
+        </div>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Modulos ({modulos.length})</CardTitle>
+            <div>
+              <CardTitle>Modulos</CardTitle>
+              <CardDescription>Use as setas para reordenar. Clique no lapis para editar.</CardDescription>
+            </div>
             <Button size="sm" onClick={() => openModuloDialog()} className="bg-purple-600 hover:bg-purple-700">
-              <Plus className="w-4 h-4 mr-2" /> Adicionar
+              <Plus className="w-4 h-4 mr-2" /> Adicionar Modulo
             </Button>
           </CardHeader>
           <CardContent>
             {modulos.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground">Nenhum modulo. Clique em Adicionar.</p>
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Nenhum modulo adicionado</p>
+                <p className="text-sm">Clique em &quot;Adicionar Modulo&quot; para comecar</p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {modulos.map((m, i) => {
                   const Icon = MODO_ICONS[m.modo];
                   return (
                     <div key={m.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
-                      <span className="text-sm text-gray-400 w-6">{i + 1}</span>
+                      <div className="flex flex-col gap-1">
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => moveModulo(i, 'up')} disabled={i === 0}>
+                          <ChevronDown className="w-3 h-3 rotate-180" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => moveModulo(i, 'down')} disabled={i === modulos.length - 1}>
+                          <ChevronDown className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      <GripVertical className="w-4 h-4 text-gray-400" />
                       <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
                         <Icon className="w-4 h-4 text-purple-600" />
                       </div>
@@ -625,8 +690,7 @@ export default function AdminTrilhasPage() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
-                        <div className={`w-2.5 h-2.5 rounded-full ${session.ativa ? 'bg-green-500' : 'bg-gray-300'}`} />
-                        <Building2 className="w-5 h-5 text-blue-500" />
+                        <FolderOpen className="w-5 h-5 text-purple-500" />
                         {session.titulo}
                       </CardTitle>
                       <div className="flex items-center gap-2">

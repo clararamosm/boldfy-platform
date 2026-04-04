@@ -81,7 +81,7 @@ export default function MasterTrilhasPage() {
 
   // --- Trail Builder ---
   const [trailForm, setTrailForm] = useState({
-    titulo: '', descricao: '', ordem: 0, tempoEstimadoMin: 30,
+    titulo: '', descricao: '', ordem: 0, tempoEstimadoMin: 30, pontuacaoBonusTrilha: 0,
   });
   const [modulos, setModulos] = useState<Modulo[]>([]);
   const [moduloDialogOpen, setModuloDialogOpen] = useState(false);
@@ -225,11 +225,12 @@ export default function MasterTrilhasPage() {
         descricao: trail.descricao,
         ordem: trail.ordem,
         tempoEstimadoMin: trail.tempoEstimadoMin || 30,
+        pontuacaoBonusTrilha: trail.pontuacaoBonusTrilha || 0,
       });
       setModulos(trail.modulos || []);
     } else {
       setSelectedTrail(null);
-      setTrailForm({ titulo: '', descricao: '', ordem: 0, tempoEstimadoMin: 30 });
+      setTrailForm({ titulo: '', descricao: '', ordem: 0, tempoEstimadoMin: 30, pontuacaoBonusTrilha: 0 });
       setModulos([]);
     }
     setViewMode('builder');
@@ -267,6 +268,7 @@ export default function MasterTrilhasPage() {
         ativa: true,
         pontuacaoTotal: total,
         pontuacaoBonus: bonus,
+        pontuacaoBonusTrilha: trailForm.pontuacaoBonusTrilha || 0,
         tempoEstimadoMin: trailForm.tempoEstimadoMin,
         modulos: modulos.map((m, i) => Object.fromEntries(Object.entries({ ...m, ordem: i }).filter(([_, v]) => v !== undefined))),
         atualizadaEm: Timestamp.now(),
@@ -454,14 +456,13 @@ export default function MasterTrilhasPage() {
             <Card key={session.id} className="overflow-hidden">
               <div className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => openSessionTrails(session)}>
-                  <div className={`w-2 h-2 rounded-full ${session.ativa ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <FolderOpen className="w-5 h-5 text-purple-500" />
                   <div>
                     <h3 className="font-semibold">{session.titulo}</h3>
                     <p className="text-sm text-muted-foreground">{session.descricao}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline">Ordem: {session.ordem}</Badge>
                   <Switch checked={session.ativa} onCheckedChange={() => toggleSessionActive(session)} />
                   <Button variant="ghost" size="icon" onClick={() => openSessionDialog(session)}>
                     <Pencil className="w-4 h-4" />
@@ -530,7 +531,7 @@ export default function MasterTrilhasPage() {
                       <p className="text-sm text-muted-foreground">{trail.descricao}</p>
                       <div className="flex gap-2 mt-1">
                         <Badge variant="secondary">{trail.modulos?.length || 0} modulos</Badge>
-                        <Badge variant="secondary">{trail.pontuacaoTotal || 0} pontos</Badge>
+                        <Badge variant="secondary"><Zap className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} pontos</Badge>
                         {trail.pontuacaoBonus > 0 && (
                           <Badge variant="outline" className="text-yellow-600">+{trail.pontuacaoBonus} bonus</Badge>
                         )}
@@ -589,22 +590,24 @@ export default function MasterTrilhasPage() {
           <CardHeader>
             <CardTitle>Informacoes da Trilha</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
+          <CardContent className="space-y-4">
+            <div>
               <Label>Titulo</Label>
               <Input value={trailForm.titulo} onChange={e => setTrailForm({...trailForm, titulo: e.target.value})} placeholder="Ex: Fundamentos do LinkedIn" />
             </div>
-            <div className="col-span-2">
+            <div>
               <Label>Descricao</Label>
               <Textarea value={trailForm.descricao} onChange={e => setTrailForm({...trailForm, descricao: e.target.value})} placeholder="Descreva o objetivo desta trilha..." />
             </div>
-            <div>
-              <Label>Ordem</Label>
-              <Input type="number" value={trailForm.ordem} onChange={e => setTrailForm({...trailForm, ordem: parseInt(e.target.value) || 0})} />
-            </div>
-            <div>
-              <Label>Tempo Estimado (min)</Label>
-              <Input type="number" value={trailForm.tempoEstimadoMin} onChange={e => setTrailForm({...trailForm, tempoEstimadoMin: parseInt(e.target.value) || 0})} />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Tempo Estimado (min)</Label>
+                <Input type="number" value={trailForm.tempoEstimadoMin} onChange={e => setTrailForm({...trailForm, tempoEstimadoMin: parseInt(e.target.value) || 0})} />
+              </div>
+              <div>
+                <Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pontuacao por Completar</Label>
+                <Input type="number" value={trailForm.pontuacaoBonusTrilha || 0} onChange={e => setTrailForm({...trailForm, pontuacaoBonusTrilha: parseInt(e.target.value) || 0})} placeholder="Ex: 200" />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -612,15 +615,15 @@ export default function MasterTrilhasPage() {
         {/* Score Summary */}
         <div className="grid grid-cols-3 gap-4">
           <Card><CardContent className="pt-6 text-center">
-            <p className="text-2xl font-bold text-purple-600">{total}</p>
+            <div className="flex items-center justify-center gap-1 mb-1"><Zap className="w-5 h-5 text-yellow-500" /><p className="text-2xl font-bold text-purple-600">{total}</p></div>
             <p className="text-sm text-muted-foreground">Pontuacao Total</p>
           </CardContent></Card>
           <Card><CardContent className="pt-6 text-center">
-            <p className="text-2xl font-bold text-yellow-600">+{bonus}</p>
+            <div className="flex items-center justify-center gap-1 mb-1"><Zap className="w-5 h-5 text-yellow-500" /><p className="text-2xl font-bold text-yellow-600">+{bonus}</p></div>
             <p className="text-sm text-muted-foreground">Bonus Possivel</p>
           </CardContent></Card>
           <Card><CardContent className="pt-6 text-center">
-            <p className="text-2xl font-bold">{modulos.length}</p>
+            <p className="text-2xl font-bold mb-1">{modulos.length}</p>
             <p className="text-sm text-muted-foreground">Modulos</p>
           </CardContent></Card>
         </div>
@@ -665,7 +668,7 @@ export default function MasterTrilhasPage() {
                         <p className="text-xs text-muted-foreground">{MODO_LABELS_LOCAL[modulo.modo]}</p>
                       </div>
                       {MODO_CONFIG_LOCAL[modulo.modo].temPontuacao && (
-                        <Badge variant="secondary">{modulo.pontuacaoBase || 0} pontos</Badge>
+                        <Badge variant="secondary"><Zap className="w-3 h-3 mr-1 text-yellow-500" />{modulo.pontuacaoBase || 0} pontos</Badge>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => openModuloDialog(index)}>
                         <Pencil className="w-4 h-4" />
