@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, where, getDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -71,6 +71,8 @@ export default function AdminBibliotecaPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [companyId, setCompanyId] = useState<string | null>(null);
+    const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+    const [editDialogOpen, setEditDialogOpen] = useState<string | null>(null);
     const { toast } = useToast();
     const formRef = useRef<HTMLFormElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -163,6 +165,16 @@ export default function AdminBibliotecaPage() {
                 title: "Sucesso!",
                 description: `Ativo ${assetId ? 'atualizado' : 'criado'} com sucesso.`,
             });
+
+            // Close dialog and clean up form
+            if (assetId) {
+                setEditDialogOpen(null);
+            } else {
+                setUploadDialogOpen(false);
+            }
+            if (formRef.current) formRef.current.reset();
+            if (fileInputRef.current) fileInputRef.current.value = '';
+
             fetchAssets(companyId);
         } catch (error) {
             console.error("Error submitting asset:", error);
@@ -176,8 +188,10 @@ export default function AdminBibliotecaPage() {
         if (!companyId || !confirm(`Tem certeza que deseja excluir o ativo "${asset.name}"?`)) return;
         
         try {
-            const fileRef = ref(storage, asset.filePath);
-            await deleteObject(fileRef);
+            if (asset.filePath) {
+                const fileRef = ref(storage, asset.filePath);
+                await deleteObject(fileRef).catch(err => console.warn("File not found in storage, continuing...", err));
+            }
 
             const assetDoc = doc(db, "companies", companyId, "assets", asset.id);
             await deleteDoc(assetDoc);
@@ -208,6 +222,8 @@ export default function AdminBibliotecaPage() {
             actionText={isSubmitting ? "Salvando..." : "Salvar Alterações"}
             onAction={() => handleAction(asset.id)}
             formId="asset-form"
+            open={editDialogOpen === asset.id}
+            onOpenChange={(open) => setEditDialogOpen(open ? asset.id : null)}
         >
             <AssetForm asset={asset} isSubmitting={isSubmitting} formRef={formRef} fileRef={fileInputRef} />
         </ActionDialog>
@@ -230,6 +246,8 @@ export default function AdminBibliotecaPage() {
               actionText={isSubmitting ? "Enviando..." : "Fazer Upload"}
               onAction={() => handleAction()}
               formId="asset-form"
+              open={uploadDialogOpen}
+              onOpenChange={setUploadDialogOpen}
             >
               <AssetForm isSubmitting={isSubmitting} formRef={formRef} fileRef={fileInputRef} />
             </ActionDialog>

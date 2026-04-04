@@ -20,6 +20,10 @@ type UserData = {
   name: string;
   email: string;
   role: string;
+  profile?: {
+    name?: string;
+    email?: string;
+  };
 };
 
 export default function MasterLayout({ children }: { children: React.ReactNode }) {
