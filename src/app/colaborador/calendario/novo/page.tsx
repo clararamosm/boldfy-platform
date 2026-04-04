@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createScheduledPost, updateScheduledPost } from '@/app/actions/posts';
+import { publishToLinkedIn, getLinkedInStatus } from '@/app/actions/linkedin';
 import {
   CalendarDays,
   Clock,
@@ -40,6 +41,9 @@ function EditorContent() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [linkedinConnected, setLinkedinConnected] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
@@ -67,7 +71,7 @@ function EditorContent() {
     }
   }, [searchParams]);
 
-  // Auth
+  // Auth + LinkedIn status
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
@@ -76,6 +80,9 @@ function EditorContent() {
       }
       setUserId(firebaseUser.uid);
       setIsLoading(false);
+      // Check LinkedIn status
+      const status = await getLinkedInStatus(firebaseUser.uid);
+      setLinkedinConnected(status.connected && !!status.tokenValid);
     });
     return () => unsubscribe();
   }, [router]);
@@ -150,6 +157,54 @@ function EditorContent() {
     }
 
     setIsSaving(false);
+  };
+
+  // Publish immediately to LinkedIn
+  const handlePublishNow = async () => {
+    if (!userId) return;
+    if (!caption.trim()) {
+      toast({ variant: 'destructive', title: 'Legenda obrigatória', description: 'Escreva uma legenda para o post.' });
+      return;
+    }
+
+    setIsPublishing(true);
+
+    try {
+      // Upload media to Firebase Storage first if present
+      let mediaUrl: string | undefined;
+
+      if (mediaFile) {
+        const storageRef = ref(storage, `users/${userId}/posts/${Date.now()}_${mediaFile.name}`);
+        const snapshot = await uploadBytes(storageRef, mediaFile);
+        mediaUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      // Publish to LinkedIn (with optional image)
+      const result = await publishToLinkedIn(userId, caption, mediaUrl);
+
+      if (result.success) {
+        setPublishedUrl(result.postUrl || null);
+        toast({ title: 'Publicado no LinkedIn!', description: 'Seu post está no ar.' });
+
+        // Also save as a published record
+        await createScheduledPost(userId, {
+          caption,
+          mediaUrl,
+          mediaType: mediaFile?.type,
+          scheduledFor: new Date().toISOString(),
+        });
+      } else {
+        toast({ variant: 'destructive', title: 'Erro ao publicar', description: result.error });
+        if (result.needsReconnect) {
+          router.push('/colaborador/configuracoes');
+        }
+      }
+    } catch (error) {
+      console.error('Error publishing:', error);
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível publicar.' });
+    }
+
+    setIsPublishing(false);
   };
 
   // Truncate caption for preview
@@ -270,24 +325,74 @@ function EditorContent() {
               </div>
             </div>
 
-            {/* Submit */}
-            <Button
-              onClick={handleSubmit}
-              disabled={isSaving || !caption.trim() || !scheduledDate}
-              className="w-full gap-2"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Agendando...
-                </>
+            {/* Actions */}
+            <div className="space-y-2">
+              {/* Publish now */}
+              {publishedUrl ? (
+                <a
+                  href={publishedUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full rounded-md bg-green-600 hover:bg-green-700 text-white px-4 py-2 text-sm font-medium transition-colors"
+                >
+                  <Linkedin className="h-4 w-4" />
+                  Ver post no LinkedIn
+                </a>
               ) : (
-                <>
-                  <CalendarDays className="h-4 w-4" />
-                  Agendar Post
-                </>
+                <Button
+                  onClick={handlePublishNow}
+                  disabled={isPublishing || isSaving || !caption.trim() || !linkedinConnected}
+                  className="w-full gap-2 bg-[#0A66C2] hover:bg-[#004182] text-white"
+                >
+                  {isPublishing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Publicando...
+                    </>
+                  ) : (
+                    <>
+                      <Linkedin className="h-4 w-4" />
+                      Publicar agora no LinkedIn
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
+
+              {!linkedinConnected && !publishedUrl && (
+                <p className="text-xs text-muted-foreground text-center">
+                  <a href="/colaborador/configuracoes" className="text-[#0A66C2] hover:underline">
+                    Conecte seu LinkedIn
+                  </a>
+                  {' '}para publicar diretamente.
+                </p>
+              )}
+
+              {/* Divider */}
+              <div className="relative py-1">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">ou</span></div>
+              </div>
+
+              {/* Schedule */}
+              <Button
+                variant="outline"
+                onClick={handleSubmit}
+                disabled={isSaving || isPublishing || !caption.trim() || !scheduledDate}
+                className="w-full gap-2"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Agendando...
+                  </>
+                ) : (
+                  <>
+                    <CalendarDays className="h-4 w-4" />
+                    Agendar para depois
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

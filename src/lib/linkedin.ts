@@ -1,9 +1,10 @@
 // src/lib/linkedin.ts
-// LinkedIn OAuth 2.0 + OpenID Connect utilities
+// LinkedIn OAuth 2.0 + OpenID Connect + Posts API (v2) utilities
 
 const LINKEDIN_AUTH_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 const LINKEDIN_USERINFO_URL = 'https://api.linkedin.com/v2/userinfo';
+const LINKEDIN_API_VERSION = '202504';
 
 export type LinkedInTokens = {
   access_token: string;
@@ -185,49 +186,117 @@ export function isTokenExpired(tokenExpiresAt: number): boolean {
   return Date.now() >= tokenExpiresAt - bufferMs;
 }
 
-// ─── LinkedIn Posts API (w_member_social) ────────────────────────
-
-const LINKEDIN_POSTS_URL = 'https://api.linkedin.com/v2/ugcPosts';
+// ─── LinkedIn Posts API v2 (replaces deprecated UGC API) ────────
 
 export type LinkedInPostResult = {
   postId: string;
   postUrl: string;
 };
 
+/** Common headers for LinkedIn REST API v2 */
+function linkedInApiHeaders(accessToken: string) {
+  return {
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'LinkedIn-Version': LINKEDIN_API_VERSION,
+    'X-Restli-Protocol-Version': '2.0.0',
+  };
+}
+
 /**
- * Publish a text post to LinkedIn using the UGC Posts API.
- * Requires w_member_social scope.
+ * Upload an image to LinkedIn and return its image URN.
+ * 3-step flow: initializeUpload → PUT binary → return URN.
+ */
+export async function uploadImageToLinkedIn(
+  accessToken: string,
+  linkedinId: string,
+  imageUrl: string
+): Promise<string> {
+  const ownerUrn = `urn:li:person:${linkedinId}`;
+
+  // Step 1: Initialize upload
+  const initRes = await fetch('https://api.linkedin.com/rest/images?action=initializeUpload', {
+    method: 'POST',
+    headers: linkedInApiHeaders(accessToken),
+    body: JSON.stringify({ initializeUploadRequest: { owner: ownerUrn } }),
+  });
+
+  if (!initRes.ok) {
+    const err = await initRes.json().catch(() => ({}));
+    console.error('LinkedIn image init failed:', err);
+    throw new Error(`Falha ao iniciar upload de imagem: ${err.message || initRes.statusText}`);
+  }
+
+  const initData = await initRes.json();
+  const uploadUrl = initData.value?.uploadUrl;
+  const imageUrn = initData.value?.image;
+
+  if (!uploadUrl || !imageUrn) {
+    throw new Error('LinkedIn não retornou URL de upload.');
+  }
+
+  // Step 2: Download image from Firebase Storage and upload to LinkedIn
+  const imgRes = await fetch(imageUrl);
+  if (!imgRes.ok) throw new Error('Não foi possível baixar a imagem para upload.');
+  const imageBuffer = await imgRes.arrayBuffer();
+
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/octet-stream',
+    },
+    body: imageBuffer,
+  });
+
+  if (!uploadRes.ok) {
+    console.error('LinkedIn image upload failed:', uploadRes.statusText);
+    throw new Error(`Falha no upload da imagem: ${uploadRes.statusText}`);
+  }
+
+  return imageUrn;
+}
+
+/**
+ * Publish a post to LinkedIn using the Posts API v2.
+ * Supports text-only or text + image.
  */
 export async function publishLinkedInPost(
   accessToken: string,
   linkedinId: string,
-  text: string
+  text: string,
+  imageUrl?: string
 ): Promise<LinkedInPostResult> {
   const authorUrn = `urn:li:person:${linkedinId}`;
 
-  const body = {
+  // Upload image first if provided
+  let imageUrn: string | undefined;
+  if (imageUrl) {
+    imageUrn = await uploadImageToLinkedIn(accessToken, linkedinId, imageUrl);
+  }
+
+  // Build post body (Posts API v2 format)
+  const body: Record<string, unknown> = {
     author: authorUrn,
+    commentary: text,
+    visibility: 'PUBLIC',
     lifecycleState: 'PUBLISHED',
-    specificContent: {
-      'com.linkedin.ugc.ShareContent': {
-        shareCommentary: {
-          text,
-        },
-        shareMediaCategory: 'NONE',
-      },
-    },
-    visibility: {
-      'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+    distribution: {
+      feedDistribution: 'MAIN_FEED',
+      targetEntities: [],
+      thirdPartyDistributionChannels: [],
     },
   };
 
-  const response = await fetch(LINKEDIN_POSTS_URL, {
+  if (imageUrn) {
+    body.content = {
+      media: { title: 'Post image', id: imageUrn },
+    };
+  }
+
+  const response = await fetch('https://api.linkedin.com/rest/posts', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      'X-Restli-Protocol-Version': '2.0.0',
-    },
+    headers: linkedInApiHeaders(accessToken),
     body: JSON.stringify(body),
   });
 
@@ -235,27 +304,15 @@ export async function publishLinkedInPost(
     const errorData = await response.json().catch(() => ({}));
     console.error('LinkedIn post publish failed:', errorData);
 
-    if (response.status === 401) {
-      throw new Error('TOKEN_EXPIRED');
-    }
-    if (response.status === 403) {
-      throw new Error('Sem permissão para publicar. Verifique se o scope w_member_social está ativo.');
-    }
-    if (response.status === 429) {
-      throw new Error('Limite de publicações atingido. Tente novamente mais tarde.');
-    }
+    if (response.status === 401) throw new Error('TOKEN_EXPIRED');
+    if (response.status === 403) throw new Error('Sem permissão para publicar. Verifique se o scope w_member_social está ativo.');
+    if (response.status === 429) throw new Error('Limite de publicações atingido. Tente novamente mais tarde.');
 
-    throw new Error(
-      `Falha ao publicar: ${errorData.message || errorData.error || response.statusText}`
-    );
+    throw new Error(`Falha ao publicar: ${errorData.message || errorData.error || response.statusText}`);
   }
 
-  // LinkedIn returns the post ID in the 'id' header or response body
   const postId = response.headers.get('x-restli-id') || '';
-
-  // Build the post URL (LinkedIn format)
-  const encodedPostId = encodeURIComponent(postId);
-  const postUrl = `https://www.linkedin.com/feed/update/${encodedPostId}/`;
+  const postUrl = `https://www.linkedin.com/feed/update/${encodeURIComponent(postId)}/`;
 
   return { postId, postUrl };
 }

@@ -121,10 +121,12 @@ export async function getLinkedInStatus(userId: string): Promise<{
 /**
  * Publish content to LinkedIn on behalf of the user.
  * Handles token refresh automatically if needed.
+ * Optionally includes an image (Firebase Storage URL).
  */
 export async function publishToLinkedIn(
   userId: string,
-  content: string
+  content: string,
+  mediaUrl?: string
 ): Promise<PublishResult> {
   try {
     if (!userId) {
@@ -186,8 +188,8 @@ export async function publishToLinkedIn(
       }
     }
 
-    // 3. Publish the post
-    const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim());
+    // 3. Publish the post (with optional image)
+    const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim(), mediaUrl);
 
     return {
       success: true,
