@@ -93,6 +93,7 @@ export async function getLinkedInStatus(userId: string): Promise<{
   connected: boolean;
   name?: string;
   picture?: string;
+  headline?: string;
   tokenValid?: boolean;
 }> {
   try {
@@ -109,7 +110,8 @@ export async function getLinkedInStatus(userId: string): Promise<{
     return {
       connected: true,
       name: connection.name,
-      picture: connection.picture,
+      picture: data?.photoURL || connection.picture,
+      headline: data?.position || data?.profile?.position || undefined,
       tokenValid: !isTokenExpired(connection.tokenExpiresAt),
     };
   } catch (error) {

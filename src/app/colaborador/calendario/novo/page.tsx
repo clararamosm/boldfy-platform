@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -43,6 +43,9 @@ function EditorContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [linkedinConnected, setLinkedinConnected] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [profilePicture, setProfilePicture] = useState('');
+  const [profileHeadline, setProfileHeadline] = useState('');
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -80,9 +83,12 @@ function EditorContent() {
       }
       setUserId(firebaseUser.uid);
       setIsLoading(false);
-      // Check LinkedIn status
+      // Check LinkedIn status + profile data for preview
       const status = await getLinkedInStatus(firebaseUser.uid);
       setLinkedinConnected(status.connected && !!status.tokenValid);
+      if (status.name) setProfileName(status.name);
+      if (status.picture) setProfilePicture(status.picture);
+      if (status.headline) setProfileHeadline(status.headline);
     });
     return () => unsubscribe();
   }, [router]);
@@ -407,13 +413,14 @@ function EditorContent() {
           <div className="p-4 pb-2">
             <div className="flex items-start gap-3">
               <Avatar className="h-12 w-12 border-2 border-muted">
+                {profilePicture && <AvatarImage src={profilePicture} />}
                 <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-700 text-white text-sm font-bold">
-                  VC
+                  {profileName ? profileName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'VC'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-foreground">Seu Nome</p>
-                <p className="text-xs text-muted-foreground truncate">Sua headline profissional</p>
+                <p className="font-semibold text-sm text-foreground">{profileName || 'Seu Nome'}</p>
+                <p className="text-xs text-muted-foreground truncate">{profileHeadline || 'Sua headline profissional'}</p>
                 <p className="text-xs text-muted-foreground">
                   {scheduledDate
                     ? format(new Date(`${scheduledDate}T${scheduledTime}`), "d MMM 'às' HH:mm", { locale: ptBR })
