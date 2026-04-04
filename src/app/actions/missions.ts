@@ -18,6 +18,7 @@ export async function submitMissionProof(
 ): Promise<{ success?: boolean; error?: string }> {
   try {
     await requireSelf(idToken, userId);
+
     const missionDoc = await adminDb
       .collection('companies')
       .doc(companyId)
@@ -75,6 +76,7 @@ export async function completeMissionSelf(
 ): Promise<{ success?: boolean; error?: string }> {
   try {
     await requireSelf(idToken, userId);
+
     const missionDoc = await adminDb
       .collection('companies')
       .doc(companyId)
@@ -157,13 +159,14 @@ export async function completeMissionSelf(
 
 export async function reviewMissionProof(
   idToken: string,
-  companyId: string,
   submissionId: string,
+  companyId: string,
   action: 'approve' | 'reject',
   adminFeedback?: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
     await requireAdmin(idToken, companyId);
+
     const subRef = adminDb
       .collection('companies')
       .doc(companyId)

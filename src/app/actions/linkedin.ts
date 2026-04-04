@@ -241,14 +241,14 @@ export type DashboardMetrics = {
  * Reads posts from Firestore (scheduledPosts with status=published),
  * then batch-fetches engagement from LinkedIn socialMetadata API.
  */
-export async function getLinkedInDashboardMetrics(userId: string): Promise<DashboardMetrics> {
+export async function getLinkedInDashboardMetrics(idToken: string, userId: string): Promise<DashboardMetrics> {
   const empty: DashboardMetrics = {
     posts: [],
     totals: { totalPosts: 0, totalReactions: 0, totalComments: 0, avgReactionsPerPost: 0, avgCommentsPerPost: 0 },
   };
 
   try {
-    if (!userId) return { ...empty, error: 'Usuario nao identificado.' };
+    await requireSelf(idToken, userId);
 
     // 1. Get user's LinkedIn connection
     const userDoc = await adminDb.collection('users').doc(userId).get();

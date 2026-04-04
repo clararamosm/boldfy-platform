@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAuthToken } from '@/lib/auth-client';
 import { getCompanyRanking, type RankedUser } from "@/app/actions";
+import { getAuthToken } from '@/lib/auth-client';
 
 type UserRanking = RankedUser & {
   isCurrentUser?: boolean;

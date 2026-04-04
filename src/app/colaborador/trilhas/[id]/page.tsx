@@ -21,8 +21,8 @@ import {
 import type {
   Trilha, Modulo, ModuloModo, ProgressoTrilha, QuestaoDesafio
 } from '@/types/trilhas';
-import { getAuthToken } from '@/lib/auth-client';
 import { recalculatePoints } from '@/app/actions';
+import { getAuthToken } from '@/lib/auth-client';
 
 const MODO_ICONS: Record<ModuloModo, any> = {
   aula: Play,
@@ -284,7 +284,9 @@ export default function TrilhaFullscreenPage() {
 
     // Recalculate user total points server-side
     if (user) {
-      getAuthToken().then(token => recalculatePoints(token, user.uid)).catch(err =>
+      getAuthToken().then(token =>
+        recalculatePoints(token, user.uid)
+      ).catch(err =>
         console.error('Error recalculating points:', err)
       );
     }

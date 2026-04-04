@@ -24,6 +24,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { reviewMissionProof } from "@/app/actions";
+import { getAuthToken } from '@/lib/auth-client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -457,9 +458,10 @@ export default function AdminMissoesPage() {
       const brandContext = companyDoc.exists() ? companyDoc.data().brandContext || {} : {};
       const companyName = companyDoc.exists() ? companyDoc.data().companyName || '' : '';
 
+      const token = await getAuthToken();
       const res = await fetch('/api/ai/missions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ brandContext, companyName }),
       });
 

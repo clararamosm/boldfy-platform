@@ -78,6 +78,7 @@ export async function handleAlignContent(
 ): Promise<AlignContentState> {
   try {
     const idToken = formData.get('idToken') as string;
+    if (!idToken) return { error: 'Token de autenticação ausente.', alignedContent: null };
 
     try {
       await requireAuth(idToken);
@@ -105,7 +106,7 @@ export async function handleAlignContent(
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
     const response = await fetch(`${baseUrl}/api/ai/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
       body: JSON.stringify({
         content,
         companyProfile,

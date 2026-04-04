@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAuthToken } from '@/lib/auth-client';
 import { submitMissionProof, completeMissionSelf } from "@/app/actions";
+import { getAuthToken } from '@/lib/auth-client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 

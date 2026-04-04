@@ -1,6 +1,7 @@
 'use server';
 
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
+import { requireMaster } from '@/lib/auth-guard';
 
 // ---- Delete Company Action (by Master) ----
 
@@ -10,9 +11,13 @@ type DeleteCompanyState = {
 };
 
 export async function deleteCompany(
+  idToken: string,
   companyId: string
 ): Promise<DeleteCompanyState> {
   try {
+    // Verificar que o caller e master
+    await requireMaster(idToken);
+
     if (!adminDb) {
       return { error: "O servico de banco de dados nao esta disponivel." };
     }

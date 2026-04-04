@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // 60 second timeout
 
 export async function GET(request: NextRequest) {
-  // Security: verify cron secret - BLOQUEIA se CRON_SECRET nao estiver configurado
+  // Security: verify cron secret (fail-closed — nega acesso se secret nao estiver configurado)
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
 

@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { getAuthToken } from '@/lib/auth-client';
 import { inviteAdmin } from '@/app/actions';
 import { deleteCompany } from '@/app/deleteCompanyAction';
+import { getAuthToken } from '@/lib/auth-client';
 
 type Company = {
     id: string;
@@ -190,7 +191,8 @@ export default function MasterEmpresasPage() {
   const handleDeleteCompany = async () => {
     if (!confirmDeleteId) return;
     try {
-      const result = await deleteCompany(confirmDeleteId);
+      const token = await getAuthToken();
+      const result = await deleteCompany(token, confirmDeleteId);
       if (result.error) {
         throw new Error(result.error);
       }

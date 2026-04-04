@@ -21,6 +21,7 @@ import {
     Loader2, Unplug, CalendarDays
 } from 'lucide-react';
 import { getLinkedInDashboardMetrics, type PostWithMetrics, type DashboardMetrics } from '@/app/actions/linkedin';
+import { getAuthToken } from '@/lib/auth-client';
 
 // ---- Types ----
 type Mission = {
@@ -246,7 +247,8 @@ export default function ColaboradorDashboardPage() {
 
                 // Fetch LinkedIn metrics (non-blocking)
                 try {
-                    const metrics = await getLinkedInDashboardMetrics(user.uid);
+                    const token = await getAuthToken();
+                    const metrics = await getLinkedInDashboardMetrics(token, user.uid);
                     setLinkedinMetrics(metrics);
                 } catch (err) {
                     console.error('LinkedIn metrics error:', err);

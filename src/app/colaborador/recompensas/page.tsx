@@ -7,6 +7,7 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { getAuthToken } from '@/lib/auth-client';
 import { redeemReward } from '@/app/actions';
+import { getAuthToken } from '@/lib/auth-client';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";

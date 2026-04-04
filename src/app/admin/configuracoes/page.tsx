@@ -14,11 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, AlertCircle, Camera } from "lucide-react";
+import { Loader2, Camera } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getStripe } from "@/lib/stripe-client";
-import { useSearchParams } from "next/navigation";
 import { onAuthStateChanged, User } from "firebase/auth";
+import { getAuthToken } from "@/lib/auth-client";
 
 type CompanyData = {
     id: string;
@@ -39,20 +38,6 @@ type CompanyData = {
     licenses: number;
     trialEndsAt?: string;
 };
-
-function ActivationButton({ companyData, onClick, isPending }: { companyData: CompanyData, onClick: () => void, isPending: boolean }) {
-    if (!companyData) return null;
-    const isTrial = companyData.status === 'Trial';
-    return (
-        <Button onClick={onClick} className="w-full sm:w-auto" disabled={isPending}>
-            {isPending ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Redirecionando...</>
-            ) : (
-                isTrial ? "Iniciar Assinatura com 30 Dias Grátis" : "Ativar Assinatura"
-            )}
-        </Button>
-    )
-}
 
 const SettingsSkeleton = () => (
     <>
@@ -95,10 +80,7 @@ function ConfiguracoesPageContent() {
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
-    const searchParams = useSearchParams();
-
     const fetchData = useCallback(async (companyId: string) => {
         try {
             const companyDocRef = doc(db, "companies", companyId);
@@ -157,38 +139,6 @@ function ConfiguracoesPageContent() {
         });
         return () => unsubscribe();
     }, [fetchData, toast]);
-
-    useEffect(() => {
-        if (searchParams.get('payment_success') && companyData) {
-            toast({ title: 'Assinatura Iniciada!', description: 'Seu período de teste começou. Bem-vindo(a) à Boldfy!' });
-        }
-        if (searchParams.get('payment_canceled')) {
-            toast({ variant: 'destructive', title: 'Processo Cancelado', description: 'O processo de assinatura foi cancelado.' });
-        }
-    }, [searchParams, toast, companyData]);
-    const handleCheckout = async () => {
-        if (!companyData) return;
-        setIsCheckingOut(true);
-        try {
-            const response = await fetch('/api/stripe/checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ companyData })
-            });
-            const { sessionId, error } = await response.json();
-            if (error) throw new Error(error);
-            if (sessionId) {
-                const stripe = await getStripe();
-                if (!stripe) { toast({ variant: 'destructive', title: 'Erro', description: 'Stripe.js não foi carregado.' }); return; }
-                await stripe.redirectToCheckout({ sessionId });
-            }
-        } catch(error) {
-            const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
-            toast({ variant: 'destructive', title: 'Erro no Checkout', description: errorMessage });
-            setIsCheckingOut(false);
-        }
-    }
-
 
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -250,7 +200,6 @@ function ConfiguracoesPageContent() {
         }
     };
 
-    const isSubscriptionNeeded = companyData?.status === 'Inativa' || companyData?.status === 'Trial';
     const isReadOnly = companyData?.status === 'Inativa';
 
     if (isLoading || !companyData) {
@@ -261,23 +210,6 @@ function ConfiguracoesPageContent() {
             <Header title="Configurações" />
             <main className="flex-1 overflow-auto p-4 md:p-6">
                 <div className="grid gap-6 max-w-4xl mx-auto">
-                    {isSubscriptionNeeded && (
-                        <Card className="border-primary bg-primary/5">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2"><AlertCircle className="text-primary"/>Sua Conta Precisa de uma Assinatura</CardTitle>
-                                <CardDescription>
-                                    {companyData.status === 'Trial'
-                                        ? 'Você está em um período de teste gratuito. Para garantir que não haja interrupção no serviço, inicie sua assinatura agora.'
-                                        : 'Para desbloquear todas as funcionalidades da plataforma, é necessário ativar sua assinatura.'
-                                    }
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ActivationButton companyData={companyData} onClick={handleCheckout} isPending={isCheckingOut} />
-                            </CardContent>
-                        </Card>
-                    )}
-
                     <Card>
                         <CardHeader>
                             <CardTitle>Perfil do Administrador</CardTitle>

@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ai } from "@/ai/genkit";
+import { auth as adminAuth } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
   try {
+    // Verificar autenticacao
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    try {
+      await adminAuth.verifyIdToken(authHeader.split('Bearer ')[1]);
+    } catch {
+      return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
     const { brandContext, companyName } = await req.json();
 
     const bc = brandContext || {};

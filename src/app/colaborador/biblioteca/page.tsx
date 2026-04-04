@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { toggleStarContent } from '@/app/actions';
+import { getAuthToken } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 
 const ITEMS_PER_PAGE = 15;

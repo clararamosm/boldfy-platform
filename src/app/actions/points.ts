@@ -20,6 +20,7 @@ export async function getCompanyRanking(idToken: string, userId: string): Promis
 }> {
   try {
     await requireSelf(idToken, userId);
+
     const userDoc = await adminDb.collection('users').doc(userId).get();
     if (!userDoc.exists) {
       return { ranking: [], monthlyPrizeName: null, error: 'Usuário não encontrado.' };
@@ -79,6 +80,7 @@ export async function getCompanyRanking(idToken: string, userId: string): Promis
 export async function recalculatePoints(idToken: string, userId: string): Promise<{ points: number; error?: string }> {
   try {
     await requireSelf(idToken, userId);
+
     const progressSnap = await adminDb
       .collection('users')
       .doc(userId)

@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getAuthToken } from '@/lib/auth-client';
 import { getScheduledPosts, deleteScheduledPost, type ScheduledPost } from '@/app/actions/posts';
+import { getAuthToken } from '@/lib/auth-client';
 import {
   ChevronLeft,
   ChevronRight,

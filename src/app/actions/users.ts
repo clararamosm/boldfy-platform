@@ -4,9 +4,9 @@
 import { z } from 'zod';
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { requireMaster, requireAdmin } from '@/lib/auth-guard';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
-import { requireMaster, requireAdmin } from '@/lib/auth-guard';
 
 // ---- Email Invitation Helper ----
 
@@ -82,13 +82,10 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     return { error: "O serviço de autenticação do administrador não está disponível. Verifique a configuração do servidor." };
   }
 
+  // Verificar que quem chama e master
   const idToken = formData.get('idToken') as string;
-
-  try {
-    await requireMaster(idToken);
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Erro de autenticação.' };
-  }
+  if (!idToken) return { error: 'Token de autenticacao ausente.' };
+  try { await requireMaster(idToken); } catch (e: any) { return { error: e.message }; }
 
   const validatedData = InviteAdminSchema.safeParse({
     companyName: formData.get('companyName'),
@@ -178,14 +175,11 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     return { error: "O serviço de autenticação do administrador não está disponível." };
   }
 
+  // Verificar que quem chama e admin da empresa
   const idToken = formData.get('idToken') as string;
-  const companyId = formData.get('companyId') as string;
-
-  try {
-    await requireAdmin(idToken, companyId);
-  } catch (error) {
-    return { error: error instanceof Error ? error.message : 'Erro de autenticação.' };
-  }
+  const formCompanyId = formData.get('companyId') as string;
+  if (!idToken) return { error: 'Token de autenticacao ausente.' };
+  try { await requireAdmin(idToken, formCompanyId); } catch (e: any) { return { error: e.message }; }
 
   const validatedData = InviteCollaboratorSchema.safeParse({
     name: formData.get('name'),
@@ -197,7 +191,7 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     return { error: validatedData.error.errors.map(e => e.message).join(', ') };
   }
 
-  const { name, email } = validatedData.data;
+  const { name, email, companyId } = validatedData.data;
 
   try {
     const companyDocSnap = await adminDb.collection("companies").doc(companyId).get();
@@ -264,13 +258,15 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
 
 // ---- Delete Collaborator Action (by Admin) ----
 
-export async function deleteCollaborator(idToken: string, companyId: string, userId: string): Promise<{ success?: boolean; error?: string }> {
+export async function deleteCollaborator(idToken: string, userId: string): Promise<{ success?: boolean; error?: string }> {
   if (!adminAuth) {
     return { error: "O serviço de autenticação não está disponível." };
   }
   try {
-    await requireAdmin(idToken, companyId);
-
+    // Verificar que quem chama e admin da mesma empresa do colaborador
+    const targetDoc = await adminDb.collection('users').doc(userId).get();
+    if (!targetDoc.exists) return { error: 'Colaborador nao encontrado.' };
+    await requireAdmin(idToken, targetDoc.data()!.companyId);
     try {
       await adminAuth.deleteUser(userId);
     } catch (authError: any) {

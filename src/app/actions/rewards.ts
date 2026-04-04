@@ -16,6 +16,7 @@ export async function redeemReward(
 ): Promise<{ success?: boolean; error?: string }> {
   try {
     await requireSelf(idToken, userId);
+
     const rewardDoc = await adminDb
       .collection('companies')
       .doc(companyId)
@@ -145,12 +146,13 @@ export async function redeemReward(
 
 export async function markRescueAsPaid(
   idToken: string,
-  companyId: string,
   rescueId: string,
+  companyId: string,
   userId?: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
     await requireAdmin(idToken, companyId);
+
     const batch = adminDb.batch();
 
     const companyRescueRef = adminDb

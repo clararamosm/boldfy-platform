@@ -20,6 +20,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuthToken } from '@/lib/auth-client';
 import { createScheduledPost, updateScheduledPost } from '@/app/actions/posts';
 import { publishToLinkedIn, getLinkedInStatus } from '@/app/actions/linkedin';
+import { getAuthToken } from '@/lib/auth-client';
 import {
   CalendarDays,
   Clock,
@@ -85,7 +86,8 @@ function EditorContent() {
       setUserId(firebaseUser.uid);
       setIsLoading(false);
       // Check LinkedIn status + profile data for preview
-      const status = await getLinkedInStatus(firebaseUser.uid);
+      const tkn = await firebaseUser.getIdToken();
+      const status = await getLinkedInStatus(tkn, firebaseUser.uid);
       setLinkedinConnected(status.connected && !!status.tokenValid);
       if (status.name) setProfileName(status.name);
       if (status.picture) setProfilePicture(status.picture);
@@ -188,14 +190,15 @@ function EditorContent() {
       }
 
       // Publish to LinkedIn (with optional image)
-      const result = await publishToLinkedIn(userId, caption, mediaUrl);
+      const token = await getAuthToken();
+      const result = await publishToLinkedIn(token, userId, caption, mediaUrl);
 
       if (result.success) {
         setPublishedUrl(result.postUrl || null);
         toast({ title: 'Publicado no LinkedIn!', description: 'Seu post está no ar.' });
 
         // Also save as a published record
-        await createScheduledPost(userId, {
+        await createScheduledPost(token, userId, {
           caption,
           mediaUrl,
           mediaType: mediaFile?.type,

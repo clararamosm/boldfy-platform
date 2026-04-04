@@ -18,8 +18,8 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
-import { getAuthToken } from '@/lib/auth-client';
 import { inviteCollaborator, deleteCollaborator } from '@/app/actions';
+import { getAuthToken } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
 
 type Collaborator = {
@@ -151,10 +151,6 @@ export default function AdminColaboradoresPage() {
   }, [fetchData, router, toast]);
 
   useEffect(() => {
-    getAuthToken().then(setCachedToken).catch(() => {});
-  }, []);
-
-  useEffect(() => {
     if (inviteState.success) {
       toast({ title: "Convite enviado!", description: "O colaborador receberá um e-mail para definir sua senha." });
       setIsDialogOpen(false);
@@ -246,10 +242,10 @@ export default function AdminColaboradoresPage() {
   };
 
   const handleRemoveCollaborator = async () => {
-    if (!confirmDeleteId || !companyId) return;
+    if (!confirmDeleteId) return;
     try {
       const token = await getAuthToken();
-      const result = await deleteCollaborator(token, companyId, confirmDeleteId);
+      const result = await deleteCollaborator(token, confirmDeleteId);
       if (result.error) {
         toast({ title: "Erro ao remover colaborador", description: result.error, variant: "destructive" });
       } else {
@@ -275,7 +271,6 @@ export default function AdminColaboradoresPage() {
         >
           <form action={formAction} ref={formRef}>
             <input type="hidden" name="companyId" value={companyId || ''} />
-            <input type="hidden" name="idToken" value={cachedToken} />
             <InviteFormContent />
             <div className="flex justify-end mt-6">
               <Button type="submit">Enviar Convite</Button>
