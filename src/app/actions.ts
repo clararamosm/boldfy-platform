@@ -498,6 +498,146 @@ export async function getCompanyRanking(userId: string): Promise<{
   }
 }
 
+// ---- Mission Proof Submission & Approval ----
+
+export async function submitMissionProof(
+  userId: string,
+  missionId: string,
+  companyId: string,
+  userName: string,
+  proofUrl: string,
+  proofFileName: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    // Validate mission exists
+    const missionDoc = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missions')
+      .doc(missionId)
+      .get();
+
+    if (!missionDoc.exists) {
+      return { error: 'Missão não encontrada.' };
+    }
+
+    // Check if user already has a pending or approved submission
+    const existingSnap = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missionSubmissions')
+      .where('missionId', '==', missionId)
+      .where('userId', '==', userId)
+      .where('status', 'in', ['pending', 'approved'])
+      .get();
+
+    if (!existingSnap.empty) {
+      return { error: 'Você já enviou uma comprovação para esta missão.' };
+    }
+
+    // Create submission
+    await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missionSubmissions')
+      .add({
+        missionId,
+        userId,
+        userName,
+        proofUrl,
+        proofFileName,
+        status: 'pending',
+        submittedAt: FieldValue.serverTimestamp(),
+      });
+
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in submitMissionProof:', msg);
+    return { error: msg };
+  }
+}
+
+export async function reviewMissionProof(
+  submissionId: string,
+  companyId: string,
+  action: 'approve' | 'reject',
+  adminFeedback?: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const subRef = adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missionSubmissions')
+      .doc(submissionId);
+
+    const subDoc = await subRef.get();
+    if (!subDoc.exists) {
+      return { error: 'Submissão não encontrada.' };
+    }
+
+    const subData = subDoc.data()!;
+    if (subData.status !== 'pending') {
+      return { error: 'Esta submissão já foi avaliada.' };
+    }
+
+    // Get mission data for points
+    const missionDoc = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missions')
+      .doc(subData.missionId)
+      .get();
+
+    if (action === 'approve') {
+      const missionPoints = missionDoc.exists ? missionDoc.data()!.points || 0 : 0;
+      const batch = adminDb.batch();
+
+      // Update submission status
+      batch.update(subRef, {
+        status: 'approved',
+        reviewedAt: FieldValue.serverTimestamp(),
+        adminFeedback: adminFeedback || null,
+      });
+
+      // Award points to user
+      const userRef = adminDb.collection('users').doc(subData.userId);
+      batch.update(userRef, {
+        points: FieldValue.increment(missionPoints),
+      });
+
+      // Add to points history
+      const historyRef = adminDb
+        .collection('users')
+        .doc(subData.userId)
+        .collection('pointsHistory')
+        .doc();
+      batch.set(historyRef, {
+        description: `Missão concluída: ${missionDoc.exists ? missionDoc.data()!.name : 'Missão'}`,
+        date: FieldValue.serverTimestamp(),
+        points: missionPoints,
+        type: 'gain',
+        source: 'missao',
+      });
+
+      await batch.commit();
+    } else {
+      // Reject
+      await subRef.update({
+        status: 'rejected',
+        reviewedAt: FieldValue.serverTimestamp(),
+        adminFeedback: adminFeedback || null,
+      });
+    }
+
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in reviewMissionProof:', msg);
+    return { error: msg };
+  }
+}
+
 // ---- Server-Side Reward Redemption ----
 
 export async function redeemReward(

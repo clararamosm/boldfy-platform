@@ -5,7 +5,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, Upload, Clock, Zap, CalendarDays, Loader2, History, XCircle } from "lucide-react";
+import { CheckCircle, Upload, Clock, Zap, CalendarDays, Loader2, History, XCircle, AlertCircle, HourglassIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -13,12 +13,16 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import React, { useState, useEffect, useCallback } from "react";
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { db, auth } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import { db, auth, storage } from '@/lib/firebase';
+import { collection, query, getDocs, doc, getDoc } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { submitMissionProof } from "@/app/actions";
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-type MissionStatus = 'completa' | 'pendente' | 'agendada' | 'expirada' | 'cancelada';
+type MissionStatus = 'completa' | 'pendente' | 'aguardando' | 'rejeitada' | 'agendada' | 'expirada';
 
 type Mission = {
     id: string;
@@ -29,29 +33,73 @@ type Mission = {
     startDate?: any;
     endDate?: any;
     type: 'timed' | 'fixed';
-    adminStatus?: string;
+    submissionFeedback?: string;
+};
+
+const formatDate = (d: any) => {
+    if (!d) return '';
+    const date = d.toDate ? d.toDate() : new Date(d);
+    return format(date, "dd/MM/yyyy", { locale: ptBR });
 };
 
 // ---- Sub-components ----
-const MissionCard = ({ name, description, points, status, startDate, endDate }: Mission) => {
-    const [fileUploaded, setFileUploaded] = useState(false);
+const MissionCard = ({ mission, onSubmitProof, isSubmitting }: { mission: Mission, onSubmitProof: (missionId: string, file: File) => Promise<void>, isSubmitting: boolean }) => {
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
 
-    const uploadForm = (
-        <div className="space-y-2">
-            <Label htmlFor="submission-file" className="sr-only">Arquivo</Label>
-            <Input id="submission-file" type="file" accept="image/*,video/*,.pdf" onChange={(e) => setFileUploaded((e.target.files?.length ?? 0) > 0)} />
-            <p className="text-xs text-muted-foreground pt-1">Envie uma imagem, video ou PDF como comprovacao.</p>
-        </div>
-    );
+    const handleSubmit = async () => {
+        if (!selectedFile) return;
+        await onSubmitProof(mission.id, selectedFile);
+        setSelectedFile(null);
+        setDialogOpen(false);
+    };
 
-    const statusInfo: Record<MissionStatus, { icon: React.ReactNode; text: string; color: string; badge?: string; badgeVariant?: string; button: React.ReactNode }> = {
+    const statusConfig: Record<MissionStatus, { icon: React.ReactNode; text: string; color: string; badge?: string; badgeClass?: string; button: React.ReactNode }> = {
         completa: {
             icon: <CheckCircle className="h-4 w-4 mr-2" />,
-            text: "Missao Completa",
+            text: "Missão Concluída",
             color: "text-green-600",
-            badge: "Concluida",
-            badgeVariant: "bg-green-100 text-green-700",
-            button: <Button disabled variant="secondary">Concluida</Button>
+            badge: "Concluída",
+            badgeClass: "bg-green-100 text-green-700",
+            button: <Button disabled variant="secondary"><CheckCircle className="mr-2 h-4 w-4" />Concluída</Button>
+        },
+        aguardando: {
+            icon: <HourglassIcon className="h-4 w-4 mr-2" />,
+            text: "Aguardando aprovação do admin",
+            color: "text-yellow-600",
+            badge: "Aguardando",
+            badgeClass: "bg-yellow-100 text-yellow-700",
+            button: <Button disabled variant="outline"><HourglassIcon className="mr-2 h-4 w-4" />Aguardando aprovação</Button>
+        },
+        rejeitada: {
+            icon: <XCircle className="h-4 w-4 mr-2" />,
+            text: mission.submissionFeedback ? `Motivo: ${mission.submissionFeedback}` : "Comprovação rejeitada. Envie novamente.",
+            color: "text-red-600",
+            badge: "Rejeitada",
+            badgeClass: "bg-red-100 text-red-700",
+            button: (
+                <ActionDialog
+                    title="Reenviar Comprovação"
+                    description={`Envie um novo anexo para a missão "${mission.name}".`}
+                    trigger={<Button variant="destructive"><Upload className="mr-2 h-4 w-4" /> Reenviar</Button>}
+                    actionText={selectedFile ? "Enviar Comprovação" : "Selecione um arquivo"}
+                    onAction={handleSubmit}
+                    showCancel
+                    open={dialogOpen}
+                    onOpenChange={setDialogOpen}
+                >
+                    <div className="space-y-2">
+                        <Label htmlFor={`file-${mission.id}`} className="sr-only">Arquivo</Label>
+                        <Input id={`file-${mission.id}`} type="file" accept="image/*,video/*,.pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} disabled={isSubmitting} />
+                        <p className="text-xs text-muted-foreground">Envie uma imagem, vídeo ou PDF como comprovação.</p>
+                        {mission.submissionFeedback && (
+                            <div className="bg-red-50 border border-red-200 rounded-md p-2 mt-2">
+                                <p className="text-xs text-red-700"><AlertCircle className="h-3 w-3 inline mr-1" />Feedback: {mission.submissionFeedback}</p>
+                            </div>
+                        )}
+                    </div>
+                </ActionDialog>
+            )
         },
         pendente: {
             icon: null,
@@ -59,81 +107,80 @@ const MissionCard = ({ name, description, points, status, startDate, endDate }: 
             color: "",
             button: (
                 <ActionDialog
-                    title="Enviar Comprovacao"
-                    description={`Envie um anexo para completar a missao "${name}".`}
-                    trigger={<Button><Upload className="mr-2 h-4 w-4" /> Enviar Comprovacao</Button>}
-                    actionText={fileUploaded ? "Concluir Missao" : "Selecione um arquivo"}
+                    title="Enviar Comprovação"
+                    description={`Envie um anexo para completar a missão "${mission.name}".`}
+                    trigger={<Button><Upload className="mr-2 h-4 w-4" /> Enviar Comprovação</Button>}
+                    actionText={selectedFile ? "Enviar Comprovação" : "Selecione um arquivo"}
+                    onAction={handleSubmit}
                     showCancel
+                    open={dialogOpen}
+                    onOpenChange={setDialogOpen}
                 >
-                    {uploadForm}
+                    <div className="space-y-2">
+                        <Label htmlFor={`file-${mission.id}`} className="sr-only">Arquivo</Label>
+                        <Input id={`file-${mission.id}`} type="file" accept="image/*,video/*,.pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} disabled={isSubmitting} />
+                        <p className="text-xs text-muted-foreground">Envie uma imagem, vídeo ou PDF como comprovação.</p>
+                    </div>
                 </ActionDialog>
             )
         },
         agendada: {
             icon: <Clock className="h-4 w-4 mr-2" />,
-            text: "Missao Agendada",
-            color: "text-muted-foreground",
+            text: "Missão Agendada",
+            color: "text-blue-600",
             badge: "Agendada",
-            badgeVariant: "bg-blue-100 text-blue-700",
-            button: <Button disabled>Em breve</Button>
+            badgeClass: "bg-blue-100 text-blue-700",
+            button: <Button disabled variant="outline">Em breve</Button>
         },
         expirada: {
             icon: <Clock className="h-4 w-4 mr-2" />,
-            text: "Missao Expirada",
-            color: "text-orange-600",
+            text: "Missão Expirada",
+            color: "text-muted-foreground",
             badge: "Expirada",
-            badgeVariant: "bg-orange-100 text-orange-700",
+            badgeClass: "bg-gray-100 text-gray-600",
             button: <Button disabled variant="outline">Expirada</Button>
         },
-        cancelada: {
-            icon: <XCircle className="h-4 w-4 mr-2" />,
-            text: "Missao Cancelada",
-            color: "text-red-600",
-            badge: "Cancelada",
-            badgeVariant: "bg-red-100 text-red-700",
-            button: <Button disabled variant="outline">Cancelada</Button>
-        }
     };
 
-    const currentStatus = statusInfo[status];
-    const isHistory = status === 'completa' || status === 'expirada' || status === 'cancelada';
+    const cfg = statusConfig[mission.status];
+    const isHistory = mission.status === 'completa' || mission.status === 'expirada';
 
     return (
         <Card className={isHistory ? 'opacity-80' : ''}>
             <CardHeader>
                 <div className="flex justify-between items-start gap-4">
-                    <CardTitle className="font-headline text-lg">{name}</CardTitle>
+                    <CardTitle className="font-headline text-lg">{mission.name}</CardTitle>
                     <div className="flex items-center gap-2 shrink-0">
-                        {currentStatus.badge && (
-                            <Badge variant="secondary" className={currentStatus.badgeVariant}>
-                                {currentStatus.badge}
+                        {cfg.badge && (
+                            <Badge variant="secondary" className={cfg.badgeClass}>
+                                {cfg.badge}
                             </Badge>
                         )}
                         <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap">
-                            <Zap className="h-3 w-3 mr-1"/> {points}
+                            <Zap className="h-3 w-3 mr-1"/> {mission.points}
                         </Badge>
                     </div>
                 </div>
-                <CardDescription>{description}</CardDescription>
+                <CardDescription>{mission.description}</CardDescription>
             </CardHeader>
             <CardContent>
-                {startDate && endDate && (
+                {mission.startDate && mission.endDate && (
                     <div className="text-xs text-muted-foreground flex items-center">
                         <CalendarDays className="h-3 w-3 mr-1.5" />
-                        <span>Periodo: {startDate.toDate().toLocaleDateString()} - {endDate.toDate().toLocaleDateString()}</span>
+                        <span>Período: {formatDate(mission.startDate)} — {formatDate(mission.endDate)}</span>
                     </div>
                 )}
             </CardContent>
             <CardFooter className="flex justify-between items-center">
-                {status !== 'pendente' ? (
-                    <div className={`text-sm ${currentStatus.color} flex items-center font-medium`}>
-                        {currentStatus.icon}
-                        {currentStatus.text}
+                {cfg.text ? (
+                    <div className={`text-sm ${cfg.color} flex items-center font-medium`}>
+                        {cfg.icon}
+                        <span className="line-clamp-1">{cfg.text}</span>
                     </div>
                 ) : (
                     <span/>
                 )}
-                {currentStatus.button}
+                {cfg.button}
             </CardFooter>
         </Card>
     );
@@ -164,61 +211,47 @@ const MissionsPageSkeleton = () => (
 );
 
 // ---- Main Component ----
-export default function InfluencerMissoesPage() {
+export default function ColaboradorMissoesPage() {
     const [missions, setMissions] = useState<Mission[]>([]);
     const [historyMissions, setHistoryMissions] = useState<Mission[]>([]);
     const [stats, setStats] = useState({ weeklyPoints: 0, fixedProgress: 0, fixedCompleted: 0, fixedTotal: 0 });
     const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [userInfo, setUserInfo] = useState<{ uid: string; companyId: string; name: string } | null>(null);
     const { toast } = useToast();
-
-    const deriveMissionStatus = (missionDoc: any, now: Date): { status: MissionStatus; isActive: boolean } => {
-        const adminStatus = missionDoc.status;
-
-        // Cancelled missions go to history
-        if (adminStatus === 'Cancelada') {
-            return { status: 'cancelada', isActive: false };
-        }
-
-        // Inactive/past missions go to history
-        if (adminStatus === 'Inativa' || adminStatus === 'Passada') {
-            return { status: 'expirada', isActive: false };
-        }
-
-        // Check if timed mission has expired
-        if (missionDoc.endDate && missionDoc.endDate.toDate() < now) {
-            return { status: 'expirada', isActive: false };
-        }
-
-        // Pending admin approval - show as scheduled
-        if (adminStatus === 'Pendente') {
-            return { status: 'agendada', isActive: true };
-        }
-
-        // Active missions
-        if (adminStatus === 'Ativa' || adminStatus === 'Fixa' || adminStatus === 'Agendada') {
-            return { status: 'pendente', isActive: true };
-        }
-
-        // Completed missions go to history
-        if (adminStatus === 'Concluida' || adminStatus === 'Completa') {
-            return { status: 'completa', isActive: false };
-        }
-
-        return { status: 'pendente', isActive: true };
-    };
 
     const fetchMissions = useCallback(async (user: User) => {
         setIsLoading(true);
         try {
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
+            const userDocSnap = await getDoc(doc(db, "users", user.uid));
             if (!userDocSnap.exists()) throw new Error("User not found.");
 
-            const companyId = userDocSnap.data().companyId;
-            if (!companyId) throw new Error("CompanyId not found for user.");
+            const userData = userDocSnap.data();
+            const companyId = userData.companyId;
+            if (!companyId) throw new Error("CompanyId not found.");
 
-            const missionsQuery = query(collection(db, "companies", companyId, "missions"));
-            const missionsSnap = await getDocs(missionsQuery);
+            setUserInfo({
+                uid: user.uid,
+                companyId,
+                name: userData.profile?.name || userData.name || 'Colaborador',
+            });
+
+            // Fetch missions
+            const missionsSnap = await getDocs(collection(db, "companies", companyId, "missions"));
+
+            // Fetch user's submissions
+            const subsSnap = await getDocs(collection(db, "companies", companyId, "missionSubmissions"));
+            const userSubs: Record<string, { status: string; feedback?: string }> = {};
+            subsSnap.docs.forEach(d => {
+                const data = d.data();
+                if (data.userId === user.uid) {
+                    // Keep the latest submission per mission (pending/approved wins over rejected)
+                    const existing = userSubs[data.missionId];
+                    if (!existing || data.status === 'pending' || data.status === 'approved') {
+                        userSubs[data.missionId] = { status: data.status, feedback: data.adminFeedback };
+                    }
+                }
+            });
 
             const now = new Date();
             const active: Mission[] = [];
@@ -226,45 +259,73 @@ export default function InfluencerMissoesPage() {
 
             missionsSnap.docs.forEach(docSnap => {
                 const data = docSnap.data();
-                const { status, isActive } = deriveMissionStatus(data, now);
+                const sub = userSubs[docSnap.id];
+
+                // Derive status
+                let status: MissionStatus = 'pendente';
+                let submissionFeedback: string | undefined;
+
+                // Check if timed mission is in valid period
+                const isFixed = data.type === 'fixed';
+                const start = data.startDate?.toDate ? data.startDate.toDate() : data.startDate ? new Date(data.startDate) : null;
+                const end = data.endDate?.toDate ? data.endDate.toDate() : data.endDate ? new Date(data.endDate) : null;
+
+                if (!isFixed && start && now < start) {
+                    status = 'agendada';
+                } else if (!isFixed && end && now > end) {
+                    status = 'expirada';
+                } else if (sub?.status === 'approved') {
+                    status = 'completa';
+                } else if (sub?.status === 'pending') {
+                    status = 'aguardando';
+                } else if (sub?.status === 'rejected') {
+                    status = 'rejeitada';
+                    submissionFeedback = sub.feedback;
+                } else {
+                    status = 'pendente';
+                }
 
                 const mission: Mission = {
                     id: docSnap.id,
-                    name: data.title || data.name || 'Sem titulo',
+                    name: data.name || 'Sem título',
                     description: data.description || '',
                     points: data.points || 0,
                     status,
                     startDate: data.startDate || null,
                     endDate: data.endDate || null,
                     type: data.type || 'fixed',
-                    adminStatus: data.status
+                    submissionFeedback,
                 };
 
-                if (isActive) {
-                    active.push(mission);
-                } else {
+                if (status === 'completa' || status === 'expirada') {
                     history.push(mission);
+                } else {
+                    active.push(mission);
                 }
             });
 
-            // Sort history: completed first, then expired, then cancelled
-            const statusOrder: Record<string, number> = { completa: 0, expirada: 1, cancelada: 2 };
-            history.sort((a, b) => (statusOrder[a.status] ?? 3) - (statusOrder[b.status] ?? 3));
+            // Sort: pendente/rejeitada first, then aguardando, then agendada
+            const statusOrder: Record<string, number> = { pendente: 0, rejeitada: 1, aguardando: 2, agendada: 3 };
+            active.sort((a, b) => (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4));
+
+            const historyOrder: Record<string, number> = { completa: 0, expirada: 1 };
+            history.sort((a, b) => (historyOrder[a.status] ?? 2) - (historyOrder[b.status] ?? 2));
 
             const fixedActive = active.filter(m => m.type === 'fixed');
-            const completedFixed = fixedActive.filter(m => m.status === 'completa').length;
+            const completedFixed = history.filter(m => m.type === 'fixed' && m.status === 'completa').length;
+            const totalFixed = fixedActive.length + completedFixed;
 
             setMissions(active);
             setHistoryMissions(history);
             setStats({
                 weeklyPoints: 0,
                 fixedCompleted: completedFixed,
-                fixedTotal: fixedActive.length,
-                fixedProgress: fixedActive.length > 0 ? (completedFixed / fixedActive.length) * 100 : 0,
+                fixedTotal: totalFixed,
+                fixedProgress: totalFixed > 0 ? (completedFixed / totalFixed) * 100 : 0,
             });
         } catch (error) {
             console.error("Error fetching missions: ", error);
-            toast({ variant: 'destructive', title: 'Erro ao buscar missoes.', description: (error as Error).message });
+            toast({ variant: 'destructive', title: 'Erro ao buscar missões.', description: (error as Error).message });
         } finally {
             setIsLoading(false);
         }
@@ -281,53 +342,88 @@ export default function InfluencerMissoesPage() {
         return () => unsubscribe();
     }, [fetchMissions]);
 
+    const handleSubmitProof = async (missionId: string, file: File) => {
+        if (!userInfo) return;
+        setIsSubmitting(true);
+        try {
+            // Upload file to Storage
+            const filePath = `companies/${userInfo.companyId}/missions/${missionId}/${userInfo.uid}/${file.name}`;
+            const fileRef = storageRef(storage, filePath);
+            await uploadBytes(fileRef, file);
+            const downloadUrl = await getDownloadURL(fileRef);
+
+            // Submit via server action
+            const result = await submitMissionProof(
+                userInfo.uid,
+                missionId,
+                userInfo.companyId,
+                userInfo.name,
+                downloadUrl,
+                file.name
+            );
+
+            if (result.error) {
+                toast({ variant: 'destructive', title: 'Erro', description: result.error });
+                return;
+            }
+
+            toast({ title: 'Comprovação enviada!', description: 'Aguarde a aprovação do admin.' });
+            fetchMissions(auth.currentUser!);
+        } catch (error) {
+            console.error("Error submitting proof:", error);
+            toast({ variant: 'destructive', title: 'Erro ao enviar comprovação.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const weeklyMissions = missions.filter(m => m.type === 'timed');
     const fixedMissions = missions.filter(m => m.type === 'fixed');
 
     const renderMissions = (missionList: Mission[]) => {
-        if (isLoading) {
-            return <MissionsPageSkeleton />;
-        }
+        if (isLoading) return <MissionsPageSkeleton />;
         if (missionList.length === 0) {
-            return <p className="text-center text-muted-foreground py-8">Nenhuma missao nesta categoria.</p>;
+            return <p className="text-center text-muted-foreground py-8">Nenhuma missão nesta categoria.</p>;
         }
         return (
             <div className="space-y-4">
-                {missionList.map(mission => <MissionCard key={mission.id} {...mission} />)}
+                {missionList.map(mission => (
+                    <MissionCard key={mission.id} mission={mission} onSubmitProof={handleSubmitProof} isSubmitting={isSubmitting} />
+                ))}
             </div>
         );
     };
 
     return (
         <>
-            <Header title="Missoes" />
+            <Header title="Missões" />
             <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
                 <Card>
                     <CardContent className="grid gap-4 md:grid-cols-2 p-4">
                         <div className="p-2">
                             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <Zap className="h-4 w-4"/> Pontos de Missoes da Semana
+                                <Zap className="h-4 w-4"/> Pontos de Missões da Semana
                             </div>
                             <div className="text-3xl font-bold">{stats.weeklyPoints}</div>
                         </div>
                         <div className="p-2">
                             <div className="flex items-center justify-between gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <span>Progresso em Missoes Fixas</span>
+                                <span>Progresso em Missões Fixas</span>
                                 <span>{stats.fixedCompleted} / {stats.fixedTotal}</span>
                             </div>
                             <Progress value={stats.fixedProgress} className="h-2" />
-                            {stats.fixedProgress === 100 && <p className="text-xs text-muted-foreground mt-2">Voce completou todas as missoes fixas!</p>}
+                            {stats.fixedProgress === 100 && stats.fixedTotal > 0 && <p className="text-xs text-muted-foreground mt-2">Você completou todas as missões fixas!</p>}
                         </div>
                     </CardContent>
                 </Card>
 
                 <Tabs defaultValue="semana">
                     <TabsList className="mb-4">
-                        <TabsTrigger value="semana">Missoes da Semana</TabsTrigger>
-                        <TabsTrigger value="fixas">Missoes Fixas</TabsTrigger>
+                        <TabsTrigger value="semana">Missões da Semana</TabsTrigger>
+                        <TabsTrigger value="fixas">Missões Fixas</TabsTrigger>
                         <TabsTrigger value="historico" className="flex items-center gap-1.5">
                             <History className="h-3.5 w-3.5" />
-                            Historico
+                            Histórico
                             {historyMissions.length > 0 && (
                                 <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
                                     {historyMissions.length}
@@ -347,12 +443,14 @@ export default function InfluencerMissoesPage() {
                         ) : historyMissions.length === 0 ? (
                             <div className="text-center py-12">
                                 <History className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                                <p className="text-muted-foreground font-medium">Nenhuma missao no historico</p>
-                                <p className="text-sm text-muted-foreground mt-1">Missoes concluidas, expiradas ou canceladas aparecerao aqui.</p>
+                                <p className="text-muted-foreground font-medium">Nenhuma missão no histórico</p>
+                                <p className="text-sm text-muted-foreground mt-1">Missões concluídas ou expiradas aparecerão aqui.</p>
                             </div>
                         ) : (
                             <div className="space-y-4">
-                                {historyMissions.map(mission => <MissionCard key={mission.id} {...mission} />)}
+                                {historyMissions.map(mission => (
+                                    <MissionCard key={mission.id} mission={mission} onSubmitProof={handleSubmitProof} isSubmitting={isSubmitting} />
+                                ))}
                             </div>
                         )}
                     </TabsContent>
