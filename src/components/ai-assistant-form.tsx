@@ -8,9 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Loader2, ClipboardCopy, Check } from 'lucide-react';
+import { Sparkles, Loader2, ClipboardCopy, Check, Linkedin, ExternalLink, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { publishToLinkedIn, getLinkedInStatus } from '@/app/actions/linkedin';
+import { Badge } from './ui/badge';
+import Link from 'next/link';
 
 const initialState = {
   alignedContent: null,
@@ -36,12 +39,24 @@ function SubmitButton() {
   );
 }
 
-// TODO: In a real app, the userId would come from the user's session.
 export function AiAssistantForm({ companyId, userId = "user-123" }: { companyId: string, userId?: string }) {
   const [state, formAction] = useActionState(handleAlignContent, initialState);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [linkedinStatus, setLinkedinStatus] = useState<{
+    connected: boolean;
+    name?: string;
+    tokenValid?: boolean;
+  }>({ connected: false });
+
+  useEffect(() => {
+    if (userId && userId !== 'user-123') {
+      getLinkedInStatus(userId).then(setLinkedinStatus);
+    }
+  }, [userId]);
 
   useEffect(() => {
     if (state?.error) {
@@ -51,6 +66,9 @@ export function AiAssistantForm({ companyId, userId = "user-123" }: { companyId:
         description: state.error,
       });
     }
+    if (state?.alignedContent) {
+      setPublishedUrl(null);
+    }
   }, [state, toast]);
 
   const handleCopy = () => {
@@ -59,6 +77,26 @@ export function AiAssistantForm({ companyId, userId = "user-123" }: { companyId:
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     }
+  };
+
+  const handlePublish = async () => {
+    if (!state?.alignedContent) return;
+    setIsPublishing(true);
+    try {
+      const result = await publishToLinkedIn(userId, state.alignedContent);
+      if (result.error) {
+        toast({ variant: 'destructive', title: 'Erro ao publicar', description: result.error });
+        if (result.needsReconnect) {
+          setLinkedinStatus(prev => ({ ...prev, connected: false }));
+        }
+      } else if (result.success) {
+        setPublishedUrl(result.postUrl || null);
+        toast({ title: 'Publicado no LinkedIn!', description: 'Seu conteúdo foi publicado com sucesso.' });
+      }
+    } catch {
+      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível publicar no LinkedIn.' });
+    }
+    setIsPublishing(false);
   };
 
   return (
@@ -150,6 +188,56 @@ export function AiAssistantForm({ companyId, userId = "user-123" }: { companyId:
                 </Button>
             )}
           </div>
+
+          {/* LinkedIn Publish Section */}
+          {state?.alignedContent && (
+            <div className="rounded-lg border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Linkedin className="h-5 w-5 text-[#0A66C2]" />
+                  <span className="font-medium text-sm">Publicar no LinkedIn</span>
+                </div>
+                {linkedinStatus.connected ? (
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs">
+                    {linkedinStatus.name || 'Conectado'}
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-xs">Não conectado</Badge>
+                )}
+              </div>
+
+              {publishedUrl ? (
+                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/10 rounded-md p-3">
+                  <Check className="h-4 w-4 flex-shrink-0" />
+                  <span>Publicado com sucesso!</span>
+                  <a href={publishedUrl} target="_blank" rel="noopener noreferrer"
+                    className="ml-auto flex items-center gap-1 text-[#0A66C2] hover:underline font-medium">
+                    Ver post <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              ) : linkedinStatus.connected && linkedinStatus.tokenValid ? (
+                <Button type="button" onClick={handlePublish} disabled={isPublishing}
+                  className="w-full bg-[#0A66C2] hover:bg-[#004182] text-white">
+                  {isPublishing ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publicando...</>
+                  ) : (
+                    <><Linkedin className="mr-2 h-4 w-4" /> Publicar no LinkedIn</>
+                  )}
+                </Button>
+              ) : (
+                <div className="text-sm text-muted-foreground space-y-2">
+                  <p>{linkedinStatus.connected
+                    ? 'Seu token expirou. Reconecte nas configurações.'
+                    : 'Conecte sua conta do LinkedIn para publicar diretamente.'}</p>
+                  <Button type="button" variant="outline" size="sm" asChild>
+                    <Link href="/colaborador/configuracoes">
+                      <Settings className="mr-2 h-4 w-4" /> Ir para Configurações
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </form>

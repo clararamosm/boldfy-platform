@@ -11,13 +11,16 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { db, auth, storage } from '@/lib/firebase';
-import { Loader2, Camera } from "lucide-react";
+import { Loader2, Camera, Linkedin, ExternalLink, Unlink, CheckCircle2, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { getLinkedInAuthUrl, disconnectLinkedIn } from "@/app/actions/linkedin";
 
 type ProfileData = {
     name: string;
@@ -34,6 +37,16 @@ type BrandingData = {
     languageStyle: string;
     contentPillars: string;
 };
+
+type LinkedInConnectionData = {
+    linkedinId: string;
+    name: string;
+    email?: string;
+    picture?: string;
+    tokenExpiresAt: number;
+    connectedAt: number;
+    scopes: string;
+} | null;
 
 function SettingsSkeleton() {
     return (
@@ -60,13 +73,16 @@ function SettingsSkeleton() {
     );
 }
 
-export default function SettingsPage() {
+function SettingsPageContent() {
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
     const [branding, setBranding] = useState<BrandingData>({ voice: '', expertise: '', value: '', position: '', languageStyle: '', contentPillars: '' });
+    const [linkedinConnection, setLinkedinConnection] = useState<LinkedInConnectionData>(null);
+    const [isConnectingLinkedin, setIsConnectingLinkedin] = useState(false);
+    const [isDisconnectingLinkedin, setIsDisconnectingLinkedin] = useState(false);
 
     const fetchData = useCallback(async (userId: string) => {
         try {
@@ -90,6 +106,9 @@ export default function SettingsPage() {
                     languageStyle: data.languageStyle || '',
                     contentPillars: Array.isArray(data.contentPillars) ? data.contentPillars.join(', ') : (data.contentPillars || ''),
                 });
+                if (data.linkedinConnection) {
+                    setLinkedinConnection(data.linkedinConnection);
+                }
             } else {
                 toast({
                     title: "Perfil não encontrado",
@@ -127,6 +146,60 @@ export default function SettingsPage() {
 
         return () => unsubscribe();
     }, [fetchData, toast]);
+
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        const linkedinStatus = searchParams.get('linkedin');
+        if (linkedinStatus === 'success') {
+            toast({ title: "LinkedIn conectado!", description: "Sua conta do LinkedIn foi vinculada com sucesso." });
+            if (currentUserId) fetchData(currentUserId);
+            window.history.replaceState({}, '', window.location.pathname);
+        } else if (linkedinStatus === 'error') {
+            const message = searchParams.get('message') || 'Erro ao conectar com LinkedIn.';
+            toast({ variant: "destructive", title: "Erro no LinkedIn", description: message });
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+    }, [searchParams, toast, currentUserId, fetchData]);
+
+    const handleConnectLinkedin = async () => {
+        if (!currentUserId) return;
+        setIsConnectingLinkedin(true);
+        try {
+            const result = await getLinkedInAuthUrl(currentUserId);
+            if (result.error) {
+                toast({ variant: "destructive", title: "Erro", description: result.error });
+            } else if (result.url) {
+                window.location.href = result.url;
+                return;
+            }
+        } catch {
+            toast({ variant: "destructive", title: "Erro", description: "Não foi possível iniciar a conexão com o LinkedIn." });
+        }
+        setIsConnectingLinkedin(false);
+    };
+
+    const handleDisconnectLinkedin = async () => {
+        if (!currentUserId) return;
+        setIsDisconnectingLinkedin(true);
+        try {
+            const result = await disconnectLinkedIn(currentUserId);
+            if (result.error) {
+                toast({ variant: "destructive", title: "Erro", description: result.error });
+            } else {
+                setLinkedinConnection(null);
+                toast({ title: "LinkedIn desconectado", description: "Sua conta do LinkedIn foi desvinculada." });
+            }
+        } catch {
+            toast({ variant: "destructive", title: "Erro", description: "Não foi possível desconectar o LinkedIn." });
+        }
+        setIsDisconnectingLinkedin(false);
+    };
+
+    const isLinkedinTokenValid = useMemo(() => {
+        if (!linkedinConnection) return false;
+        const bufferMs = 5 * 60 * 1000;
+        return Date.now() < linkedinConnection.tokenExpiresAt - bufferMs;
+    }, [linkedinConnection]);
 
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -360,6 +433,120 @@ export default function SettingsPage() {
                                 </CardContent>
                             </Card>
 
+                            {/* LinkedIn */}
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0A66C2]">
+                                                <Linkedin className="h-5 w-5 text-white" />
+                                            </div>
+                                            <div>
+                                                <CardTitle className="text-lg">LinkedIn</CardTitle>
+                                                <CardDescription>
+                                                    Conecte sua conta para publicar conteúdo diretamente.
+                                                </CardDescription>
+                                            </div>
+                                        </div>
+                                        {linkedinConnection && (
+                                            <Badge
+                                                variant={isLinkedinTokenValid ? "default" : "secondary"}
+                                                className={isLinkedinTokenValid
+                                                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                                    : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                                                }
+                                            >
+                                                {isLinkedinTokenValid ? (
+                                                    <><CheckCircle2 className="mr-1 h-3 w-3" /> Conectado</>
+                                                ) : (
+                                                    <><AlertCircle className="mr-1 h-3 w-3" /> Token expirado</>
+                                                )}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    {linkedinConnection ? (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center gap-3 rounded-lg border p-3">
+                                                {linkedinConnection.picture ? (
+                                                    <Avatar className="h-10 w-10">
+                                                        <AvatarImage src={linkedinConnection.picture} />
+                                                        <AvatarFallback>{linkedinConnection.name?.[0]?.toUpperCase() || 'L'}</AvatarFallback>
+                                                    </Avatar>
+                                                ) : (
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0A66C2]/10">
+                                                        <Linkedin className="h-5 w-5 text-[#0A66C2]" />
+                                                    </div>
+                                                )}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="font-medium text-sm truncate">{linkedinConnection.name}</p>
+                                                    {linkedinConnection.email && (
+                                                        <p className="text-xs text-muted-foreground truncate">{linkedinConnection.email}</p>
+                                                    )}
+                                                </div>
+                                                <div className="text-right text-xs text-muted-foreground">
+                                                    <p>Conectado em</p>
+                                                    <p>{new Date(linkedinConnection.connectedAt).toLocaleDateString('pt-BR')}</p>
+                                                </div>
+                                            </div>
+                                            {!isLinkedinTokenValid && (
+                                                <div className="flex items-start gap-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/10 p-3 text-sm text-yellow-700 dark:text-yellow-400">
+                                                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                                    <p>Seu token de acesso expirou. Reconecte sua conta para continuar publicando.</p>
+                                                </div>
+                                            )}
+                                            <div className="flex gap-2">
+                                                {!isLinkedinTokenValid && (
+                                                    <Button
+                                                        onClick={handleConnectLinkedin}
+                                                        disabled={isConnectingLinkedin}
+                                                        size="sm"
+                                                    >
+                                                        {isConnectingLinkedin ? (
+                                                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Reconectando...</>
+                                                        ) : (
+                                                            <><ExternalLink className="mr-2 h-4 w-4" /> Reconectar</>
+                                                        )}
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleDisconnectLinkedin}
+                                                    disabled={isDisconnectingLinkedin}
+                                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10"
+                                                >
+                                                    {isDisconnectingLinkedin ? (
+                                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Desconectando...</>
+                                                    ) : (
+                                                        <><Unlink className="mr-2 h-4 w-4" /> Desconectar</>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <p className="text-sm text-muted-foreground">
+                                                Conecte sua conta do LinkedIn para publicar conteúdo alinhado diretamente na plataforma.
+                                                Seus dados são armazenados com segurança.
+                                            </p>
+                                            <Button
+                                                onClick={handleConnectLinkedin}
+                                                disabled={isConnectingLinkedin}
+                                                className="bg-[#0A66C2] hover:bg-[#004182] text-white"
+                                            >
+                                                {isConnectingLinkedin ? (
+                                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Conectando...</>
+                                                ) : (
+                                                    <><Linkedin className="mr-2 h-4 w-4" /> Conectar LinkedIn</>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
                             {/* Notificações */}
                             <Card>
                                 <CardHeader>
@@ -417,5 +604,13 @@ export default function SettingsPage() {
                 </div>
             </main>
         </div>
+    );
+}
+
+export default function SettingsPage() {
+    return (
+        <Suspense fallback={<div className="flex min-h-screen flex-col"><Header /><main className="flex-1 p-6 md:p-10"><div className="mx-auto max-w-4xl"><SettingsSkeleton /></div></main></div>}>
+            <SettingsPageContent />
+        </Suspense>
     );
 }
