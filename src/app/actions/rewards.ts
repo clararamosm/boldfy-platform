@@ -3,16 +3,19 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { requireSelf, requireAdmin } from '@/lib/auth-guard';
 
 // ---- Reward Redemption ----
 
 export async function redeemReward(
+  idToken: string,
   userId: string,
   rewardId: string,
   companyId: string,
   userName: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
+    await requireSelf(idToken, userId);
     const rewardDoc = await adminDb
       .collection('companies')
       .doc(companyId)
@@ -141,11 +144,13 @@ export async function redeemReward(
 // ---- Mark Rescue as Paid ----
 
 export async function markRescueAsPaid(
-  rescueId: string,
+  idToken: string,
   companyId: string,
+  rescueId: string,
   userId?: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
+    await requireAdmin(idToken, companyId);
     const batch = adminDb.batch();
 
     const companyRescueRef = adminDb

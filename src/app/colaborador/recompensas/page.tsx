@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, orderBy } from 'firebase/firestore';
+import { getAuthToken } from '@/lib/auth-client';
 import { redeemReward } from '@/app/actions';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -277,7 +278,9 @@ export default function InfluencerRecompensasPage() {
 
         setIsSubmitting(true);
         try {
+            const token = await getAuthToken();
             const result = await redeemReward(
+                token,
                 userInfo.uid,
                 reward.id,
                 userInfo.companyId,

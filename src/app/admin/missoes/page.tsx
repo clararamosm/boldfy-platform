@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from '@/hooks/use-toast';
+import { getAuthToken } from '@/lib/auth-client';
 import { reviewMissionProof } from "@/app/actions";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -542,7 +543,9 @@ export default function AdminMissoesPage() {
     if (!companyId) return;
     setIsReviewing(true);
     try {
+      const token = await getAuthToken();
       const result = await reviewMissionProof(
+        token,
         submissionId,
         companyId,
         action,

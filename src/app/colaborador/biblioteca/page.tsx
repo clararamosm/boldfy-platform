@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { getAuthToken } from '@/lib/auth-client';
 import { toggleStarContent } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 
@@ -336,7 +337,8 @@ export default function ColaboradorBibliotecaPage() {
     // ── Handlers ─────────────────────────────────────────────────
     const handleStarToggle = async (contentId: string, starred: boolean) => {
         if (!userId) return;
-        const result = await toggleStarContent(userId, contentId, starred);
+        const token = await getAuthToken();
+        const result = await toggleStarContent(token, userId, contentId, starred);
         if (result.success) {
             setGeneratedContent(prev =>
                 prev.map(item => item.id === contentId ? { ...item, starred } : item)

@@ -19,6 +19,7 @@ import { db, auth } from '@/lib/firebase';
 import { Loader2, Linkedin, ExternalLink, Unlink, CheckCircle2, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInAuthUrl, disconnectLinkedIn } from "@/app/actions/linkedin";
 
 type ProfileData = {
@@ -164,7 +165,8 @@ function SettingsPageContent() {
         if (!currentUserId) return;
         setIsConnectingLinkedin(true);
         try {
-            const result = await getLinkedInAuthUrl(currentUserId);
+            const token = await getAuthToken();
+            const result = await getLinkedInAuthUrl(token, currentUserId);
             if (result.error) {
                 toast({ variant: "destructive", title: "Erro", description: result.error });
             } else if (result.url) {
@@ -181,7 +183,8 @@ function SettingsPageContent() {
         if (!currentUserId) return;
         setIsDisconnectingLinkedin(true);
         try {
-            const result = await disconnectLinkedIn(currentUserId);
+            const token = await getAuthToken();
+            const result = await disconnectLinkedIn(token, currentUserId);
             if (result.error) {
                 toast({ variant: "destructive", title: "Erro", description: result.error });
             } else {

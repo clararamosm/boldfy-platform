@@ -2,6 +2,7 @@
 'use server';
 
 import { db as adminDb } from '@/lib/firebase-admin';
+import { requireSelf } from '@/lib/auth-guard';
 
 // ---- Server-Side Company Ranking ----
 
@@ -12,12 +13,13 @@ export type RankedUser = {
   avatarUrl?: string;
 };
 
-export async function getCompanyRanking(userId: string): Promise<{
+export async function getCompanyRanking(idToken: string, userId: string): Promise<{
   ranking: RankedUser[];
   monthlyPrizeName: string | null;
   error?: string;
 }> {
   try {
+    await requireSelf(idToken, userId);
     const userDoc = await adminDb.collection('users').doc(userId).get();
     if (!userDoc.exists) {
       return { ranking: [], monthlyPrizeName: null, error: 'Usuário não encontrado.' };
@@ -74,8 +76,9 @@ export async function getCompanyRanking(userId: string): Promise<{
 
 // ---- Server-Side Points Recalculation ----
 
-export async function recalculatePoints(userId: string): Promise<{ points: number; error?: string }> {
+export async function recalculatePoints(idToken: string, userId: string): Promise<{ points: number; error?: string }> {
   try {
+    await requireSelf(idToken, userId);
     const progressSnap = await adminDb
       .collection('users')
       .doc(userId)

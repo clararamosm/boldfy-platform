@@ -13,6 +13,7 @@ import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getAuthToken } from '@/lib/auth-client';
 import { getCompanyRanking, type RankedUser } from "@/app/actions";
 
 type UserRanking = RankedUser & {
@@ -77,7 +78,8 @@ export default function RankingsPage() {
   const fetchData = useCallback(async (userId: string) => {
     setIsLoading(true);
     try {
-      const result = await getCompanyRanking(userId);
+      const token = await getAuthToken();
+      const result = await getCompanyRanking(token, userId);
 
       if (result.error) {
         toast({ variant: 'destructive', title: "Erro", description: result.error });

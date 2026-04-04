@@ -18,6 +18,7 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
+import { getAuthToken } from '@/lib/auth-client';
 import { inviteCollaborator, deleteCollaborator } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 
@@ -75,6 +76,7 @@ export default function AdminColaboradoresPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
+  const [cachedToken, setCachedToken] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
   const router = useRouter();
@@ -147,6 +149,10 @@ export default function AdminColaboradoresPage() {
 
     return () => unsubscribe();
   }, [fetchData, router, toast]);
+
+  useEffect(() => {
+    getAuthToken().then(setCachedToken).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (inviteState.success) {
@@ -240,9 +246,10 @@ export default function AdminColaboradoresPage() {
   };
 
   const handleRemoveCollaborator = async () => {
-    if (!confirmDeleteId) return;
+    if (!confirmDeleteId || !companyId) return;
     try {
-      const result = await deleteCollaborator(confirmDeleteId);
+      const token = await getAuthToken();
+      const result = await deleteCollaborator(token, companyId, confirmDeleteId);
       if (result.error) {
         toast({ title: "Erro ao remover colaborador", description: result.error, variant: "destructive" });
       } else {
@@ -268,6 +275,7 @@ export default function AdminColaboradoresPage() {
         >
           <form action={formAction} ref={formRef}>
             <input type="hidden" name="companyId" value={companyId || ''} />
+            <input type="hidden" name="idToken" value={cachedToken} />
             <InviteFormContent />
             <div className="flex justify-end mt-6">
               <Button type="submit">Enviar Convite</Button>

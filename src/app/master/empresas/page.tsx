@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { getAuthToken } from '@/lib/auth-client';
 import { inviteAdmin } from '@/app/actions';
 import { deleteCompany } from '@/app/deleteCompanyAction';
 
@@ -67,9 +68,14 @@ export default function MasterEmpresasPage() {
     const [isEditCompanyOpen, setIsEditCompanyOpen] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmDeleteName, setConfirmDeleteName] = useState("");
+    const [cachedToken, setCachedToken] = useState('');
     const formRef = useRef<HTMLFormElement>(null);
 
     const [inviteState, formAction] = useActionState(inviteAdmin, { error: undefined, success: undefined });
+
+    useEffect(() => {
+        getAuthToken().then(setCachedToken).catch(() => {});
+    }, []);
 
     const fetchCompanies = async () => {
         setIsLoading(true);
@@ -219,6 +225,7 @@ export default function MasterEmpresasPage() {
                     onOpenChange={setIsDialogOpen}
                 >
                     <form ref={formRef} action={formAction} id="company-form">
+                        <input type="hidden" name="idToken" value={cachedToken} />
                         <CompanyFormContent />
                     </form>
                 </ActionDialog>

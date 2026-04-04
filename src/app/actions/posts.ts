@@ -3,6 +3,7 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { requireSelf } from '@/lib/auth-guard';
 
 export type ScheduledPost = {
   id: string;
@@ -19,6 +20,7 @@ export type ScheduledPost = {
 };
 
 export async function createScheduledPost(
+  idToken: string,
   userId: string,
   data: {
     caption: string;
@@ -28,7 +30,7 @@ export async function createScheduledPost(
   }
 ): Promise<{ success?: boolean; postId?: string; error?: string }> {
   try {
-    if (!userId) return { error: 'Usuário não identificado.' };
+    await requireSelf(idToken, userId);
     if (!data.caption.trim()) return { error: 'A legenda não pode estar vazia.' };
     if (!data.scheduledFor) return { error: 'Data de agendamento é obrigatória.' };
 
@@ -54,6 +56,7 @@ export async function createScheduledPost(
 }
 
 export async function updateScheduledPost(
+  idToken: string,
   userId: string,
   postId: string,
   data: {
@@ -65,7 +68,8 @@ export async function updateScheduledPost(
   }
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    if (!userId || !postId) return { error: 'Dados insuficientes.' };
+    await requireSelf(idToken, userId);
+    if (!postId) return { error: 'Dados insuficientes.' };
 
     const updateData: Record<string, unknown> = {
       updatedAt: new Date().toISOString(),
@@ -86,11 +90,13 @@ export async function updateScheduledPost(
 }
 
 export async function deleteScheduledPost(
+  idToken: string,
   userId: string,
   postId: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    if (!userId || !postId) return { error: 'Dados insuficientes.' };
+    await requireSelf(idToken, userId);
+    if (!postId) return { error: 'Dados insuficientes.' };
     await adminDb.collection('users').doc(userId).collection('scheduledPosts').doc(postId).delete();
     return { success: true };
   } catch (error) {
@@ -100,10 +106,11 @@ export async function deleteScheduledPost(
 }
 
 export async function getScheduledPosts(
+  idToken: string,
   userId: string
 ): Promise<{ posts?: ScheduledPost[]; error?: string }> {
   try {
-    if (!userId) return { error: 'Usuário não identificado.' };
+    await requireSelf(idToken, userId);
 
     const snapshot = await adminDb
       .collection('users')

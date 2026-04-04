@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { requireAuth, requireSelf } from '@/lib/auth-guard';
 
 // ---- Helpers ----
 
@@ -76,6 +77,14 @@ export async function handleAlignContent(
   formData: FormData
 ): Promise<AlignContentState> {
   try {
+    const idToken = formData.get('idToken') as string;
+
+    try {
+      await requireAuth(idToken);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Erro de autenticação.', alignedContent: null };
+    }
+
     const validatedData = AlignContentActionSchema.safeParse({
       content: formData.get('content'),
       companyId: formData.get('companyId'),
@@ -133,8 +142,9 @@ export async function handleAlignContent(
 
 // ---- Toggle Star on Generated Content ----
 
-export async function toggleStarContent(userId: string, contentId: string, starred: boolean): Promise<{ success?: boolean; error?: string }> {
+export async function toggleStarContent(idToken: string, userId: string, contentId: string, starred: boolean): Promise<{ success?: boolean; error?: string }> {
   try {
+    await requireSelf(idToken, userId);
     await adminDb.collection('users').doc(userId).collection('generatedContent').doc(contentId).update({ starred });
     return { success: true };
   } catch (error) {

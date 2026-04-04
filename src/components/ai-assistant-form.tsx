@@ -3,6 +3,7 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { getAuthToken } from '@/lib/auth-client';
 import { handleAlignContent } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -155,8 +156,13 @@ function LinkedInMockup({ content, onUseLegenda }: { content: string; onUseLegen
 export function AiAssistantForm({ companyId, userId = "user-123" }: { companyId: string, userId?: string }) {
   const [state, formAction] = useActionState(handleAlignContent, initialState);
   const { toast } = useToast();
+  const [cachedToken, setCachedToken] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    getAuthToken().then(setCachedToken).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (state?.error) {
@@ -180,6 +186,7 @@ export function AiAssistantForm({ companyId, userId = "user-123" }: { companyId:
     <form ref={formRef} action={formAction}>
       <input type="hidden" name="companyId" value={companyId} />
       <input type="hidden" name="userId" value={userId} />
+      <input type="hidden" name="idToken" value={cachedToken} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* LEFT SIDE — Input */}

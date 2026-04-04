@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { getAuthToken } from '@/lib/auth-client';
 import { getScheduledPosts, deleteScheduledPost, type ScheduledPost } from '@/app/actions/posts';
 import {
   ChevronLeft,
@@ -95,7 +96,8 @@ export default function CalendarioPage() {
   const fetchPosts = useCallback(async () => {
     if (!userId) return;
     setIsLoading(true);
-    const result = await getScheduledPosts(userId);
+    const token = await getAuthToken();
+    const result = await getScheduledPosts(token, userId);
     if (result.posts) {
       setPosts(result.posts);
     } else if (result.error) {
@@ -162,7 +164,8 @@ export default function CalendarioPage() {
 
   const handleDeletePost = async (postId: string) => {
     if (!userId) return;
-    const result = await deleteScheduledPost(userId, postId);
+    const token = await getAuthToken();
+    const result = await deleteScheduledPost(token, userId, postId);
     if (result.success) {
       setPosts(prev => prev.filter(p => p.id !== postId));
       toast({ title: 'Post removido.' });

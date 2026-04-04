@@ -4,6 +4,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { generateAuthUrl, publishLinkedInPost, refreshAccessToken, buildConnectionData, isTokenExpired, fetchPostMetricsBatch, type LinkedInConnection, type LinkedInPostMetrics } from '@/lib/linkedin';
+import { requireSelf } from '@/lib/auth-guard';
 import crypto from 'crypto';
 
 type LinkedInAuthResult = {
@@ -15,11 +16,9 @@ type LinkedInAuthResult = {
  * Generate LinkedIn OAuth authorization URL.
  * The state parameter encodes the userId for validation in the callback.
  */
-export async function getLinkedInAuthUrl(userId: string): Promise<LinkedInAuthResult> {
+export async function getLinkedInAuthUrl(idToken: string, userId: string): Promise<LinkedInAuthResult> {
   try {
-    if (!userId) {
-      return { error: 'Usuário não identificado.' };
-    }
+    await requireSelf(idToken, userId);
 
     // Generate a secure random state that includes the userId
     const nonce = crypto.randomBytes(16).toString('hex');
@@ -51,11 +50,9 @@ type DisconnectResult = {
  * Disconnect LinkedIn account from user profile.
  * Removes stored tokens and connection data from Firestore.
  */
-export async function disconnectLinkedIn(userId: string): Promise<DisconnectResult> {
+export async function disconnectLinkedIn(idToken: string, userId: string): Promise<DisconnectResult> {
   try {
-    if (!userId) {
-      return { error: 'Usuário não identificado.' };
-    }
+    await requireSelf(idToken, userId);
 
     const userRef = adminDb.collection('users').doc(userId);
     const userDoc = await userRef.get();
@@ -64,7 +61,7 @@ export async function disconnectLinkedIn(userId: string): Promise<DisconnectResu
       return { error: 'Usuário não encontrado.' };
     }
 
-    // Remove LinkedIn connection data
+    // Remove LinkedIn connection data using FieldValue.delete()
     await userRef.update({
       linkedinConnection: FieldValue.delete(),
     });
@@ -89,7 +86,7 @@ type PublishResult = {
 /**
  * Get the current LinkedIn connection status for a user.
  */
-export async function getLinkedInStatus(userId: string): Promise<{
+export async function getLinkedInStatus(idToken: string, userId: string): Promise<{
   connected: boolean;
   name?: string;
   picture?: string;
@@ -97,7 +94,7 @@ export async function getLinkedInStatus(userId: string): Promise<{
   tokenValid?: boolean;
 }> {
   try {
-    if (!userId) return { connected: false };
+    await requireSelf(idToken, userId);
 
     const userDoc = await adminDb.collection('users').doc(userId).get();
     if (!userDoc.exists) return { connected: false };
@@ -126,14 +123,13 @@ export async function getLinkedInStatus(userId: string): Promise<{
  * Optionally includes an image (Firebase Storage URL).
  */
 export async function publishToLinkedIn(
+  idToken: string,
   userId: string,
   content: string,
   mediaUrl?: string
 ): Promise<PublishResult> {
   try {
-    if (!userId) {
-      return { error: 'Usuário não identificado.' };
-    }
+    await requireSelf(idToken, userId);
 
     if (!content || content.trim().length === 0) {
       return { error: 'Conteúdo vazio. Escreva algo antes de publicar.' };

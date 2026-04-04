@@ -3,10 +3,12 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { requireSelf, requireAdmin } from '@/lib/auth-guard';
 
 // ---- Mission Proof Submission ----
 
 export async function submitMissionProof(
+  idToken: string,
   userId: string,
   missionId: string,
   companyId: string,
@@ -15,6 +17,7 @@ export async function submitMissionProof(
   proofFileName: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
+    await requireSelf(idToken, userId);
     const missionDoc = await adminDb
       .collection('companies')
       .doc(companyId)
@@ -64,12 +67,14 @@ export async function submitMissionProof(
 // ---- Auto-Complete Mission (no proof required) ----
 
 export async function completeMissionSelf(
+  idToken: string,
   userId: string,
   missionId: string,
   companyId: string,
   userName: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
+    await requireSelf(idToken, userId);
     const missionDoc = await adminDb
       .collection('companies')
       .doc(companyId)
@@ -151,12 +156,14 @@ export async function completeMissionSelf(
 // ---- Admin Review Mission Proof ----
 
 export async function reviewMissionProof(
-  submissionId: string,
+  idToken: string,
   companyId: string,
+  submissionId: string,
   action: 'approve' | 'reject',
   adminFeedback?: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
+    await requireAdmin(idToken, companyId);
     const subRef = adminDb
       .collection('companies')
       .doc(companyId)

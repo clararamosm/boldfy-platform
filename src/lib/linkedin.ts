@@ -1,10 +1,10 @@
 // src/lib/linkedin.ts
 // LinkedIn OAuth 2.0 + OpenID Connect + Posts API (v2) utilities
 
+const LINKEDIN_API_VERSION = '202603';
 const LINKEDIN_AUTH_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 const LINKEDIN_USERINFO_URL = 'https://api.linkedin.com/v2/userinfo';
-const LINKEDIN_API_VERSION = '202603';
 
 export type LinkedInTokens = {
   access_token: string;
@@ -22,6 +22,7 @@ export type LinkedInProfile = {
   picture?: string;
   email?: string;
   email_verified?: boolean;
+  position?: string;
 };
 
 export type LinkedInConnection = {
@@ -29,6 +30,7 @@ export type LinkedInConnection = {
   name: string;
   email?: string;
   picture?: string;
+  position?: string;
   accessToken: string;
   refreshToken?: string;
   tokenExpiresAt: number; // Unix timestamp in ms
@@ -175,6 +177,7 @@ export function buildConnectionData(
 
   if (profile.email) connection.email = profile.email;
   if (profile.picture) connection.picture = profile.picture;
+  if (profile.position) connection.position = profile.position;
   if (tokens.refresh_token) connection.refreshToken = tokens.refresh_token;
   if (tokens.refresh_token_expires_in) {
     connection.refreshTokenExpiresAt = now + tokens.refresh_token_expires_in * 1000;

@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { getAuthToken } from '@/lib/auth-client';
 import { createScheduledPost, updateScheduledPost } from '@/app/actions/posts';
 import { publishToLinkedIn, getLinkedInStatus } from '@/app/actions/linkedin';
 import {
@@ -144,7 +145,8 @@ function EditorContent() {
       // Create ISO date from date + time
       const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString();
 
-      const result = await createScheduledPost(userId, {
+      const token = await getAuthToken();
+      const result = await createScheduledPost(token, userId, {
         caption,
         mediaUrl,
         mediaType,

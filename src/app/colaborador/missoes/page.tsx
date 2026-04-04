@@ -18,6 +18,7 @@ import { collection, query, getDocs, doc, getDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getAuthToken } from '@/lib/auth-client';
 import { submitMissionProof, completeMissionSelf } from "@/app/actions";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -385,7 +386,9 @@ export default function ColaboradorMissoesPage() {
             const downloadUrl = await getDownloadURL(fileRef);
 
             // Submit via server action
+            const token = await getAuthToken();
             const result = await submitMissionProof(
+                token,
                 userInfo.uid,
                 missionId,
                 userInfo.companyId,
@@ -413,7 +416,9 @@ export default function ColaboradorMissoesPage() {
         if (!userInfo) return;
         setIsSubmitting(true);
         try {
+            const token = await getAuthToken();
             const result = await completeMissionSelf(
+                token,
                 userInfo.uid,
                 missionId,
                 userInfo.companyId,

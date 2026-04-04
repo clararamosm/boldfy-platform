@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
+import { getAuthToken } from '@/lib/auth-client';
 
 type Reward = {
     id: string;
@@ -200,7 +201,8 @@ export default function AdminRecompensasPage() {
     const handleMarkAsPaid = async (rescue: Rescue) => {
         if (!companyId) return;
         try {
-            const result = await markRescueAsPaid(rescue.id, companyId, rescue.userId);
+            const token = await getAuthToken();
+            const result = await markRescueAsPaid(token, rescue.id, companyId, rescue.userId);
             if (result.error) {
                 toast({ variant: 'destructive', title: 'Erro ao marcar como pago.', description: result.error });
                 return;
