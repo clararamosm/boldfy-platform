@@ -4,7 +4,7 @@
 const LINKEDIN_AUTH_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 const LINKEDIN_USERINFO_URL = 'https://api.linkedin.com/v2/userinfo';
-const LINKEDIN_API_VERSION = '202501';
+const LINKEDIN_API_VERSION = '202603';
 
 export type LinkedInTokens = {
   access_token: string;
