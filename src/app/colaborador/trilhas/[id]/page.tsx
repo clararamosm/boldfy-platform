@@ -21,6 +21,7 @@ import {
 import type {
   Trilha, Modulo, ModuloModo, ProgressoTrilha, QuestaoDesafio
 } from '@/types/trilhas';
+import { recalculatePoints } from '@/app/actions';
 
 const MODO_ICONS: Record<ModuloModo, any> = {
   aula: Play,
@@ -271,6 +272,13 @@ export default function TrilhaFullscreenPage() {
     }
 
     await saveProgress(updatedProgress);
+
+    // Recalculate user total points server-side
+    if (user) {
+      recalculatePoints(user.uid).catch(err =>
+        console.error('Error recalculating points:', err)
+      );
+    }
 
     // Auto-advance or show conclusion
     if (allMandatoryDone && updatedProgress.concluida) {

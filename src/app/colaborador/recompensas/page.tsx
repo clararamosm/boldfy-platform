@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, where, addDoc, serverTimestamp, writeBatch, orderBy } from 'firebase/firestore';
+import { recalculatePoints } from '@/app/actions';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -298,13 +299,12 @@ export default function InfluencerRecompensasPage() {
                 source: 'resgate',
             });
 
-            // Update user points
-            const userRef = doc(db, 'users', userInfo.uid);
-            batch.update(userRef, {
-                points: stats.available - reward.points,
-            });
-
             await batch.commit();
+
+            // Recalculate points server-side (authoritative)
+            recalculatePoints(userInfo.uid).catch(err =>
+                console.error('Error recalculating points after redeem:', err)
+            );
 
             toast({ title: "Recompensa resgatada com sucesso!" });
             fetchData(userInfo.uid);

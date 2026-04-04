@@ -363,3 +363,54 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     return { error: `Erro ao convidar colaborador: ${errorMessage}` };
   }
 }
+
+// ---- Server-Side Points Recalculation ----
+
+export async function recalculatePoints(userId: string): Promise<{ points: number; error?: string }> {
+  try {
+    // 1. Read all trailProgress subcollection docs for this user
+    const progressSnap = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('trailProgress')
+      .get();
+
+    // 2. Sum pontosGanhos from completed trails only
+    let earnedPoints = 0;
+    progressSnap.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.pontosGanhos && typeof data.pontosGanhos === 'number') {
+        earnedPoints += data.pontosGanhos;
+      }
+    });
+
+    // 3. Read rescue history to subtract spent points
+    let spentPoints = 0;
+    const rescuesSnap = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('rescues')
+      .get();
+
+    rescuesSnap.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.points && typeof data.points === 'number') {
+        spentPoints += data.points;
+      }
+    });
+
+    // 4. Final points = earned - spent
+    const finalPoints = Math.max(0, earnedPoints - spentPoints);
+
+    // 5. Update user document with calculated points (server-side only)
+    await adminDb.collection('users').doc(userId).update({
+      points: finalPoints,
+    });
+
+    return { points: finalPoints };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in recalculatePoints:', errorMessage);
+    return { points: 0, error: errorMessage };
+  }
+}

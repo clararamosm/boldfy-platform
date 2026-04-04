@@ -15,7 +15,7 @@ service cloud.firestore {
 
     // Fields that only server actions can modify (never client)
     function isNotChangingProtectedFields() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'companyName']);
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'companyName', 'points']);
     }
 
     // Rules for the 'users' collection
@@ -45,6 +45,15 @@ service cloud.firestore {
 
         // Master can read any progress
         allow read: if hasRole(request.auth.uid, 'master');
+      }
+
+      // Rescues (reward redemptions) and points history
+      match /rescues/{rescueId} {
+        allow read, create: if request.auth.uid == userId;
+      }
+
+      match /pointsHistory/{historyId} {
+        allow read, create: if request.auth.uid == userId;
       }
     }
 
