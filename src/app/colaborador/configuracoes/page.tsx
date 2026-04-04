@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Select removido — voice agora é textarea livre
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,8 @@ type BrandingData = {
     expertise: string;
     value: string;
     position: string;
+    languageStyle: string;
+    contentPillars: string;
 };
 
 function SettingsSkeleton() {
@@ -64,7 +66,7 @@ export default function SettingsPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
-    const [branding, setBranding] = useState<BrandingData>({ voice: 'amigavel', expertise: '', value: '', position: '' });
+    const [branding, setBranding] = useState<BrandingData>({ voice: '', expertise: '', value: '', position: '', languageStyle: '', contentPillars: '' });
 
     const fetchData = useCallback(async (userId: string) => {
         try {
@@ -81,10 +83,12 @@ export default function SettingsPage() {
             photoURL: data.photoURL || '',
           });
                 setBranding({
-                    voice: data.voice || 'amigavel',
+                    voice: data.voice || '',
                     expertise: data.expertise || '',
                     value: data.value || '',
                     position: data.position || '',
+                    languageStyle: data.languageStyle || '',
+                    contentPillars: Array.isArray(data.contentPillars) ? data.contentPillars.join(', ') : (data.contentPillars || ''),
                 });
             } else {
                 toast({
@@ -172,6 +176,8 @@ export default function SettingsPage() {
                 expertise: branding.expertise,
                 value: branding.value,
                 position: branding.position,
+                languageStyle: branding.languageStyle,
+                contentPillars: branding.contentPillars.split(',').map(s => s.trim()).filter(Boolean),
             }, { merge: true });
 
             toast({
@@ -285,29 +291,21 @@ export default function SettingsPage() {
                                 <CardContent className="space-y-6">
                                     <div className="space-y-2">
                                         <Label htmlFor="voice">Tom de voz</Label>
-                                        <Select
+                                        <Textarea
+                                            id="voice"
+                                            placeholder="Como você se comunica? Ex: informal e direto, técnico e analítico, inspiracional com humor..."
                                             value={branding.voice}
-                                            onValueChange={(value) =>
-                                                setBranding({ ...branding, voice: value })
+                                            onChange={(e) =>
+                                                setBranding({ ...branding, voice: e.target.value })
                                             }
-                                        >
-                                            <SelectTrigger id="voice">
-                                                <SelectValue placeholder="Selecione o tom de voz" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="amigavel">Amigável</SelectItem>
-                                                <SelectItem value="profissional">Profissional</SelectItem>
-                                                <SelectItem value="inspirador">Inspirador</SelectItem>
-                                                <SelectItem value="educativo">Educativo</SelectItem>
-                                                <SelectItem value="provocativo">Provocativo</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        />
+                                        <p className="text-xs text-muted-foreground">Descreva livremente como você fala e escreve. A IA vai calibrar o tom do conteúdo com base nisso.</p>
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="expertise">Áreas de expertise</Label>
                                         <Textarea
                                             id="expertise"
-                                            placeholder="Ex: Marketing Digital, Vendas, Liderança..."
+                                            placeholder="Ex: Marketing Digital, Vendas B2B, Liderança..."
                                             value={branding.expertise}
                                             onChange={(e) =>
                                                 setBranding({ ...branding, expertise: e.target.value })
@@ -335,6 +333,29 @@ export default function SettingsPage() {
                                                 setBranding({ ...branding, position: e.target.value })
                                             }
                                         />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="languageStyle">Estilo de linguagem</Label>
+                                        <Textarea
+                                            id="languageStyle"
+                                            placeholder="Preferências de escrita: usa gírias? é formal? escreve curto? usa analogias? Ex: 'direto, frases curtas, sem formalidade, gosto de analogias do esporte'"
+                                            value={branding.languageStyle}
+                                            onChange={(e) =>
+                                                setBranding({ ...branding, languageStyle: e.target.value })
+                                            }
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="contentPillars">Pilares de conteúdo</Label>
+                                        <Textarea
+                                            id="contentPillars"
+                                            placeholder="Os 2-4 temas que você aborda no LinkedIn, separados por vírgula (ex: liderança, vendas consultivas, cultura de feedback)"
+                                            value={branding.contentPillars}
+                                            onChange={(e) =>
+                                                setBranding({ ...branding, contentPillars: e.target.value })
+                                            }
+                                        />
+                                        <p className="text-xs text-muted-foreground">Separe por vírgula. A IA garante que todo conteúdo se encaixe nesses pilares.</p>
                                     </div>
                                 </CardContent>
                             </Card>

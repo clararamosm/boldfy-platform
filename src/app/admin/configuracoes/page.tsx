@@ -26,10 +26,15 @@ type CompanyData = {
     companyName: string;
     email: string;
     adminPhotoURL?: string;
+    // Brand Context corporativo (8 campos)
+    valueProposition: string;
     tagline: string;
-    audience: string;
-    tone: string;
-    messages: string;
+    businessKeywords: string;
+    solutions: string;
+    targetPainPoints: string;
+    targetAudience: string;
+    approvedTopics: string;
+    prohibitedPhrases: string;
     status: 'Ativa' | 'Inativa' | 'Trial' | 'pending_payment';
     licenses: number;
     trialEndsAt?: string;
@@ -101,15 +106,20 @@ function ConfiguracoesPageContent() {
 
             if (companyDocSnap.exists()) {
                 const data = companyDocSnap.data();
+                const bc = data.brandContext || data.branding || {};
                 setCompanyData({
                     id: companyDocSnap.id,
                     adminName: data.adminProfile?.name || '',
                     companyName: data.companyName || '',
                     email: data.adminProfile?.email || '',
-                    tagline: data.branding?.tagline || '',
-                    audience: data.branding?.audience || '',
-                    tone: data.branding?.tone || '',
-                    messages: data.branding?.messages || '',
+                    valueProposition: bc.valueProposition || '',
+                    tagline: bc.tagline || '',
+                    businessKeywords: Array.isArray(bc.businessKeywords) ? bc.businessKeywords.join(', ') : (bc.businessKeywords || ''),
+                    solutions: Array.isArray(bc.solutions) ? bc.solutions.join(', ') : (bc.solutions || ''),
+                    targetPainPoints: Array.isArray(bc.targetPainPoints) ? bc.targetPainPoints.join(', ') : (bc.targetPainPoints || ''),
+                    targetAudience: bc.targetAudience || bc.audience || '',
+                    approvedTopics: Array.isArray(bc.approvedTopics) ? bc.approvedTopics.join(', ') : (bc.approvedTopics || ''),
+                    prohibitedPhrases: Array.isArray(bc.prohibitedPhrases) ? bc.prohibitedPhrases.join(', ') : (bc.prohibitedPhrases || ''),
                     status: data.status || 'Trial',
                     licenses: data.licenses || 5,
                     trialEndsAt: data.trialEndsAt
@@ -200,24 +210,31 @@ function ConfiguracoesPageContent() {
             if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
-    const handleSaveChanges = async (section: 'branding') => {
+    const splitToArray = (text: string): string[] =>
+        text.split(',').map(s => s.trim()).filter(Boolean);
+
+    const handleSaveChanges = async (section: 'brandContext') => {
         if (!companyData) return;
         setIsSaving(true);
         try {
             const companyDocRef = doc(db, "companies", companyData.id);
             let dataToSave = {};
-            if (section === 'branding') {
+            if (section === 'brandContext') {
                 dataToSave = {
-                    branding: {
+                    brandContext: {
+                        valueProposition: companyData.valueProposition,
                         tagline: companyData.tagline,
-                        audience: companyData.audience,
-                        tone: companyData.tone,
-                        messages: companyData.messages,
+                        businessKeywords: splitToArray(companyData.businessKeywords),
+                        solutions: splitToArray(companyData.solutions),
+                        targetPainPoints: splitToArray(companyData.targetPainPoints),
+                        targetAudience: companyData.targetAudience,
+                        approvedTopics: splitToArray(companyData.approvedTopics),
+                        prohibitedPhrases: splitToArray(companyData.prohibitedPhrases),
                     }
                 };
             }
             await setDoc(companyDocRef, dataToSave, { merge: true });
-            toast({ title: "Sucesso!", description: "As configurações de branding da empresa foram salvas." });
+            toast({ title: "Sucesso!", description: "O Brand Context da empresa foi salvo." });
         } catch (error) {
             console.error("Error saving settings: ", error);
             toast({ variant: 'destructive', title: "Erro ao salvar", description: "Não foi possível salvar as alterações." });
@@ -313,31 +330,52 @@ function ConfiguracoesPageContent() {
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle>Configurações da Empresa</CardTitle>
-                            <CardDescription>Essas informações treinarão a IA para alinhar o conteúdo dos colaboradores com a voz da sua marca.</CardDescription>
+                            <CardTitle>Brand Context da Empresa</CardTitle>
+                            <CardDescription>Essas informações alimentam a IA para alinhar o conteúdo dos colaboradores com a marca. A IA tece a marca de forma orgânica na narrativa pessoal de cada autor.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
+                                <Label htmlFor="valueProposition">Proposta de Valor</Label>
+                                <Textarea id="valueProposition" placeholder="O que a empresa entrega de único para o mercado?" value={companyData.valueProposition} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                            </div>
+                            <div className="space-y-2">
                                 <Label htmlFor="tagline">Tagline</Label>
-                                <Input id="tagline" placeholder="Sua tagline ou slogan" value={companyData.tagline} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <Input id="tagline" placeholder="Frase-síntese da marca (ex: 'Gamificação que transforma colaboradores em embaixadores')" value={companyData.tagline} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="audience">Público-alvo</Label>
-                                <Textarea id="audience" placeholder="Descreva seu público-alvo" value={companyData.audience} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <Label htmlFor="businessKeywords">Keywords de Negócio</Label>
+                                <Textarea id="businessKeywords" placeholder="Termos do nicho da empresa, separados por vírgula (ex: employee advocacy, gamificação, marca empregadora)" value={companyData.businessKeywords} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">Separe por vírgula. A IA usa esses termos naturalmente nos textos.</p>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="tone">Tom de Voz</Label>
-                                <Textarea id="tone" placeholder="Descreva o tom de voz da marca" value={companyData.tone} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <Label htmlFor="solutions">Soluções que a Empresa Oferece</Label>
+                                <Textarea id="solutions" placeholder="O que a empresa vende ou faz, separado por vírgula (ex: plataforma de advocacy, trilhas de capacitação, assistente IA)" value={companyData.solutions} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">Separe por vírgula.</p>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="messages">Mensagens-chave</Label>
-                                <Textarea id="messages" placeholder="Quais são as mensagens principais que devem ser comunicadas?" value={companyData.messages} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <Label htmlFor="targetPainPoints">Dores do Público-alvo</Label>
+                                <Textarea id="targetPainPoints" placeholder="Problemas que seu público enfrenta, separados por vírgula (ex: baixo engajamento no LinkedIn, colaboradores não postam, marca sem presença)" value={companyData.targetPainPoints} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">Separe por vírgula. A IA usa isso para gerar identificação no leitor.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="targetAudience">Público-alvo</Label>
+                                <Textarea id="targetAudience" placeholder="Quem a empresa atende (ex: líderes de RH e marketing de empresas B2B com 50+ colaboradores)" value={companyData.targetAudience} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="approvedTopics">Tópicos Aprovados</Label>
+                                <Textarea id="approvedTopics" placeholder="Temas que os colaboradores devem abordar, separados por vírgula (ex: employee advocacy, cultura organizacional, liderança)" value={companyData.approvedTopics} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">Separe por vírgula. O conteúdo gerado girará em torno desses temas.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="prohibitedPhrases">Frases / Tópicos Proibidos</Label>
+                                <Textarea id="prohibitedPhrases" placeholder="O que NUNCA deve aparecer no conteúdo, separado por vírgula (ex: nome de concorrente X, preços, termos técnicos internos)" value={companyData.prohibitedPhrases} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">Separe por vírgula.</p>
                             </div>
                         </CardContent>
                         <CardFooter className="border-t px-6 py-4">
-                            <Button onClick={() => handleSaveChanges('branding')} disabled={isSaving || isReadOnly}>
+                            <Button onClick={() => handleSaveChanges('brandContext')} disabled={isSaving || isReadOnly}>
                                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Salvar Configurações da Empresa
+                                Salvar Brand Context
                             </Button>
                         </CardFooter>
                     </Card>

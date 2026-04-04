@@ -63,46 +63,53 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink }: {
 
 // ---- AI Content Alignment Action ----
 
-async function getCompanyProfile(companyId: string): Promise<string> {
+async function getCompanyProfile(companyId: string): Promise<Record<string, string>> {
   const companyDocSnap = await adminDb.collection("companies").doc(companyId).get();
 
   if (companyDocSnap.exists) {
     const data = companyDocSnap.data();
-    const branding = data?.branding;
-    if (branding) {
-      return `
-      Company Name: ${data?.companyName || 'N/A'}
-      Tagline: ${branding.tagline || 'N/A'}
-      Target Audience: ${branding.audience || 'N/A'}
-      Tone of Voice: ${branding.tone || 'N/A'}
-      Key Messages: ${branding.messages || 'N/A'}
-      `;
-    }
+    const bc = data?.brandContext || data?.branding || {};
+    const arrToStr = (v: unknown) => Array.isArray(v) ? v.join(', ') : (v as string || '');
+    return {
+      companyName: data?.companyName || '',
+      valueProposition: bc.valueProposition || '',
+      tagline: bc.tagline || '',
+      businessKeywords: arrToStr(bc.businessKeywords),
+      solutions: arrToStr(bc.solutions),
+      targetPainPoints: arrToStr(bc.targetPainPoints),
+      targetAudience: bc.targetAudience || bc.audience || '',
+      approvedTopics: arrToStr(bc.approvedTopics),
+      prohibitedPhrases: arrToStr(bc.prohibitedPhrases),
+    };
   }
-  throw new Error('Perfil da empresa não encontrado ou incompleto.');
+  throw new Error('Perfil da empresa não encontrado.');
 }
 
-async function getPersonalBranding(userId: string): Promise<string> {
+async function getPersonalBranding(userId: string): Promise<Record<string, string>> {
   const userDocSnap = await adminDb.collection("users").doc(userId).get();
 
   if (userDocSnap.exists) {
     const data = userDocSnap.data();
-    const personalBranding = data?.personalBranding;
-    if (personalBranding) {
-      return `
-      Voice Style: ${personalBranding.voice || 'N/A'}
-      Areas of Expertise: ${personalBranding.expertise || 'N/A'}
-      Value Proposition: ${personalBranding.valueProposition || 'N/A'}
-      Current Position: ${personalBranding.position || 'N/A'}
-      `;
-    }
+    const arrToStr = (v: unknown) => Array.isArray(v) ? v.join(', ') : (v as string || '');
+    return {
+      authorName: data?.profile?.name || data?.name || '',
+      position: data?.position || '',
+      voice: data?.voice || '',
+      expertise: data?.expertise || '',
+      value: data?.value || '',
+      languageStyle: data?.languageStyle || '',
+      contentPillars: arrToStr(data?.contentPillars),
+    };
   }
-  return `
-  Tone of Voice: Amigável e Inspirador.
-  Expertise: Marketing Digital, Vendas, Liderança.
-  Value Proposition: Ofereço dicas práticas e insights do mundo real para ajudar outros profissionais a crescerem.
-  Current Position: Gerente de Marketing.
-  `;
+  return {
+    authorName: '',
+    position: '',
+    voice: '',
+    expertise: '',
+    value: '',
+    languageStyle: '',
+    contentPillars: '',
+  };
 }
 
 const AlignContentActionSchema = z.object({
@@ -205,7 +212,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       status: 'Ativa',
       licenses: licenses,
       adminProfile: { email: adminEmail, name: adminName },
-      branding: { tagline: '', audience: '', tone: '', messages: '' },
+      brandContext: { valueProposition: '', tagline: '', businessKeywords: [], solutions: [], targetPainPoints: [], targetAudience: '', approvedTopics: [], prohibitedPhrases: [] },
       subscription: {
         plan: 'trial',
         status: 'trialing',
