@@ -201,7 +201,8 @@ function EditorContent() {
       }
     } catch (error) {
       console.error('Error publishing:', error);
-      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível publicar.' });
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+      toast({ variant: 'destructive', title: 'Erro ao publicar', description: msg });
     }
 
     setIsPublishing(false);

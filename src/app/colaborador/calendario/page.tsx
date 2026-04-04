@@ -67,12 +67,15 @@ function CalendarSkeleton() {
   );
 }
 
+type StatusFilter = 'all' | 'scheduled' | 'published' | 'draft' | 'failed';
+
 export default function CalendarioPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const { toast } = useToast();
   const router = useRouter();
 
@@ -105,6 +108,30 @@ export default function CalendarioPage() {
     if (userId) fetchPosts();
   }, [userId, fetchPosts]);
 
+  // Status counts
+  const statusCounts = useMemo(() => {
+    const counts = { all: posts.length, scheduled: 0, published: 0, draft: 0, failed: 0 };
+    posts.forEach(post => {
+      if (post.status in counts) counts[post.status as keyof typeof counts]++;
+    });
+    return counts;
+  }, [posts]);
+
+  // Filtered posts by selected status
+  const filteredPosts = useMemo(() => {
+    if (statusFilter === 'all') return posts;
+    return posts.filter(p => p.status === statusFilter);
+  }, [posts, statusFilter]);
+
+  // Upcoming posts (next scheduled, not yet published)
+  const upcomingPosts = useMemo(() => {
+    const now = new Date();
+    return posts
+      .filter(p => p.status === 'scheduled' && parseISO(p.scheduledFor) > now)
+      .sort((a, b) => parseISO(a.scheduledFor).getTime() - parseISO(b.scheduledFor).getTime())
+      .slice(0, 5);
+  }, [posts]);
+
   // Calendar days
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -114,17 +141,17 @@ export default function CalendarioPage() {
     return eachDayOfInterval({ start: calStart, end: calEnd });
   }, [currentMonth]);
 
-  // Posts grouped by day
+  // Posts grouped by day (respects filter)
   const postsByDay = useMemo(() => {
     const map = new Map<string, ScheduledPost[]>();
-    posts.forEach(post => {
+    filteredPosts.forEach(post => {
       const dayKey = format(parseISO(post.scheduledFor), 'yyyy-MM-dd');
       const existing = map.get(dayKey) || [];
       existing.push(post);
       map.set(dayKey, existing);
     });
     return map;
-  }, [posts]);
+  }, [filteredPosts]);
 
   // Selected day posts
   const selectedDayPosts = useMemo(() => {
@@ -189,6 +216,35 @@ export default function CalendarioPage() {
                 <Plus className="h-4 w-4" />
                 Novo Post
               </Button>
+            </div>
+
+            {/* Status filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              {([
+                { key: 'all' as StatusFilter, label: 'Todos', color: 'bg-muted text-foreground' },
+                { key: 'scheduled' as StatusFilter, label: 'Agendados', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+                { key: 'published' as StatusFilter, label: 'Publicados', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+                { key: 'draft' as StatusFilter, label: 'Rascunhos', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
+                { key: 'failed' as StatusFilter, label: 'Falhou', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+              ]).map(f => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setStatusFilter(f.key)}
+                  className={`
+                    inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all
+                    ${statusFilter === f.key ? f.color + ' ring-2 ring-primary/30 shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}
+                  `}
+                >
+                  {f.label}
+                  <span className={`
+                    inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold
+                    ${statusFilter === f.key ? 'bg-white/60 dark:bg-black/20' : 'bg-muted-foreground/10'}
+                  `}>
+                    {statusCounts[f.key]}
+                  </span>
+                </button>
+              ))}
             </div>
 
             {/* Calendar grid */}
@@ -362,13 +418,41 @@ export default function CalendarioPage() {
                 </Card>
               )
             ) : (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-10 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Clique em um dia do calendário para ver os posts agendados
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="space-y-3">
+                {upcomingPosts.length > 0 ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">Próximos agendamentos:</p>
+                    {upcomingPosts.map(post => {
+                      const config = statusConfig[post.status];
+                      const StatusIcon = config.icon;
+                      return (
+                        <Card key={post.id} className="overflow-hidden">
+                          <CardContent className="p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="secondary" className={`${config.color} text-xs gap-1`}>
+                                <StatusIcon className="h-3 w-3" />
+                                {config.label}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {format(parseISO(post.scheduledFor), "d MMM, HH:mm", { locale: ptBR })}
+                              </span>
+                            </div>
+                            <p className="text-sm line-clamp-2 whitespace-pre-line">{post.caption}</p>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </>
+                ) : (
+                  <Card className="border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum post agendado. Clique em um dia ou use o botão "Novo Post".
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
           </div>
         </div>

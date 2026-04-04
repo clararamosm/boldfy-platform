@@ -4,7 +4,7 @@
 const LINKEDIN_AUTH_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 const LINKEDIN_USERINFO_URL = 'https://api.linkedin.com/v2/userinfo';
-const LINKEDIN_API_VERSION = '202504';
+const LINKEDIN_API_VERSION = '202501';
 
 export type LinkedInTokens = {
   access_token: string;
@@ -307,13 +307,14 @@ export async function publishLinkedInPost(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error('LinkedIn post publish failed:', errorData);
+    console.error('LinkedIn post publish failed:', JSON.stringify({ status: response.status, errorData }));
 
     if (response.status === 401) throw new Error('TOKEN_EXPIRED');
     if (response.status === 403) throw new Error('Sem permissão para publicar. Verifique se o scope w_member_social está ativo.');
+    if (response.status === 422) throw new Error(`Conteúdo rejeitado pelo LinkedIn: ${errorData.message || 'verifique o texto e tente novamente.'}`);
     if (response.status === 429) throw new Error('Limite de publicações atingido. Tente novamente mais tarde.');
 
-    throw new Error(`Falha ao publicar: ${errorData.message || errorData.error || response.statusText}`);
+    throw new Error(`Falha ao publicar (${response.status}): ${errorData.message || errorData.error || response.statusText}`);
   }
 
   const postId = response.headers.get('x-restli-id') || '';
