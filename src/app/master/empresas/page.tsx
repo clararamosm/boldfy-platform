@@ -50,7 +50,7 @@ function CompanyFormContent() {
                 <Label htmlFor="licenses">Número de Licenças (mín. 5)</Label>
                 <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="5" defaultValue="5" disabled={pending} required />
              </div>
-             <p className="text-xs text-muted-foreground">O free trial de 30 dias permite até 5 licenças. Após o período, a cobrança será baseada no número de licenças definido aqui.</p>
+             <p className="text-xs text-muted-foreground">Licenças contam apenas colaboradores (a conta de admin é gratuita). Mínimo de 5 licenças.</p>
         </div>
     );
 }
@@ -210,7 +210,7 @@ export default function MasterEmpresasPage() {
                 </div>
                  <ActionDialog
                     title="Adicionar Nova Empresa"
-                    description="Preencha os dados para criar uma nova empresa. Ela começará com um free trial de 30 dias."
+                    description="Preencha os dados para criar uma nova empresa. Ela começará com um free trial."
                     trigger={addCompanyButton}
                     actionText="Criar e Convidar Admin"
                     onAction={() => formRef.current?.requestSubmit()}

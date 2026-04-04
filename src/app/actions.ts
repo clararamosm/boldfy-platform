@@ -179,7 +179,7 @@ const InviteAdminSchema = z.object({
   companyName: z.string().min(1, 'Nome da empresa é obrigatório.'),
   adminName: z.string().min(1, 'Nome do admin é obrigatório.'),
   adminEmail: z.string().email('E-mail inválido.'),
-  licenses: z.coerce.number().int().min(1, 'O número de licenças deve ser no mínimo 1.').positive('Número de licenças deve ser positivo.'),
+  licenses: z.coerce.number().int().min(5, 'O número de licenças deve ser no mínimo 5.').positive('Número de licenças deve ser positivo.'),
 });
 
 type InviteAdminState = {
@@ -217,7 +217,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
         plan: 'trial',
         status: 'trialing',
         totalLicenses: licenses,
-        usedLicenses: 1,
+        usedLicenses: 0,
         trialEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       },
       createdAt: FieldValue.serverTimestamp(),
@@ -361,6 +361,43 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
     console.error("Error in inviteCollaborator:", errorMessage);
     return { error: `Erro ao convidar colaborador: ${errorMessage}` };
+  }
+}
+
+// ---- Delete Collaborator Action (by Admin) ----
+
+export async function deleteCollaborator(userId: string): Promise<{ success?: boolean; error?: string }> {
+  if (!adminAuth) {
+    return { error: "O serviço de autenticação não está disponível." };
+  }
+  try {
+    // 1. Delete from Firebase Auth
+    try {
+      await adminAuth.deleteUser(userId);
+    } catch (authError: any) {
+      if (authError?.code !== 'auth/user-not-found') {
+        console.error(`Error deleting Auth user ${userId}:`, authError?.message);
+      }
+    }
+
+    // 2. Delete user subcollections (trailProgress, rescues, pointsHistory)
+    const userRef = adminDb.collection('users').doc(userId);
+    const subcollections = await userRef.listCollections();
+    for (const subcol of subcollections) {
+      const docs = await subcol.listDocuments();
+      for (const d of docs) {
+        await d.delete();
+      }
+    }
+
+    // 3. Delete Firestore user doc
+    await userRef.delete();
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in deleteCollaborator:', errorMessage);
+    return { error: `Erro ao remover colaborador: ${errorMessage}` };
   }
 }
 

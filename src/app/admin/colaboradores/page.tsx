@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useActionState, useRef } from 
 import { useFormStatus } from 'react-dom';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, getDocs, doc, getDoc, query, where, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, where, updateDoc } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +18,7 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
-import { inviteCollaborator } from '@/app/actions';
+import { inviteCollaborator, deleteCollaborator } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 
 type Collaborator = {
@@ -242,8 +242,12 @@ export default function AdminColaboradoresPage() {
   const handleRemoveCollaborator = async () => {
     if (!confirmDeleteId) return;
     try {
-      await deleteDoc(doc(db, "users", confirmDeleteId));
-      toast({ title: "Colaborador removido com sucesso!" });
+      const result = await deleteCollaborator(confirmDeleteId);
+      if (result.error) {
+        toast({ title: "Erro ao remover colaborador", description: result.error, variant: "destructive" });
+      } else {
+        toast({ title: "Colaborador removido com sucesso!" });
+      }
       setConfirmDeleteId(null);
       setConfirmDeleteName("");
       await refreshCollaborators();
