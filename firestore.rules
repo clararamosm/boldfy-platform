@@ -47,13 +47,14 @@ service cloud.firestore {
         allow read: if hasRole(request.auth.uid, 'master');
       }
 
-      // Rescues (reward redemptions) and points history
+      // Rescues (reward redemptions) — created by server action redeemReward (Admin SDK)
       match /rescues/{rescueId} {
-        allow read, create: if request.auth.uid == userId;
+        allow read: if request.auth.uid == userId;
       }
 
+      // Points history — created by server actions (Admin SDK)
       match /pointsHistory/{historyId} {
-        allow read, create: if request.auth.uid == userId;
+        allow read: if request.auth.uid == userId;
       }
 
       // Generated content from AI assistant

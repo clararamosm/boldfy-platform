@@ -426,6 +426,195 @@ export async function deleteCollaborator(userId: string): Promise<{ success?: bo
   }
 }
 
+// ---- Server-Side Reward Redemption ----
+
+export async function redeemReward(
+  userId: string,
+  rewardId: string,
+  companyId: string,
+  userName: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    // 1. Read reward to validate it exists, is available, and has stock
+    const rewardDoc = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('rewards')
+      .doc(rewardId)
+      .get();
+
+    if (!rewardDoc.exists) {
+      return { error: 'Recompensa não encontrada.' };
+    }
+
+    const reward = rewardDoc.data()!;
+
+    if (reward.status !== 'Disponível') {
+      return { error: 'Esta recompensa não está mais disponível.' };
+    }
+
+    // Check stock
+    if (typeof reward.stock === 'number' && reward.stock <= 0) {
+      return { error: 'Estoque esgotado para esta recompensa.' };
+    }
+
+    // 2. Recalculate current points to get authoritative balance
+    const progressSnap = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('trailProgress')
+      .get();
+
+    let earnedPoints = 0;
+    progressSnap.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.pontosGanhos && typeof data.pontosGanhos === 'number') {
+        earnedPoints += data.pontosGanhos;
+      }
+    });
+
+    const rescuesSnap = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('rescues')
+      .get();
+
+    let spentPoints = 0;
+    rescuesSnap.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.points && typeof data.points === 'number') {
+        spentPoints += data.points;
+      }
+    });
+
+    const currentPoints = Math.max(0, earnedPoints - spentPoints);
+
+    if (currentPoints < reward.points) {
+      return { error: `Pontos insuficientes. Você tem ${currentPoints} pontos, mas precisa de ${reward.points}.` };
+    }
+
+    // 3. Write everything in a batch via Admin SDK
+    const batch = adminDb.batch();
+    const now = FieldValue.serverTimestamp();
+
+    // 3a. User-level rescue doc
+    const userRescueRef = adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('rescues')
+      .doc();
+
+    batch.set(userRescueRef, {
+      rewardName: reward.name,
+      rewardId,
+      date: now,
+      status: 'Pendente',
+      points: reward.points,
+    });
+
+    // 3b. Company-level rescue doc (for admin visibility)
+    const companyRescueRef = adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('rescues')
+      .doc(userRescueRef.id); // Same ID for cross-reference
+
+    batch.set(companyRescueRef, {
+      userId,
+      userName,
+      rewardName: reward.name,
+      rewardId,
+      date: now,
+      status: 'Pendente',
+      points: reward.points,
+    });
+
+    // 3c. Points history entry
+    const historyRef = adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('pointsHistory')
+      .doc();
+
+    batch.set(historyRef, {
+      description: `Resgate: ${reward.name}`,
+      date: now,
+      points: reward.points,
+      type: 'spend',
+      source: 'resgate',
+    });
+
+    // 3d. Decrement stock (if not unlimited)
+    if (typeof reward.stock === 'number') {
+      batch.update(rewardDoc.ref, {
+        stock: reward.stock - 1,
+        ...(reward.stock - 1 === 0 && { status: 'Desativada' }),
+      });
+    }
+
+    // 3e. Update user points directly
+    const newPoints = currentPoints - reward.points;
+    batch.update(adminDb.collection('users').doc(userId), {
+      points: Math.max(0, newPoints),
+    });
+
+    await batch.commit();
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in redeemReward:', errorMessage);
+    return { error: `Erro ao resgatar recompensa: ${errorMessage}` };
+  }
+}
+
+// ---- Mark Rescue as Paid (dual-write) ----
+
+export async function markRescueAsPaid(
+  rescueId: string,
+  companyId: string,
+  userId?: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const batch = adminDb.batch();
+
+    // Update company-level rescue
+    const companyRescueRef = adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('rescues')
+      .doc(rescueId);
+
+    const companyRescueDoc = await companyRescueRef.get();
+    if (!companyRescueDoc.exists) {
+      return { error: 'Resgate não encontrado.' };
+    }
+
+    batch.update(companyRescueRef, { status: 'Pago' });
+
+    // Update user-level rescue (same ID)
+    const rescueData = companyRescueDoc.data()!;
+    const rescueUserId = userId || rescueData.userId;
+
+    if (rescueUserId) {
+      const userRescueRef = adminDb
+        .collection('users')
+        .doc(rescueUserId)
+        .collection('rescues')
+        .doc(rescueId);
+
+      batch.update(userRescueRef, { status: 'Pago' });
+    }
+
+    await batch.commit();
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in markRescueAsPaid:', errorMessage);
+    return { error: `Erro ao marcar como pago: ${errorMessage}` };
+  }
+}
+
 // ---- Server-Side Points Recalculation ----
 
 export async function recalculatePoints(userId: string): Promise<{ points: number; error?: string }> {

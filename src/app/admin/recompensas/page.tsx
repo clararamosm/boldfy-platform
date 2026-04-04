@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
+import { markRescueAsPaid } from '@/app/actions';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,9 +30,11 @@ type Reward = {
 
 type Rescue = {
     id: string;
+    userId: string;
     userName: string;
     rewardName: string;
-    date: string;
+    date: any;
+    points: number;
     status: 'Pendente' | 'Pago';
 }
 
@@ -194,11 +197,14 @@ export default function AdminRecompensasPage() {
         }
     }
 
-    const handleMarkAsPaid = async (rescueId: string) => {
+    const handleMarkAsPaid = async (rescue: Rescue) => {
         if (!companyId) return;
-         try {
-            const rescueDoc = doc(db, "companies", companyId, "rescues", rescueId);
-            await updateDoc(rescueDoc, { status: 'Pago' });
+        try {
+            const result = await markRescueAsPaid(rescue.id, companyId, rescue.userId);
+            if (result.error) {
+                toast({ variant: 'destructive', title: 'Erro ao marcar como pago.', description: result.error });
+                return;
+            }
             toast({ title: 'Resgate marcado como pago.' });
             fetchRescues(companyId);
         } catch (error) {
@@ -363,6 +369,7 @@ export default function AdminRecompensasPage() {
                     <TableRow>
                       <TableHead>Colaborador</TableHead>
                       <TableHead>Recompensa</TableHead>
+                      <TableHead>Pontos</TableHead>
                       <TableHead>Data</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Ação</TableHead>
@@ -370,17 +377,18 @@ export default function AdminRecompensasPage() {
                   </TableHeader>
                   <TableBody>
                     {isLoading ? <TableSkeleton cols={5} /> : rescues.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-8">Nenhum resgate encontrado.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-center py-8">Nenhum resgate encontrado.</TableCell></TableRow>
                     ) : rescues.map((rescue) => (
                          <TableRow key={rescue.id}>
                           <TableCell className="font-medium">{rescue.userName}</TableCell>
                           <TableCell>{rescue.rewardName}</TableCell>
-                          <TableCell>{new Date(rescue.date).toLocaleDateString()}</TableCell>
+                          <TableCell>{rescue.points?.toLocaleString() || '—'}</TableCell>
+                          <TableCell>{rescue.date?.toDate ? rescue.date.toDate().toLocaleDateString() : 'N/A'}</TableCell>
                           <TableCell>
                             <Badge variant={rescue.status === 'Pendente' ? 'destructive' : 'default'} className={rescue.status === 'Pago' ? "bg-green-600 hover:bg-green-700" : ""}>{rescue.status}</Badge>
                           </TableCell>
                           <TableCell>
-                            <Button size="sm" variant="outline" disabled={rescue.status === 'Pago'} onClick={() => handleMarkAsPaid(rescue.id)}>
+                            <Button size="sm" variant="outline" disabled={rescue.status === 'Pago'} onClick={() => handleMarkAsPaid(rescue)}>
                                 {rescue.status === 'Pendente' ? 'Marcar como Pago' : 'Pago'}
                             </Button>
                           </TableCell>
