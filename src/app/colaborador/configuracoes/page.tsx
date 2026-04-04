@@ -563,6 +563,18 @@ function SettingsPageContent() {
                                     )}
                                 </Button>
                             </div>
+
+                            {/* Privacy policy link */}
+                            <div className="text-center pt-4 border-t">
+                                <a
+                                    href="/privacidade"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
+                                >
+                                    Política de Privacidade
+                                </a>
+                            </div>
                         </>
                     )}
                 </div>

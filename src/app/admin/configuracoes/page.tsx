@@ -409,6 +409,18 @@ function ConfiguracoesPageContent() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Privacy policy link */}
+                    <div className="text-center py-4">
+                        <a
+                            href="/privacidade"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
+                        >
+                            Política de Privacidade
+                        </a>
+                    </div>
                 </div>
             </main>
         </>
