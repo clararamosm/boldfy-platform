@@ -2,6 +2,7 @@
 'use server';
 
 import { db as adminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { generateAuthUrl, publishLinkedInPost, refreshAccessToken, buildConnectionData, isTokenExpired, fetchPostMetricsBatch, type LinkedInConnection, type LinkedInPostMetrics } from '@/lib/linkedin';
 import crypto from 'crypto';
 
@@ -63,8 +64,7 @@ export async function disconnectLinkedIn(userId: string): Promise<DisconnectResu
       return { error: 'Usuário não encontrado.' };
     }
 
-    // Remove LinkedIn connection data using FieldValue.delete()
-    const { FieldValue } = await import('firebase-admin/firestore');
+    // Remove LinkedIn connection data
     await userRef.update({
       linkedinConnection: FieldValue.delete(),
     });
