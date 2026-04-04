@@ -64,6 +64,15 @@ export interface Trilha {
   criadaEm: Timestamp;
   atualizadaEm?: Timestamp;
 
+  // Missao gatilho (criada ao concluir trilha)
+  missaoGatilho?: {
+    titulo: string;
+    descricao: string;
+    pontos?: number;
+    requerComprovante?: boolean;
+    prazoDias?: number;
+  };
+
   // Campo para trilhas de empresa (custom)
   isGlobal?: boolean;
   globalTrailId?: string; // referencia a trilha global original

@@ -60,6 +60,7 @@ export default function TrilhaFullscreenPage() {
   const [showConclusion, setShowConclusion] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reviewMode, setReviewMode] = useState(false);
 
   // Desafio state
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -197,11 +198,12 @@ export default function TrilhaFullscreenPage() {
   }, [progress]);
 
   const canAccessModule = useCallback((index: number) => {
+    if (reviewMode) return true;
     if (index === 0) return true;
     const prevModule = sortedModules[index - 1];
     if (!prevModule) return true;
     return isModuleCompleted(prevModule.id);
-  }, [sortedModules, isModuleCompleted]);
+  }, [sortedModules, isModuleCompleted, reviewMode]);
 
   // Save progress to Firestore
   const saveProgress = useCallback(async (updatedProgress: ProgressoTrilha) => {
@@ -250,6 +252,11 @@ export default function TrilhaFullscreenPage() {
       // Create trigger mission if exists
       if (trail.missaoGatilho) {
         try {
+          const triggerNow = Timestamp.now();
+          const triggerDeadlineDays = trail.missaoGatilho.prazoDias || 14;
+          const triggerEndDate = new Date();
+          triggerEndDate.setDate(triggerEndDate.getDate() + triggerDeadlineDays);
+
           await addDoc(collection(db, 'companies', companyId!, 'missions'), {
             name: trail.missaoGatilho.titulo,
             description: trail.missaoGatilho.descricao,
@@ -260,8 +267,11 @@ export default function TrilhaFullscreenPage() {
             trailId: id,
             assignedTo: user!.uid,
             requiresProof: trail.missaoGatilho.requerComprovante || false,
-            deadlineDays: trail.missaoGatilho.prazoDias || 7,
-            createdAt: Timestamp.now(),
+            completionMode: trail.missaoGatilho.requerComprovante ? 'proof' : 'auto',
+            deadlineDays: triggerDeadlineDays,
+            startDate: triggerNow,
+            endDate: Timestamp.fromDate(triggerEndDate),
+            createdAt: triggerNow,
           });
         } catch (err) {
           console.error('Error creating trigger mission:', err);
@@ -344,17 +354,29 @@ export default function TrilhaFullscreenPage() {
     if (!currentModule || !user || !companyId) return;
     setSaving(true);
     try {
+      const now = Timestamp.now();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + 14);
+
+      const missionPoints = currentModule.missaoGatilho?.pontosRecompensa
+        || currentModule.conteudo?.pontuacaoBase
+        || 0;
+
       await addDoc(collection(db, 'companies', companyId, 'missions'), {
         name: currentModule.titulo || 'Missao de Trilha',
         description: currentModule.conteudo?.instrucao || '',
-        points: 0,
+        points: missionPoints,
         type: 'trail_content',
         status: 'active',
         tag: 'Missao de Trilha',
         trailId: id,
         moduleId: currentModule.id,
         assignedTo: user.uid,
-        createdAt: Timestamp.now(),
+        completionMode: 'proof',
+        startDate: now,
+        endDate: Timestamp.fromDate(endDate),
+        deadlineDays: 14,
+        createdAt: now,
       });
       await completeModule(currentModule.id, 0);
     } catch (err) {
@@ -390,6 +412,9 @@ export default function TrilhaFullscreenPage() {
     if (next < sortedModules.length && canAccessModule(next)) {
       setActiveModuleIndex(next);
       resetModuleState();
+    } else if (reviewMode && next >= sortedModules.length) {
+      setReviewMode(false);
+      setShowConclusion(true);
     }
   };
 
@@ -590,6 +615,18 @@ export default function TrilhaFullscreenPage() {
                 >
                   <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Trilhas
                 </Button>
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    setReviewMode(true);
+                    setShowConclusion(false);
+                    setShowIntro(false);
+                    setActiveModuleIndex(0);
+                    resetModuleState();
+                  }}
+                >
+                  <BookOpen className="mr-2 h-4 w-4" /> Refazer Trilha
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -611,10 +648,15 @@ export default function TrilhaFullscreenPage() {
           <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(!sidebarOpen)}>
             <Menu className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => router.push('/colaborador/trilhas')}>
+          <Button variant="ghost" size="sm" onClick={() => { setReviewMode(false); router.push('/colaborador/trilhas'); }}>
             <X className="h-5 w-5" />
           </Button>
           <span className="text-sm font-medium hidden sm:inline">{trail.titulo}</span>
+          {reviewMode && (
+            <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
+              Modo Revisao
+            </Badge>
+          )}
         </div>
 
         <div className="flex-1 max-w-md mx-4">

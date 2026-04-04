@@ -5,7 +5,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle, Upload, Clock, Zap, CalendarDays, Loader2, History, XCircle, AlertCircle, HourglassIcon } from "lucide-react";
+import { CheckCircle, Upload, Clock, Zap, CalendarDays, Loader2, History, XCircle, AlertCircle, HourglassIcon, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -32,9 +32,12 @@ type Mission = {
     status: MissionStatus;
     startDate?: any;
     endDate?: any;
-    type: 'timed' | 'fixed';
+    type: 'timed' | 'fixed' | 'trail_content' | 'trail_trigger';
     completionMode?: 'auto' | 'proof';
     submissionFeedback?: string;
+    trailId?: string;
+    moduleId?: string;
+    assignedTo?: string;
 };
 
 const formatDate = (d: any) => {
@@ -220,6 +223,7 @@ const MissionsPageSkeleton = () => (
 export default function ColaboradorMissoesPage() {
     const [missions, setMissions] = useState<Mission[]>([]);
     const [historyMissions, setHistoryMissions] = useState<Mission[]>([]);
+    const [trailMissions, setTrailMissions] = useState<Mission[]>([]);
     const [stats, setStats] = useState({ weeklyPoints: 0, fixedProgress: 0, fixedCompleted: 0, fixedTotal: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -262,23 +266,31 @@ export default function ColaboradorMissoesPage() {
             const now = new Date();
             const active: Mission[] = [];
             const history: Mission[] = [];
+            const trailActive: Mission[] = [];
 
             missionsSnap.docs.forEach(docSnap => {
                 const data = docSnap.data();
+
+                // Filter trail missions: only show those assigned to this user
+                const isTrailMission = data.type === 'trail_content' || data.type === 'trail_trigger';
+                if (isTrailMission && data.assignedTo && data.assignedTo !== user.uid) {
+                    return;
+                }
+
                 const sub = userSubs[docSnap.id];
 
                 // Derive status
                 let status: MissionStatus = 'pendente';
                 let submissionFeedback: string | undefined;
 
-                // Check if timed mission is in valid period
+                // Check if timed/trail mission is in valid period
                 const isFixed = data.type === 'fixed';
                 const start = data.startDate?.toDate ? data.startDate.toDate() : data.startDate ? new Date(data.startDate) : null;
                 const end = data.endDate?.toDate ? data.endDate.toDate() : data.endDate ? new Date(data.endDate) : null;
 
                 if (!isFixed && start && now < start) {
                     status = 'agendada';
-                } else if (!isFixed && end && now > end) {
+                } else if (!isFixed && end && now > end && sub?.status !== 'approved') {
                     status = 'expirada';
                 } else if (sub?.status === 'approved') {
                     status = 'completa';
@@ -302,7 +314,19 @@ export default function ColaboradorMissoesPage() {
                     type: data.type || 'fixed',
                     completionMode: data.completionMode || 'proof',
                     submissionFeedback,
+                    trailId: data.trailId,
+                    moduleId: data.moduleId,
+                    assignedTo: data.assignedTo,
                 };
+
+                if (isTrailMission) {
+                    if (status === 'completa' || status === 'expirada') {
+                        history.push(mission);
+                    } else {
+                        trailActive.push(mission);
+                    }
+                    return;
+                }
 
                 if (status === 'completa' || status === 'expirada') {
                     history.push(mission);
@@ -324,6 +348,7 @@ export default function ColaboradorMissoesPage() {
 
             setMissions(active);
             setHistoryMissions(history);
+            setTrailMissions(trailActive);
             setStats({
                 weeklyPoints: 0,
                 fixedCompleted: completedFixed,
@@ -449,9 +474,18 @@ export default function ColaboradorMissoesPage() {
                 </Card>
 
                 <Tabs defaultValue="semana">
-                    <TabsList className="mb-4">
-                        <TabsTrigger value="semana">Missões da Semana</TabsTrigger>
-                        <TabsTrigger value="fixas">Missões Fixas</TabsTrigger>
+                    <TabsList className="mb-4 grid grid-cols-2 md:flex md:w-auto w-full">
+                        <TabsTrigger value="semana">Missoes da Semana</TabsTrigger>
+                        <TabsTrigger value="fixas">Missoes Fixas</TabsTrigger>
+                        <TabsTrigger value="trilha" className="flex items-center gap-1.5">
+                            <Target className="h-3.5 w-3.5" />
+                            Missoes de Trilha
+                            {trailMissions.length > 0 && (
+                                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                                    {trailMissions.length}
+                                </Badge>
+                            )}
+                        </TabsTrigger>
                         <TabsTrigger value="historico" className="flex items-center gap-1.5">
                             <History className="h-3.5 w-3.5" />
                             Histórico
@@ -467,6 +501,9 @@ export default function ColaboradorMissoesPage() {
                     </TabsContent>
                     <TabsContent value="fixas">
                         {renderMissions(fixedMissions)}
+                    </TabsContent>
+                    <TabsContent value="trilha">
+                        {renderMissions(trailMissions)}
                     </TabsContent>
                     <TabsContent value="historico">
                         {isLoading ? (

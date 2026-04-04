@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { db, auth } from '@/lib/firebase';
 import {
   collection, doc, getDocs, getDoc, query, orderBy
@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Play, BookOpen, HelpCircle, Wrench, Target,
-  ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2, Zap
+  ChevronLeft, ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2, Zap
 } from 'lucide-react';
 import { Header } from '@/components/dashboard/header';
 import type { Sessao, Trilha, ProgressoTrilha, ModuloModo } from '@/types/trilhas';
@@ -26,6 +26,68 @@ const MODO_ICONS: Record<ModuloModo, any> = {
 interface SessionWithTrails {
   session: Sessao;
   trails: (Trilha & { progress?: ProgressoTrilha })[];
+}
+
+function ScrollableTrailRow({ children }: { children: React.ReactNode }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (el) {
+      el.addEventListener('scroll', checkScroll);
+      const ro = new ResizeObserver(checkScroll);
+      ro.observe(el);
+      return () => {
+        el.removeEventListener('scroll', checkScroll);
+        ro.disconnect();
+      };
+    }
+  }, [checkScroll, children]);
+
+  const scroll = (direction: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const step = 296; // 280px card + 16px gap
+    el.scrollBy({ left: direction === 'left' ? -step : step, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="relative group">
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-gray-800/90 shadow-md rounded-full p-1.5 hover:bg-white dark:hover:bg-gray-800 transition-opacity hidden md:flex items-center justify-center"
+        >
+          <ChevronLeft className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+        </button>
+      )}
+      <div
+        ref={scrollRef}
+        className="flex gap-4 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollSnapType: 'x mandatory', scrollbarWidth: 'none' }}
+      >
+        {children}
+      </div>
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 dark:bg-gray-800/90 shadow-md rounded-full p-1.5 hover:bg-white dark:hover:bg-gray-800 transition-opacity hidden md:flex items-center justify-center"
+        >
+          <ChevronRight className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function ColaboradorTrilhasPage() {
@@ -185,7 +247,8 @@ export default function ColaboradorTrilhasPage() {
             </div>
             <p className="text-sm text-muted-foreground ml-7">{session.descricao}</p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-7">
+            <div className="ml-7">
+            <ScrollableTrailRow>
               {trails.map(trail => {
                 const progress = trail.progress;
                 const totalModulos = trail.modulos?.length || 0;
@@ -196,7 +259,8 @@ export default function ColaboradorTrilhasPage() {
                 return (
                   <Card
                     key={trail.id}
-                    className={`cursor-pointer hover:shadow-md transition-shadow ${isConcluida ? 'border-green-200 bg-green-50/30' : ''}`}
+                    className={`cursor-pointer hover:shadow-md transition-shadow flex-shrink-0 w-[280px] ${isConcluida ? 'border-green-200 bg-green-50/30' : ''}`}
+                    style={{ scrollSnapAlign: 'start' }}
                     onClick={() => openTrail(trail)}
                   >
                     <CardHeader className="pb-3">
@@ -247,6 +311,7 @@ export default function ColaboradorTrilhasPage() {
                   </Card>
                 );
               })}
+            </ScrollableTrailRow>
             </div>
           </div>
         ))
