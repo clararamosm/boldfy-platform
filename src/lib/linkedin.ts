@@ -162,20 +162,25 @@ export function buildConnectionData(
 ): LinkedInConnection {
   const now = Date.now();
 
-  return {
+  // Build base object — Firestore rejects undefined values,
+  // so we only include optional fields when they have a value.
+  const connection: LinkedInConnection = {
     linkedinId: profile.sub,
     name: profile.name,
-    email: profile.email,
-    picture: profile.picture,
     accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
     tokenExpiresAt: now + tokens.expires_in * 1000,
-    refreshTokenExpiresAt: tokens.refresh_token_expires_in
-      ? now + tokens.refresh_token_expires_in * 1000
-      : undefined,
     scopes: tokens.scope,
     connectedAt: now,
   };
+
+  if (profile.email) connection.email = profile.email;
+  if (profile.picture) connection.picture = profile.picture;
+  if (tokens.refresh_token) connection.refreshToken = tokens.refresh_token;
+  if (tokens.refresh_token_expires_in) {
+    connection.refreshTokenExpiresAt = now + tokens.refresh_token_expires_in * 1000;
+  }
+
+  return connection;
 }
 
 /**
