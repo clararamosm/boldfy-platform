@@ -2,57 +2,100 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // Helper function to check if a user has a specific role
     function hasRole(userId, role) {
       return get(/databases/$(database)/documents/users/$(userId)).data.role == role;
     }
-    
+
     // Helper function to get the user's company ID
     function getCompanyId(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data.companyId;
     }
 
+    // Fields that only server actions can modify (never client)
+    function isNotChangingProtectedFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'companyName']);
+    }
+
     // Rules for the 'users' collection
     match /users/{userId} {
-      // Any authenticated user can create their own user document
-      allow create: if request.auth != null;
-      
+      // Only server actions create users (via Admin SDK, which bypasses rules)
+      allow create: if false;
+
       // A user can read their own document.
       // An admin can read documents of users in their own company.
       // A master admin can read any user document.
-      allow read: if request.auth.uid == userId 
+      allow read: if request.auth.uid == userId
                   || (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == resource.data.companyId)
                   || hasRole(request.auth.uid, 'master');
 
-      // A user can update their own profile and personal branding data.
-      allow update: if request.auth.uid == userId;
+      // A user can update their own profile and personal branding data,
+      // but CANNOT change role, companyId, or companyName.
+      allow update: if request.auth.uid == userId && isNotChangingProtectedFields();
+
+      // Rules for user subcollections (trailProgress, etc.)
+      match /trailProgress/{trailId} {
+        // User can read and write their own progress
+        allow read, write: if request.auth.uid == userId;
+
+        // Admin can read progress of users in their company
+        allow read: if hasRole(request.auth.uid, 'admin')
+                    && getCompanyId(request.auth.uid) == getCompanyId(userId);
+
+        // Master can read any progress
+        allow read: if hasRole(request.auth.uid, 'master');
+      }
     }
 
     // Rules for the 'companies' collection
     match /companies/{companyId} {
-      // Master admins can create companies.
-      // The server-side logic handles the initial creation.
-      allow create: if hasRole(request.auth.uid, 'master');
+      // Only server actions create companies (via Admin SDK)
+      allow create: if false;
 
-      // Admins and influencers can read their own company's data.
+      // Admins and colaboradores can read their own company's data.
       // Master admins can read any company's data.
-      allow read: if request.auth != null 
+      allow read: if request.auth != null
                   && (getCompanyId(request.auth.uid) == companyId || hasRole(request.auth.uid, 'master'));
-      
+
       // Only admins of the company or master admins can update company data.
-      allow write: if request.auth != null 
+      allow update: if request.auth != null
                    && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
 
-      // Rules for company subcollections
+      // Only server actions can delete companies (via Admin SDK)
+      allow delete: if false;
+
+      // Rules for company subcollections (sessions, activatedGlobalTrails, assets, etc.)
       match /{subcollection}/{docId} {
-        // Admins of the company and master admins can manage subcollections (assets, collaborators, etc.)
-        allow read, write: if request.auth != null 
+        // Admins of the company and master admins can manage subcollections
+        allow read, write: if request.auth != null
                          && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
-                         
-        // Influencers can only read data from subcollections (e.g., view assets)
-        allow read: if request.auth != null 
+
+        // Colaboradores can only read data from subcollections
+        allow read: if request.auth != null
                     && hasRole(request.auth.uid, 'colaborador') && getCompanyId(request.auth.uid) == companyId;
+
+        // Deep subcollections (e.g., sessions/{id}/trails/{id})
+        match /{deepSub}/{deepDocId} {
+          allow read, write: if request.auth != null
+                           && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
+
+          allow read: if request.auth != null
+                      && hasRole(request.auth.uid, 'colaborador') && getCompanyId(request.auth.uid) == companyId;
+        }
+      }
+    }
+
+    // Rules for global sessions (master-managed, read by all authenticated users)
+    match /globalSessions/{sessionId} {
+      // Only master can write global sessions
+      allow read: if request.auth != null;
+      allow write: if hasRole(request.auth.uid, 'master');
+
+      // Trails within global sessions
+      match /trails/{trailId} {
+        allow read: if request.auth != null;
+        allow write: if hasRole(request.auth.uid, 'master');
       }
     }
   }
