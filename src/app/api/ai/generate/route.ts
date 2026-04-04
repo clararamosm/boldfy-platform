@@ -18,15 +18,43 @@ export async function POST(req: NextRequest) {
     const pb = personalBranding || {};
 
     const lengthGuide: Record<string, string> = {
-      short: "Caption curta: 4-6 linhas no mobile, direto ao ponto. Ideal para posts de opiniao forte.",
-      medium: "Caption media: 8-15 linhas no mobile. Sweet spot de 31-60 segundos de leitura.",
-      long: "Caption longa: 15-25 linhas no mobile. Para frameworks, listas e conteudo educacional denso.",
+      short: `Caption CURTA. Afiada e direta. Poucas linhas. O autor entra com opiniao forte, entrega o ponto e sai. Sem enrolacao, sem contexto excessivo. Ideal para provocacoes, tomadas de posicao e insights rapidos. A secao acionavel pode ser apenas 1-2 items ou pode ser omitida se nao fizer sentido. O bold statement fecha com impacto imediato.`,
+      medium: `Caption MEDIA. Equilibra profundidade e agilidade. O hook puxa, o body desenvolve a narrativa com substancia mas sem se alongar, a secao acionavel traz valor concreto (2-3 items), e fecha com conclusao + bold statement. Sweet spot de 31-60 segundos de leitura no mobile.`,
+      long: `Caption LONGA. Narrativa completa com todas as 5 secoes bem desenvolvidas. O hook abre com forca, o body conta a historia inteira com detalhes concretos e vividos, a secao acionavel aprofunda com 3-5 items de valor real (licoes, dicas, passos), a conclusao amarra o raciocinio, e o bold statement encerra com frase memoravel. 15-25 linhas no mobile. Para conteudo educacional denso, frameworks, e historias que precisam de espaco pra respirar.`,
     };
 
     const formatGuide: Record<string, string> = {
-      linkedin: "Otimizado para LinkedIn: paragrafos de 1-2 linhas, quebras de linha generosas, mobile-first. Sem emojis excessivos.",
-      "text-heavy": "Texto denso: paragrafos mais longos, informativo, menos formatacao visual.",
-      hybrid: "Hibrido: mix de paragrafos curtos e medios, formatacao adaptavel.",
+      linkedin: `FORMATO LINKEDIN (scroll-friendly, mobile-first):
+A escrita precisa ter ritmo visual. Cada frase respira sozinha. O leitor escaneia antes de ler — entao cada linha precisa puxar pra proxima.
+Regras de formatacao:
+- 1 ideia por linha. Nunca empilhar 2 conceitos na mesma frase.
+- Quebras de linha generosas entre blocos de pensamento. O espaco em branco e parte da comunicacao.
+- Frases curtas e isoladas criam tensao e cadencia. Varie entre frases de 3-5 palavras e frases de 8-12 palavras.
+- Bullet points e listas usam travessao (—) ou ponto simples, nunca emojis como marcadores.
+- Cada bloco visual (2-4 linhas) deve ser separado por uma linha em branco.
+- O texto deve parecer poetico no scroll — cada linha com peso proprio, como se pudesse existir sozinha.
+- Nao e sobre ser raso. E sobre ser denso em poucas palavras. Cada linha carrega significado.
+- Evite paragrafos de mais de 2 linhas. Se tem 3 linhas, quebre.`,
+      "text-heavy": `FORMATO TEXTO DENSO (editorial, leitura continua):
+A escrita flui como um ensaio ou artigo. Ideias conectadas em paragrafos completos, sem quebras artificiais.
+Regras de formatacao:
+- Paragrafos de 3-5 frases que desenvolvem um raciocinio inteiro antes de quebrar.
+- As frases se conectam com transicoes naturais — uma ideia leva a proxima dentro do mesmo paragrafo.
+- Nao usar listas, bullet points ou formatacao visual. O poder esta na argumentacao fluida.
+- O ritmo e de leitura continua, como um editorial de revista ou uma carta pessoal.
+- Cada paragrafo e um bloco de pensamento completo: abre, desenvolve, amarra.
+- Use virgulas, ponto e virgula e conectivos pra criar cadencia dentro da frase. Frases mais longas sao bem-vindas quando o raciocinio pede.
+- A separacao entre paragrafos e uma unica linha em branco (sem espacamento excessivo).
+- O texto deve soar como alguem pensando em voz alta de forma articulada — profundo, conectado, sem pressa.`,
+      hybrid: `FORMATO HIBRIDO (equilibrio entre visual e profundidade):
+Meio-termo entre o formato LinkedIn e o texto denso. Paragrafos curtos mas completos, com listas ocasionais quando o conteudo pede.
+Regras de formatacao:
+- Paragrafos de 2-3 frases. Curtos o suficiente pra escanear, completos o suficiente pra desenvolver uma ideia.
+- Use listas e bullet points com moderacao — apenas quando listar items realmente faz mais sentido que um paragrafo.
+- Alterne entre blocos de texto fluido e momentos de formatacao visual. Nao seja 100% de nenhum dos dois.
+- Quebras de linha entre paragrafos, mas sem o espacamento exagerado do formato LinkedIn.
+- O ritmo e de conversa — direto mas nao telegrafado, articulado mas nao academico.
+- Frases variam entre curtas (impacto) e medias (desenvolvimento). Evite frases muito longas.`,
     };
 
     const systemPrompt = `Voce e um assistente de criacao de captions para LinkedIn. Seu objetivo e ajudar o autor a criar captions de alta performance que alinham a marca corporativa da empresa com a autenticidade da marca pessoal do autor.
@@ -54,18 +82,19 @@ Voce so gera captions (legendas de texto). Nao gera designs, carousels, nem inst
 - Varie o estilo de hook. Nunca repetir o mesmo padrao em captions consecutivas.
 
 **2. Body (narrativa — sem quantidade fixa de paragrafos):**
-O tamanho e a estrutura do body dependem do conteudo. Adapte livremente. Principios:
-- Paragrafos curtos. 1-2 linhas no maximo. Mobile-first.
+O tamanho e a estrutura do body dependem do conteudo e do FORMATO selecionado. Adapte livremente. Principios universais:
 - Escrever mais com menos. Cada frase precisa justificar sua existencia.
 - Tom de conversa entre profissionais. Contracoes naturais, cadencia irregular.
-- Situacoes concretas > abstracoes.
-- Varie a formatacao do body entre estes estilos conforme o conteudo pedir:
-  * Paragrafos curtos sequenciais (narrativa fluida)
-  * Bullet points (quando listar ideias, aprendizados ou exemplos)
-  * Listas numeradas (quando ha ordem ou hierarquia)
+- Situacoes concretas > abstracoes. Exemplos reais > teorias genericas.
+- A formatacao visual (quebras de linha, listas, tamanho de paragrafo) e definida pelo FORMATO selecionado na secao "FORMATO E TAMANHO". Siga rigorosamente as regras do formato escolhido.
+- Ferramentas de formatacao disponiveis (use conforme o formato permitir):
+  * Paragrafos sequenciais (narrativa fluida)
+  * Bullet points com travessao (—) para listar ideias, aprendizados ou exemplos
+  * Listas numeradas quando ha ordem ou hierarquia
   * Listas minimalistas (uma palavra ou frase curta por item)
   * Listas com pouca descricao (item + frase de contexto)
   * Mix de estilos dentro da mesma caption
+- IMPORTANTE: No formato "texto denso", NAO use listas ou bullet points. No formato "linkedin", use formatacao visual generosamente. No formato "hibrido", use com moderacao.
 
 **3. Secao acionavel (apos a narrativa):**
 Depois de contar a historia ou expor a opiniao, traga algo pratico. Escolha o que fizer mais sentido:
