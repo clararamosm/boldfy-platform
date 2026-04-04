@@ -316,3 +316,160 @@ export async function publishLinkedInPost(
 
   return { postId, postUrl };
 }
+
+// ─── LinkedIn Post Metrics (socialMetadata API) ─────────────────
+
+export type LinkedInReactionSummary = {
+  LIKE?: number;
+  PRAISE?: number;
+  CELEBRATION?: number;
+  LOVE?: number;
+  INSIGHTFUL?: number;
+  CURIOUS?: number;
+};
+
+export type LinkedInPostMetrics = {
+  postId: string;
+  reactions: LinkedInReactionSummary;
+  totalReactions: number;
+  comments: number;
+  topLevelComments: number;
+};
+
+/**
+ * Fetch engagement metrics (reactions + comments) for a single post.
+ * Uses the socialMetadata endpoint (available with w_member_social).
+ * The postId should be the activity URN returned when publishing.
+ */
+export async function fetchPostMetrics(
+  accessToken: string,
+  postId: string
+): Promise<LinkedInPostMetrics> {
+  // Ensure we have an activity URN format
+  const activityUrn = postId.startsWith('urn:li:')
+    ? postId
+    : `urn:li:activity:${postId}`;
+
+  const url = `https://api.linkedin.com/rest/socialMetadata/${encodeURIComponent(activityUrn)}`;
+
+  const response = await fetch(url, {
+    headers: linkedInApiHeaders(accessToken),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    console.error('LinkedIn socialMetadata failed:', err);
+    // Return zeros instead of throwing — post may not have metrics yet
+    return {
+      postId,
+      reactions: {},
+      totalReactions: 0,
+      comments: 0,
+      topLevelComments: 0,
+    };
+  }
+
+  const data = await response.json();
+
+  // Parse reaction summaries
+  const reactions: LinkedInReactionSummary = {};
+  let totalReactions = 0;
+
+  if (data.reactionSummaries) {
+    for (const [type, summary] of Object.entries(data.reactionSummaries)) {
+      const count = (summary as { count?: number }).count || 0;
+      reactions[type as keyof LinkedInReactionSummary] = count;
+      totalReactions += count;
+    }
+  }
+
+  const comments = data.commentSummary?.count || 0;
+  const topLevelComments = data.commentSummary?.topLevelCount || 0;
+
+  return {
+    postId,
+    reactions,
+    totalReactions,
+    comments,
+    topLevelComments,
+  };
+}
+
+/**
+ * Batch fetch metrics for multiple posts at once.
+ * Uses socialMetadata BATCH_GET with ids=List(...).
+ */
+export async function fetchPostMetricsBatch(
+  accessToken: string,
+  postIds: string[]
+): Promise<LinkedInPostMetrics[]> {
+  if (postIds.length === 0) return [];
+
+  // Build URN list
+  const urns = postIds.map(id =>
+    id.startsWith('urn:li:') ? id : `urn:li:activity:${id}`
+  );
+
+  const urnList = urns.map(u => encodeURIComponent(u)).join(',');
+  const url = `https://api.linkedin.com/rest/socialMetadata?ids=List(${urnList})`;
+
+  const response = await fetch(url, {
+    headers: {
+      ...linkedInApiHeaders(accessToken),
+      'X-RestLi-Method': 'BATCH_GET',
+    },
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    console.error('LinkedIn socialMetadata batch failed:', err);
+    // Return empty metrics for all posts
+    return postIds.map(id => ({
+      postId: id,
+      reactions: {},
+      totalReactions: 0,
+      comments: 0,
+      topLevelComments: 0,
+    }));
+  }
+
+  const data = await response.json();
+  const results: LinkedInPostMetrics[] = [];
+
+  for (const id of postIds) {
+    const urn = id.startsWith('urn:li:') ? id : `urn:li:activity:${id}`;
+    const entry = data.results?.[urn];
+
+    if (!entry) {
+      results.push({
+        postId: id,
+        reactions: {},
+        totalReactions: 0,
+        comments: 0,
+        topLevelComments: 0,
+      });
+      continue;
+    }
+
+    const reactions: LinkedInReactionSummary = {};
+    let totalReactions = 0;
+
+    if (entry.reactionSummaries) {
+      for (const [type, summary] of Object.entries(entry.reactionSummaries)) {
+        const count = (summary as { count?: number }).count || 0;
+        reactions[type as keyof LinkedInReactionSummary] = count;
+        totalReactions += count;
+      }
+    }
+
+    results.push({
+      postId: id,
+      reactions,
+      totalReactions,
+      comments: entry.commentSummary?.count || 0,
+      topLevelComments: entry.commentSummary?.topLevelCount || 0,
+    });
+  }
+
+  return results;
+}

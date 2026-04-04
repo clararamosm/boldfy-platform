@@ -10,7 +10,6 @@ const adminNavItems = [
     { title: "Trilhas", href: "/admin/trilhas", icon: BookOpen },
     { title: "Recompensas", href: "/admin/recompensas", icon: Gift },
     { title: "Biblioteca", href: "/admin/biblioteca", icon: Library },
-    { title: "LinkedIn Track", href: "/admin/linkedin-track", icon: Linkedin, badge: "Em breve", disabled: true },
     { title: "LinkedIn Feed", href: "/admin/linkedin-feed", icon: Newspaper, badge: "Em breve", disabled: true },
     { title: "Configurações", href: "/admin/configuracoes", icon: Cog },
 ];

@@ -8,14 +8,19 @@ import {
     collection, getDocs, getDoc, doc, query, where, orderBy, limit
 } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import Link from 'next/link';
 import {
-    Trophy, Target, BookOpen, Gift, ChevronRight, Star, TrendingUp
+    Trophy, Target, BookOpen, Gift, ChevronRight,
+    Linkedin, Heart, MessageCircle, TrendingUp, ExternalLink,
+    Loader2, Unplug, CalendarDays
 } from 'lucide-react';
+import { getLinkedInDashboardMetrics, type PostWithMetrics, type DashboardMetrics } from '@/app/actions/linkedin';
 
 // ---- Types ----
 type Mission = {
@@ -31,12 +36,6 @@ type Trail = {
     totalPhases: number;
     completedPhases: number;
     progress: number;
-};
-
-type Reward = {
-    id: string;
-    title: string;
-    pointsCost: number;
 };
 
 type DashboardData = {
@@ -80,6 +79,50 @@ const TrailItem = ({ title, progress }: { title: string; progress: number }) => 
     </Link>
 );
 
+// ---- LinkedIn Post Card ----
+const LinkedInPostCard = ({ post }: { post: PostWithMetrics }) => {
+    const captionPreview = post.caption.length > 120
+        ? post.caption.substring(0, 120) + '...'
+        : post.caption;
+
+    const publishDate = post.publishedAt
+        ? new Date(post.publishedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+        : '';
+
+    return (
+        <div className="flex items-start gap-3 p-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors">
+            <div className="h-9 w-9 rounded-full bg-[#0A66C2]/10 flex items-center justify-center shrink-0">
+                <Linkedin className="h-4 w-4 text-[#0A66C2]" />
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground line-clamp-2">{captionPreview}</p>
+                <div className="flex items-center gap-3 mt-1.5">
+                    <span className="text-xs text-muted-foreground">{publishDate}</span>
+                    <div className="flex items-center gap-1 text-xs text-rose-500">
+                        <Heart className="h-3 w-3" />
+                        <span>{post.metrics.totalReactions}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-blue-500">
+                        <MessageCircle className="h-3 w-3" />
+                        <span>{post.metrics.comments}</span>
+                    </div>
+                    {post.linkedinPostUrl && (
+                        <a
+                            href={post.linkedinPostUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-muted-foreground hover:text-[#0A66C2] transition-colors"
+                        >
+                            <ExternalLink className="h-3 w-3" />
+                        </a>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ---- Skeletons ----
 const DashboardSkeleton = () => (
     <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -99,10 +142,32 @@ const DashboardSkeleton = () => (
     </div>
 );
 
+const LinkedInSkeleton = () => (
+    <Card className="border-[#0A66C2]/20">
+        <CardHeader className="pb-3">
+            <Skeleton className="h-5 w-40" />
+        </CardHeader>
+        <CardContent>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+                {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-16 rounded-lg" />
+                ))}
+            </div>
+            <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-14" />
+                ))}
+            </div>
+        </CardContent>
+    </Card>
+);
+
 // ---- Main Component ----
-export default function InfluencerDashboardPage() {
+export default function ColaboradorDashboardPage() {
     const [data, setData] = useState<DashboardData | null>(null);
+    const [linkedinMetrics, setLinkedinMetrics] = useState<DashboardMetrics | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [linkedinLoading, setLinkedinLoading] = useState(true);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -119,7 +184,7 @@ export default function InfluencerDashboardPage() {
                 const companyId = userData.companyId;
                 if (!companyId) return;
 
-                // Fetch missions, trails, rewards, and trail progress in parallel
+                // Fetch dashboard data + LinkedIn metrics in parallel
                 const [missionsSnap, trailsSnap, rewardsSnap, progressSnap] = await Promise.all([
                     getDocs(query(
                         collection(db, "companies", companyId, "missions"),
@@ -176,6 +241,20 @@ export default function InfluencerDashboardPage() {
                     completedTrails,
                     totalTrails: trails.length
                 });
+
+                setIsLoading(false);
+
+                // Fetch LinkedIn metrics (non-blocking)
+                try {
+                    const metrics = await getLinkedInDashboardMetrics(user.uid);
+                    setLinkedinMetrics(metrics);
+                } catch (err) {
+                    console.error('LinkedIn metrics error:', err);
+                    setLinkedinMetrics(null);
+                } finally {
+                    setLinkedinLoading(false);
+                }
+
             } catch (err) {
                 console.error('Dashboard error:', err);
                 toast({
@@ -183,8 +262,8 @@ export default function InfluencerDashboardPage() {
                     description: "Tente novamente mais tarde.",
                     variant: "destructive"
                 });
-            } finally {
                 setIsLoading(false);
+                setLinkedinLoading(false);
             }
         });
 
@@ -212,6 +291,9 @@ export default function InfluencerDashboardPage() {
             </div>
         );
     }
+
+    const hasLinkedin = linkedinMetrics && !linkedinMetrics.error;
+    const hasPosts = hasLinkedin && linkedinMetrics.totals.totalPosts > 0;
 
     return (
         <div>
@@ -259,6 +341,126 @@ export default function InfluencerDashboardPage() {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* LinkedIn Metrics Section */}
+                {linkedinLoading ? (
+                    <LinkedInSkeleton />
+                ) : linkedinMetrics?.error === 'LinkedIn nao conectado.' ? (
+                    <Card className="border-dashed border-[#0A66C2]/30">
+                        <CardContent className="p-6">
+                            <div className="flex flex-col items-center text-center gap-3 py-4">
+                                <div className="h-12 w-12 rounded-full bg-[#0A66C2]/10 flex items-center justify-center">
+                                    <Linkedin className="h-6 w-6 text-[#0A66C2]" />
+                                </div>
+                                <div>
+                                    <p className="font-semibold">Conecte seu LinkedIn</p>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Conecte sua conta para ver metricas dos seus posts aqui no dashboard.
+                                    </p>
+                                </div>
+                                <Button asChild variant="outline" className="mt-2 border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/5">
+                                    <Link href="/colaborador/configuracoes">
+                                        <Linkedin className="mr-2 h-4 w-4" /> Conectar LinkedIn
+                                    </Link>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : linkedinMetrics?.error ? (
+                    <Card className="border-dashed border-amber-300">
+                        <CardContent className="p-6">
+                            <div className="flex items-center gap-3 text-amber-700">
+                                <Unplug className="h-5 w-5 shrink-0" />
+                                <div>
+                                    <p className="font-medium text-sm">{linkedinMetrics.error}</p>
+                                    <Link href="/colaborador/configuracoes" className="text-xs text-[#0A66C2] hover:underline mt-1 inline-block">
+                                        Ir para Configuracoes
+                                    </Link>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : hasPosts ? (
+                    <Card className="border-[#0A66C2]/20">
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Linkedin className="h-5 w-5 text-[#0A66C2]" />
+                                    <CardTitle className="text-lg">LinkedIn Performance</CardTitle>
+                                </div>
+                                <Link href="/colaborador/calendario" className="text-xs text-primary hover:underline">
+                                    Ver calendario
+                                </Link>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Metric Summary Cards */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className="bg-[#0A66C2]/5 rounded-lg p-3 text-center">
+                                    <p className="text-2xl font-bold text-[#0A66C2]">{linkedinMetrics!.totals.totalPosts}</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">Posts publicados</p>
+                                </div>
+                                <div className="bg-rose-50 rounded-lg p-3 text-center">
+                                    <p className="text-2xl font-bold text-rose-600">{linkedinMetrics!.totals.totalReactions}</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">Reacoes totais</p>
+                                </div>
+                                <div className="bg-blue-50 rounded-lg p-3 text-center">
+                                    <p className="text-2xl font-bold text-blue-600">{linkedinMetrics!.totals.totalComments}</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">Comentarios</p>
+                                </div>
+                                <div className="bg-green-50 rounded-lg p-3 text-center">
+                                    <p className="text-2xl font-bold text-green-600">{linkedinMetrics!.totals.avgReactionsPerPost}</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">Media reacoes/post</p>
+                                </div>
+                            </div>
+
+                            {/* Recent Posts */}
+                            <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Posts recentes</p>
+                                <div className="space-y-1">
+                                    {linkedinMetrics!.posts.slice(0, 5).map(post => (
+                                        <LinkedInPostCard key={post.id} post={post} />
+                                    ))}
+                                </div>
+                            </div>
+
+                            {linkedinMetrics!.posts.length > 5 && (
+                                <div className="text-center pt-1">
+                                    <Link href="/colaborador/calendario" className="text-xs text-[#0A66C2] hover:underline">
+                                        Ver todos os {linkedinMetrics!.totals.totalPosts} posts
+                                    </Link>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : hasLinkedin ? (
+                    <Card className="border-[#0A66C2]/20">
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center gap-2">
+                                <Linkedin className="h-5 w-5 text-[#0A66C2]" />
+                                <CardTitle className="text-lg">LinkedIn Performance</CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-col items-center text-center gap-3 py-6">
+                                <div className="h-12 w-12 rounded-full bg-[#0A66C2]/10 flex items-center justify-center">
+                                    <CalendarDays className="h-6 w-6 text-[#0A66C2]" />
+                                </div>
+                                <div>
+                                    <p className="font-medium">Nenhum post publicado ainda</p>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        Publique seu primeiro post pelo Calendario para ver as metricas aqui.
+                                    </p>
+                                </div>
+                                <Button asChild variant="outline" className="mt-1">
+                                    <Link href="/colaborador/calendario/novo">
+                                        <CalendarDays className="mr-2 h-4 w-4" /> Criar post
+                                    </Link>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
 
                 {/* Content Grid */}
                 <div className="grid md:grid-cols-2 gap-6">

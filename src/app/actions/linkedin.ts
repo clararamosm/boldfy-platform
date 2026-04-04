@@ -2,7 +2,7 @@
 'use server';
 
 import { db as adminDb } from '@/lib/firebase-admin';
-import { generateAuthUrl, publishLinkedInPost, refreshAccessToken, buildConnectionData, isTokenExpired, type LinkedInConnection } from '@/lib/linkedin';
+import { generateAuthUrl, publishLinkedInPost, refreshAccessToken, buildConnectionData, isTokenExpired, fetchPostMetricsBatch, type LinkedInConnection, type LinkedInPostMetrics } from '@/lib/linkedin';
 import crypto from 'crypto';
 
 type LinkedInAuthResult = {
@@ -207,5 +207,189 @@ export async function publishToLinkedIn(
 
     const message = error instanceof Error ? error.message : 'Erro desconhecido.';
     return { error: `Erro ao publicar: ${message}` };
+  }
+}
+
+// ─── LinkedIn Post Metrics ──────────────────────────────────────
+
+export type PostWithMetrics = {
+  id: string;
+  caption: string;
+  mediaUrl?: string;
+  linkedinPostId: string;
+  linkedinPostUrl?: string;
+  publishedAt: string;
+  metrics: {
+    totalReactions: number;
+    comments: number;
+    reactions: LinkedInPostMetrics['reactions'];
+  };
+};
+
+export type DashboardMetrics = {
+  posts: PostWithMetrics[];
+  totals: {
+    totalPosts: number;
+    totalReactions: number;
+    totalComments: number;
+    avgReactionsPerPost: number;
+    avgCommentsPerPost: number;
+  };
+  error?: string;
+};
+
+/**
+ * Fetch LinkedIn metrics for all published posts of a user.
+ * Reads posts from Firestore (scheduledPosts with status=published),
+ * then batch-fetches engagement from LinkedIn socialMetadata API.
+ */
+export async function getLinkedInDashboardMetrics(userId: string): Promise<DashboardMetrics> {
+  const empty: DashboardMetrics = {
+    posts: [],
+    totals: { totalPosts: 0, totalReactions: 0, totalComments: 0, avgReactionsPerPost: 0, avgCommentsPerPost: 0 },
+  };
+
+  try {
+    if (!userId) return { ...empty, error: 'Usuario nao identificado.' };
+
+    // 1. Get user's LinkedIn connection
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) return { ...empty, error: 'Usuario nao encontrado.' };
+
+    const userData = userDoc.data();
+    const connection = userData?.linkedinConnection as LinkedInConnection | undefined;
+
+    if (!connection) {
+      return { ...empty, error: 'LinkedIn nao conectado.' };
+    }
+
+    // 2. Check token validity
+    let accessToken = connection.accessToken;
+    if (isTokenExpired(connection.tokenExpiresAt)) {
+      if (connection.refreshToken && connection.refreshTokenExpiresAt && !isTokenExpired(connection.refreshTokenExpiresAt)) {
+        try {
+          const newTokens = await refreshAccessToken(connection.refreshToken);
+          const profile = {
+            sub: connection.linkedinId,
+            name: connection.name,
+            given_name: '',
+            family_name: '',
+            picture: connection.picture,
+            email: connection.email,
+          };
+          const updatedConnection = buildConnectionData(newTokens, profile);
+          const userRef = adminDb.collection('users').doc(userId);
+          await userRef.update({ linkedinConnection: updatedConnection });
+          accessToken = newTokens.access_token;
+        } catch {
+          return { ...empty, error: 'Token expirado. Reconecte sua conta do LinkedIn.' };
+        }
+      } else {
+        return { ...empty, error: 'Token expirado. Reconecte sua conta do LinkedIn.' };
+      }
+    }
+
+    // 3. Get all published posts from Firestore
+    const postsSnap = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('scheduledPosts')
+      .where('status', '==', 'published')
+      .orderBy('updatedAt', 'desc')
+      .limit(50)
+      .get();
+
+    if (postsSnap.empty) {
+      return { ...empty };
+    }
+
+    // 4. Collect posts that have linkedinPostId
+    const postsWithIds: { doc: FirebaseFirestore.QueryDocumentSnapshot; linkedinPostId: string }[] = [];
+    for (const d of postsSnap.docs) {
+      const data = d.data();
+      if (data.linkedinPostId) {
+        postsWithIds.push({ doc: d, linkedinPostId: data.linkedinPostId });
+      }
+    }
+
+    if (postsWithIds.length === 0) {
+      // Posts exist but none have linkedinPostId — return post data without API metrics
+      const posts: PostWithMetrics[] = postsSnap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          caption: data.caption || '',
+          mediaUrl: data.mediaUrl,
+          linkedinPostId: '',
+          linkedinPostUrl: data.linkedinPostUrl || '',
+          publishedAt: data.updatedAt || data.createdAt || '',
+          metrics: { totalReactions: 0, comments: 0, reactions: {} },
+        };
+      });
+      return {
+        posts,
+        totals: { totalPosts: posts.length, totalReactions: 0, totalComments: 0, avgReactionsPerPost: 0, avgCommentsPerPost: 0 },
+      };
+    }
+
+    // 5. Batch fetch metrics from LinkedIn
+    const linkedinIds = postsWithIds.map(p => p.linkedinPostId);
+    let metricsMap: Record<string, LinkedInPostMetrics> = {};
+
+    try {
+      const metrics = await fetchPostMetricsBatch(accessToken, linkedinIds);
+      for (const m of metrics) {
+        metricsMap[m.postId] = m;
+      }
+    } catch (err) {
+      console.error('Error fetching LinkedIn metrics batch:', err);
+      // Continue without metrics — show zeros
+    }
+
+    // 6. Build response
+    let totalReactions = 0;
+    let totalComments = 0;
+
+    const posts: PostWithMetrics[] = postsSnap.docs.map(d => {
+      const data = d.data();
+      const liId = data.linkedinPostId || '';
+      const m = metricsMap[liId];
+
+      const reactions = m?.totalReactions || 0;
+      const comments = m?.comments || 0;
+      totalReactions += reactions;
+      totalComments += comments;
+
+      return {
+        id: d.id,
+        caption: data.caption || '',
+        mediaUrl: data.mediaUrl,
+        linkedinPostId: liId,
+        linkedinPostUrl: data.linkedinPostUrl || '',
+        publishedAt: data.updatedAt || data.createdAt || '',
+        metrics: {
+          totalReactions: reactions,
+          comments,
+          reactions: m?.reactions || {},
+        },
+      };
+    });
+
+    const totalPosts = posts.length;
+
+    return {
+      posts,
+      totals: {
+        totalPosts,
+        totalReactions,
+        totalComments,
+        avgReactionsPerPost: totalPosts > 0 ? Math.round((totalReactions / totalPosts) * 10) / 10 : 0,
+        avgCommentsPerPost: totalPosts > 0 ? Math.round((totalComments / totalPosts) * 10) / 10 : 0,
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching LinkedIn dashboard metrics:', error);
+    const message = error instanceof Error ? error.message : 'Erro desconhecido.';
+    return { ...empty, error: `Erro ao buscar metricas: ${message}` };
   }
 }
