@@ -200,7 +200,6 @@ export default function TrilhaFullscreenPage() {
     if (index === 0) return true;
     const prevModule = sortedModules[index - 1];
     if (!prevModule) return true;
-    if (!prevModule.obrigatorio) return true;
     return isModuleCompleted(prevModule.id);
   }, [sortedModules, isModuleCompleted]);
 
@@ -232,9 +231,8 @@ export default function TrilhaFullscreenPage() {
     const totalPoints = Object.values(newPointsMap).reduce((a, b) => a + b, 0);
     const newPercent = Math.round((newCompleted.length / sortedModules.length) * 100);
 
-    // Check if all mandatory modules are done
-    const mandatoryModules = sortedModules.filter(m => m.obrigatorio);
-    const allMandatoryDone = mandatoryModules.every(m => newCompleted.includes(m.id));
+    // Check if all modules are done (all modules are mandatory)
+    const allModulesDone = sortedModules.length > 0 && sortedModules.every(m => newCompleted.includes(m.id));
 
     const updatedProgress: ProgressoTrilha = {
       ...progress,
@@ -244,7 +242,7 @@ export default function TrilhaFullscreenPage() {
       percentual: newPercent,
     };
 
-    if (allMandatoryDone && !progress.concluida) {
+    if (allModulesDone && !progress.concluida) {
       updatedProgress.concluida = true;
       updatedProgress.concluidaEm = Timestamp.now();
       updatedProgress.pontosGanhos = totalPoints + (trail.pontuacaoBonus || 0);
@@ -281,7 +279,7 @@ export default function TrilhaFullscreenPage() {
     }
 
     // Auto-advance or show conclusion
-    if (allMandatoryDone && updatedProgress.concluida) {
+    if (allModulesDone && updatedProgress.concluida) {
       setShowConclusion(true);
     }
   }, [progress, trail, sortedModules, companyId, id, user, saveProgress]);
@@ -633,7 +631,7 @@ export default function TrilhaFullscreenPage() {
               <Star className="h-3 w-3 mr-1" />
               {currentModule.tipo === 'desafio'
                 ? (currentModule.conteudo?.pontuacaoBase || 0) + ' pontos'
-                : (currentModule.pontuacao || 0) + ' pontos'}
+                : (currentModule.pontuacaoBase || 0) + ' pontos'}
             </Badge>
           )}
           {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
@@ -968,14 +966,14 @@ export default function TrilhaFullscreenPage() {
                     {/* Action button per mode */}
                     {currentModule.tipo === 'aula' && (
                       <Button
-                        onClick={() => completeModule(currentModule.id, currentModule.pontuacao || 0)}
+                        onClick={() => completeModule(currentModule.id, currentModule.pontuacaoBase || 0)}
                         disabled={!videoCompleted && !(currentModule.conteudo?.videoUrl?.includes('youtube') || currentModule.conteudo?.videoUrl?.includes('vimeo'))}
                       >
                         <CheckCircle2 className="mr-2 h-4 w-4" /> Modulo concluido
                       </Button>
                     )}
                     {currentModule.tipo === 'leitura' && (
-                      <Button onClick={() => completeModule(currentModule.id, currentModule.pontuacao || 0)}>
+                      <Button onClick={() => completeModule(currentModule.id, currentModule.pontuacaoBase || 0)}>
                         <CheckCircle2 className="mr-2 h-4 w-4" /> Conclui a leitura
                       </Button>
                     )}
