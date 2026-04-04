@@ -452,23 +452,23 @@ export async function getCompanyRanking(userId: string): Promise<{
       return { ranking: [], monthlyPrizeName: null, error: 'Empresa não associada ao usuário.' };
     }
 
-    // 2. Fetch all users in the company, sorted by points desc then name asc
+    // 2. Fetch all users in the company, sort in JS (avoids composite index requirement)
     const usersSnap = await adminDb
       .collection('users')
       .where('companyId', '==', companyId)
-      .orderBy('points', 'desc')
-      .orderBy('name', 'asc')
       .get();
 
-    const ranking: RankedUser[] = usersSnap.docs.map(doc => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        name: data.profile?.name || data.name || 'Sem nome',
-        points: data.points || 0,
-        avatarUrl: data.profile?.avatarUrl || data.avatarUrl || undefined,
-      };
-    });
+    const ranking: RankedUser[] = usersSnap.docs
+      .map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.profile?.name || data.name || 'Sem nome',
+          points: data.points || 0,
+          avatarUrl: data.profile?.avatarUrl || data.avatarUrl || undefined,
+        };
+      })
+      .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
 
     // 3. Resolve monthly prize name from reward ID
     let monthlyPrizeName: string | null = null;
