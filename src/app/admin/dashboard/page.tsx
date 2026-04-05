@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, getDocs, query, where, doc, getDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
@@ -23,6 +23,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getAuthToken } from '@/lib/auth-client';
+import { getAdminDashboardData, type DashboardData } from '@/app/actions/dashboard';
+import { useAuth } from '@/contexts/auth-context';
 
 // ─── Period Filter ──────────────────────────────────────────────────
 type PeriodKey = 'this_week' | 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months';
@@ -35,7 +38,7 @@ const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
   { key: 'last_6_months', label: 'Últimos 6 meses' },
 ];
 
-function getPeriodRange(key: PeriodKey): { start: Date; end: Date; prevStart: Date; prevEnd: Date } {
+function getPeriodRange(key: PeriodKey) {
   const now = new Date();
   let start: Date, end: Date, prevStart: Date, prevEnd: Date;
 
@@ -85,30 +88,15 @@ function getPeriodRange(key: PeriodKey): { start: Date; end: Date; prevStart: Da
       break;
     }
   }
-  return { start, end, prevStart, prevEnd };
-}
-
-// ─── Helper: Firestore Timestamp → Date ─────────────────────────────
-function toDate(ts: unknown): Date | null {
-  if (!ts) return null;
-  if (ts instanceof Timestamp) return ts.toDate();
-  if (ts instanceof Date) return ts;
-  if (typeof ts === 'string') return new Date(ts);
-  if (typeof ts === 'object' && 'seconds' in (ts as Record<string, unknown>)) {
-    return new Date(((ts as Record<string, number>).seconds) * 1000);
-  }
-  return null;
-}
-
-function isInRange(ts: unknown, start: Date, end: Date): boolean {
-  const d = toDate(ts);
-  if (!d) return false;
-  return d >= start && d <= end;
+  return {
+    start: start.toISOString(),
+    end: end.toISOString(),
+    prevStart: prevStart.toISOString(),
+    prevEnd: prevEnd.toISOString(),
+  };
 }
 
 // ─── Value Formatting ───────────────────────────────────────────────
-const CPM_UNIT = 0.30;
-
 function formatCurrency(value: number): string {
   if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
   return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
@@ -202,189 +190,25 @@ function DashboardSkeleton() {
   );
 }
 
-// ─── Types ──────────────────────────────────────────────────────────
-type TopCollaborator = {
-  id: string;
-  name: string;
-  points: number;
-  missionsCompleted: number;
-};
-
-type DashboardData = {
-  // Company
-  totalLicenses: number;
-  // Collaborators
-  activeCollaborators: number;
-  collaboratorsWithActivity: number;
-  // Missions (period)
-  missionsApproved: number;
-  missionsPending: number;
-  totalMissionsAvailable: number;
-  prevMissionsApproved: number;
-  // Trails
-  trailsStarted: number;
-  trailsCompleted: number;
-  totalTrails: number;
-  // Points
-  totalPointsDistributed: number;
-  prevPointsDistributed: number;
-  // Rewards
-  rewardsRedeemed: number;
-  totalPointsRedeemed: number;
-  // Top 5
-  topCollaborators: TopCollaborator[];
-  // Estimated impressions (placeholder)
-  estimatedImpressions: number;
-  estimatedValue: number;
-};
-
 // ─── Main Component ─────────────────────────────────────────────────
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodKey>('this_month');
-  const [companyId, setCompanyId] = useState<string | null>(null);
+  const { user } = useAuth();
   const { toast } = useToast();
 
-  const periodRange = useMemo(() => getPeriodRange(period), [period]);
-
-  const fetchData = useCallback(async (cId: string) => {
+  const fetchData = useCallback(async (companyId: string) => {
     setIsLoading(true);
     try {
-      const { start, end, prevStart, prevEnd } = getPeriodRange(period);
-      const companyDoc = await getDoc(doc(db, "companies", cId));
-      const companyData = companyDoc.data();
+      const token = await getAuthToken();
+      const result = await getAdminDashboardData(token, companyId, getPeriodRange(period));
 
-      // Parallel fetch
-      const [collabSnap, missionsSnap, submissionsSnap, trailsSnap, rewardsSnap, rescuesSnap] = await Promise.all([
-        getDocs(query(collection(db, "users"), where("companyId", "==", cId), where("role", "==", "colaborador"))),
-        getDocs(collection(db, "companies", cId, "missions")),
-        getDocs(collection(db, "companies", cId, "missionSubmissions")),
-        getDocs(collection(db, "companies", cId, "trails")),
-        getDocs(collection(db, "companies", cId, "rewards")),
-        getDocs(collection(db, "companies", cId, "rescues")),
-      ]);
-
-      // === Collaborators ===
-      const activeCollaborators = collabSnap.size;
-      let collaboratorsWithActivity = 0;
-      const collabMap = new Map<string, { name: string; points: number; missionsCompleted: number }>();
-
-      collabSnap.docs.forEach(d => {
-        const data = d.data();
-        const points = data.points || 0;
-        if (points > 0) collaboratorsWithActivity++;
-        collabMap.set(d.id, { name: data.name || data.profile?.name || 'Sem nome', points, missionsCompleted: 0 });
-      });
-
-      // === Missions ===
-      let totalMissionsAvailable = 0;
-      missionsSnap.docs.forEach(d => {
-        const status = d.data().status;
-        if (status === 'Ativa' || status === 'Fixa' || status === 'Agendada') totalMissionsAvailable++;
-      });
-
-      let missionsApproved = 0;
-      let missionsPending = 0;
-      let prevMissionsApproved = 0;
-
-      submissionsSnap.docs.forEach(d => {
-        const data = d.data();
-        const submittedAt = data.submittedAt || data.reviewedAt;
-
-        if (data.status === 'approved' && isInRange(submittedAt, start, end)) {
-          missionsApproved++;
-          const c = collabMap.get(data.userId);
-          if (c) c.missionsCompleted++;
-        }
-        if (data.status === 'pending') missionsPending++;
-        if (data.status === 'approved' && isInRange(submittedAt, prevStart, prevEnd)) {
-          prevMissionsApproved++;
-        }
-      });
-
-      // === Trails ===
-      const totalTrails = trailsSnap.docs.filter(d => d.data().active === true || d.data().ativa === true).length;
-
-      // Fetch trail progress for all collaborators (resilient — skip on permission errors)
-      let trailsStarted = 0;
-      let trailsCompleted = 0;
-
-      const trailProgressPromises = collabSnap.docs.map(async (collabDoc) => {
-        try {
-          const progressSnap = await getDocs(collection(db, "users", collabDoc.id, "trailProgress"));
-          progressSnap.docs.forEach(pd => {
-            const pData = pd.data();
-            if (pData.concluida || pData.status === 'completed') trailsCompleted++;
-            else trailsStarted++;
-          });
-        } catch (e) {
-          console.warn(`Could not fetch trailProgress for ${collabDoc.id}`, e);
-        }
-      });
-      await Promise.all(trailProgressPromises);
-
-      // === Points ===
-      let totalPointsDistributed = 0;
-      let prevPointsDistributed = 0;
-
-      const pointsPromises = collabSnap.docs.map(async (collabDoc) => {
-        try {
-          const histSnap = await getDocs(collection(db, "users", collabDoc.id, "pointsHistory"));
-          histSnap.docs.forEach(hd => {
-            const hData = hd.data();
-            if (hData.type === 'gain') {
-              if (isInRange(hData.date, start, end)) totalPointsDistributed += hData.points || 0;
-              if (isInRange(hData.date, prevStart, prevEnd)) prevPointsDistributed += hData.points || 0;
-            }
-          });
-        } catch (e) {
-          console.warn(`Could not fetch pointsHistory for ${collabDoc.id}`, e);
-        }
-      });
-      await Promise.all(pointsPromises);
-
-      // === Rewards/Rescues ===
-      let rewardsRedeemed = 0;
-      let totalPointsRedeemed = 0;
-
-      rescuesSnap.docs.forEach(d => {
-        const data = d.data();
-        if (isInRange(data.createdAt || data.date, start, end)) {
-          rewardsRedeemed++;
-          totalPointsRedeemed += data.pointsCost || data.points || 0;
-        }
-      });
-
-      // === Top 5 ===
-      const topCollaborators = Array.from(collabMap.entries())
-        .map(([id, c]) => ({ id, ...c }))
-        .sort((a, b) => b.points - a.points)
-        .slice(0, 5);
-
-      // === Estimated impressions (placeholder until LinkedIn Track is active) ===
-      const estimatedImpressions = activeCollaborators * 3000;
-      const estimatedValue = estimatedImpressions * CPM_UNIT;
-
-      setData({
-        totalLicenses: companyData?.licenses || 0,
-        activeCollaborators,
-        collaboratorsWithActivity,
-        missionsApproved,
-        missionsPending,
-        totalMissionsAvailable,
-        prevMissionsApproved,
-        trailsStarted,
-        trailsCompleted,
-        totalTrails,
-        totalPointsDistributed,
-        prevPointsDistributed,
-        rewardsRedeemed,
-        totalPointsRedeemed,
-        topCollaborators,
-        estimatedImpressions,
-        estimatedValue,
-      });
+      if (result.error) {
+        toast({ variant: 'destructive', title: 'Erro ao carregar dashboard', description: result.error });
+      } else if (result.data) {
+        setData(result.data);
+      }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       toast({ variant: 'destructive', title: 'Erro ao carregar dashboard' });
@@ -393,24 +217,26 @@ export default function AdminDashboardPage() {
     }
   }, [period, toast]);
 
+  // Get companyId from auth context or Firestore
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-      if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
-          const cId = userDoc.data().companyId;
-          setCompanyId(cId);
-          fetchData(cId);
-        }
-      }
-    });
-    return () => unsubscribe();
-  }, [fetchData]);
+    if (!user) return;
 
-  // Refetch when period changes
-  useEffect(() => {
-    if (companyId) fetchData(companyId);
-  }, [companyId, fetchData]);
+    const getCompanyAndFetch = async () => {
+      let cId = user.companyId;
+
+      // For master viewing admin panel, companyId comes from URL
+      if (!cId && user.role === 'master') {
+        const params = new URLSearchParams(window.location.search);
+        cId = params.get('companyId') || undefined;
+      }
+
+      if (cId) {
+        fetchData(cId);
+      }
+    };
+
+    getCompanyAndFetch();
+  }, [user, fetchData]);
 
   if (isLoading || !data) {
     return (
