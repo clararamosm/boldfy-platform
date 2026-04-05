@@ -1,7 +1,7 @@
 'use client';
 
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { BookOpen, Cog, Gift, LayoutDashboard, Library, Trophy, Users, Newspaper, UserSearch } from "lucide-react";
+import { BookOpen, Gift, LayoutDashboard, Library, Trophy, Users, Newspaper, UserSearch } from "lucide-react";
 
 const adminNavItems = [
     { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -12,7 +12,6 @@ const adminNavItems = [
     { title: "Biblioteca", href: "/admin/biblioteca", icon: Library },
     { title: "LinkedIn Feed", href: "/admin/linkedin-feed", icon: Newspaper },
     { title: "LinkedIn Leads", href: "/admin/linkedin-leads", icon: UserSearch, badge: "Em breve", disabled: true },
-    { title: "Configurações", href: "/admin/configuracoes", icon: Cog },
 ];
 
 export function AdminSidebarNav() {
