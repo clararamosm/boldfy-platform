@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Loader2, ClipboardCopy, Check, ThumbsUp, MessageSquare, Repeat2, Send, ArrowRight, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Sparkles, Loader2, ClipboardCopy, Check, ThumbsUp, MessageSquare, Repeat2, Send, ArrowRight, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -285,6 +285,9 @@ export function AiAssistantForm({
     }
 
     setContent(currentContent);
+    setSelectedHook(null);
+    setFinalContent(null);
+    setHooks([]);
     setIsGeneratingHooks(true);
 
     try {
@@ -349,13 +352,6 @@ export function AiAssistantForm({
   };
 
   // ─── Navigation ───────────────────────────────────────────
-  const handleBackToInput = () => {
-    setStep('input');
-    setHooks([]);
-    setSelectedHook(null);
-    setFinalContent(null);
-  };
-
   const handleRegenerateHooks = async () => {
     setHooks([]);
     setIsGeneratingHooks(true);
@@ -386,17 +382,6 @@ export function AiAssistantForm({
     }
   };
 
-  const handleNewPost = () => {
-    setStep('input');
-    setHooks([]);
-    setSelectedHook(null);
-    setFinalContent(null);
-    setContent('');
-    if (textareaRef.current) {
-      textareaRef.current.value = '';
-    }
-  };
-
   const handleUseLegenda = () => {
     if (finalContent) {
       const params = new URLSearchParams({ caption: finalContent });
@@ -404,97 +389,95 @@ export function AiAssistantForm({
     }
   };
 
+  const isEditorDisabled = isGeneratingHooks || isGeneratingPost;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-      {/* LEFT SIDE */}
-      <div>
-        {/* Step 1: Input */}
-        {step === 'input' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-headline text-lg">Crie sua legenda</CardTitle>
-              <CardDescription>
-                Escreva sua ideia e nossa IA irá sugerir hooks para você escolher antes de gerar o post completo.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="grid w-full gap-1.5">
-                <Label htmlFor="content">Sua ideia</Label>
-                <Textarea
-                  ref={textareaRef}
-                  placeholder="Escreva sua ideia de post aqui..."
-                  id="content"
-                  name="content"
-                  rows={5}
-                  defaultValue={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2.5">
-                  <Label className="text-xs font-medium">Formato</Label>
-                  <RadioGroup value={format} onValueChange={setFormat} className="gap-1.5">
-                    {[
-                      { value: 'linkedin', label: 'LinkedIn' },
-                      { value: 'text-heavy', label: 'Texto Denso' },
-                      { value: 'hybrid', label: 'Híbrido' },
-                    ].map(({ value, label }) => (
-                      <div key={value} className="flex items-center space-x-2">
-                        <RadioGroupItem value={value} id={`format-${value}`} />
-                        <Label htmlFor={`format-${value}`} className="font-normal text-sm">{label}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-                <div className="space-y-2.5">
-                  <Label className="text-xs font-medium">Tamanho</Label>
-                  <RadioGroup value={length} onValueChange={setLength} className="gap-1.5">
-                    {[
-                      { value: 'short', label: 'Curto' },
-                      { value: 'medium', label: 'Médio' },
-                      { value: 'long', label: 'Longo' },
-                    ].map(({ value, label }) => (
-                      <div key={value} className="flex items-center space-x-2">
-                        <RadioGroupItem value={value} id={`length-${value}`} />
-                        <Label htmlFor={`length-${value}`} className="font-normal text-sm">{label}</Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
-                </div>
-              </div>
-
-              <LoadingButton
-                loading={isGeneratingHooks}
-                messages={HOOK_LOADING_MESSAGES}
-                onClick={handleGenerateHooks}
-                label="Gerar Legenda"
-                icon={Sparkles}
+      {/* LEFT SIDE — Editor always visible + hooks/result below */}
+      <div className="space-y-4">
+        {/* Editor Card — always visible */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-headline text-lg">Crie sua legenda</CardTitle>
+            <CardDescription>
+              Escreva sua ideia e nossa IA irá sugerir hooks para você escolher antes de gerar o post completo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="grid w-full gap-1.5">
+              <Label htmlFor="content">Sua ideia</Label>
+              <Textarea
+                ref={textareaRef}
+                placeholder="Escreva sua ideia de post aqui..."
+                id="content"
+                name="content"
+                rows={5}
+                defaultValue={content}
+                onChange={(e) => setContent(e.target.value)}
+                disabled={isEditorDisabled}
+                required
               />
-            </CardContent>
-          </Card>
-        )}
+            </div>
 
-        {/* Step 2: Hook Selection */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2.5">
+                <Label className="text-xs font-medium">Formato</Label>
+                <RadioGroup value={format} onValueChange={setFormat} className="gap-1.5" disabled={isEditorDisabled}>
+                  {[
+                    { value: 'linkedin', label: 'LinkedIn' },
+                    { value: 'text-heavy', label: 'Texto Denso' },
+                    { value: 'hybrid', label: 'Híbrido' },
+                  ].map(({ value, label }) => (
+                    <div key={value} className="flex items-center space-x-2">
+                      <RadioGroupItem value={value} id={`format-${value}`} />
+                      <Label htmlFor={`format-${value}`} className="font-normal text-sm">{label}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+              <div className="space-y-2.5">
+                <Label className="text-xs font-medium">Tamanho</Label>
+                <RadioGroup value={length} onValueChange={setLength} className="gap-1.5" disabled={isEditorDisabled}>
+                  {[
+                    { value: 'short', label: 'Curto' },
+                    { value: 'medium', label: 'Médio' },
+                    { value: 'long', label: 'Longo' },
+                  ].map(({ value, label }) => (
+                    <div key={value} className="flex items-center space-x-2">
+                      <RadioGroupItem value={value} id={`length-${value}`} />
+                      <Label htmlFor={`length-${value}`} className="font-normal text-sm">{label}</Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            </div>
+
+            <LoadingButton
+              loading={isGeneratingHooks}
+              messages={HOOK_LOADING_MESSAGES}
+              onClick={handleGenerateHooks}
+              label="Gerar Legenda"
+              icon={Sparkles}
+            />
+
+            {/* Selected hook indicator — shown after post is generated */}
+            {step === 'result' && selectedHook && (
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <p className="text-xs text-muted-foreground mb-1">Hook selecionado:</p>
+                <p className="text-sm whitespace-pre-line">{selectedHook}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Hook Selection — appears below editor */}
         {step === 'hooks' && (
           <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleBackToInput}
-                  className="p-1 rounded-md hover:bg-muted transition-colors"
-                >
-                  <ArrowLeft className="h-4 w-4 text-muted-foreground" />
-                </button>
-                <div>
-                  <CardTitle className="font-headline text-lg">Escolha seu hook</CardTitle>
-                  <CardDescription>
-                    Selecione a abertura que mais combina com você. O post será gerado a partir dela.
-                  </CardDescription>
-                </div>
-              </div>
+            <CardHeader className="pb-3">
+              <CardTitle className="font-headline text-base">Escolha seu hook</CardTitle>
+              <CardDescription>
+                Selecione a abertura que mais combina com você. O post será gerado a partir dela.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {isGeneratingHooks ? (
@@ -550,33 +533,6 @@ export function AiAssistantForm({
             </CardContent>
           </Card>
         )}
-
-        {/* Step 3: Result — show new post button */}
-        {step === 'result' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-headline text-lg">Post gerado!</CardTitle>
-              <CardDescription>
-                Veja o preview ao lado. Você pode copiar, usar a legenda ou criar um novo post.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="p-3 rounded-lg bg-muted/50 border">
-                <p className="text-xs text-muted-foreground mb-1">Hook selecionado:</p>
-                <p className="text-sm whitespace-pre-line">{selectedHook}</p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleNewPost}
-                className="w-full"
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                Criar novo post
-              </Button>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {/* RIGHT SIDE — Preview */}
@@ -595,9 +551,9 @@ export function AiAssistantForm({
               </div>
               <p className="font-medium text-muted-foreground">Preview do seu post</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {step === 'input'
-                  ? 'Gere uma legenda para ver como ficará no LinkedIn'
-                  : 'Selecione um hook para gerar o post completo'
+                {step === 'hooks'
+                  ? 'Selecione um hook para gerar o post completo'
+                  : 'Gere uma legenda para ver como ficará no LinkedIn'
                 }
               </p>
             </CardContent>
