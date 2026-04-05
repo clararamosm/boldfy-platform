@@ -204,11 +204,6 @@ export default function ColaboradorTrilhasPage() {
       <Header title="Trilhas" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
 
-      {/* Suggest new trails */}
-      <div className="flex justify-end">
-        <SuggestTrailDialog pagina="Trilhas Colaborador" />
-      </div>
-
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         <Card><CardContent className="pt-6 text-center">
@@ -322,6 +317,11 @@ export default function ColaboradorTrilhasPage() {
           </div>
         ))
       )}
+
+      {/* Suggest new trails */}
+      <div className="flex justify-center pt-4 pb-2">
+        <SuggestTrailDialog pagina="Trilhas Colaborador" />
+      </div>
       </main>
     </>
   );

@@ -306,11 +306,6 @@ export default function AdminTrilhasPage() {
       <Header title="Trilhas" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
 
-      {/* Suggest new trails */}
-      <div className="flex justify-end">
-        <SuggestTrailDialog pagina="Trilhas Admin" />
-      </div>
-
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-purple-500" /></div>
       ) : (
@@ -490,6 +485,11 @@ export default function AdminTrilhasPage() {
 
       {/* ANALYTICS DIALOG */}
       <AnalyticsDialog open={analyticsOpen} onOpenChange={setAnalyticsOpen} analytics={analyticsTrail} />
+
+      {/* Suggest new trails */}
+      <div className="flex justify-center pt-4 pb-2">
+        <SuggestTrailDialog pagina="Trilhas Admin" />
+      </div>
       </main>
     </>
   );
