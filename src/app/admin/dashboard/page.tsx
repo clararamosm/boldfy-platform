@@ -1,190 +1,410 @@
 // src/app/admin/dashboard/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, limit, orderBy, query, where, doc, getDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { collection, getDocs, query, where, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Trophy, Gift, CheckCircle, Target, BookOpen, TrendingUp, Zap } from "lucide-react";
+import {
+  Users, Trophy, Gift, Target, BookOpen, TrendingUp, Zap, Lock,
+  ChevronUp, ChevronDown, Minus, Award, BarChart3, Activity,
+} from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-type StatCardProps = {
-  title: string;
-  value: string;
-  description: string;
-  icon: React.ElementType;
-  isLoading: boolean;
-};
+// ─── Period Filter ──────────────────────────────────────────────────
+type PeriodKey = 'this_week' | 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months';
 
-const StatCard = ({ title, value, description, icon: Icon, isLoading }: StatCardProps) => (
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{title}</CardTitle>
-      <Icon className="h-4 w-4 text-muted-foreground" />
-    </CardHeader>
-    <CardContent>
-      {isLoading ? (
-        <Skeleton className="h-8 w-16 mt-1" />
-      ) : (
-        <div className="text-2xl font-bold font-headline">{value}</div>
-      )}
-      <p className="text-xs text-muted-foreground">{description}</p>
-    </CardContent>
-  </Card>
-);
+const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
+  { key: 'this_week', label: 'Esta semana' },
+  { key: 'this_month', label: 'Este mês' },
+  { key: 'last_month', label: 'Último mês' },
+  { key: 'last_3_months', label: 'Últimos 3 meses' },
+  { key: 'last_6_months', label: 'Últimos 6 meses' },
+];
 
-const DashboardSkeleton = () => (
-  <>
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      <StatCard title="Colaboradores Ativos" value="" description="" icon={Users} isLoading={true} />
-      <StatCard title="Missões Ativas" value="" description="" icon={Target} isLoading={true} />
-      <StatCard title="Trilhas" value="" description="" icon={BookOpen} isLoading={true} />
-      <StatCard title="Recompensas" value="" description="" icon={Gift} isLoading={true} />
+function getPeriodRange(key: PeriodKey): { start: Date; end: Date; prevStart: Date; prevEnd: Date } {
+  const now = new Date();
+  let start: Date, end: Date, prevStart: Date, prevEnd: Date;
+
+  switch (key) {
+    case 'this_week': {
+      const dayOfWeek = now.getDay();
+      start = new Date(now);
+      start.setDate(now.getDate() - dayOfWeek);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(now);
+      prevStart = new Date(start);
+      prevStart.setDate(prevStart.getDate() - 7);
+      prevEnd = new Date(start);
+      prevEnd.setMilliseconds(-1);
+      break;
+    }
+    case 'this_month': {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now);
+      prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      prevEnd = new Date(start);
+      prevEnd.setMilliseconds(-1);
+      break;
+    }
+    case 'last_month': {
+      start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+      prevStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      prevEnd = new Date(start);
+      prevEnd.setMilliseconds(-1);
+      break;
+    }
+    case 'last_3_months': {
+      start = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+      end = new Date(now);
+      prevStart = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+      prevEnd = new Date(start);
+      prevEnd.setMilliseconds(-1);
+      break;
+    }
+    case 'last_6_months': {
+      start = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+      end = new Date(now);
+      prevStart = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+      prevEnd = new Date(start);
+      prevEnd.setMilliseconds(-1);
+      break;
+    }
+  }
+  return { start, end, prevStart, prevEnd };
+}
+
+// ─── Helper: Firestore Timestamp → Date ─────────────────────────────
+function toDate(ts: unknown): Date | null {
+  if (!ts) return null;
+  if (ts instanceof Timestamp) return ts.toDate();
+  if (ts instanceof Date) return ts;
+  if (typeof ts === 'string') return new Date(ts);
+  if (typeof ts === 'object' && 'seconds' in (ts as Record<string, unknown>)) {
+    return new Date(((ts as Record<string, number>).seconds) * 1000);
+  }
+  return null;
+}
+
+function isInRange(ts: unknown, start: Date, end: Date): boolean {
+  const d = toDate(ts);
+  if (!d) return false;
+  return d >= start && d <= end;
+}
+
+// ─── Value Formatting ───────────────────────────────────────────────
+const CPM_UNIT = 0.30;
+
+function formatCurrency(value: number): string {
+  if (value >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
+  return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
+}
+
+function formatNumber(value: number): string {
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return value.toLocaleString('pt-BR');
+}
+
+// ─── Comparison Badge ───────────────────────────────────────────────
+function ComparisonBadge({ current, previous }: { current: number; previous: number }) {
+  if (previous === 0 && current === 0) return null;
+  if (previous === 0) return (
+    <span className="inline-flex items-center text-[11px] text-green-600 dark:text-green-400 font-medium">
+      <ChevronUp className="h-3 w-3" /> Novo
+    </span>
+  );
+  const pct = Math.round(((current - previous) / previous) * 100);
+  if (pct === 0) return (
+    <span className="inline-flex items-center text-[11px] text-muted-foreground font-medium">
+      <Minus className="h-3 w-3" /> 0%
+    </span>
+  );
+  const isPositive = pct > 0;
+  return (
+    <span className={`inline-flex items-center text-[11px] font-medium ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+      {isPositive ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+      {isPositive ? '+' : ''}{pct}%
+    </span>
+  );
+}
+
+// ─── Health Bar ─────────────────────────────────────────────────────
+function HealthBar({ label, value, thresholdGreen, thresholdOrange }: {
+  label: string;
+  value: number;
+  thresholdGreen: number;
+  thresholdOrange: number;
+}) {
+  const color = value >= thresholdGreen
+    ? 'bg-green-500'
+    : value >= thresholdOrange
+      ? 'bg-orange-500'
+      : 'bg-red-500';
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="text-sm font-semibold">{value}%</span>
+      </div>
+      <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${Math.min(value, 100)}%` }} />
+      </div>
     </div>
-    <div className="grid gap-6 md:grid-cols-2 mt-6">
-      <Card>
-        <CardHeader><Skeleton className="h-7 w-48" /></CardHeader>
-        <CardContent><Skeleton className="h-40" /></CardContent>
-      </Card>
-      <Card>
-        <CardHeader><Skeleton className="h-7 w-48" /></CardHeader>
-        <CardContent><Skeleton className="h-40" /></CardContent>
-      </Card>
-    </div>
-  </>
-);
+  );
+}
 
+// ─── Coming Soon Overlay ────────────────────────────────────────────
+function ComingSoonOverlay({ children, message }: { children: React.ReactNode; message?: string }) {
+  return (
+    <div className="relative">
+      <div className="opacity-40 pointer-events-none select-none blur-[1px]">{children}</div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg">
+        <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-full border shadow-sm">
+          <Lock className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground">{message || 'Em breve'}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Skeleton ───────────────────────────────────────────────────────
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i}>
+            <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
+            <CardContent><Skeleton className="h-8 w-20" /><Skeleton className="h-3 w-32 mt-2" /></CardContent>
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-6 md:grid-cols-[3fr_2fr]">
+        <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
+        <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── Types ──────────────────────────────────────────────────────────
 type TopCollaborator = {
   id: string;
   name: string;
   points: number;
+  missionsCompleted: number;
 };
 
-type DashboardStats = {
-  activeCollaborators: number;
+type DashboardData = {
+  // Company
   totalLicenses: number;
-  activeMissions: number;
-  totalMissions: number;
-  completedMissions: number;
-  activeTrails: number;
+  // Collaborators
+  activeCollaborators: number;
+  collaboratorsWithActivity: number;
+  // Missions (period)
+  missionsApproved: number;
+  missionsPending: number;
+  totalMissionsAvailable: number;
+  prevMissionsApproved: number;
+  // Trails
+  trailsStarted: number;
+  trailsCompleted: number;
   totalTrails: number;
-  totalRewards: number;
+  // Points
   totalPointsDistributed: number;
-  engagedCollaborators: number;
+  prevPointsDistributed: number;
+  // Rewards
+  rewardsRedeemed: number;
+  totalPointsRedeemed: number;
+  // Top 5
   topCollaborators: TopCollaborator[];
+  // Estimated impressions (placeholder)
+  estimatedImpressions: number;
+  estimatedValue: number;
 };
 
+// ─── Main Component ─────────────────────────────────────────────────
 export default function AdminDashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [period, setPeriod] = useState<PeriodKey>('this_month');
+  const [companyId, setCompanyId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchData = useCallback(async (companyId: string) => {
+  const periodRange = useMemo(() => getPeriodRange(period), [period]);
+
+  const fetchData = useCallback(async (cId: string) => {
     setIsLoading(true);
     try {
-      const companyDocRef = doc(db, "companies", companyId);
-      const companySnap = await getDoc(companyDocRef);
-      const companyData = companySnap.data();
+      const { start, end, prevStart, prevEnd } = getPeriodRange(period);
+      const companyDoc = await getDoc(doc(db, "companies", cId));
+      const companyData = companyDoc.data();
 
-      // Parallel fetch all data
-      const [collaboratorsSnap, missionsSnap, trailsSnap, rewardsSnap] = await Promise.all([
-        getDocs(query(
-          collection(db, "users"),
-          where("companyId", "==", companyId),
-          where("role", "==", "colaborador")
-        )),
-        getDocs(collection(db, "companies", companyId, "missions")),
-        getDocs(collection(db, "companies", companyId, "trails")),
-        getDocs(collection(db, "companies", companyId, "rewards"))
+      // Parallel fetch
+      const [collabSnap, missionsSnap, submissionsSnap, trailsSnap, rewardsSnap, rescuesSnap] = await Promise.all([
+        getDocs(query(collection(db, "users"), where("companyId", "==", cId), where("role", "==", "colaborador"))),
+        getDocs(collection(db, "companies", cId, "missions")),
+        getDocs(collection(db, "companies", cId, "missionSubmissions")),
+        getDocs(collection(db, "companies", cId, "trails")),
+        getDocs(collection(db, "companies", cId, "rewards")),
+        getDocs(collection(db, "companies", cId, "rescues")),
       ]);
 
-      // Process collaborators
-      const activeCollaboratorsCount = collaboratorsSnap.size;
-      let totalPointsDistributed = 0;
-      let engagedCount = 0;
-      const collaboratorsList: TopCollaborator[] = [];
+      // === Collaborators ===
+      const activeCollaborators = collabSnap.size;
+      let collaboratorsWithActivity = 0;
+      const collabMap = new Map<string, { name: string; points: number; missionsCompleted: number }>();
 
-      collaboratorsSnap.docs.forEach(docSnap => {
-        const data = docSnap.data();
+      collabSnap.docs.forEach(d => {
+        const data = d.data();
         const points = data.points || 0;
-        totalPointsDistributed += points;
-        if (points > 0) engagedCount++;
-        collaboratorsList.push({
-          id: docSnap.id,
-          name: data.name || 'Sem nome',
-          points
+        if (points > 0) collaboratorsWithActivity++;
+        collabMap.set(d.id, { name: data.name || data.profile?.name || 'Sem nome', points, missionsCompleted: 0 });
+      });
+
+      // === Missions ===
+      let totalMissionsAvailable = 0;
+      missionsSnap.docs.forEach(d => {
+        const status = d.data().status;
+        if (status === 'Ativa' || status === 'Fixa' || status === 'Agendada') totalMissionsAvailable++;
+      });
+
+      let missionsApproved = 0;
+      let missionsPending = 0;
+      let prevMissionsApproved = 0;
+
+      submissionsSnap.docs.forEach(d => {
+        const data = d.data();
+        const submittedAt = data.submittedAt || data.reviewedAt;
+
+        if (data.status === 'approved' && isInRange(submittedAt, start, end)) {
+          missionsApproved++;
+          const c = collabMap.get(data.userId);
+          if (c) c.missionsCompleted++;
+        }
+        if (data.status === 'pending') missionsPending++;
+        if (data.status === 'approved' && isInRange(submittedAt, prevStart, prevEnd)) {
+          prevMissionsApproved++;
+        }
+      });
+
+      // === Trails ===
+      const totalTrails = trailsSnap.docs.filter(d => d.data().active === true || d.data().ativa === true).length;
+
+      // Fetch trail progress for all collaborators
+      let trailsStarted = 0;
+      let trailsCompleted = 0;
+
+      const trailProgressPromises = collabSnap.docs.map(async (collabDoc) => {
+        const progressSnap = await getDocs(collection(db, "users", collabDoc.id, "trailProgress"));
+        progressSnap.docs.forEach(pd => {
+          const pData = pd.data();
+          if (pData.concluida || pData.status === 'completed') trailsCompleted++;
+          else trailsStarted++;
         });
       });
+      await Promise.all(trailProgressPromises);
 
-      // Sort by points descending and take top 5
-      collaboratorsList.sort((a, b) => b.points - a.points);
-      const topCollaborators = collaboratorsList.slice(0, 5);
+      // === Points ===
+      let totalPointsDistributed = 0;
+      let prevPointsDistributed = 0;
 
-      // Process missions
-      let activeMissions = 0;
-      let completedMissions = 0;
-      missionsSnap.docs.forEach(docSnap => {
-        const status = docSnap.data().status;
-        if (status === 'Ativa' || status === 'Fixa' || status === 'Agendada') activeMissions++;
-        if (status === 'Concluida' || status === 'Completa') completedMissions++;
+      const pointsPromises = collabSnap.docs.map(async (collabDoc) => {
+        const histSnap = await getDocs(collection(db, "users", collabDoc.id, "pointsHistory"));
+        histSnap.docs.forEach(hd => {
+          const hData = hd.data();
+          if (hData.type === 'gain') {
+            if (isInRange(hData.date, start, end)) totalPointsDistributed += hData.points || 0;
+            if (isInRange(hData.date, prevStart, prevEnd)) prevPointsDistributed += hData.points || 0;
+          }
+        });
+      });
+      await Promise.all(pointsPromises);
+
+      // === Rewards/Rescues ===
+      let rewardsRedeemed = 0;
+      let totalPointsRedeemed = 0;
+
+      rescuesSnap.docs.forEach(d => {
+        const data = d.data();
+        if (isInRange(data.createdAt || data.date, start, end)) {
+          rewardsRedeemed++;
+          totalPointsRedeemed += data.pointsCost || data.points || 0;
+        }
       });
 
-      // Process trails
-      const activeTrails = trailsSnap.docs.filter(d => d.data().active === true).length;
+      // === Top 5 ===
+      const topCollaborators = Array.from(collabMap.entries())
+        .map(([id, c]) => ({ id, ...c }))
+        .sort((a, b) => b.points - a.points)
+        .slice(0, 5);
 
-      setStats({
-        activeCollaborators: activeCollaboratorsCount,
+      // === Estimated impressions (placeholder until LinkedIn Track is active) ===
+      const estimatedImpressions = activeCollaborators * 3000;
+      const estimatedValue = estimatedImpressions * CPM_UNIT;
+
+      setData({
         totalLicenses: companyData?.licenses || 0,
-        activeMissions,
-        totalMissions: missionsSnap.size,
-        completedMissions,
-        activeTrails,
-        totalTrails: trailsSnap.size,
-        totalRewards: rewardsSnap.size,
+        activeCollaborators,
+        collaboratorsWithActivity,
+        missionsApproved,
+        missionsPending,
+        totalMissionsAvailable,
+        prevMissionsApproved,
+        trailsStarted,
+        trailsCompleted,
+        totalTrails,
         totalPointsDistributed,
-        engagedCollaborators: engagedCount,
-        topCollaborators
+        prevPointsDistributed,
+        rewardsRedeemed,
+        totalPointsRedeemed,
+        topCollaborators,
+        estimatedImpressions,
+        estimatedValue,
       });
     } catch (error) {
-      console.error("Error fetching dashboard data: ", error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao carregar dashboard',
-        description: 'Não foi possível buscar os dados do dashboard.',
-      });
+      console.error("Error fetching dashboard data:", error);
+      toast({ variant: 'destructive', title: 'Erro ao carregar dashboard' });
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [period, toast]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
       if (user) {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const companyId = userDocSnap.data().companyId;
-          fetchData(companyId);
-        } else {
-          toast({ variant: "destructive", title: "Usuário não encontrado" });
-          setIsLoading(false);
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          const cId = userDoc.data().companyId;
+          setCompanyId(cId);
+          fetchData(cId);
         }
-      } else {
-        setIsLoading(false);
       }
     });
     return () => unsubscribe();
-  }, [fetchData, toast]);
+  }, [fetchData]);
 
+  // Refetch when period changes
+  useEffect(() => {
+    if (companyId) fetchData(companyId);
+  }, [companyId, fetchData]);
 
-  if (isLoading || !stats) {
+  if (isLoading || !data) {
     return (
       <>
         <Header title="Dashboard" />
@@ -192,102 +412,280 @@ export default function AdminDashboardPage() {
           <DashboardSkeleton />
         </main>
       </>
-    )
+    );
   }
 
-  const engagementRate = stats.activeCollaborators > 0
-    ? Math.round((stats.engagedCollaborators / stats.activeCollaborators) * 100)
+  const adhesionRate = data.totalLicenses > 0
+    ? Math.round((data.activeCollaborators / data.totalLicenses) * 100)
+    : 0;
+  const engagementRate = data.activeCollaborators > 0
+    ? Math.round((data.collaboratorsWithActivity / data.activeCollaborators) * 100)
+    : 0;
+  const missionCompletionRate = data.totalMissionsAvailable > 0
+    ? Math.round((data.missionsApproved / (data.activeCollaborators * data.totalMissionsAvailable)) * 100)
+    : 0;
+  const trailProgressRate = data.activeCollaborators > 0
+    ? Math.round(((data.trailsStarted + data.trailsCompleted) / data.activeCollaborators) * 100)
+    : 0;
+  const redemptionRate = data.totalPointsDistributed > 0
+    ? Math.round((data.totalPointsRedeemed / data.totalPointsDistributed) * 100)
     : 0;
 
   return (
     <>
       <Header title="Dashboard" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Colaboradores"
-            value={`${stats.activeCollaborators} / ${stats.totalLicenses}`}
-            description="Licenças utilizadas"
-            icon={Users}
-            isLoading={false}
-          />
-          <StatCard
-            title="Missões Ativas"
-            value={`${stats.activeMissions}`}
-            description={`${stats.totalMissions} total · ${stats.completedMissions} concluídas`}
-            icon={Target}
-            isLoading={false}
-          />
-          <StatCard
-            title="Trilhas"
-            value={`${stats.activeTrails}`}
-            description={`${stats.totalTrails} total criadas`}
-            icon={BookOpen}
-            isLoading={false}
-          />
-          <StatCard
-            title="Recompensas"
-            value={`${stats.totalRewards}`}
-            description="Cadastradas no catálogo"
-            icon={Gift}
-            isLoading={false}
-          />
+        {/* Period filter */}
+        <div className="flex items-center justify-end">
+          <Select value={period} onValueChange={(v) => setPeriod(v as PeriodKey)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIOD_OPTIONS.map(o => (
+                <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Engagement + Points Overview */}
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="font-headline text-lg flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                Engajamento
-              </CardTitle>
-              <CardDescription>
-                Colaboradores com atividade (pontos {'>'} 0)
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-3xl font-bold">{engagementRate}%</span>
-                <span className="text-sm text-muted-foreground">
-                  {stats.engagedCollaborators} de {stats.activeCollaborators} colaboradores
-                </span>
-              </div>
-              <Progress value={engagementRate} className="h-3" />
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-amber-500" />
-                  <span className="text-muted-foreground">Total de pontos distribuídos</span>
+        {/* ─── BLOCO 1: KPIs de topo ─────────────────────────────────── */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/* Card 1: Valor equivalente (COMING SOON) */}
+          <ComingSoonOverlay message="Em breve com LinkedIn Track">
+            <Card className="border-purple-200 dark:border-purple-900/50">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Valor equivalente</CardTitle>
+                <TrendingUp className="h-4 w-4 text-purple-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                  {formatCurrency(data.estimatedValue)}
                 </div>
-                <span className="font-bold">{stats.totalPointsDistributed.toLocaleString()}</span>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Estimativa: {data.activeCollaborators} colaboradores
+                </p>
+              </CardContent>
+            </Card>
+          </ComingSoonOverlay>
+
+          {/* Card 2: Impressões (COMING SOON) */}
+          <ComingSoonOverlay message="Em breve com LinkedIn Track">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Impressões geradas</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatNumber(data.estimatedImpressions)}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  × R$0,30 = valor acima
+                </p>
+              </CardContent>
+            </Card>
+          </ComingSoonOverlay>
+
+          {/* Card 3: Colaboradores ativos (WORKS) */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Colaboradores ativos</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {data.activeCollaborators} <span className="text-base font-normal text-muted-foreground">/ {data.totalLicenses}</span>
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                <span className={adhesionRate >= 70 ? 'text-green-600' : adhesionRate >= 40 ? 'text-orange-500' : 'text-red-500'}>
+                  {adhesionRate}% de adesão
+                </span>
+              </p>
             </CardContent>
           </Card>
 
-          {/* Top Collaborators */}
+          {/* Card 4: ROI (COMING SOON) */}
+          <ComingSoonOverlay message="Em breve com LinkedIn Track">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">ROI do programa</CardTitle>
+                <Award className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">2.4x</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Valor gerado ÷ custo
+                </p>
+              </CardContent>
+            </Card>
+          </ComingSoonOverlay>
+        </div>
+
+        {/* ─── BLOCO 2: Gráfico + Donut ──────────────────────────────── */}
+        <div className="grid gap-6 md:grid-cols-[3fr_2fr]">
+          {/* Evolução mensal (COMING SOON) */}
+          <ComingSoonOverlay message="Disponível com LinkedIn Track">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                  Impressões e valor equivalente
+                </CardTitle>
+                <CardDescription>Evolução mensal — efeito composto</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Placeholder chart */}
+                <div className="flex items-end gap-2 h-40 px-2">
+                  {[25, 35, 42, 50, 58, 65].map((h, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="w-full bg-purple-300 dark:bg-purple-800 rounded-t" style={{ height: `${h}%` }} />
+                      <span className="text-[10px] text-muted-foreground">
+                        {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'][i]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </ComingSoonOverlay>
+
+          {/* Engajamento donut */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="font-headline text-lg flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-muted-foreground" />
-                Top Colaboradores
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Activity className="h-5 w-5 text-muted-foreground" />
+                Engajamento no programa
               </CardTitle>
-              <CardDescription>
-                Ranking por pontos
-              </CardDescription>
+              <CardDescription>Distribuição de atividade</CardDescription>
             </CardHeader>
             <CardContent>
-              {stats.topCollaborators.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4 text-sm">
+              <div className="flex items-center justify-center py-2">
+                {/* Simple donut using CSS */}
+                <div className="relative h-40 w-40">
+                  <svg viewBox="0 0 36 36" className="h-40 w-40 -rotate-90">
+                    {/* Inactive */}
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#E8D8F5" strokeWidth="3"
+                      strokeDasharray={`${100} ${0}`} strokeDashoffset="0" className="dark:stroke-purple-900/40" />
+                    {/* Pending */}
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#CD50F1" strokeWidth="3"
+                      strokeDasharray={`${data.activeCollaborators > 0 ? ((data.activeCollaborators - data.collaboratorsWithActivity) / data.activeCollaborators * 100) : 0} ${100}`}
+                      strokeDashoffset={`-${data.activeCollaborators > 0 ? (data.collaboratorsWithActivity / data.activeCollaborators * 100) : 0}`} />
+                    {/* Active */}
+                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#9840AD" strokeWidth="3"
+                      strokeDasharray={`${data.activeCollaborators > 0 ? (data.collaboratorsWithActivity / data.activeCollaborators * 100) : 0} ${100}`}
+                      strokeDashoffset="0" />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold">{data.activeCollaborators}</span>
+                    <span className="text-[10px] text-muted-foreground">colaboradores</span>
+                  </div>
+                </div>
+              </div>
+              {/* Legend */}
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-2 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#9840AD]" />
+                  Engajados ({data.collaboratorsWithActivity})
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#CD50F1]" />
+                  Sem atividade ({data.activeCollaborators - data.collaboratorsWithActivity})
+                </span>
+                {data.totalLicenses > data.activeCollaborators && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#E8D8F5] dark:bg-purple-900/40" />
+                    Inativos ({data.totalLicenses - data.activeCollaborators})
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ─── BLOCO 3: Métricas operacionais ────────────────────────── */}
+        <div className="grid gap-4 md:grid-cols-3">
+          {/* Missões concluídas */}
+          <Card>
+            <CardContent className="pt-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">Missões concluídas</span>
+                <Target className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold">{data.missionsApproved}</span>
+                <span className="text-sm text-muted-foreground">/ {data.totalMissionsAvailable * data.activeCollaborators || '—'}</span>
+              </div>
+              <ComparisonBadge current={data.missionsApproved} previous={data.prevMissionsApproved} />
+              {data.missionsPending > 0 && (
+                <p className="text-xs text-orange-500">{data.missionsPending} pendente{data.missionsPending > 1 ? 's' : ''} de revisão</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Trilhas concluídas */}
+          <Card>
+            <CardContent className="pt-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">Trilhas concluídas</span>
+                <BookOpen className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold">{data.trailsCompleted}</span>
+                <span className="text-sm text-muted-foreground">/ {data.trailsStarted + data.trailsCompleted} iniciadas</span>
+              </div>
+              {(data.trailsStarted + data.trailsCompleted) > 0 && (
+                <Progress
+                  value={(data.trailsCompleted / (data.trailsStarted + data.trailsCompleted)) * 100}
+                  className="h-2"
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Pontos distribuídos */}
+          <Card>
+            <CardContent className="pt-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">Pontos distribuídos</span>
+                <Zap className="h-4 w-4 text-amber-500" />
+              </div>
+              <div className="text-3xl font-bold">{data.totalPointsDistributed.toLocaleString()}</div>
+              <ComparisonBadge current={data.totalPointsDistributed} previous={data.prevPointsDistributed} />
+              {data.rewardsRedeemed > 0 && (
+                <p className="text-xs text-muted-foreground">{data.rewardsRedeemed} recompensa{data.rewardsRedeemed > 1 ? 's' : ''} resgatada{data.rewardsRedeemed > 1 ? 's' : ''}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ─── BLOCO 4: Leaderboard + Saúde ──────────────────────────── */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Top 5 */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-muted-foreground" />
+                Top 5 colaboradores
+              </CardTitle>
+              <CardDescription>Ranking por pontos no período</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {data.topCollaborators.length === 0 ? (
+                <p className="text-center text-muted-foreground py-6 text-sm">
                   Nenhum colaborador com pontos ainda.
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {stats.topCollaborators.map((collab, index) => (
+                  {data.topCollaborators.map((collab, index) => (
                     <div key={collab.id} className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-muted-foreground w-5">
-                        {index + 1}º
-                      </span>
+                      <div className={`
+                        flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold
+                        ${index === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                          index === 1 ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' :
+                          index === 2 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                          'bg-muted text-muted-foreground'}
+                      `}>
+                        {index + 1}
+                      </div>
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="text-xs">
                           {collab.name.substring(0, 2).toUpperCase()}
@@ -295,9 +693,12 @@ export default function AdminDashboardPage() {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{collab.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {collab.missionsCompleted} missão{collab.missionsCompleted !== 1 ? 'ões' : ''} · {collab.points.toLocaleString()} pts
+                        </p>
                       </div>
-                      <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0">
-                        <Zap className="h-3 w-3 mr-1" /> {collab.points.toLocaleString()}
+                      <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0 text-xs">
+                        <Zap className="h-3 w-3 mr-0.5" /> {collab.points.toLocaleString()}
                       </Badge>
                     </div>
                   ))}
@@ -305,77 +706,36 @@ export default function AdminDashboardPage() {
               )}
             </CardContent>
           </Card>
-        </div>
 
-        {/* Platform Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-headline text-lg">Resumo da Plataforma</CardTitle>
-            <CardDescription>Visão geral dos recursos configurados</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Recurso</TableHead>
-                  <TableHead className="text-center">Ativos</TableHead>
-                  <TableHead className="text-center">Total</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <Target className="h-4 w-4 text-green-500" /> Missões
-                  </TableCell>
-                  <TableCell className="text-center">{stats.activeMissions}</TableCell>
-                  <TableCell className="text-center">{stats.totalMissions}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="secondary" className={stats.activeMissions > 0 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}>
-                      {stats.activeMissions > 0 ? 'Ativo' : 'Nenhuma ativa'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-blue-500" /> Trilhas
-                  </TableCell>
-                  <TableCell className="text-center">{stats.activeTrails}</TableCell>
-                  <TableCell className="text-center">{stats.totalTrails}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="secondary" className={stats.activeTrails > 0 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}>
-                      {stats.activeTrails > 0 ? 'Ativo' : 'Nenhuma ativa'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <Gift className="h-4 w-4 text-purple-500" /> Recompensas
-                  </TableCell>
-                  <TableCell className="text-center">{stats.totalRewards}</TableCell>
-                  <TableCell className="text-center">{stats.totalRewards}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="secondary" className={stats.totalRewards > 0 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}>
-                      {stats.totalRewards > 0 ? 'Configurado' : 'Nenhuma'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="font-medium flex items-center gap-2">
-                    <Users className="h-4 w-4 text-indigo-500" /> Colaboradores
-                  </TableCell>
-                  <TableCell className="text-center">{stats.activeCollaborators}</TableCell>
-                  <TableCell className="text-center">{stats.totalLicenses}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge variant="secondary" className={stats.activeCollaborators > 0 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}>
-                      {stats.activeCollaborators > 0 ? `${Math.round((stats.activeCollaborators / Math.max(stats.totalLicenses, 1)) * 100)}% usado` : 'Nenhum'}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          {/* Saúde do programa */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Activity className="h-5 w-5 text-muted-foreground" />
+                Saúde do programa
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <HealthBar label="Adesão ao programa" value={adhesionRate} thresholdGreen={70} thresholdOrange={40} />
+              <HealthBar label="Missões completadas (semana)" value={missionCompletionRate} thresholdGreen={60} thresholdOrange={30} />
+              <HealthBar label="Trilhas em andamento" value={trailProgressRate} thresholdGreen={50} thresholdOrange={25} />
+              <HealthBar label="Recompensas resgatadas" value={redemptionRate} thresholdGreen={30} thresholdOrange={15} />
+
+              {/* Custo por impressão (COMING SOON) */}
+              <ComingSoonOverlay message="Em breve">
+                <div className="mt-2 rounded-lg bg-muted/50 p-4">
+                  <p className="text-xs text-muted-foreground">Custo por impressão efetivo</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-xl font-bold text-primary">R$ 0,13</span>
+                    <span className="text-xs text-muted-foreground">
+                      vs R$0,30 em Ads = 57% mais barato
+                    </span>
+                  </div>
+                </div>
+              </ComingSoonOverlay>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </>
   );

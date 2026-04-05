@@ -142,8 +142,7 @@ export default function PrivacidadePage() {
               </li>
               <li>
                 <strong className="text-foreground">Provedores de serviço:</strong> Google (Firebase,
-                hosting), Stripe (pagamentos), OpenAI/Google AI (geração de conteúdo — sem dados
-                pessoais identificáveis).
+                hosting), Google AI (geração de conteúdo — sem dados pessoais identificáveis).
               </li>
               <li>
                 <strong className="text-foreground">Obrigação legal:</strong> quando exigido por lei
