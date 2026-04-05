@@ -29,6 +29,7 @@ type FeedbackDialogProps = {
 export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
   const [open, setOpen] = useState(false);
   const [tipo, setTipo] = useState<FeedbackType>('Feedback');
+  const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -58,6 +59,10 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
   };
 
   const handleSubmit = async () => {
+    if (!titulo.trim()) {
+      toast({ variant: 'destructive', title: 'Título obrigatório', description: 'Dê um título curto ao seu report.' });
+      return;
+    }
     if (!descricao.trim()) {
       toast({ variant: 'destructive', title: 'Descrição obrigatória', description: 'Escreva uma descrição do feedback ou bug.' });
       return;
@@ -68,21 +73,23 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
     try {
       let imageUrl: string | undefined;
 
-      // Upload image to Firebase Storage if exists
+      // Upload image to Firebase Storage (path: /users/{uid}/feedback/...)
       if (imageFile && user) {
-        const storageRef = ref(storage, `feedback/${user.uid}/${Date.now()}_${imageFile.name}`);
-        await uploadBytes(storageRef, imageFile);
-        imageUrl = await getDownloadURL(storageRef);
+        try {
+          const storageRef = ref(storage, `users/${user.uid}/feedback/${Date.now()}_${imageFile.name}`);
+          await uploadBytes(storageRef, imageFile);
+          imageUrl = await getDownloadURL(storageRef);
+        } catch (uploadErr) {
+          console.error('Image upload error:', uploadErr);
+          // Continue without image — don't block the feedback
+        }
       }
 
-      // Generate a short title from description
-      const titulo = tipo === 'Bug'
-        ? `🐛 ${descricao.slice(0, 60)}${descricao.length > 60 ? '...' : ''}`
-        : `💡 ${descricao.slice(0, 60)}${descricao.length > 60 ? '...' : ''}`;
+      const tituloFormatado = tipo === 'Bug' ? `🐛 ${titulo}` : `💡 ${titulo}`;
 
       const result = await sendFeedbackToNotion({
         tipo,
-        titulo,
+        titulo: tituloFormatado,
         descricao,
         pagina,
         userName: user?.name,
@@ -98,6 +105,7 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
           // Reset after close animation
           setTimeout(() => {
             setSent(false);
+            setTitulo('');
             setDescricao('');
             setTipo('Feedback');
             removeImage();
@@ -172,10 +180,25 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
                 </RadioGroup>
               </div>
 
+              {/* Title */}
+              <div className="space-y-2">
+                <Label htmlFor="feedback-title" className="text-sm font-medium">
+                  Título
+                </Label>
+                <input
+                  id="feedback-title"
+                  type="text"
+                  placeholder={tipo === 'Bug' ? 'Ex: Botão não funciona na página X' : 'Ex: Sugestão para melhorar Y'}
+                  value={titulo}
+                  onChange={(e) => setTitulo(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+
               {/* Description */}
               <div className="space-y-2">
                 <Label htmlFor="feedback-desc" className="text-sm font-medium">
-                  {tipo === 'Bug' ? 'Descreva o bug' : 'Sua sugestão'}
+                  Descrição
                 </Label>
                 <Textarea
                   id="feedback-desc"
@@ -185,7 +208,7 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
                   }
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
-                  rows={4}
+                  rows={3}
                 />
               </div>
 
@@ -229,7 +252,7 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
               {/* Submit */}
               <Button
                 onClick={handleSubmit}
-                disabled={sending || !descricao.trim()}
+                disabled={sending || !titulo.trim() || !descricao.trim()}
                 className="w-full"
               >
                 {sending ? (
