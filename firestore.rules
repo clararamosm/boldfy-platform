@@ -55,6 +55,13 @@ service cloud.firestore {
       // Points history — created by server actions (Admin SDK)
       match /pointsHistory/{historyId} {
         allow read: if request.auth.uid == userId;
+
+        // Admin can read points history of users in their company
+        allow read: if hasRole(request.auth.uid, 'admin')
+                    && getCompanyId(request.auth.uid) == getCompanyId(userId);
+
+        // Master can read any points history
+        allow read: if hasRole(request.auth.uid, 'master');
       }
 
       // Generated content from AI assistant

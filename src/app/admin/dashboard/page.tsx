@@ -306,17 +306,21 @@ export default function AdminDashboardPage() {
       // === Trails ===
       const totalTrails = trailsSnap.docs.filter(d => d.data().active === true || d.data().ativa === true).length;
 
-      // Fetch trail progress for all collaborators
+      // Fetch trail progress for all collaborators (resilient — skip on permission errors)
       let trailsStarted = 0;
       let trailsCompleted = 0;
 
       const trailProgressPromises = collabSnap.docs.map(async (collabDoc) => {
-        const progressSnap = await getDocs(collection(db, "users", collabDoc.id, "trailProgress"));
-        progressSnap.docs.forEach(pd => {
-          const pData = pd.data();
-          if (pData.concluida || pData.status === 'completed') trailsCompleted++;
-          else trailsStarted++;
-        });
+        try {
+          const progressSnap = await getDocs(collection(db, "users", collabDoc.id, "trailProgress"));
+          progressSnap.docs.forEach(pd => {
+            const pData = pd.data();
+            if (pData.concluida || pData.status === 'completed') trailsCompleted++;
+            else trailsStarted++;
+          });
+        } catch (e) {
+          console.warn(`Could not fetch trailProgress for ${collabDoc.id}`, e);
+        }
       });
       await Promise.all(trailProgressPromises);
 
@@ -325,14 +329,18 @@ export default function AdminDashboardPage() {
       let prevPointsDistributed = 0;
 
       const pointsPromises = collabSnap.docs.map(async (collabDoc) => {
-        const histSnap = await getDocs(collection(db, "users", collabDoc.id, "pointsHistory"));
-        histSnap.docs.forEach(hd => {
-          const hData = hd.data();
-          if (hData.type === 'gain') {
-            if (isInRange(hData.date, start, end)) totalPointsDistributed += hData.points || 0;
-            if (isInRange(hData.date, prevStart, prevEnd)) prevPointsDistributed += hData.points || 0;
-          }
-        });
+        try {
+          const histSnap = await getDocs(collection(db, "users", collabDoc.id, "pointsHistory"));
+          histSnap.docs.forEach(hd => {
+            const hData = hd.data();
+            if (hData.type === 'gain') {
+              if (isInRange(hData.date, start, end)) totalPointsDistributed += hData.points || 0;
+              if (isInRange(hData.date, prevStart, prevEnd)) prevPointsDistributed += hData.points || 0;
+            }
+          });
+        } catch (e) {
+          console.warn(`Could not fetch pointsHistory for ${collabDoc.id}`, e);
+        }
       });
       await Promise.all(pointsPromises);
 
