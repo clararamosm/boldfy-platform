@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Sparkles, Loader2, ClipboardCopy, Check, ThumbsUp, MessageSquare, Repeat2, Send, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Skeleton } from './ui/skeleton';
 import { useRouter } from 'next/navigation';
 
 const initialState = {
@@ -20,15 +21,38 @@ const initialState = {
   error: null,
 };
 
+// ─── Loading messages for the generate button ──────────────────────
+const LOADING_MESSAGES = [
+  'Lendo seu contexto de marca...',
+  'Entendendo o posicionamento da empresa...',
+  'Analisando seu tom de voz...',
+  'Criando uma legenda alinhada...',
+  'Aplicando as melhores práticas...',
+  'Finalizando os ajustes...',
+];
+
 function SubmitButton() {
   const { pending } = useFormStatus();
+  const [msgIdx, setMsgIdx] = useState(0);
+
+  useEffect(() => {
+    if (!pending) {
+      setMsgIdx(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setMsgIdx(prev => (prev + 1) % LOADING_MESSAGES.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [pending]);
+
   return (
-    <Button type="submit" disabled={pending} className="w-full">
+    <Button type="submit" disabled={pending} className="w-full relative overflow-hidden">
       {pending ? (
-        <>
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Gerando legenda...
-        </>
+        <span className="flex items-center gap-2 animate-fade-in" key={msgIdx}>
+          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+          <span className="truncate">{LOADING_MESSAGES[msgIdx]}</span>
+        </span>
       ) : (
         <>
           <Sparkles className="mr-2 h-4 w-4" />
@@ -39,7 +63,14 @@ function SubmitButton() {
   );
 }
 
-function LinkedInMockup({ content, onUseLegenda }: { content: string; onUseLegenda: () => void }) {
+// ─── User profile info type ─────────────────────────────────────
+type UserProfile = {
+  name?: string;
+  avatarUrl?: string;
+  headline?: string; // cargo / position from personal branding
+};
+
+function LinkedInMockup({ content, onUseLegenda, userProfile }: { content: string; onUseLegenda: () => void; userProfile?: UserProfile }) {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = () => {
@@ -53,6 +84,11 @@ function LinkedInMockup({ content, onUseLegenda }: { content: string; onUseLegen
   const [expanded, setExpanded] = useState(false);
   const displayText = isLong && !expanded ? content.slice(0, 280) + '...' : content;
 
+  const userName = userProfile?.name || '';
+  const userInitials = userName
+    ? userName.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase()
+    : '';
+
   return (
     <div className="space-y-4">
       <div className="text-sm font-medium text-muted-foreground mb-2">Preview do Post</div>
@@ -63,14 +99,25 @@ function LinkedInMockup({ content, onUseLegenda }: { content: string; onUseLegen
         <div className="p-4 pb-2">
           <div className="flex items-start gap-3">
             <Avatar className="h-12 w-12 border-2 border-muted">
+              {userProfile?.avatarUrl ? (
+                <AvatarImage src={userProfile.avatarUrl} alt={userName} />
+              ) : null}
               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-700 text-white text-sm font-bold">
-                VC
+                {userInitials || '?'}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm text-foreground">Seu Nome</p>
-              <p className="text-xs text-muted-foreground truncate">Sua headline profissional</p>
-              <p className="text-xs text-muted-foreground">Agora · 🌐</p>
+              {userName ? (
+                <p className="font-semibold text-sm text-foreground">{userName}</p>
+              ) : (
+                <Skeleton className="h-4 w-32" />
+              )}
+              {userProfile?.headline ? (
+                <p className="text-xs text-muted-foreground truncate">{userProfile.headline}</p>
+              ) : (
+                <Skeleton className="h-3 w-48 mt-1" />
+              )}
+              <p className="text-xs text-muted-foreground mt-0.5">Agora · 🌐</p>
             </div>
           </div>
         </div>
@@ -153,13 +200,40 @@ function LinkedInMockup({ content, onUseLegenda }: { content: string; onUseLegen
   );
 }
 
-export function AiAssistantForm({ companyId, userId = "user-123", externalContent }: { companyId: string, userId?: string, externalContent?: string }) {
+// ─── Pulsing border wrapper ─────────────────────────────────────
+function PulsingCard({ isPulsing, children }: { isPulsing: boolean; children: React.ReactNode }) {
+  if (!isPulsing) {
+    return <Card>{children}</Card>;
+  }
+  return (
+    <div className="relative rounded-xl">
+      {/* Animated border glow */}
+      <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 opacity-75 animate-pulse blur-[2px]" />
+      <Card className="relative bg-background">
+        {children}
+      </Card>
+    </div>
+  );
+}
+
+export function AiAssistantForm({
+  companyId,
+  userId = "user-123",
+  externalContent,
+  userProfile,
+}: {
+  companyId: string;
+  userId?: string;
+  externalContent?: string;
+  userProfile?: UserProfile;
+}) {
   const [state, formAction] = useActionState(handleAlignContent, initialState);
   const { toast } = useToast();
   const [cachedToken, setCachedToken] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Fill textarea when external content changes (e.g. hot topic selected)
   useEffect(() => {
@@ -180,26 +254,35 @@ export function AiAssistantForm({ companyId, userId = "user-123", externalConten
         title: 'Erro ao gerar legenda',
         description: state.error,
       });
+      setIsGenerating(false);
+    }
+    if (state?.alignedContent) {
+      setIsGenerating(false);
     }
   }, [state, toast]);
 
   const handleUseLegenda = () => {
     if (state?.alignedContent) {
-      // Encode caption and navigate to calendar editor
       const params = new URLSearchParams({ caption: state.alignedContent });
       router.push(`/colaborador/calendario/novo?${params.toString()}`);
     }
   };
 
   return (
-    <form ref={formRef} action={formAction}>
+    <form
+      ref={formRef}
+      action={(formData) => {
+        setIsGenerating(true);
+        formAction(formData);
+      }}
+    >
       <input type="hidden" name="companyId" value={companyId} />
       <input type="hidden" name="userId" value={userId} />
       <input type="hidden" name="idToken" value={cachedToken} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* LEFT SIDE — Input */}
-        <Card>
+        <PulsingCard isPulsing={isGenerating}>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Crie sua legenda</CardTitle>
             <CardDescription>
@@ -254,7 +337,7 @@ export function AiAssistantForm({ companyId, userId = "user-123", externalConten
 
             <SubmitButton />
           </CardContent>
-        </Card>
+        </PulsingCard>
 
         {/* RIGHT SIDE — Preview */}
         <div className="lg:sticky lg:top-6">
@@ -262,6 +345,7 @@ export function AiAssistantForm({ companyId, userId = "user-123", externalConten
             <LinkedInMockup
               content={state.alignedContent}
               onUseLegenda={handleUseLegenda}
+              userProfile={userProfile}
             />
           ) : (
             <Card className="border-dashed">

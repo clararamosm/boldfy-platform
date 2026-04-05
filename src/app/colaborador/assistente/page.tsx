@@ -1,7 +1,7 @@
 // src/app/colaborador/assistente/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { Header } from "@/components/dashboard/header";
 import { AiAssistantForm } from "@/components/ai-assistant-form";
@@ -52,6 +52,17 @@ export default function AiAssistantPage() {
   const { user, loading } = useAuth();
   const [topicPrompt, setTopicPrompt] = useState<string | undefined>();
 
+  // Build user profile for the LinkedIn preview mockup
+  const userProfile = useMemo(() => {
+    if (!user) return undefined;
+    const raw = user.rawData || {};
+    return {
+      name: user.name,
+      avatarUrl: user.profile?.avatarUrl || (raw.photoURL as string) || undefined,
+      headline: (raw.position as string) || undefined,
+    };
+  }, [user]);
+
   return (
     <>
       <Header title="Assistente de Conteúdo IA" />
@@ -69,6 +80,7 @@ export default function AiAssistantPage() {
             companyId={user.companyId || ''}
             userId={user.uid}
             externalContent={topicPrompt}
+            userProfile={userProfile}
           />
         ) : (
           <p className="text-center text-muted-foreground">Ocorreu um erro ao carregar os dados do usuario.</p>
