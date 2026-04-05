@@ -2,6 +2,8 @@
 
 // Server action to send feedback, bugs, and trail suggestions to Notion
 
+import { db as adminDb } from '@/lib/firebase-admin';
+
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const NOTION_DB_ID = process.env.NOTION_FEEDBACK_DB_ID;
 
@@ -23,6 +25,20 @@ export async function sendFeedbackToNotion(input: FeedbackInput): Promise<{ succ
   }
 
   try {
+    // Resolve company name from companyId
+    let companyName = input.companyId || 'N/A';
+    if (input.companyId) {
+      try {
+        const companyDoc = await adminDb.collection('companies').doc(input.companyId).get();
+        if (companyDoc.exists) {
+          const companyData = companyDoc.data();
+          companyName = companyData?.name || companyData?.companyName || input.companyId;
+        }
+      } catch (err) {
+        console.error('Error fetching company name:', err);
+      }
+    }
+
     // First, query the database to discover which properties exist
     const dbResponse = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB_ID}`, {
       method: 'GET',
@@ -65,7 +81,7 @@ export async function sendFeedbackToNotion(input: FeedbackInput): Promise<{ succ
     addSelectIfExists('Prioridade', 'Média');
     addRichTextIfExists('Descrição', input.descricao);
     addRichTextIfExists('Usuário', `${input.userName || 'Anônimo'} (${input.userEmail || 'sem email'})`);
-    addRichTextIfExists('Empresa', input.companyId || 'N/A');
+    addRichTextIfExists('Empresa', companyName);
 
     if (dbProperties['Data'] && dbProperties['Data'].type === 'date') {
       properties['Data'] = { date: { start: new Date().toISOString().split('T')[0] } };
@@ -84,7 +100,7 @@ export async function sendFeedbackToNotion(input: FeedbackInput): Promise<{ succ
       { object: 'block' as const, type: 'heading_3' as const, heading_3: { rich_text: [{ type: 'text' as const, text: { content: `${input.tipo}: ${input.titulo}` } }] } },
       { object: 'block' as const, type: 'paragraph' as const, paragraph: { rich_text: [{ type: 'text' as const, text: { content: input.descricao } }] } },
       { object: 'block' as const, type: 'divider' as const, divider: {} },
-      { object: 'block' as const, type: 'paragraph' as const, paragraph: { rich_text: [{ type: 'text' as const, text: { content: `📍 Página: ${input.pagina} | 👤 ${input.userName || 'Anônimo'} (${input.userEmail || ''}) | 🏢 ${input.companyId || 'N/A'} | 📅 ${new Date().toLocaleDateString('pt-BR')}` } }] } },
+      { object: 'block' as const, type: 'paragraph' as const, paragraph: { rich_text: [{ type: 'text' as const, text: { content: `📍 Página: ${input.pagina} | 👤 ${input.userName || 'Anônimo'} (${input.userEmail || ''}) | 🏢 ${companyName} | 📅 ${new Date().toLocaleDateString('pt-BR')}` } }] } },
     ];
 
     if (input.imageUrl) {

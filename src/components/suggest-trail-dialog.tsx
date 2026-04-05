@@ -23,6 +23,7 @@ type SuggestTrailDialogProps = {
 
 export function SuggestTrailDialog({ pagina }: SuggestTrailDialogProps) {
   const [open, setOpen] = useState(false);
+  const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -30,6 +31,10 @@ export function SuggestTrailDialog({ pagina }: SuggestTrailDialogProps) {
   const { user } = useAuth();
 
   const handleSubmit = async () => {
+    if (!titulo.trim()) {
+      toast({ variant: 'destructive', title: 'Título obrigatório', description: 'Dê um título curto à sua sugestão.' });
+      return;
+    }
     if (!descricao.trim()) {
       toast({ variant: 'destructive', title: 'Descrição obrigatória', description: 'Escreva sua sugestão de trilha.' });
       return;
@@ -38,8 +43,6 @@ export function SuggestTrailDialog({ pagina }: SuggestTrailDialogProps) {
     setSending(true);
 
     try {
-      const titulo = `📚 ${descricao.slice(0, 60)}${descricao.length > 60 ? '...' : ''}`;
-
       const result = await sendFeedbackToNotion({
         tipo: 'Sugestão de Trilha',
         titulo,
@@ -56,6 +59,7 @@ export function SuggestTrailDialog({ pagina }: SuggestTrailDialogProps) {
           setOpen(false);
           setTimeout(() => {
             setSent(false);
+            setTitulo('');
             setDescricao('');
           }, 300);
         }, 1500);
@@ -97,20 +101,34 @@ export function SuggestTrailDialog({ pagina }: SuggestTrailDialogProps) {
             </DialogHeader>
 
             <div className="space-y-4 mt-2">
+              {/* Title */}
               <div className="space-y-2">
-                <Label htmlFor="trail-suggestion" className="text-sm font-medium">Sua sugestão</Label>
+                <Label htmlFor="trail-title" className="text-sm font-medium">Título</Label>
+                <input
+                  id="trail-title"
+                  type="text"
+                  placeholder="Ex: Trilha de carrosséis no LinkedIn"
+                  value={titulo}
+                  onChange={(e) => setTitulo(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="trail-suggestion" className="text-sm font-medium">Descrição</Label>
                 <Textarea
                   id="trail-suggestion"
-                  placeholder="Ex: Uma trilha sobre como criar carrosséis no LinkedIn, ou sobre storytelling profissional..."
+                  placeholder="Descreva o que você gostaria de aprender, quais habilidades, formatos..."
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
-                  rows={4}
+                  rows={3}
                 />
               </div>
 
               <Button
                 onClick={handleSubmit}
-                disabled={sending || !descricao.trim()}
+                disabled={sending || !titulo.trim() || !descricao.trim()}
                 className="w-full"
               >
                 {sending ? (

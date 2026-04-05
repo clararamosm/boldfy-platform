@@ -85,11 +85,9 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
         }
       }
 
-      const tituloFormatado = tipo === 'Bug' ? `🐛 ${titulo}` : `💡 ${titulo}`;
-
       const result = await sendFeedbackToNotion({
         tipo,
-        titulo: tituloFormatado,
+        titulo,
         descricao,
         pagina,
         userName: user?.name,
