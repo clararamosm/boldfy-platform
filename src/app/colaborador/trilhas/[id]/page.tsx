@@ -1,5 +1,6 @@
 'use client';
 
+import DOMPurify from 'dompurify';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { db, auth } from '@/lib/firebase';
 import {
@@ -798,7 +799,7 @@ export default function TrilhaFullscreenPage() {
                 </div>
                 <div
                   className="prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: currentModule.conteudo?.texto || '<p>Conteudo nao disponivel.</p>' }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentModule.conteudo?.texto || '<p>Conteudo nao disponivel.</p>') }}
                 />
               </div>
             )}
