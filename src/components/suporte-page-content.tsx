@@ -3,6 +3,7 @@
 import { Header } from '@/components/dashboard/header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { SupportDialog } from '@/components/support-dialog';
 import {
   BookOpen,
   Linkedin,
@@ -13,9 +14,14 @@ import {
   Zap,
   Settings,
   PlayCircle,
+  Users,
+  LayoutDashboard,
+  Gift,
+  Library,
 } from 'lucide-react';
 
-const tutorialSections = [
+// ─── Tutorial sections for Colaboradores ──────────────────────
+const colaboradorSections = [
   {
     title: 'Primeiros Passos',
     description: 'Como começar na plataforma',
@@ -42,6 +48,7 @@ const tutorialSections = [
     icon: Sparkles,
     items: [
       'Como gerar uma legenda',
+      'Escolher hooks para seu post',
       'Usando temas em alta como inspiração',
       'Formatos e tamanhos de post',
     ],
@@ -97,54 +104,183 @@ const tutorialSections = [
   },
 ];
 
-export function SuportePageContent() {
+// ─── Tutorial sections for Admins ─────────────────────────────
+const adminSections = [
+  {
+    title: 'Dashboard & Métricas',
+    description: 'Visão geral da empresa',
+    icon: LayoutDashboard,
+    items: [
+      'Entendendo o painel de métricas',
+      'Acompanhar atividade dos colaboradores',
+      'Indicadores de engajamento',
+    ],
+  },
+  {
+    title: 'Gerenciar Colaboradores',
+    description: 'Convites e permissões',
+    icon: Users,
+    items: [
+      'Como convidar colaboradores',
+      'Limites de licenças',
+      'Remover colaboradores',
+    ],
+  },
+  {
+    title: 'Missões',
+    description: 'Crie e gerencie missões',
+    icon: Trophy,
+    items: [
+      'Como criar uma missão',
+      'Tipos de missão disponíveis',
+      'Aprovar provas de missão',
+    ],
+  },
+  {
+    title: 'Trilhas',
+    description: 'Capacitação da equipe',
+    icon: BookOpen,
+    items: [
+      'Como criar uma trilha',
+      'Adicionar módulos e quizzes',
+      'Acompanhar progresso dos colaboradores',
+    ],
+  },
+  {
+    title: 'Recompensas',
+    description: 'Premie sua equipe',
+    icon: Gift,
+    items: [
+      'Como criar recompensas',
+      'Gerenciar resgates',
+      'Marcar como pago/entregue',
+    ],
+  },
+  {
+    title: 'Biblioteca',
+    description: 'Materiais e recursos',
+    icon: Library,
+    items: [
+      'Adicionar materiais à biblioteca',
+      'Organizar por categorias',
+      'Compartilhar com colaboradores',
+    ],
+  },
+  {
+    title: 'LinkedIn Feed',
+    description: 'Acompanhe os posts',
+    icon: Linkedin,
+    items: [
+      'Monitorar posts dos colaboradores',
+      'Métricas de alcance da equipe',
+    ],
+  },
+  {
+    title: 'Configurações',
+    description: 'Configure sua empresa',
+    icon: Settings,
+    items: [
+      'Branding da empresa',
+      'Temas em alta personalizados',
+      'Configurações gerais',
+    ],
+  },
+];
+
+// ─── Reusable section grid ────────────────────────────────────
+function TutorialGrid({ sections }: { sections: typeof colaboradorSections }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {sections.map((section) => (
+        <Card key={section.title} className="opacity-80 hover:opacity-100 transition-opacity">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                <section.icon className="h-4 w-4 text-purple-600" />
+              </div>
+              <div>
+                <CardTitle className="text-sm">{section.title}</CardTitle>
+                <CardDescription className="text-xs">{section.description}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1.5">
+              {section.items.map((item) => (
+                <li key={item} className="text-xs text-muted-foreground flex items-start gap-2">
+                  <span className="text-purple-300 mt-0.5">●</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────
+type SuportePageContentProps = {
+  role?: 'admin' | 'colaborador';
+};
+
+export function SuportePageContent({ role = 'colaborador' }: SuportePageContentProps) {
+  const isAdmin = role === 'admin';
+
   return (
     <>
       <Header title="Central de Suporte" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         {/* Header banner */}
         <div className="rounded-xl bg-gradient-to-r from-purple-50 to-purple-100/50 border border-purple-200/50 p-6">
-          <div className="flex items-center gap-3 mb-2">
-            <BookOpen className="h-6 w-6 text-purple-600" />
-            <h2 className="text-xl font-bold text-foreground">Como usar a Boldfy</h2>
-            <Badge variant="outline" className="text-[10px] border-purple-200 text-purple-600">
-              Em construção
-            </Badge>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <BookOpen className="h-6 w-6 text-purple-600" />
+                <h2 className="text-xl font-bold text-foreground">Como usar a Boldfy</h2>
+                <Badge variant="outline" className="text-[10px] border-purple-200 text-purple-600">
+                  Em construção
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground max-w-2xl">
+                Tutoriais e guias para aproveitar ao máximo a plataforma.
+                Estamos construindo essa documentação — em breve cada tópico terá um tutorial completo.
+              </p>
+            </div>
+            <SupportDialog pagina="Central de Suporte" />
           </div>
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            Tutoriais e guias para aproveitar ao máximo a plataforma.
-            Estamos construindo essa documentação — em breve cada tópico terá um tutorial completo.
-          </p>
         </div>
 
-        {/* Tutorial cards grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {tutorialSections.map((section) => (
-            <Card key={section.title} className="opacity-80 hover:opacity-100 transition-opacity">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                    <section.icon className="h-4 w-4 text-purple-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm">{section.title}</CardTitle>
-                    <CardDescription className="text-xs">{section.description}</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-1.5">
-                  {section.items.map((item) => (
-                    <li key={item} className="text-xs text-muted-foreground flex items-start gap-2">
-                      <span className="text-purple-300 mt-0.5">●</span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {/* Admin sees both sections */}
+        {isAdmin && (
+          <>
+            {/* Admin tutorials */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-purple-600" />
+                <h3 className="font-semibold text-sm text-foreground">Painel Administrativo</h3>
+                <Badge variant="secondary" className="text-[10px]">Admin</Badge>
+              </div>
+              <TutorialGrid sections={adminSections} />
+            </div>
+
+            {/* Collaborator tutorials — for admin reference */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-purple-600" />
+                <h3 className="font-semibold text-sm text-foreground">Visão do Colaborador</h3>
+                <Badge variant="outline" className="text-[10px]">Colaborador</Badge>
+              </div>
+              <TutorialGrid sections={colaboradorSections} />
+            </div>
+          </>
+        )}
+
+        {/* Collaborator sees only their section */}
+        {!isAdmin && (
+          <TutorialGrid sections={colaboradorSections} />
+        )}
       </main>
     </>
   );

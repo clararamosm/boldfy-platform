@@ -34,3 +34,5 @@ env:
   # --- Variáveis públicas do Notion ---
   - variable: NOTION_FEEDBACK_DB_ID
     value: 33994982dee4807eb456e291ca3f6dc4
+  - variable: NOTION_SUPPORT_DB_ID
+    value: 33994982dee4809c9764f7c5f078556e

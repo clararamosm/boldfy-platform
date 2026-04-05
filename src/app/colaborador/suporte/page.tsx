@@ -1,5 +1,5 @@
 import { SuportePageContent } from '@/components/suporte-page-content';
 
 export default function ColaboradorSuportePage() {
-  return <SuportePageContent />;
+  return <SuportePageContent role="colaborador" />;
 }
