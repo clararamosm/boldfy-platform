@@ -42,24 +42,29 @@ function SubmitButton() {
     }
     const interval = setInterval(() => {
       setMsgIdx(prev => (prev + 1) % LOADING_MESSAGES.length);
-    }, 2500);
+    }, 1500);
     return () => clearInterval(interval);
   }, [pending]);
 
   return (
-    <Button type="submit" disabled={pending} className="w-full relative overflow-hidden">
-      {pending ? (
-        <span className="flex items-center gap-2 animate-fade-in" key={msgIdx}>
-          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
-          <span className="truncate">{LOADING_MESSAGES[msgIdx]}</span>
-        </span>
-      ) : (
-        <>
-          <Sparkles className="mr-2 h-4 w-4" />
-          Gerar Legenda
-        </>
+    <div className="relative">
+      {pending && (
+        <div className="absolute -inset-[2px] rounded-lg bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 opacity-75 animate-pulse blur-[2px]" />
       )}
-    </Button>
+      <Button type="submit" disabled={pending} className="w-full relative overflow-hidden">
+        {pending ? (
+          <span className="flex items-center gap-2 animate-fade-in" key={msgIdx}>
+            <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+            <span className="truncate">{LOADING_MESSAGES[msgIdx]}</span>
+          </span>
+        ) : (
+          <>
+            <Sparkles className="mr-2 h-4 w-4" />
+            Gerar Legenda
+          </>
+        )}
+      </Button>
+    </div>
   );
 }
 
@@ -91,8 +96,6 @@ function LinkedInMockup({ content, onUseLegenda, userProfile }: { content: strin
 
   return (
     <div className="space-y-4">
-      <div className="text-sm font-medium text-muted-foreground mb-2">Preview do Post</div>
-
       {/* LinkedIn Post Mockup */}
       <div className="bg-white dark:bg-zinc-900 rounded-xl border shadow-sm overflow-hidden">
         {/* Header */}
@@ -200,21 +203,7 @@ function LinkedInMockup({ content, onUseLegenda, userProfile }: { content: strin
   );
 }
 
-// ─── Pulsing border wrapper ─────────────────────────────────────
-function PulsingCard({ isPulsing, children }: { isPulsing: boolean; children: React.ReactNode }) {
-  if (!isPulsing) {
-    return <Card>{children}</Card>;
-  }
-  return (
-    <div className="relative rounded-xl">
-      {/* Animated border glow */}
-      <div className="absolute -inset-[2px] rounded-xl bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 opacity-75 animate-pulse blur-[2px]" />
-      <Card className="relative bg-background">
-        {children}
-      </Card>
-    </div>
-  );
-}
+// PulsingCard removed — pulsing effect now on the submit button only
 
 export function AiAssistantForm({
   companyId,
@@ -233,7 +222,6 @@ export function AiAssistantForm({
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
-  const [isGenerating, setIsGenerating] = useState(false);
   // Track state changes with a counter to detect repeated identical results
   const stateVersionRef = useRef(0);
 
@@ -264,7 +252,6 @@ export function AiAssistantForm({
         description: state.error,
       });
     }
-    setIsGenerating(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
@@ -279,7 +266,6 @@ export function AiAssistantForm({
     <form
       ref={formRef}
       action={async (formData) => {
-        setIsGenerating(true);
         // Always get a fresh token before submitting
         try {
           const freshToken = await getAuthToken();
@@ -291,7 +277,6 @@ export function AiAssistantForm({
             title: 'Erro de autenticação',
             description: 'Faça login novamente para continuar.',
           });
-          setIsGenerating(false);
           return;
         }
         formAction(formData);
@@ -303,7 +288,7 @@ export function AiAssistantForm({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* LEFT SIDE — Input */}
-        <PulsingCard isPulsing={isGenerating}>
+        <Card>
           <CardHeader>
             <CardTitle className="font-headline text-lg">Crie sua legenda</CardTitle>
             <CardDescription>
@@ -358,7 +343,7 @@ export function AiAssistantForm({
 
             <SubmitButton />
           </CardContent>
-        </PulsingCard>
+        </Card>
 
         {/* RIGHT SIDE — Preview */}
         <div className="lg:sticky lg:top-6">

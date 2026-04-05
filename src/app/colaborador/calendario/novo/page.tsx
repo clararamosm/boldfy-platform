@@ -318,35 +318,6 @@ function EditorContent() {
               )}
             </div>
 
-            {/* Date & time */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="date" className="flex items-center gap-1.5">
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  Data
-                </Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  min={format(new Date(), 'yyyy-MM-dd')}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="time" className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5" />
-                  Horário
-                </Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                />
-              </div>
-            </div>
-
             {/* Actions */}
             <div className="space-y-2">
               {/* Publish now */}
@@ -393,6 +364,35 @@ function EditorContent() {
               <div className="relative py-1">
                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
                 <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">ou</span></div>
+              </div>
+
+              {/* Date & time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="date" className="flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    Data
+                  </Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                    min={format(new Date(), 'yyyy-MM-dd')}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="time" className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    Horário
+                  </Label>
+                  <Input
+                    id="time"
+                    type="time"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                  />
+                </div>
               </div>
 
               {/* Schedule */}
