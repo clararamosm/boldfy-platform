@@ -153,12 +153,21 @@ function LinkedInMockup({ content, onUseLegenda }: { content: string; onUseLegen
   );
 }
 
-export function AiAssistantForm({ companyId, userId = "user-123" }: { companyId: string, userId?: string }) {
+export function AiAssistantForm({ companyId, userId = "user-123", externalContent }: { companyId: string, userId?: string, externalContent?: string }) {
   const [state, formAction] = useActionState(handleAlignContent, initialState);
   const { toast } = useToast();
   const [cachedToken, setCachedToken] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
+
+  // Fill textarea when external content changes (e.g. hot topic selected)
+  useEffect(() => {
+    if (externalContent && textareaRef.current) {
+      textareaRef.current.value = externalContent;
+      textareaRef.current.focus();
+    }
+  }, [externalContent]);
 
   useEffect(() => {
     getAuthToken().then(setCachedToken).catch(() => {});
@@ -201,6 +210,7 @@ export function AiAssistantForm({ companyId, userId = "user-123" }: { companyId:
             <div className="grid w-full gap-1.5">
               <Label htmlFor="content">Sua ideia</Label>
               <Textarea
+                ref={textareaRef}
                 placeholder="Escreva sua ideia de post aqui..."
                 id="content"
                 name="content"

@@ -37,6 +37,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
+import { HotTopicsBox } from '@/components/hot-topics-box';
 
 function EditorContent() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -257,6 +258,9 @@ function EditorContent() {
           <ArrowLeft className="h-4 w-4" />
           Voltar ao calendário
         </Button>
+
+        {/* Hot Topics — inspiração rápida */}
+        <HotTopicsBox onSelectTopic={(prompt) => setCaption(prev => prev ? prev + '\n\n' + prompt : prompt)} />
 
         <Card>
           <CardHeader>
