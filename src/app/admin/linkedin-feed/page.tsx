@@ -10,7 +10,7 @@ import {
   Linkedin, ExternalLink, Video,
   Newspaper, Users,
 } from "lucide-react";
-import { getCompanyFeed, type FeedPost } from '@/app/actions/posts';
+import { getCompanyFeed, markFeedAsRead, type FeedPost } from '@/app/actions/posts';
 import { getAuthToken } from '@/lib/auth-client';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -197,6 +197,8 @@ export default function AdminLinkedInFeedPage() {
           toast({ variant: 'destructive', title: 'Erro', description: result.error });
         } else {
           setPosts(result.posts || []);
+          // Mark feed as read to reset unread badge
+          markFeedAsRead(token).catch(() => {});
         }
       } catch (err) {
         console.error('Feed error:', err);

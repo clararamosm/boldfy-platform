@@ -229,3 +229,82 @@ export async function getCompanyFeed(
     return { error: 'Erro ao carregar feed.' };
   }
 }
+
+// ─── Unread Feed Count ──────────────────────────────────────────
+export async function getUnreadFeedCount(
+  idToken: string,
+): Promise<{ count: number; error?: string }> {
+  try {
+    const authUser = await requireAuth(idToken);
+    if (!authUser.companyId) return { count: 0, error: 'Empresa não encontrada.' };
+
+    // Get last read timestamp from user doc
+    const userDoc = await adminDb.collection('users').doc(authUser.uid).get();
+    const userData = userDoc.data();
+    const lastReadAt = userData?.lastFeedReadAt;
+    // Convert Firestore Timestamp or string to Date
+    const lastReadDate = lastReadAt
+      ? (lastReadAt.toDate ? lastReadAt.toDate() : new Date(lastReadAt))
+      : new Date(0); // epoch = never read
+
+    // Get all collaborators in company
+    const usersSnap = await adminDb.collection('users')
+      .where('companyId', '==', authUser.companyId)
+      .where('role', '==', 'colaborador')
+      .get();
+
+    if (usersSnap.empty) return { count: 0 };
+
+    // Count published posts newer than lastReadDate
+    let unreadCount = 0;
+
+    const countPromises = usersSnap.docs.map(async (uDoc) => {
+      try {
+        const postsSnap = await adminDb
+          .collection('users')
+          .doc(uDoc.id)
+          .collection('scheduledPosts')
+          .where('status', '==', 'published')
+          .limit(20)
+          .get();
+
+        for (const postDoc of postsSnap.docs) {
+          const data = postDoc.data();
+          const publishedAt = data.publishedAt || data.updatedAt || data.createdAt;
+          if (!publishedAt) continue;
+          const postDate = publishedAt.toDate ? publishedAt.toDate() : new Date(publishedAt);
+          if (postDate > lastReadDate) {
+            unreadCount++;
+          }
+        }
+      } catch (e) {
+        console.error(`[UnreadFeed] Error counting for user ${uDoc.id}:`, e);
+      }
+    });
+
+    await Promise.all(countPromises);
+
+    return { count: unreadCount };
+  } catch (error) {
+    console.error('Error counting unread feed:', error);
+    return { count: 0, error: 'Erro ao contar posts não lidos.' };
+  }
+}
+
+// ─── Mark Feed as Read ──────────────────────────────────────────
+export async function markFeedAsRead(
+  idToken: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const authUser = await requireAuth(idToken);
+
+    await adminDb.collection('users').doc(authUser.uid).update({
+      lastFeedReadAt: FieldValue.serverTimestamp(),
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error marking feed as read:', error);
+    return { success: false, error: 'Erro ao marcar feed como lido.' };
+  }
+}
