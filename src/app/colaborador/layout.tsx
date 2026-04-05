@@ -14,7 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
-import { LogOut, User as UserIcon, Loader2 } from "lucide-react";
+import { LogOut, User as UserIcon, Loader2, AlertTriangle, Linkedin } from "lucide-react";
 
 type UserData = {
     name: string;
@@ -22,9 +22,23 @@ type UserData = {
     role: string;
 };
 
+type TokenStatus = 'valid' | 'expiring_soon' | 'expired' | 'not_connected';
+
+function getTokenStatus(userData: Record<string, unknown>): { status: TokenStatus; daysLeft: number } {
+    const connection = userData?.linkedinConnection as { tokenExpiresAt?: number } | undefined;
+    if (!connection?.tokenExpiresAt) return { status: 'not_connected', daysLeft: 0 };
+    const now = Date.now();
+    const msLeft = connection.tokenExpiresAt - now;
+    const daysLeft = Math.floor(msLeft / (1000 * 60 * 60 * 24));
+    if (msLeft <= 0) return { status: 'expired', daysLeft: 0 };
+    if (daysLeft <= 7) return { status: 'expiring_soon', daysLeft };
+    return { status: 'valid', daysLeft };
+}
+
 export default function ColaboradorLayout({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [tokenStatus, setTokenStatus] = useState<{ status: TokenStatus; daysLeft: number }>({ status: 'not_connected', daysLeft: 0 });
     const router = useRouter();
 
     useEffect(() => {
@@ -41,6 +55,7 @@ export default function ColaboradorLayout({ children }: { children: React.ReactN
                     return;
                 }
                 setUser({ name: data.profile?.name || data.name || '', email: data.profile?.email || data.email || '', role: data.role });
+                setTokenStatus(getTokenStatus(userDoc.data() as Record<string, unknown>));
             } else {
                 router.push('/login');
             }
@@ -117,6 +132,30 @@ export default function ColaboradorLayout({ children }: { children: React.ReactN
 
     return (
         <DashboardLayout sidebar={sidebarContent}>
+            {tokenStatus.status === 'expired' && (
+                <div className="bg-red-50 border-b border-red-200 px-4 py-2.5 flex items-center justify-between dark:bg-red-950/30 dark:border-red-900">
+                    <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <span className="text-sm font-medium">Seu token do LinkedIn expirou. Reconecte para continuar publicando.</span>
+                    </div>
+                    <Link href="/colaborador/configuracoes" className="text-sm font-medium text-red-700 dark:text-red-400 hover:underline whitespace-nowrap flex items-center gap-1">
+                        <Linkedin className="h-3.5 w-3.5" /> Reconectar
+                    </Link>
+                </div>
+            )}
+            {tokenStatus.status === 'expiring_soon' && (
+                <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between dark:bg-amber-950/30 dark:border-amber-900">
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <span className="text-sm font-medium">
+                            Seu token do LinkedIn expira em {tokenStatus.daysLeft} dia{tokenStatus.daysLeft !== 1 ? 's' : ''}. Reconecte para evitar interrupções.
+                        </span>
+                    </div>
+                    <Link href="/colaborador/configuracoes" className="text-sm font-medium text-amber-700 dark:text-amber-400 hover:underline whitespace-nowrap flex items-center gap-1">
+                        <Linkedin className="h-3.5 w-3.5" /> Reconectar
+                    </Link>
+                </div>
+            )}
             {children}
         </DashboardLayout>
     );

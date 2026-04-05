@@ -10,7 +10,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Loader2, Users, UserCheck } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Loader2, Users, UserCheck, Linkedin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -30,7 +30,17 @@ type Collaborator = {
   status: 'Ativo' | 'Inativo' | 'Pendente';
   createdAt: any;
   avatarUrl?: string;
+  linkedinStatus: 'connected' | 'expiring' | 'expired' | 'not_connected';
 };
+
+function getLinkedinTokenStatus(data: Record<string, unknown>): Collaborator['linkedinStatus'] {
+  const connection = data?.linkedinConnection as { tokenExpiresAt?: number } | undefined;
+  if (!connection?.tokenExpiresAt) return 'not_connected';
+  const msLeft = connection.tokenExpiresAt - Date.now();
+  if (msLeft <= 0) return 'expired';
+  if (msLeft <= 7 * 24 * 60 * 60 * 1000) return 'expiring';
+  return 'connected';
+}
 
 const StatCard = ({ title, value, icon: Icon, isLoading }: { title: string, value: string, icon: React.ElementType, isLoading: boolean }) => (
   <Card>
@@ -94,16 +104,17 @@ export default function AdminColaboradoresPage() {
 
       const collaboratorsQuery = query(collection(db, "users"), where("companyId", "==", currentCompanyId), where("role", "==", "colaborador"));
       const querySnapshot = await getDocs(collaboratorsQuery);
-      const fetchedCollaborators = querySnapshot.docs.map(doc => {
-        const data = doc.data();
+      const fetchedCollaborators = querySnapshot.docs.map(d => {
+        const data = d.data();
         return {
-          id: doc.id,
+          id: d.id,
           name: data.profile?.name || '',
           email: data.profile?.email || '',
           points: data.points || 0,
           status: data.status || 'Pendente',
           createdAt: data.createdAt?.toDate(),
-          avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture
+          avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture,
+          linkedinStatus: getLinkedinTokenStatus(data),
         }
       }) as Collaborator[];
       setCollaborators(fetchedCollaborators);
@@ -198,7 +209,8 @@ export default function AdminColaboradoresPage() {
         points: data.points || 0,
         status: data.status || 'Pendente',
         createdAt: data.createdAt?.toDate(),
-        avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture
+        avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture,
+        linkedinStatus: getLinkedinTokenStatus(data),
       };
     }) as Collaborator[];
     setCollaborators(collabList);
@@ -305,6 +317,7 @@ export default function AdminColaboradoresPage() {
                   <TableHead>Colaborador</TableHead>
                   <TableHead>Pontos</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>LinkedIn</TableHead>
                   <TableHead>Data de Adesão</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
@@ -312,7 +325,7 @@ export default function AdminColaboradoresPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center">
+                    <TableCell colSpan={6} className="text-center">
                       <div className="flex justify-center items-center p-4">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         <span className="ml-2">Carregando colaboradores...</span>
@@ -321,7 +334,7 @@ export default function AdminColaboradoresPage() {
                   </TableRow>
                 ) : collaborators.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
+                    <TableCell colSpan={6} className="text-center py-8">
                       Nenhum colaborador encontrado. Convide o primeiro!
                     </TableCell>
                   </TableRow>
@@ -342,6 +355,26 @@ export default function AdminColaboradoresPage() {
                       </TableCell>
                       <TableCell>{user.points}</TableCell>
                       <TableCell>{getStatusBadge(user.status)}</TableCell>
+                      <TableCell>
+                        {user.linkedinStatus === 'connected' && (
+                          <Badge variant="outline" className="text-[#0A66C2] border-[#0A66C2]/30 bg-[#0A66C2]/5">
+                            <Linkedin className="h-3 w-3 mr-1" /> Conectado
+                          </Badge>
+                        )}
+                        {user.linkedinStatus === 'expiring' && (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+                            <Linkedin className="h-3 w-3 mr-1" /> Expirando
+                          </Badge>
+                        )}
+                        {user.linkedinStatus === 'expired' && (
+                          <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50 dark:bg-red-950/30">
+                            <Linkedin className="h-3 w-3 mr-1" /> Expirado
+                          </Badge>
+                        )}
+                        {user.linkedinStatus === 'not_connected' && (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       <TableCell>{user.createdAt?.toLocaleDateString() || 'N/A'}</TableCell>
                       <TableCell>
                         <DropdownMenu>
