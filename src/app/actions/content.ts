@@ -115,33 +115,67 @@ export async function handleAlignContent(
     };
 
     const formatGuide: Record<string, string> = {
-      linkedin: `FORMATO LINKEDIN (scroll-friendly, mobile-first):
-A escrita precisa ter ritmo visual, mas NAO exagere nas quebras de linha. Nem toda frase precisa estar sozinha.
+      linkedin: `FORMATO LINKEDIN (visual, escaneavel, mobile-first):
+Este e o formato mais VISUAL e AREJADO. Cada frase carrega peso proprio. A leitura e rapida e ritmica, como poesia moderna.
 Regras de formatacao:
--> Frases que fazem parte do mesmo bloco de pensamento ficam JUNTAS (mesma linha ou linhas consecutivas sem linha em branco entre elas). Exemplo: "Nao e sobre ser um influenciador." e "E sobre ser um profissional que contribui, que inspira, que compartilha." ficam juntas, sem linha em branco entre elas.
--> Linha em branco APENAS entre blocos de pensamento diferentes (mudanca de assunto, transicao de ideia, antes/depois de lista).
--> Blocos de 2-4 frases consecutivas sao ideais. Evite o padrao de 1 frase por linha com linha em branco depois de cada uma — isso cria excesso de espaco e parece artificial.
--> Use -> como marcador de listas (nunca -, *, ou emojis como marcadores).
--> Frases curtas criam impacto quando usadas com moderacao. Se TODA frase e curta e isolada, nenhuma tem impacto.
--> Varie o ritmo: misture frases curtas (3-5 palavras) com frases medias (8-15 palavras) no mesmo bloco.`,
+-> Blocos CURTOS: maximo 1-3 frases por bloco. NUNCA paragrafos longos de 4+ linhas corridas.
+-> Frases que complementam a mesma ideia ficam juntas (sem linha em branco entre elas), mas o bloco todo e curto.
+-> Linha em branco entre cada bloco de pensamento. O espaco em branco e parte da comunicacao.
+-> Frases curtas e afiadas criam ritmo. Varie entre frases de 3-5 palavras e frases de 8-12 palavras.
+-> Listas usam -> e sao CURTAS (so o item, sem descricao ou contexto).
+-> Numeracao com 1/ 2/ 3/ tambem funciona para listas curtas.
+-> O bold statement final fica ISOLADO na ultima linha, separado por linha em branco.
+-> Pense no scroll do mobile: cada bloco e uma "tela" que prende o leitor antes de scrollar pro proximo.
+
+Exemplo de formatacao LinkedIn CORRETA:
+"Ser um embaixador da sua marca na rede, todo dia.
+Para muitos, a IA virou uma ferramenta essencial nessa missao.
+
+Eu, como Head de Marketing, ja nao imagino meu dia sem a ajuda da IA para otimizar minha presenca no LinkedIn.
+
+Nao e sobre terceirizar minha voz, mas sobre multiplicar minha capacidade de impactar.
+
+A gente fala muito sobre o poder da voz do colaborador.
+E, de verdade, ver pessoas que antes se sentiam travadas para postar
+
+Agora usando IA para iniciar um rascunho, refinar um pensamento ou ate superar o famoso bloqueio da pagina em branco, e um game-changer.
+
+1/ traz mais alcance organico
+2/ fortalece a marca empregadora
+3/ mostra a expertise de quem faz acontecer no dia a dia
+
+Claro, o desafio e manter a autenticidade.
+
+A IA e uma co-piloto, nao a piloto principal. Ela precisa da nossa direcao, da nossa experiencia, do nosso toque pessoal para realmente ressoar.
+
+Para usar a IA no seu conteudo profissional:
+-> Use como ponto de partida para rascunhos
+-> Explore novos angulos para um mesmo tema
+-> Otimize a clareza e concisao do texto
+-> Personalize sempre com sua visao unica
+
+A IA nao veio para roubar nossa autenticidade, mas para amplifica-la.
+Seu toque humano ainda e insubstituivel."`,
       "text-heavy": `FORMATO TEXTO DENSO (editorial, leitura continua):
-A escrita flui como um ensaio ou artigo. Ideias conectadas em paragrafos completos, sem quebras artificiais.
+Escrita fluida como um ensaio ou artigo. ZERO listas, ZERO marcadores, ZERO formatacao visual. So prosa articulada.
 Regras de formatacao:
 -> Paragrafos de 3-5 frases que desenvolvem um raciocinio inteiro antes de quebrar.
 -> As frases se conectam com transicoes naturais — uma ideia leva a proxima dentro do mesmo paragrafo.
--> Nao usar listas ou formatacao visual. O poder esta na argumentacao fluida.
+-> NUNCA usar listas, bullet points, ->, numeracao ou qualquer formatacao visual. O poder esta na argumentacao fluida.
 -> O ritmo e de leitura continua, como um editorial de revista ou uma carta pessoal.
 -> Cada paragrafo e um bloco de pensamento completo: abre, desenvolve, amarra.
 -> Use virgulas, ponto e virgula e conectivos pra criar cadencia dentro da frase.
 -> A separacao entre paragrafos e uma unica linha em branco.
--> O texto deve soar como alguem pensando em voz alta de forma articulada — profundo, conectado, sem pressa.`,
+-> O texto deve soar como alguem pensando em voz alta de forma articulada — profundo, conectado, sem pressa.
+-> Se o conteudo teria uma lista, INCORPORE os items dentro de frases conectadas. Ex: em vez de "-> item 1 / -> item 2", escreva "Isso significa usar X, explorar Y, e personalizar Z."`,
       hybrid: `FORMATO HIBRIDO (equilibrio entre visual e profundidade):
-Meio-termo entre o formato LinkedIn e o texto denso. Paragrafos curtos mas completos, com listas ocasionais quando o conteudo pede.
+Meio-termo entre o formato LinkedIn e o texto denso. Paragrafos pequenos mas COMPLETOS (nao uma frase so), com listas ocasionais.
 Regras de formatacao:
--> Paragrafos de 2-4 frases. Curtos o suficiente pra escanear, completos o suficiente pra desenvolver uma ideia.
+-> Paragrafos de 2-4 frases que desenvolvem uma ideia. Mais denso que LinkedIn, mas sem os blocos longos de 5+ linhas do texto denso.
 -> Use listas com moderacao — apenas quando listar items realmente faz mais sentido que um paragrafo. Marcador: ->
+-> Listas podem ter uma frase curta de contexto por item (diferente do LinkedIn que e so o item).
 -> Alterne entre blocos de texto fluido e momentos de lista. Nao seja 100% de nenhum dos dois.
--> Quebras de linha entre paragrafos, mas sem espacamento exagerado.
+-> Uma linha em branco entre paragrafos. Sem espacamento exagerado.
 -> O ritmo e de conversa — direto mas nao telegrafado, articulado mas nao academico.`,
     };
 
@@ -159,27 +193,12 @@ REGRAS CRITICAS DE FORMATACAO (LinkedIn nao suporta rich text):
 -> Para dar enfase, use a propria construcao da frase (posicao, ritmo, isolamento) — nao formatacao visual.
 
 REGRA CRITICA DE QUEBRAS DE LINHA:
--> NAO coloque cada frase em uma linha separada com linha em branco depois. Isso cria excesso de espaco em branco.
--> Frases que fazem parte do MESMO bloco de pensamento ficam JUNTAS (linhas consecutivas, sem linha em branco entre elas).
--> Linha em branco APENAS para separar blocos de pensamento diferentes (mudanca de assunto, antes/depois de lista, transicao).
--> Um bloco tipico tem 2-4 frases consecutivas. Frases isoladas (1 frase + linha em branco) so devem ser usadas para IMPACTO especifico, nao como padrao.
-
-Exemplo de formatacao ERRADA (excesso de quebras):
-"O LinkedIn e um palco gigante.
-
-Mas muitos ainda se sentam nos bastidores.
-
-Conheco muitos profissionais que entendem o poder da plataforma.
-
-Sabem que e importante para a carreira."
-
-Exemplo de formatacao CORRETA (blocos coesos):
-"O LinkedIn e um palco gigante.
-Mas muitos ainda se sentam nos bastidores.
-
-Conheco muitos profissionais que entendem o poder da plataforma.
-Sabem que e importante para a carreira, para a empresa, para a rede.
-Mas na hora de criar conteudo, bate a inseguranca."
+-> As regras de quebra de linha DEPENDEM DO FORMATO selecionado. Siga rigorosamente o formato escolhido.
+-> No formato LINKEDIN: blocos curtos de 1-3 frases com espaco entre eles. Mais arejado.
+-> No formato HIBRIDO: paragrafos de 2-4 frases. Intermediario.
+-> No formato TEXTO DENSO: paragrafos de 3-5 frases. Mais compacto.
+-> Em TODOS os formatos: frases que complementam a mesma ideia ficam juntas (sem linha em branco entre elas).
+-> Em TODOS os formatos: linha em branco para separar blocos de pensamento diferentes.
 
 REGRAS DO ALGORITMO:
 -> Salvamentos sao o sinal mais forte. O conteudo precisa ser util o suficiente pra alguem guardar.
