@@ -13,8 +13,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
-import { LogOut, User as UserIcon, Loader2, AlertTriangle, Linkedin } from "lucide-react";
+import { LogOut, User as UserIcon, Loader2, AlertTriangle, Linkedin, HelpCircle } from "lucide-react";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { FeedbackDialog } from "@/components/feedback-dialog";
 
 type TokenStatus = 'valid' | 'expiring_soon' | 'expired' | 'not_connected';
 
@@ -74,6 +75,14 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
                 <ColaboradorSidebarNav />
             </SidebarContent>
             <SidebarFooter>
+                <div className="flex items-center gap-1.5 px-2 mb-1 group-data-[state=collapsed]:justify-center">
+                    <FeedbackDialog pagina="Sidebar" />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" asChild>
+                        <Link href="/colaborador/suporte">
+                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </Link>
+                    </Button>
+                </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="w-full justify-start gap-2 px-2">

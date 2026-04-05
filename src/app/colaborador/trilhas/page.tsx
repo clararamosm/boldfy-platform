@@ -16,6 +16,7 @@ import {
   ChevronLeft, ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2, Zap
 } from 'lucide-react';
 import { Header } from '@/components/dashboard/header';
+import { SuggestTrailDialog } from '@/components/suggest-trail-dialog';
 import type { Sessao, Trilha, ProgressoTrilha, ModuloModo } from '@/types/trilhas';
 
 const MODO_ICONS: Record<ModuloModo, any> = {
@@ -202,6 +203,11 @@ export default function ColaboradorTrilhasPage() {
     <>
       <Header title="Trilhas" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
+
+      {/* Suggest new trails */}
+      <div className="flex justify-end">
+        <SuggestTrailDialog pagina="Trilhas Colaborador" />
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">

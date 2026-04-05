@@ -25,6 +25,7 @@ import { MODO_CONFIG } from '@/types/trilhas';
 import { TrailBuilder, TrailCard, AnalyticsDialog, calcPontuacao, type TrailFormData } from '@/components/trilhas';
 import type { TrilhaAnalytics } from '@/types/trilhas';
 import { Header } from '@/components/dashboard/header';
+import { SuggestTrailDialog } from '@/components/suggest-trail-dialog';
 
 export default function AdminTrilhasPage() {
   const { toast } = useToast();
@@ -304,6 +305,11 @@ export default function AdminTrilhasPage() {
     <>
       <Header title="Trilhas" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
+
+      {/* Suggest new trails */}
+      <div className="flex justify-end">
+        <SuggestTrailDialog pagina="Trilhas Admin" />
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-purple-500" /></div>

@@ -28,3 +28,9 @@ env:
     secret: LINKEDIN_CLIENT_SECRET
   - variable: CRON_SECRET
     secret: CRON_SECRET
+  - variable: NOTION_API_KEY
+    secret: NOTION_API_KEY
+
+  # --- Variáveis públicas do Notion ---
+  - variable: NOTION_FEEDBACK_DB_ID
+    value: 33994982dee4807eb456e291ca3f6dc4

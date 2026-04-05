@@ -14,9 +14,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield } from "lucide-react";
+import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle } from "lucide-react";
 import { differenceInDays, parseISO } from 'date-fns';
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { FeedbackDialog } from "@/components/feedback-dialog";
 
 type CompanyStatus = 'Ativa' | 'Inativa' | 'Trial';
 
@@ -131,6 +132,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 <AdminSidebarNav />
             </SidebarContent>
             <SidebarFooter>
+                <div className="flex items-center gap-1.5 px-2 mb-1 group-data-[state=collapsed]:justify-center">
+                    <FeedbackDialog pagina="Sidebar" />
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" asChild>
+                        <Link href="/admin/suporte">
+                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                        </Link>
+                    </Button>
+                </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="w-full justify-start gap-2 px-2">
