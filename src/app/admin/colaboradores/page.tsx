@@ -124,6 +124,8 @@ export default function AdminColaboradoresPage() {
         return;
       }
       try {
+        const token = await getAuthToken();
+        setCachedToken(token);
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
@@ -267,10 +269,17 @@ export default function AdminColaboradoresPage() {
           title="Convidar Novo Colaborador"
           description="Envie um convite para um novo membro da equipe. Ele receberá um e-mail para criar sua senha."
           open={isDialogOpen}
-          onOpenChange={setIsDialogOpen}
+          onOpenChange={async (open) => {
+            if (open) {
+              const freshToken = await getAuthToken();
+              setCachedToken(freshToken);
+            }
+            setIsDialogOpen(open);
+          }}
         >
           <form action={formAction} ref={formRef}>
             <input type="hidden" name="companyId" value={companyId || ''} />
+            <input type="hidden" name="idToken" value={cachedToken} />
             <InviteFormContent />
             <div className="flex justify-end mt-6">
               <Button type="submit">Enviar Convite</Button>
