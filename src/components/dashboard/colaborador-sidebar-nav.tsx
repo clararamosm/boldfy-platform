@@ -14,7 +14,7 @@ const colaboradorNavItems = [
     { title: "Biblioteca", href: "/colaborador/biblioteca", icon: Library },
     { title: "Assistente de Conteúdo", href: "/colaborador/assistente", icon: Sparkles },
     { title: "Calendário", href: "/colaborador/calendario", icon: CalendarDays },
-    { title: "LinkedIn Feed", href: "/colaborador/linkedin-feed", icon: Newspaper, badge: "Em breve", disabled: true },
+    { title: "LinkedIn Feed", href: "/colaborador/linkedin-feed", icon: Newspaper, badge: "Novo" },
     { title: "Configurações", href: "/colaborador/configuracoes", icon: Cog },
 ];
 
