@@ -29,35 +29,17 @@ import { useToast } from '@/hooks/use-toast';
 import { SimpleRichEditor } from '@/components/ui/simple-rich-editor';
 import type {
   Sessao, Trilha, Modulo, ModuloModo, QuestaoDesafio, MissaoGatilho,
-  TrilhaAnalytics, MODO_LABELS, MODO_CONFIG, FIRESTORE_PATHS
+  TrilhaAnalytics,
 } from '@/types/trilhas';
+import { MODO_LABELS, MODO_CONFIG } from '@/types/trilhas';
 import { Header } from '@/components/dashboard/header';
 
-// ============================================================
-// CONSTANTES LOCAIS (evita import de const de types em client)
-// ============================================================
-const MODO_LABELS_LOCAL: Record<ModuloModo, string> = {
-  aula: 'Aula (Video)',
-  leitura: 'Leitura',
-  desafio: 'Desafio (Quiz)',
-  faca_voce_mesmo: 'Faca Voce Mesmo',
-  missao_conteudo: 'Missao de Conteudo',
-};
-
-const MODO_ICONS_LOCAL: Record<ModuloModo, any> = {
+const MODO_ICONS: Record<ModuloModo, any> = {
   aula: Play,
   leitura: BookOpen,
   desafio: HelpCircle,
   faca_voce_mesmo: Wrench,
   missao_conteudo: Target,
-};
-
-const MODO_CONFIG_LOCAL: Record<ModuloModo, { temPontuacao: boolean; pontosPadrao: number; pontosBonus: number }> = {
-  aula: { temPontuacao: true, pontosPadrao: 80, pontosBonus: 0 },
-  leitura: { temPontuacao: true, pontosPadrao: 40, pontosBonus: 0 },
-  desafio: { temPontuacao: true, pontosPadrao: 100, pontosBonus: 50 },
-  faca_voce_mesmo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
-  missao_conteudo: { temPontuacao: true, pontosPadrao: 50, pontosBonus: 0 },
 };
 
 type ViewMode = 'sessions' | 'trails' | 'builder';
@@ -321,8 +303,8 @@ export default function MasterTrilhasPage() {
       setModuloForm({
         titulo: m.titulo, modo: m.modo, videoUrl: m.videoUrl || '',
         conteudoHtml: m.conteudoHtml || '', instrucaoCard: m.instrucaoCard || '',
-        pontuacaoBase: m.pontuacaoBase || MODO_CONFIG_LOCAL[m.modo].pontosPadrao,
-        pontuacaoBonus: m.pontuacaoBonus || MODO_CONFIG_LOCAL[m.modo].pontosBonus,
+        pontuacaoBase: m.pontuacaoBase || MODO_CONFIG[m.modo].pontosPadrao,
+        pontuacaoBonus: m.pontuacaoBonus || MODO_CONFIG[m.modo].pontosBonus,
       });
       setQuestoes(m.questoes || []);
     } else {
@@ -347,8 +329,8 @@ export default function MasterTrilhasPage() {
       videoUrl: modo === 'aula' ? moduloForm.videoUrl : undefined,
       conteudoHtml: modo === 'leitura' ? moduloForm.conteudoHtml : undefined,
       questoes: modo === 'desafio' ? questoes : undefined,
-      pontuacaoBase: MODO_CONFIG_LOCAL[modo].temPontuacao ? (moduloForm.pontuacaoBase || MODO_CONFIG_LOCAL[modo].pontosPadrao) : undefined,
-      pontuacaoBonus: MODO_CONFIG_LOCAL[modo].temPontuacao ? (moduloForm.pontuacaoBonus || MODO_CONFIG_LOCAL[modo].pontosBonus) : undefined,
+      pontuacaoBase: MODO_CONFIG[modo].temPontuacao ? (moduloForm.pontuacaoBase || MODO_CONFIG[modo].pontosPadrao) : undefined,
+      pontuacaoBonus: MODO_CONFIG[modo].temPontuacao ? (moduloForm.pontuacaoBonus || MODO_CONFIG[modo].pontosBonus) : undefined,
       instrucaoCard: modo === 'faca_voce_mesmo' ? moduloForm.instrucaoCard : undefined,
       missaoGatilho: modo === 'missao_conteudo' ? {
         tipo: 'postar_linkedin',
@@ -519,7 +501,7 @@ export default function MasterTrilhasPage() {
         <div className="space-y-3">
           {trails.map(trail => {
             const Icon = trail.modulos?.length > 0
-              ? MODO_ICONS_LOCAL[trail.modulos[0].modo]
+              ? MODO_ICONS[trail.modulos[0].modo]
               : BookOpen;
             return (
               <Card key={trail.id}>
@@ -648,7 +630,7 @@ export default function MasterTrilhasPage() {
             ) : (
               <div className="space-y-2">
                 {modulos.map((modulo, index) => {
-                  const ModoIcon = MODO_ICONS_LOCAL[modulo.modo];
+                  const ModoIcon = MODO_ICONS[modulo.modo];
                   return (
                     <div key={modulo.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
                       <div className="flex flex-col gap-1">
@@ -665,9 +647,9 @@ export default function MasterTrilhasPage() {
                       </div>
                       <div className="flex-1">
                         <p className="font-medium text-sm">{modulo.titulo}</p>
-                        <p className="text-xs text-muted-foreground">{MODO_LABELS_LOCAL[modulo.modo]}</p>
+                        <p className="text-xs text-muted-foreground">{MODO_LABELS[modulo.modo]}</p>
                       </div>
-                      {MODO_CONFIG_LOCAL[modulo.modo].temPontuacao && (
+                      {MODO_CONFIG[modulo.modo].temPontuacao && (
                         <Badge variant="secondary"><Zap className="w-3 h-3 mr-1 text-yellow-500" />{modulo.pontuacaoBase || 0} pontos</Badge>
                       )}
                       <Button variant="ghost" size="icon" onClick={() => openModuloDialog(index)}>
@@ -746,14 +728,14 @@ export default function MasterTrilhasPage() {
               <Select value={moduloForm.modo} onValueChange={(v: ModuloModo) => {
                 setModuloForm({
                   ...moduloForm, modo: v,
-                  pontuacaoBase: MODO_CONFIG_LOCAL[v].pontosPadrao,
-                  pontuacaoBonus: MODO_CONFIG_LOCAL[v].pontosBonus,
+                  pontuacaoBase: MODO_CONFIG[v].pontosPadrao,
+                  pontuacaoBonus: MODO_CONFIG[v].pontosBonus,
                 });
               }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(MODO_LABELS_LOCAL) as ModuloModo[]).map(modo => (
-                    <SelectItem key={modo} value={modo}>{MODO_LABELS_LOCAL[modo]}</SelectItem>
+                  {(Object.keys(MODO_LABELS) as ModuloModo[]).map(modo => (
+                    <SelectItem key={modo} value={modo}>{MODO_LABELS[modo]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -845,7 +827,7 @@ export default function MasterTrilhasPage() {
             )}
 
             {/* PONTUACAO (quando aplicavel) */}
-            {MODO_CONFIG_LOCAL[moduloForm.modo as ModuloModo]?.temPontuacao && (
+            {MODO_CONFIG[moduloForm.modo as ModuloModo]?.temPontuacao && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pontuacao Base</Label>

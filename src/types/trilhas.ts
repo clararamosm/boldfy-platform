@@ -10,8 +10,10 @@ export type ModuloModo = 'aula' | 'leitura' | 'desafio' | 'faca_voce_mesmo' | 'm
 // --- Questao de Quiz (modo desafio) ---
 export interface QuestaoDesafio {
   pergunta: string;
+  enunciado?: string; // alias para pergunta (usado em alguns contextos)
   opcoes: string[];
   respostaCorreta: number; // indice da opcao correta
+  explicacao?: string; // explicacao apos resposta
 }
 
 // --- Missao Gatilho (modo missao_conteudo) ---
@@ -28,6 +30,7 @@ export interface Modulo {
   titulo: string;
   modo: ModuloModo;
   ordem: number;
+  obrigatorio?: boolean;
 
   // Modo: aula
   videoUrl?: string;
@@ -91,13 +94,15 @@ export interface Sessao {
 
 // --- Progresso do Colaborador em uma Trilha ---
 export interface ProgressoTrilha {
-  trailId: string;
-  modulosCompletos: number[]; // indices dos modulos concluidos
+  trailId?: string;
+  modulosCompletos: (string | number)[]; // IDs ou indices dos modulos concluidos
   pontuacaoFixadaPorModulo: Record<string, number>; // moduloId -> pontos
   primeirasTentativasDesafio: Record<string, {
-    respostas: number[];
-    percentualAcerto: number;
-    pontosGanhos: number;
+    respostas?: number[];
+    percentual?: number;
+    percentualAcerto?: number;
+    pontos?: number;
+    pontosGanhos?: number;
   }>;
   concluida: boolean;
   percentual: number;

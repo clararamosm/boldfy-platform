@@ -157,7 +157,7 @@ export async function getCompanyFeed(
       return { error: 'Acesso nao autorizado.' };
     }
 
-    // 1. Get all collaborators in the company
+    // 1. Get all collaborators in the company (admins don't create content)
     const usersSnap = await adminDb.collection('users')
       .where('companyId', '==', authUser.companyId)
       .where('role', '==', 'colaborador')
@@ -181,12 +181,13 @@ export async function getCompanyFeed(
 
     const fetchPromises = usersSnap.docs.map(async (userDoc) => {
       try {
+        // Query only by status — no orderBy to avoid needing a composite index
+        // Sorting is done in-memory after collecting all posts
         const postsSnap = await adminDb
           .collection('users')
           .doc(userDoc.id)
           .collection('scheduledPosts')
           .where('status', '==', 'published')
-          .orderBy('publishedAt', 'desc')
           .limit(10)
           .get();
 
@@ -208,7 +209,7 @@ export async function getCompanyFeed(
           });
         }
       } catch (e) {
-        console.warn(`Could not fetch posts for user ${userDoc.id}`, e);
+        console.error(`[Feed] Error fetching posts for user ${userDoc.id}:`, e);
       }
     });
 

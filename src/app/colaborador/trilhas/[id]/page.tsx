@@ -175,18 +175,19 @@ export default function TrilhaFullscreenPage() {
 
   // Computed values
   const sortedModules = useMemo(() => {
-    return (trail?.modulos || []).map((m: any) => ({
+    return (trail?.modulos || []).map((m: Modulo) => ({
       ...m,
-      tipo: m.tipo || m.modo,
-      conteudo: m.conteudo || {
+      id: m.id as string,
+      tipo: (m.modo || 'leitura') as ModuloModo,
+      conteudo: {
         texto: m.conteudoHtml,
         videoUrl: m.videoUrl,
         materialPdfUrl: m.materialPdfUrl,
         pontuacaoBase: m.pontuacaoBase,
         pontuacaoBonus: m.pontuacaoBonus,
         questoes: m.questoes,
-        instrucao: m.instrucao,
-        exemplos: m.exemplos,
+        instrucao: m.instrucaoCard,
+        exemplos: m.missaoGatilho?.exemplos,
       },
     }));
   }, [trail]);
@@ -445,7 +446,7 @@ export default function TrilhaFullscreenPage() {
     if (currentModule.tipo === 'desafio' && progress.primeirasTentativasDesafio?.[currentModule.id]) {
       setAlreadyAttempted(true);
       const attempt = progress.primeirasTentativasDesafio[currentModule.id];
-      setQuizScore({ correct: 0, total: 0, percent: attempt.percentual, points: attempt.pontos });
+      setQuizScore({ correct: 0, total: 0, percent: attempt.percentual || attempt.percentualAcerto || 0, points: attempt.pontos || attempt.pontosGanhos || 0 });
     }
   }, [currentModule, progress]);
 

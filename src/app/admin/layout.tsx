@@ -2,7 +2,7 @@
 
 import type React from "react";
 import { useState, useEffect, Suspense } from 'react';
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
@@ -14,17 +14,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User as UserIcon, AlertTriangle, Sparkles, Loader2, ArrowLeft, Shield } from "lucide-react";
+import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield } from "lucide-react";
 import { differenceInDays, parseISO } from 'date-fns';
+import { AuthProvider, useAuth } from "@/contexts/auth-context";
 
 type CompanyStatus = 'Ativa' | 'Inativa' | 'Trial';
-
-type UserData = {
-    name: string;
-    email: string;
-    role: string;
-    companyId?: string;
-};
 
 type CompanyData = {
     status: CompanyStatus;
@@ -71,60 +65,53 @@ const TrialNotification = ({ companyId }: { companyId: string | undefined }) => 
 };
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<UserData | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { user, loading } = useAuth();
     const [companyId, setCompanyId] = useState<string | undefined>(undefined);
     const router = useRouter();
     const searchParams = useSearchParams();
     const [isMaster, setIsMaster] = useState(false);
     const [masterCompanyName, setMasterCompanyName] = useState('');
+    const [ready, setReady] = useState(false);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
-            if (!firebaseUser) {
-                router.push('/login');
+        if (loading) return;
+        if (!user) {
+            router.push('/login');
+            return;
+        }
+        if (user.role !== 'admin' && user.role !== 'master') {
+            router.push('/login');
+            return;
+        }
+
+        // Master: usar companyId da URL; Admin: usar do doc
+        if (user.role === 'master') {
+            const urlCompanyId = searchParams.get('companyId');
+            if (urlCompanyId) {
+                setCompanyId(urlCompanyId);
+                setIsMaster(true);
+                // Buscar nome da empresa para o banner
+                getDoc(doc(db, 'companies', urlCompanyId)).then((compDoc) => {
+                    if (compDoc.exists()) {
+                        setMasterCompanyName(compDoc.data().companyName || '');
+                    }
+                });
+            } else {
+                router.push('/master/empresas');
                 return;
             }
-            const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-            if (userDoc.exists()) {
-                const data = userDoc.data() as UserData & { companyId?: string };
-                if (data.role !== 'admin' && data.role !== 'master') {
-                    router.push('/login');
-                    return;
-                }
-                setUser({ name: data.profile?.name || data.name || '', email: data.profile?.email || data.email || '', role: data.role });
-                // Master: usar companyId da URL; Admin: usar do doc
-                if (data.role === 'master') {
-                    const urlCompanyId = searchParams.get('companyId');
-                    if (urlCompanyId) {
-                        setCompanyId(urlCompanyId);
-                        setIsMaster(true);
-                        // Buscar nome da empresa para o banner
-                        const compDoc = await getDoc(doc(db, 'companies', urlCompanyId));
-                        if (compDoc.exists()) {
-                            setMasterCompanyName(compDoc.data().companyName || '');
-                        }
-                    } else {
-                        router.push('/master/empresas');
-                        return;
-                    }
-                } else {
-                    setCompanyId(data.companyId);
-                }
-            } else {
-                router.push('/login');
-            }
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, [router, searchParams]);
+        } else {
+            setCompanyId(user.companyId);
+        }
+        setReady(true);
+    }, [user, loading, router, searchParams]);
 
     const handleLogout = async () => {
         await signOut(auth);
         router.push('/login');
     };
 
-    if (loading) {
+    if (loading || !ready || !user) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -149,11 +136,11 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                         <Button variant="ghost" className="w-full justify-start gap-2 px-2">
                             <Avatar className="h-8 w-8">
                                 <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                    {user?.name?.substring(0, 2).toUpperCase() || 'AD'}
+                                    {user.name?.substring(0, 2).toUpperCase() || 'AD'}
                                 </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
-                              <span className="text-sm font-medium truncate max-w-[150px]">{(user?.name || '').split(' ')[0]}</span>
+                              <span className="text-sm font-medium truncate max-w-[150px]">{(user.name || '').split(' ')[0]}</span>
                               <span className="text-xs text-muted-foreground truncate max-w-[150px]">Admin</span>
                             </div>
                         </Button>
@@ -161,9 +148,9 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                     <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuLabel>
                             <div className="flex flex-col">
-                                <span>{user?.name || ''}</span>
+                                <span>{user.name || ''}</span>
                                 <p className="text-xs leading-none text-muted-foreground">
-                                    {user?.email || ''}
+                                    {user.email || ''}
                                 </p>
                             </div>
                         </DropdownMenuLabel>
@@ -207,12 +194,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     );
 }
 
-
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     return (
-        <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-purple-600" /></div>}>
-            <AdminLayoutInner>{children}</AdminLayoutInner>
-        </Suspense>
+        <AuthProvider>
+            <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-purple-600" /></div>}>
+                <AdminLayoutInner>{children}</AdminLayoutInner>
+            </Suspense>
+        </AuthProvider>
     );
 }

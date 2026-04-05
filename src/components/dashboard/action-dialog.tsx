@@ -18,7 +18,7 @@ import { useFormStatus } from 'react-dom';
 import { Loader2 } from 'lucide-react';
 
 type ActionDialogProps = {
-  trigger: React.ReactNode;
+  trigger?: React.ReactNode;
   title: string;
   description?: string;
   children: React.ReactNode;
@@ -79,7 +79,7 @@ export function ActionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className={cn("sm:max-w-xl", className)}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>

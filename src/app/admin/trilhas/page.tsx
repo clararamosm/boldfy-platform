@@ -30,22 +30,12 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { SimpleRichEditor } from '@/components/ui/simple-rich-editor';
 import type { Sessao, Trilha, Modulo, ModuloModo, QuestaoDesafio, TrilhaAnalytics } from '@/types/trilhas';
+import { MODO_LABELS, MODO_CONFIG } from '@/types/trilhas';
 import { Header } from '@/components/dashboard/header';
 
-const MODO_LABELS: Record<ModuloModo, string> = {
-  aula: 'Aula (Video)', leitura: 'Leitura', desafio: 'Desafio (Quiz)',
-  faca_voce_mesmo: 'Faca Voce Mesmo', missao_conteudo: 'Missao de Conteudo',
-};
 const MODO_ICONS: Record<ModuloModo, any> = {
   aula: Play, leitura: BookOpen, desafio: HelpCircle,
   faca_voce_mesmo: Wrench, missao_conteudo: Target,
-};
-const MODO_CONFIG: Record<ModuloModo, { temPontuacao: boolean; pontosPadrao: number; pontosBonus: number }> = {
-  aula: { temPontuacao: true, pontosPadrao: 80, pontosBonus: 0 },
-  leitura: { temPontuacao: true, pontosPadrao: 40, pontosBonus: 0 },
-  desafio: { temPontuacao: true, pontosPadrao: 100, pontosBonus: 50 },
-  faca_voce_mesmo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
-  missao_conteudo: { temPontuacao: true, pontosPadrao: 50, pontosBonus: 0 },
 };
 
 export default function AdminTrilhasPage() {

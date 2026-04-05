@@ -21,5 +21,5 @@ export async function POST(req: NextRequest, context: any) {
     return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
   }
 
-  return genkitHandler(req, context);
+  return genkitHandler(req);
 }

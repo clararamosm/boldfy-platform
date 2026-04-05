@@ -86,7 +86,7 @@ const getStatusBadge = (status: DerivedStatus) => {
   }
 };
 
-const MissionForm = ({ mission, isSubmitting, formRef, isFixed = false }: { mission?: Mission, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement | null>, isFixed?: boolean }) => {
+const MissionForm = ({ mission, isSubmitting, formRef, isFixed = false }: { mission?: Mission, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement>, isFixed?: boolean }) => {
   const [startDate, setStartDate] = useState<Date | undefined>(
     mission?.startDate?.toDate ? mission.startDate.toDate() : mission?.startDate ? new Date(mission.startDate) : undefined
   );
@@ -191,7 +191,7 @@ const MissionTable = ({
   status: DerivedStatus;
   companyId: string | null;
   isSubmitting: boolean;
-  formRef: React.RefObject<HTMLFormElement | null>;
+  formRef: React.RefObject<HTMLFormElement>;
   onEdit: (missionId: string, isFixed: boolean) => void;
   onDelete: (missionId: string) => void;
   onOpenReview: () => void;
@@ -319,7 +319,7 @@ export default function AdminMissoesPage() {
   const [feedbackMap, setFeedbackMap] = useState<Record<string, string>>({});
 
   const { toast } = useToast();
-  const formRef = useRef<HTMLFormElement | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   const fetchMissions = useCallback(async (currentCompanyId: string) => {
     setIsLoading(true);
@@ -723,7 +723,6 @@ export default function AdminMissoesPage() {
         <ActionDialog
           title="Gerar Missoes com IA"
           description="A IA analisa o contexto da sua empresa e sugere missoes. Selecione, configure o tipo e modo, e defina datas se necessario."
-          trigger={<span />}
           open={aiDialogOpen}
           onOpenChange={(open) => { setAiDialogOpen(open); if (!open) setAiSuggestions([]); }}
           actionText={isSubmitting ? "Salvando..." : `Criar ${aiSuggestions.filter(s => s.selected).length} missao(oes)`}
