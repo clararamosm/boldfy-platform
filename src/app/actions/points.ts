@@ -81,27 +81,38 @@ export async function recalculatePoints(idToken: string, userId: string): Promis
   try {
     await requireSelf(idToken, userId);
 
-    const progressSnap = await adminDb
-      .collection('users')
-      .doc(userId)
-      .collection('trailProgress')
-      .get();
+    const userRef = adminDb.collection('users').doc(userId);
 
-    let earnedPoints = 0;
+    // 1. Sum points earned from trails (trailProgress)
+    const progressSnap = await userRef.collection('trailProgress').get();
+
+    let trailPoints = 0;
     progressSnap.docs.forEach(doc => {
       const data = doc.data();
       if (data.pontosGanhos && typeof data.pontosGanhos === 'number') {
-        earnedPoints += data.pontosGanhos;
+        trailPoints += data.pontosGanhos;
       }
     });
 
-    let spentPoints = 0;
-    const rescuesSnap = await adminDb
-      .collection('users')
-      .doc(userId)
-      .collection('rescues')
+    // 2. Sum points earned from missions (pointsHistory with source='missao')
+    const missionHistorySnap = await userRef
+      .collection('pointsHistory')
+      .where('type', '==', 'gain')
+      .where('source', '==', 'missao')
       .get();
 
+    let missionPoints = 0;
+    missionHistorySnap.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.points && typeof data.points === 'number') {
+        missionPoints += data.points;
+      }
+    });
+
+    // 3. Sum points spent on rescues
+    const rescuesSnap = await userRef.collection('rescues').get();
+
+    let spentPoints = 0;
     rescuesSnap.docs.forEach(doc => {
       const data = doc.data();
       if (data.points && typeof data.points === 'number') {
@@ -109,11 +120,11 @@ export async function recalculatePoints(idToken: string, userId: string): Promis
       }
     });
 
-    const finalPoints = Math.max(0, earnedPoints - spentPoints);
+    // 4. Final: (trails + missions) - spent
+    const totalEarned = trailPoints + missionPoints;
+    const finalPoints = Math.max(0, totalEarned - spentPoints);
 
-    await adminDb.collection('users').doc(userId).update({
-      points: finalPoints,
-    });
+    await userRef.update({ points: finalPoints });
 
     return { points: finalPoints };
   } catch (error) {

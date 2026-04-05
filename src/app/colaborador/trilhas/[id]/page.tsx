@@ -252,6 +252,19 @@ export default function TrilhaFullscreenPage() {
       updatedProgress.concluidaEm = Timestamp.now();
       updatedProgress.pontosGanhos = totalPoints + (trail.pontuacaoBonus || 0);
 
+      // Register trail completion in pointsHistory
+      try {
+        await addDoc(collection(db, 'users', user!.uid, 'pointsHistory'), {
+          description: `Trilha concluída: ${trail.titulo}`,
+          date: Timestamp.now(),
+          points: updatedProgress.pontosGanhos,
+          type: 'gain',
+          source: 'trilha',
+        });
+      } catch (err) {
+        console.error('Error adding trail to pointsHistory:', err);
+      }
+
       // Create trigger mission if exists
       if (trail.missaoGatilho) {
         try {
