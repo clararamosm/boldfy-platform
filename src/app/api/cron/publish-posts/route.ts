@@ -12,10 +12,13 @@ export const maxDuration = 60; // 60 second timeout
 
 export async function GET(request: NextRequest) {
   // Security: verify cron secret (fail-closed — nega acesso se secret nao estiver configurado)
-  const authHeader = request.headers.get('authorization');
+  const authHeader = request.headers.get('authorization') || '';
   const cronSecret = process.env.CRON_SECRET;
 
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  // Accept both "Bearer <secret>" and raw "<secret>" formats
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+
+  if (!cronSecret || token !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

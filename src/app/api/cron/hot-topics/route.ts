@@ -11,10 +11,13 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // 2 min — multiple AI calls
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
+  const authHeader = request.headers.get('authorization') || '';
   const cronSecret = process.env.CRON_SECRET;
 
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  // Accept both "Bearer <secret>" and raw "<secret>" formats
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+
+  if (!cronSecret || token !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
