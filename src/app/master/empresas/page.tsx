@@ -21,7 +21,6 @@ import { format } from 'date-fns';
 import { getAuthToken } from '@/lib/auth-client';
 import { inviteAdmin } from '@/app/actions';
 import { deleteCompany } from '@/app/deleteCompanyAction';
-import { getAuthToken } from '@/lib/auth-client';
 
 type Company = {
     id: string;

@@ -20,7 +20,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuthToken } from '@/lib/auth-client';
 import { createScheduledPost, updateScheduledPost } from '@/app/actions/posts';
 import { publishToLinkedIn, getLinkedInStatus } from '@/app/actions/linkedin';
-import { getAuthToken } from '@/lib/auth-client';
 import {
   CalendarDays,
   Clock,

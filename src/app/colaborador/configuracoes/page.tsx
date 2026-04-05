@@ -21,7 +21,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInAuthUrl, disconnectLinkedIn } from "@/app/actions/linkedin";
-import { getAuthToken } from '@/lib/auth-client';
 
 type ProfileData = {
     name: string;

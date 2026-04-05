@@ -24,7 +24,6 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { reviewMissionProof } from "@/app/actions";
-import { getAuthToken } from '@/lib/auth-client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
