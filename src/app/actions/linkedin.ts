@@ -79,6 +79,7 @@ export async function disconnectLinkedIn(idToken: string, userId: string): Promi
 type PublishResult = {
   success?: boolean;
   postUrl?: string;
+  linkedinPostId?: string;
   error?: string;
   needsReconnect?: boolean;
 };
@@ -121,12 +122,14 @@ export async function getLinkedInStatus(idToken: string, userId: string): Promis
  * Publish content to LinkedIn on behalf of the user.
  * Handles token refresh automatically if needed.
  * Optionally includes an image (Firebase Storage URL).
+ * If postId is provided, updates that post's status to 'published' in Firestore.
  */
 export async function publishToLinkedIn(
   idToken: string,
   userId: string,
   content: string,
-  mediaUrl?: string
+  mediaUrl?: string,
+  postId?: string
 ): Promise<PublishResult> {
   try {
     await requireSelf(idToken, userId);
@@ -189,9 +192,27 @@ export async function publishToLinkedIn(
     // 3. Publish the post (with optional image)
     const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim(), mediaUrl);
 
+    // 4. Update the post document in Firestore with published status
+    const now = new Date().toISOString();
+    if (postId) {
+      await adminDb
+        .collection('users')
+        .doc(userId)
+        .collection('scheduledPosts')
+        .doc(postId)
+        .update({
+          status: 'published',
+          linkedinPostId: result.postId,
+          linkedinPostUrl: result.postUrl,
+          publishedAt: now,
+          updatedAt: now,
+        });
+    }
+
     return {
       success: true,
       postUrl: result.postUrl,
+      linkedinPostId: result.postId,
     };
   } catch (error) {
     console.error('Error publishing to LinkedIn:', error);

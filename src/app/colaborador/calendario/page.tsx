@@ -43,10 +43,41 @@ import {
 import { ptBR } from 'date-fns/locale';
 
 const statusConfig = {
-  scheduled: { label: 'Agendado', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', icon: Clock },
-  published: { label: 'Publicado', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2 },
-  failed: { label: 'Falhou', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: AlertCircle },
-  draft: { label: 'Rascunho', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400', icon: Edit3 },
+  published: {
+    label: 'Publicado',
+    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    cardBorder: 'border-l-4 border-l-purple-500',
+    calendarDot: 'bg-purple-500',
+    icon: CheckCircle2,
+  },
+  scheduled: {
+    label: 'Agendado',
+    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    cardBorder: 'border-l-4 border-l-blue-500',
+    calendarDot: 'bg-blue-500',
+    icon: Clock,
+  },
+  in_progress: {
+    label: 'Em andamento',
+    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+    cardBorder: 'border-l-4 border-l-yellow-500',
+    calendarDot: 'bg-yellow-500',
+    icon: Edit3,
+  },
+  draft: {
+    label: 'Ideia',
+    color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    cardBorder: 'border-l-4 border-l-gray-400',
+    calendarDot: 'bg-gray-400',
+    icon: Edit3,
+  },
+  failed: {
+    label: 'Falhou',
+    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    cardBorder: 'border-l-4 border-l-red-500',
+    calendarDot: 'bg-red-500',
+    icon: AlertCircle,
+  },
 };
 
 function CalendarSkeleton() {
@@ -68,7 +99,7 @@ function CalendarSkeleton() {
   );
 }
 
-type StatusFilter = 'all' | 'scheduled' | 'published' | 'draft' | 'failed';
+type StatusFilter = 'all' | 'published' | 'scheduled' | 'in_progress' | 'draft' | 'failed';
 
 export default function CalendarioPage() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -112,7 +143,7 @@ export default function CalendarioPage() {
 
   // Status counts
   const statusCounts = useMemo(() => {
-    const counts = { all: posts.length, scheduled: 0, published: 0, draft: 0, failed: 0 };
+    const counts = { all: posts.length, published: 0, scheduled: 0, in_progress: 0, draft: 0, failed: 0 };
     posts.forEach(post => {
       if (post.status in counts) counts[post.status as keyof typeof counts]++;
     });
@@ -225,9 +256,10 @@ export default function CalendarioPage() {
             <div className="flex flex-wrap items-center gap-2">
               {([
                 { key: 'all' as StatusFilter, label: 'Todos', color: 'bg-muted text-foreground' },
+                { key: 'published' as StatusFilter, label: 'Publicados', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
                 { key: 'scheduled' as StatusFilter, label: 'Agendados', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-                { key: 'published' as StatusFilter, label: 'Publicados', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-                { key: 'draft' as StatusFilter, label: 'Rascunhos', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
+                { key: 'in_progress' as StatusFilter, label: 'Em andamento', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
+                { key: 'draft' as StatusFilter, label: 'Ideias', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
                 { key: 'failed' as StatusFilter, label: 'Falhou', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
               ]).map(f => (
                 <button
@@ -338,10 +370,10 @@ export default function CalendarioPage() {
               selectedDayPosts.length > 0 ? (
                 <div className="space-y-3">
                   {selectedDayPosts.map(post => {
-                    const config = statusConfig[post.status];
+                    const config = statusConfig[post.status] || statusConfig.draft;
                     const StatusIcon = config.icon;
                     return (
-                      <Card key={post.id} className="overflow-hidden">
+                      <Card key={post.id} className={`overflow-hidden ${config.cardBorder}`}>
                         <CardContent className="p-4 space-y-3">
                           {/* Status + time */}
                           <div className="flex items-center justify-between">
@@ -355,14 +387,16 @@ export default function CalendarioPage() {
                               </span>
                             </div>
                             <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => router.push(`/colaborador/calendario/novo?edit=${post.id}`)}
-                              >
-                                <Edit3 className="h-3.5 w-3.5" />
-                              </Button>
+                              {post.status !== 'published' && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => router.push(`/colaborador/calendario/novo?edit=${post.id}`)}
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -385,17 +419,24 @@ export default function CalendarioPage() {
                             </div>
                           )}
 
-                          {/* LinkedIn link */}
+                          {/* LinkedIn link for published posts */}
                           {post.linkedinPostUrl && (
                             <a
                               href={post.linkedinPostUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-xs text-[#0A66C2] hover:underline"
+                              className="flex items-center gap-1.5 text-xs text-[#0A66C2] hover:underline font-medium"
                             >
                               <Linkedin className="h-3.5 w-3.5" />
-                              Ver no LinkedIn
+                              Ver no LinkedIn ↗
                             </a>
+                          )}
+
+                          {/* Published date */}
+                          {post.status === 'published' && post.publishedAt && (
+                            <p className="text-[11px] text-muted-foreground">
+                              Publicado em {format(parseISO(post.publishedAt), "d MMM 'às' HH:mm", { locale: ptBR })}
+                            </p>
                           )}
                         </CardContent>
                       </Card>
@@ -426,10 +467,10 @@ export default function CalendarioPage() {
                   <>
                     <p className="text-xs text-muted-foreground">Próximos agendamentos:</p>
                     {upcomingPosts.map(post => {
-                      const config = statusConfig[post.status];
+                      const config = statusConfig[post.status] || statusConfig.draft;
                       const StatusIcon = config.icon;
                       return (
-                        <Card key={post.id} className="overflow-hidden">
+                        <Card key={post.id} className={`overflow-hidden ${config.cardBorder}`}>
                           <CardContent className="p-3 space-y-2">
                             <div className="flex items-center justify-between">
                               <Badge variant="secondary" className={`${config.color} text-xs gap-1`}>

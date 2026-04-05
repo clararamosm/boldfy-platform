@@ -12,9 +12,10 @@ export type ScheduledPost = {
   mediaUrl?: string;
   mediaType?: string;
   scheduledFor: string; // ISO date string
-  status: 'draft' | 'scheduled' | 'published' | 'failed';
+  status: 'draft' | 'scheduled' | 'in_progress' | 'published' | 'failed';
   linkedinPostId?: string;
   linkedinPostUrl?: string;
+  publishedAt?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -64,7 +65,7 @@ export async function updateScheduledPost(
     mediaUrl?: string;
     mediaType?: string;
     scheduledFor?: string;
-    status?: 'draft' | 'scheduled';
+    status?: 'draft' | 'scheduled' | 'in_progress';
   }
 ): Promise<{ success?: boolean; error?: string }> {
   try {

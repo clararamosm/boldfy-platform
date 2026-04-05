@@ -188,21 +188,28 @@ function EditorContent() {
         mediaUrl = await getDownloadURL(snapshot.ref);
       }
 
-      // Publish to LinkedIn (with optional image)
       const token = await getAuthToken();
-      const result = await publishToLinkedIn(token, userId, caption, mediaUrl);
+
+      // 1. Create the post record in Firestore first (as 'scheduled' — will be updated to 'published')
+      const createResult = await createScheduledPost(token, userId, {
+        caption,
+        mediaUrl,
+        mediaType: mediaFile?.type,
+        scheduledFor: new Date().toISOString(),
+      });
+
+      if (!createResult.success || !createResult.postId) {
+        toast({ variant: 'destructive', title: 'Erro', description: createResult.error || 'Erro ao salvar post.' });
+        setIsPublishing(false);
+        return;
+      }
+
+      // 2. Publish to LinkedIn and update the post status to 'published' in Firestore
+      const result = await publishToLinkedIn(token, userId, caption, mediaUrl, createResult.postId);
 
       if (result.success) {
         setPublishedUrl(result.postUrl || null);
         toast({ title: 'Publicado no LinkedIn!', description: 'Seu post está no ar.' });
-
-        // Also save as a published record
-        await createScheduledPost(token, userId, {
-          caption,
-          mediaUrl,
-          mediaType: mediaFile?.type,
-          scheduledFor: new Date().toISOString(),
-        });
       } else {
         toast({ variant: 'destructive', title: 'Erro ao publicar', description: result.error });
         if (result.needsReconnect) {

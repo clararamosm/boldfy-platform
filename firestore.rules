@@ -61,6 +61,12 @@ service cloud.firestore {
       match /generatedContent/{contentId} {
         allow read, delete: if request.auth.uid == userId;
       }
+
+      // Scheduled posts for LinkedIn — user can only access their own posts
+      // All writes go through server actions (Admin SDK), but allow client reads
+      match /scheduledPosts/{postId} {
+        allow read: if request.auth.uid == userId;
+      }
     }
 
     // Rules for the 'companies' collection
