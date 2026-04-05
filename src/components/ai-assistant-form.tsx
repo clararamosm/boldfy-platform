@@ -229,11 +229,13 @@ export function AiAssistantForm({
 }) {
   const [state, formAction] = useActionState(handleAlignContent, initialState);
   const { toast } = useToast();
-  const [cachedToken, setCachedToken] = useState('');
+  const tokenRef = useRef('');
   const formRef = useRef<HTMLFormElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
+  // Track state changes with a counter to detect repeated identical results
+  const stateVersionRef = useRef(0);
 
   // Fill textarea when external content changes (e.g. hot topic selected)
   useEffect(() => {
@@ -243,23 +245,28 @@ export function AiAssistantForm({
     }
   }, [externalContent]);
 
+  // Pre-fetch token on mount (will be refreshed on submit)
   useEffect(() => {
-    getAuthToken().then(setCachedToken).catch(() => {});
+    getAuthToken().then(t => { tokenRef.current = t; }).catch(() => {});
   }, []);
 
+  // Handle state changes from server action
   useEffect(() => {
+    // Skip initial render
+    if (!state?.error && !state?.alignedContent) return;
+
+    stateVersionRef.current += 1;
+
     if (state?.error) {
       toast({
         variant: 'destructive',
         title: 'Erro ao gerar legenda',
         description: state.error,
       });
-      setIsGenerating(false);
     }
-    if (state?.alignedContent) {
-      setIsGenerating(false);
-    }
-  }, [state, toast]);
+    setIsGenerating(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   const handleUseLegenda = () => {
     if (state?.alignedContent) {
@@ -271,14 +278,28 @@ export function AiAssistantForm({
   return (
     <form
       ref={formRef}
-      action={(formData) => {
+      action={async (formData) => {
         setIsGenerating(true);
+        // Always get a fresh token before submitting
+        try {
+          const freshToken = await getAuthToken();
+          tokenRef.current = freshToken;
+          formData.set('idToken', freshToken);
+        } catch {
+          toast({
+            variant: 'destructive',
+            title: 'Erro de autenticação',
+            description: 'Faça login novamente para continuar.',
+          });
+          setIsGenerating(false);
+          return;
+        }
         formAction(formData);
       }}
     >
       <input type="hidden" name="companyId" value={companyId} />
       <input type="hidden" name="userId" value={userId} />
-      <input type="hidden" name="idToken" value={cachedToken} />
+      <input type="hidden" name="idToken" value="" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* LEFT SIDE — Input */}
