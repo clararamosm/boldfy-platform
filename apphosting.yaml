@@ -36,3 +36,5 @@ env:
     value: 33994982dee4807eb456e291ca3f6dc4
   - variable: NOTION_SUPPORT_DB_ID
     value: 33994982dee4809c9764f7c5f078556e
+  - variable: NOTION_BETA_DB_ID
+    value: 33a94982dee48036b9a7f465ac90f053
