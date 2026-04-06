@@ -224,26 +224,49 @@ export default function BetaTestPage() {
             <h3 className="font-headline text-sm font-bold text-accent-foreground">Ads é platô. Employee Advocacy é efeito composto.</h3>
             <p className="text-[10px] text-muted-foreground">Ads só funciona enquanto você paga. EGC se compõe com o tempo — e não para.</p>
           </div>
-          <svg viewBox="0 0 620 140" className="w-full h-auto block" xmlns="http://www.w3.org/2000/svg">
-            <defs><linearGradient id="pgrd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#CD50F1"/><stop offset="100%" stopColor="#CD50F1" stopOpacity="0"/></linearGradient></defs>
-            <line x1="50" y1="10" x2="50" y2="105" stroke="hsl(279 33% 90%)" strokeWidth="1"/>
-            <line x1="50" y1="105" x2="590" y2="105" stroke="hsl(279 33% 90%)" strokeWidth="1"/>
-            <line x1="50" y1="75" x2="590" y2="75" stroke="hsl(279 33% 90%)" strokeWidth="0.5" strokeDasharray="4"/>
-            <line x1="50" y1="45" x2="590" y2="45" stroke="hsl(279 33% 90%)" strokeWidth="0.5" strokeDasharray="4"/>
-            <path d="M50,60 L140,58 L230,57 L320,58 L410,57 L500,58 L590,58" fill="none" stroke="hsl(279 33% 75%)" strokeWidth="2" strokeDasharray="6,4" opacity="0.5"/>
-            <path d="M50,100 C120,98 180,92 230,82 C300,65 370,45 440,30 C500,18 550,12 590,8 L590,105 L50,105 Z" fill="url(#pgrd)" opacity="0.12"/>
-            <path d="M50,100 C120,98 180,92 230,82 C300,65 370,45 440,30 C500,18 550,12 590,8" fill="none" stroke="#CD50F1" strokeWidth="2.5"/>
-            <circle cx="260" cy="58" r="4" fill="#CD50F1" stroke="#fff" strokeWidth="2"/>
-            <text x="260" y="50" fontFamily="Inter, sans-serif" fontSize="7.5" fill="hsl(279 33% 55%)" textAnchor="middle" fontWeight="600">break-even</text>
-            <text x="95" y="120" fontFamily="Inter, sans-serif" fontSize="8.5" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 1</text>
-            <text x="203" y="120" fontFamily="Inter, sans-serif" fontSize="8.5" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 2</text>
-            <text x="311" y="120" fontFamily="Inter, sans-serif" fontSize="8.5" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 3</text>
-            <text x="419" y="120" fontFamily="Inter, sans-serif" fontSize="8.5" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 4</text>
-            <text x="527" y="120" fontFamily="Inter, sans-serif" fontSize="8.5" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 5</text>
-            <text x="598" y="55" fontFamily="Inter, sans-serif" fontSize="7.5" fill="hsl(279 33% 75%)" fontWeight="600">Ads (platô)</text>
-            <text x="598" y="14" fontFamily="Inter, sans-serif" fontSize="8" fill="#CD50F1" fontWeight="700">EGC (composto)</text>
-            <text x="490" y="98" fontFamily="Inter, sans-serif" fontSize="7" fill="hsl(279 33% 75%)" opacity="0.7">Para quando o budget para.</text>
-            <text x="490" y="25" fontFamily="Inter, sans-serif" fontSize="7" fill="#CD50F1" opacity="0.7">Se compõe com o tempo.</text>
+          <svg viewBox="0 0 680 170" className="w-full h-auto block" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="egcFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#CD50F1" stopOpacity="0.15"/>
+                <stop offset="100%" stopColor="#CD50F1" stopOpacity="0"/>
+              </linearGradient>
+              <clipPath id="chartClip"><rect x="60" y="5" width="570" height="135"/></clipPath>
+            </defs>
+
+            {/* Grid */}
+            <line x1="60" y1="10" x2="60" y2="140" stroke="hsl(279 33% 90%)" strokeWidth="1"/>
+            <line x1="60" y1="140" x2="630" y2="140" stroke="hsl(279 33% 90%)" strokeWidth="1"/>
+            <line x1="60" y1="105" x2="630" y2="105" stroke="hsl(279 33% 90%)" strokeWidth="0.5" strokeDasharray="4"/>
+            <line x1="60" y1="70" x2="630" y2="70" stroke="hsl(279 33% 90%)" strokeWidth="0.5" strokeDasharray="4"/>
+            <line x1="60" y1="35" x2="630" y2="35" stroke="hsl(279 33% 90%)" strokeWidth="0.5" strokeDasharray="4"/>
+
+            {/* "Investimento em ads parou" vertical line */}
+            <line x1="420" y1="15" x2="420" y2="140" stroke="#D4A0B8" strokeWidth="1" strokeDasharray="4,3" opacity="0.6"/>
+            <text x="420" y="11" fontFamily="Inter, sans-serif" fontSize="7" fill="#C06080" textAnchor="middle" fontWeight="600">investimento em ads parou</text>
+
+            {/* Ads line: starts higher, rises gently, then drops abruptly */}
+            <path d="M60,92 C130,89 200,85 270,82 C330,79 370,77 420,74" fill="none" stroke="#B8A4CC" strokeWidth="2.2" strokeLinecap="round" clipPath="url(#chartClip)"/>
+            <path d="M420,74 C440,88 460,115 480,130 C490,135 500,138 520,139" fill="none" stroke="#B8A4CC" strokeWidth="2.2" strokeLinecap="round" strokeDasharray="5,4" opacity="0.5" clipPath="url(#chartClip)"/>
+
+            {/* Ads annotation */}
+            <text x="530" y="135" fontFamily="Inter, sans-serif" fontSize="7" fill="#C0A4B8" opacity="0.8">Sem budget, alcance cai.</text>
+
+            {/* EGC area fill */}
+            <path d="M60,138 C130,136 200,130 270,118 C340,100 380,78 420,58 C470,38 530,22 580,14 L630,10 L630,140 L60,140 Z" fill="url(#egcFill)" clipPath="url(#chartClip)"/>
+
+            {/* EGC line: starts from zero, compound growth, continues after ads stop */}
+            <path d="M60,138 C130,136 200,130 270,118 C340,100 380,78 420,58 C470,38 530,22 580,14 L630,10" fill="none" stroke="#CD50F1" strokeWidth="2.8" strokeLinecap="round" clipPath="url(#chartClip)"/>
+
+            {/* Line labels */}
+            <text x="610" y="71" fontFamily="Inter, sans-serif" fontSize="8.5" fill="#B8A4CC" fontWeight="600">Ads</text>
+            <text x="610" y="8" fontFamily="Inter, sans-serif" fontSize="8.5" fill="#CD50F1" fontWeight="700">EGC</text>
+
+            {/* Month labels */}
+            <text x="118" y="157" fontFamily="Inter, sans-serif" fontSize="9" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 1</text>
+            <text x="232" y="157" fontFamily="Inter, sans-serif" fontSize="9" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 2</text>
+            <text x="346" y="157" fontFamily="Inter, sans-serif" fontSize="9" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 3</text>
+            <text x="460" y="157" fontFamily="Inter, sans-serif" fontSize="9" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 4</text>
+            <text x="574" y="157" fontFamily="Inter, sans-serif" fontSize="9" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 5</text>
           </svg>
         </section>
 
