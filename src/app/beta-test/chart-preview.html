@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chart Preview — ROI</title>
+<style>
+body { font-family: 'Inter', -apple-system, sans-serif; background: #fff; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 24px; }
+.wrap { max-width: 800px; width: 100%; border: 1px solid #E8D8F5; border-radius: 12px; padding: 20px 24px; background: #fff; }
+.top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.top h3 { font-size: 14px; font-weight: 700; color: #3A1A45; }
+.top p { font-size: 10px; color: #7A6889; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h3>Ads é platô. Employee Advocacy é efeito composto.</h3>
+    <p>Ads só funciona enquanto você paga. EGC se compõe com o tempo — e não para.</p>
+  </div>
+  <svg viewBox="0 0 680 180" style="width:100%;height:auto;display:block" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="egcGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#CD50F1" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#CD50F1" stop-opacity="0"/>
+      </linearGradient>
+      <!-- Animated dash for the "cut" moment -->
+      <clipPath id="chartArea">
+        <rect x="60" y="5" width="580" height="135"/>
+      </clipPath>
+    </defs>
+
+    <!-- Grid -->
+    <line x1="60" y1="10" x2="60" y2="140" stroke="#E8D8F5" stroke-width="1"/>
+    <line x1="60" y1="140" x2="640" y2="140" stroke="#E8D8F5" stroke-width="1"/>
+    <line x1="60" y1="105" x2="640" y2="105" stroke="#E8D8F5" stroke-width="0.5" stroke-dasharray="4"/>
+    <line x1="60" y1="70" x2="640" y2="70" stroke="#E8D8F5" stroke-width="0.5" stroke-dasharray="4"/>
+    <line x1="60" y1="35" x2="640" y2="35" stroke="#E8D8F5" stroke-width="0.5" stroke-dasharray="4"/>
+
+    <!-- "Investimento parou" vertical dashed line at ~month 3.5 -->
+    <line x1="430" y1="15" x2="430" y2="140" stroke="#E8A0B8" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>
+    <text x="430" y="12" font-family="Inter, sans-serif" font-size="7.5" fill="#C06080" text-anchor="middle" font-weight="600">investimento parou</text>
+
+    <!-- ═══ ADS LINE ═══ -->
+    <!-- Ads: starts higher (~90), rises gently, then drops after "investimento parou" -->
+    <path d="M60,95 C120,92 180,88 240,84 C300,80 360,77 430,74"
+          fill="none" stroke="#B8A4CC" stroke-width="2.2" stroke-linecap="round" clip-path="url(#chartArea)">
+      <animate attributeName="stroke-dashoffset" from="500" to="0" dur="1.5s" fill="freeze"/>
+      <animate attributeName="stroke-dasharray" values="500;500" dur="0.01s" fill="freeze"/>
+    </path>
+    <!-- Ads drop after budget stops -->
+    <path d="M430,74 C460,80 500,100 540,118 C570,130 600,136 640,138"
+          fill="none" stroke="#B8A4CC" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="5,4" opacity="0.5" clip-path="url(#chartArea)">
+    </path>
+
+    <!-- ═══ EGC AREA FILL ═══ -->
+    <path d="M60,138 C120,136 180,130 240,118 C300,100 360,78 430,55 C480,38 540,24 600,16 L640,12 L640,140 L60,140 Z"
+          fill="url(#egcGrad)" clip-path="url(#chartArea)"/>
+
+    <!-- ═══ EGC LINE ═══ -->
+    <!-- EGC: starts from zero (bottom), rises organically with compound curve, continues after "investimento parou" -->
+    <path d="M60,138 C120,136 180,130 240,118 C300,100 360,78 430,55 C480,38 540,24 600,16 L640,12"
+          fill="none" stroke="#CD50F1" stroke-width="2.8" stroke-linecap="round" clip-path="url(#chartArea)"/>
+
+    <!-- Labels on the lines (with enough space from edges) -->
+    <text x="615" y="71" font-family="Inter, sans-serif" font-size="8" fill="#B8A4CC" font-weight="600">Ads</text>
+    <text x="615" y="9" font-family="Inter, sans-serif" font-size="8" fill="#CD50F1" font-weight="700">EGC</text>
+
+    <!-- Annotation: Ads drops -->
+    <text x="540" y="132" font-family="Inter, sans-serif" font-size="7" fill="#C0A4B8" opacity="0.8">Sem budget, alcance cai.</text>
+
+    <!-- Annotation: EGC continues -->
+    <text x="520" y="30" font-family="Inter, sans-serif" font-size="7" fill="#CD50F1" opacity="0.8">Continua crescendo sozinho.</text>
+
+    <!-- Month labels -->
+    <text x="110" y="157" font-family="Inter, sans-serif" font-size="9" fill="#7A6889" text-anchor="middle">Mês 1</text>
+    <text x="226" y="157" font-family="Inter, sans-serif" font-size="9" fill="#7A6889" text-anchor="middle">Mês 2</text>
+    <text x="342" y="157" font-family="Inter, sans-serif" font-size="9" fill="#7A6889" text-anchor="middle">Mês 3</text>
+    <text x="458" y="157" font-family="Inter, sans-serif" font-size="9" fill="#7A6889" text-anchor="middle">Mês 4</text>
+    <text x="574" y="157" font-family="Inter, sans-serif" font-size="9" fill="#7A6889" text-anchor="middle">Mês 5</text>
+
+    <!-- Y axis labels -->
+    <text x="55" y="142" font-family="Inter, sans-serif" font-size="7" fill="#B8A4CC" text-anchor="end">0</text>
+    <text x="55" y="70" font-family="Inter, sans-serif" font-size="7" fill="#B8A4CC" text-anchor="end">alcance</text>
+  </svg>
+</div>
+</body>
+</html>

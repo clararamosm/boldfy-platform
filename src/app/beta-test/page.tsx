@@ -10,6 +10,7 @@ import { Slider } from '@/components/ui/slider';
 import { sendBetaLeadToNotion } from '@/app/actions/beta-leads';
 import { Loader2, CheckCircle2, Calendar, ArrowRight, Megaphone, Target, Heart, Rocket, Skull, Calculator, Users, Eye, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const CALENDAR_URL = 'https://calendar.app.google/5Q1HDD2jZSkWa1DH6';
 
@@ -78,9 +79,12 @@ export default function BetaTestPage() {
         <div className="mx-auto max-w-6xl px-6 py-3 flex items-center justify-between">
           <LogoFull height={24} />
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-secondary px-3 py-1 rounded-full hidden sm:inline-flex">
               Pitch Sheet
             </span>
+            <Button onClick={scrollToForm} size="sm" className="text-[11px] font-bold h-8">
+              Quero ser beta tester <ArrowRight className="w-3 h-3 ml-1" />
+            </Button>
             <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Entrar
             </Link>
@@ -438,6 +442,75 @@ export default function BetaTestPage() {
           </div>
         </section>
 
+        {/* ═══ SHOWCASE ═══ */}
+        <section className="mb-6">
+          <div className="text-center mb-6">
+            <span className="inline-flex text-[10px] font-bold uppercase tracking-wide bg-primary text-white px-3 py-1 rounded-full mb-3">
+              a plataforma
+            </span>
+            <h3 className="font-headline text-sm font-bold text-accent-foreground mb-1">
+              Tudo isso dentro de um só lugar.
+            </h3>
+            <p className="text-[10px] text-muted-foreground">
+              IA, trilhas, missões, gamificação, calendário e analytics — tudo integrado.
+            </p>
+          </div>
+
+          <div className="relative h-[360px] md:h-[420px] mx-auto max-w-[1000px]">
+
+            {/* Screen 1: Dashboard (back left, largest) */}
+            <div className="absolute w-[260px] h-[170px] sm:w-[380px] sm:h-[250px] md:w-[480px] md:h-[310px] top-[30px] left-0 z-[1] rounded-xl overflow-hidden border border-primary/10 shadow-[0_8px_40px_rgba(93,42,103,0.12)] transition-all duration-400 hover:-translate-y-2 hover:shadow-[0_16px_60px_rgba(93,42,103,0.22)] hover:z-[10]" style={{ transform: 'rotate(-2deg)' }}>
+              <div className="absolute top-2 left-2 z-[5] inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-primary/15 rounded-lg px-2 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span className="text-[8px] font-bold uppercase tracking-wide text-[#5E2A67]">Dashboard</span>
+              </div>
+              <Image src="/images/pitch/dashboard.png" alt="Dashboard da Boldfy" fill className="object-cover object-top" sizes="(max-width: 640px) 260px, (max-width: 768px) 380px, 480px" />
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, transparent 0%, transparent 40%, hsl(var(--background) / 0.3) 70%, hsl(var(--background) / 0.85) 100%)' }} />
+            </div>
+
+            {/* Screen 2: Assistente IA (center, raised, hero) */}
+            <div className="absolute w-[240px] h-[160px] sm:w-[360px] sm:h-[240px] md:w-[440px] md:h-[300px] top-[5px] left-1/2 z-[4] rounded-xl overflow-hidden border border-primary/10 shadow-[0_8px_40px_rgba(93,42,103,0.15)] transition-all duration-400 hover:-translate-y-2 hover:shadow-[0_16px_60px_rgba(93,42,103,0.25)] hover:z-[10]" style={{ transform: 'translateX(-50%) rotate(0.5deg)' }}>
+              <div className="absolute top-2 left-2 z-[5] inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-primary/15 rounded-lg px-2 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span className="text-[8px] font-bold uppercase tracking-wide text-[#5E2A67]">Assistente IA</span>
+              </div>
+              <Image src="/images/pitch/assistente-ia.png" alt="Assistente de Conteúdo IA da Boldfy" fill className="object-cover object-top" sizes="(max-width: 640px) 240px, (max-width: 768px) 360px, 440px" />
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, transparent 0%, transparent 40%, hsl(var(--background) / 0.3) 70%, hsl(var(--background) / 0.85) 100%)' }} />
+            </div>
+
+            {/* Screen 3: Rankings (right, overlapping) */}
+            <div className="absolute w-[200px] h-[140px] sm:w-[300px] sm:h-[210px] md:w-[370px] md:h-[260px] top-[50px] right-0 z-[3] rounded-xl overflow-hidden border border-primary/10 shadow-[0_8px_40px_rgba(93,42,103,0.12)] transition-all duration-400 hover:-translate-y-2 hover:shadow-[0_16px_60px_rgba(93,42,103,0.22)] hover:z-[10]" style={{ transform: 'rotate(2deg)' }}>
+              <div className="absolute top-2 left-2 z-[5] inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-primary/15 rounded-lg px-2 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span className="text-[8px] font-bold uppercase tracking-wide text-[#5E2A67]">Rankings</span>
+              </div>
+              <Image src="/images/pitch/rankings.png" alt="Rankings e gamificação da Boldfy" fill className="object-cover object-top" sizes="(max-width: 640px) 200px, (max-width: 768px) 300px, 370px" />
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, transparent 0%, transparent 40%, hsl(var(--background) / 0.3) 70%, hsl(var(--background) / 0.85) 100%)' }} />
+            </div>
+
+            {/* Screen 4: Calendario (bottom left) */}
+            <div className="absolute w-[190px] h-[130px] sm:w-[280px] sm:h-[190px] md:w-[350px] md:h-[240px] bottom-0 left-[30px] sm:left-[50px] z-[2] rounded-xl overflow-hidden border border-primary/10 shadow-[0_8px_40px_rgba(93,42,103,0.12)] transition-all duration-400 hover:-translate-y-2 hover:shadow-[0_16px_60px_rgba(93,42,103,0.22)] hover:z-[10]" style={{ transform: 'rotate(1.5deg)' }}>
+              <div className="absolute top-2 left-2 z-[5] inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-primary/15 rounded-lg px-2 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span className="text-[8px] font-bold uppercase tracking-wide text-[#5E2A67]">Calendário</span>
+              </div>
+              <Image src="/images/pitch/calendario.png" alt="Calendário de conteúdo da Boldfy" fill className="object-cover object-top" sizes="(max-width: 640px) 190px, (max-width: 768px) 280px, 350px" />
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, transparent 0%, transparent 40%, hsl(var(--background) / 0.3) 70%, hsl(var(--background) / 0.85) 100%)' }} />
+            </div>
+
+            {/* Screen 5: Trilhas (bottom right) */}
+            <div className="absolute w-[180px] h-[125px] sm:w-[270px] sm:h-[185px] md:w-[340px] md:h-[230px] bottom-[5px] right-[40px] sm:right-[60px] z-[2] rounded-xl overflow-hidden border border-primary/10 shadow-[0_8px_40px_rgba(93,42,103,0.12)] transition-all duration-400 hover:-translate-y-2 hover:shadow-[0_16px_60px_rgba(93,42,103,0.22)] hover:z-[10]" style={{ transform: 'rotate(-1.5deg)' }}>
+              <div className="absolute top-2 left-2 z-[5] inline-flex items-center gap-1.5 bg-white/90 backdrop-blur-sm border border-primary/15 rounded-lg px-2 py-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <span className="text-[8px] font-bold uppercase tracking-wide text-[#5E2A67]">Trilhas</span>
+              </div>
+              <Image src="/images/pitch/trilhas.png" alt="Trilhas educativas da Boldfy" fill className="object-cover object-top" sizes="(max-width: 640px) 180px, (max-width: 768px) 270px, 340px" />
+              <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(180deg, transparent 0%, transparent 40%, hsl(var(--background) / 0.3) 70%, hsl(var(--background) / 0.85) 100%)' }} />
+            </div>
+
+          </div>
+        </section>
+
         {/* ═══ BENEFITS ═══ */}
         <section className="space-y-3 mb-6">
           <div className="bg-gradient-to-br from-[#5E2A67] to-[#3A1A45] rounded-xl px-5 py-3 flex flex-wrap items-center gap-3">
@@ -514,14 +587,9 @@ export default function BetaTestPage() {
             </h2>
             <p className="text-[11px] text-white/40">Estratégia primeiro. Execução pela plataforma. A gente faz junto.</p>
           </div>
-          <div className="flex gap-2 shrink-0">
-            <Button onClick={scrollToForm} className="text-[11px] font-bold">
-              Montar meu programa <ArrowRight className="w-3 h-3 ml-1" />
-            </Button>
-            <Button onClick={scrollToForm} variant="outline" className="text-[11px] font-bold border-primary/40 text-white/60 hover:text-white hover:bg-primary/10 bg-transparent">
-              Quero ser beta tester
-            </Button>
-          </div>
+          <Button onClick={scrollToForm} className="text-[11px] font-bold shrink-0">
+            Montar meu programa <ArrowRight className="w-3 h-3 ml-1" />
+          </Button>
         </section>
 
         {/* ═══ FORM ═══ */}
