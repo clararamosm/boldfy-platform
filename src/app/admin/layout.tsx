@@ -10,7 +10,7 @@ import Logo from "@/components/logo";
 import { AdminSidebarNav } from "@/components/dashboard/admin-sidebar-nav";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -132,33 +132,31 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 <AdminSidebarNav />
             </SidebarContent>
             <SidebarFooter>
-                <div className="flex items-center gap-1.5 px-2 mb-1 group-data-[state=collapsed]:justify-center">
+                <div className="flex items-center justify-center px-2 group-data-[state=collapsed]:justify-center">
                     <FeedbackDialog pagina="Sidebar" />
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" asChild>
-                        <Link href="/admin/suporte">
-                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                        </Link>
-                    </Button>
                 </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="w-full justify-start gap-2 px-2">
-                            <Avatar className="h-8 w-8">
+                        <Button variant="ghost" className="w-full justify-start gap-2 px-2 py-3 h-auto">
+                            <Avatar className="h-9 w-9 shrink-0">
+                                {user.profile?.avatarUrl && (
+                                    <AvatarImage src={user.profile.avatarUrl} alt={user.name || ''} />
+                                )}
                                 <AvatarFallback className="bg-primary/10 text-primary text-xs">
                                     {user.name?.substring(0, 2).toUpperCase() || 'AD'}
                                 </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
-                              <span className="text-sm font-medium truncate max-w-[150px]">{(user.name || '').split(' ')[0]}</span>
-                              <span className="text-xs text-muted-foreground truncate max-w-[150px]">Admin</span>
+                                <span className="text-sm font-medium truncate max-w-[130px]">{(user.name || '').split(' ')[0]}</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[130px]">Admin</span>
                             </div>
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuContent align="end" side="top" className="min-w-56 max-w-72">
                         <DropdownMenuLabel>
-                            <div className="flex flex-col">
-                                <span>{user.name || ''}</span>
-                                <p className="text-xs leading-none text-muted-foreground">
+                            <div className="flex flex-col gap-0.5">
+                                <span className="truncate">{user.name || ''}</span>
+                                <p className="text-[11px] leading-none text-muted-foreground truncate">
                                     {user.email || ''}
                                 </p>
                             </div>
@@ -168,6 +166,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                             <Link href="/admin/configuracoes">
                                 <UserIcon className="mr-2 h-4 w-4" />
                                 <span>Configurações</span>
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href="/admin/suporte">
+                                <HelpCircle className="mr-2 h-4 w-4" />
+                                <span>Suporte</span>
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
