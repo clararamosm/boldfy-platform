@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { LogoFull } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Slider } from '@/components/ui/slider';
 import { sendBetaLeadToNotion } from '@/app/actions/beta-leads';
-import { Loader2, CheckCircle2, Calendar, ArrowRight, Megaphone, Target, Heart, Rocket, Skull } from 'lucide-react';
+import { Loader2, CheckCircle2, Calendar, ArrowRight, Megaphone, Target, Heart, Rocket, Skull, Calculator, Users, Eye, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 
 const CALENDAR_URL = 'https://calendar.app.google/5Q1HDD2jZSkWa1DH6';
@@ -16,6 +17,25 @@ export default function BetaTestPage() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+
+  // Simulator state
+  const [simColabs, setSimColabs] = useState(5);
+  const [simImpressions, setSimImpressions] = useState(10000);
+
+  const simResults = useMemo(() => {
+    const CPM_BOLDFY = 0.30;
+    const CPM_ADS_LOW = 0.20;
+    const CPM_ADS_HIGH = 0.50;
+    const totalImpressions = simColabs * simImpressions;
+    const valorBoldfy = totalImpressions * CPM_BOLDFY;
+    const custoAdsLow = totalImpressions * CPM_ADS_LOW;
+    const custoAdsHigh = totalImpressions * CPM_ADS_HIGH;
+    // Monthly cost at first tier (R$499/seat) for comparison
+    const custoBoldfySeat = simColabs <= 10 ? 499 : simColabs <= 30 ? 399 : simColabs <= 99 ? 299 : 199;
+    const custoMensal = simColabs * custoBoldfySeat;
+    const roi = valorBoldfy > 0 ? ((valorBoldfy - custoMensal) / custoMensal * 100) : 0;
+    return { totalImpressions, valorBoldfy, custoAdsLow, custoAdsHigh, custoMensal, custoBoldfySeat, roi };
+  }, [simColabs, simImpressions]);
 
   // Form state
   const [nome, setNome] = useState('');
@@ -268,6 +288,131 @@ export default function BetaTestPage() {
             <text x="460" y="157" fontFamily="Inter, sans-serif" fontSize="9" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 4</text>
             <text x="574" y="157" fontFamily="Inter, sans-serif" fontSize="9" fill="hsl(279 33% 45%)" textAnchor="middle">Mês 5</text>
           </svg>
+        </section>
+
+        {/* ═══ ROI SIMULATOR ═══ */}
+        <section className="border rounded-xl overflow-hidden mb-6">
+          <div className="bg-gradient-to-br from-[#0F0A18] via-[#1A0E2E] to-[#2D1445] px-6 py-4 flex items-center gap-3">
+            <Calculator className="w-5 h-5 text-primary" />
+            <div>
+              <h3 className="font-headline text-sm font-bold text-white">Simulador de ROI</h3>
+              <p className="text-[10px] text-white/40">Veja quanto sua empresa economizaria em mídia paga com Employee Advocacy.</p>
+            </div>
+          </div>
+
+          <div className="bg-card p-6">
+            {/* Sliders */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {/* Colaboradores */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-semibold text-accent-foreground">Colaboradores no programa</span>
+                  </div>
+                  <span className="text-sm font-bold text-primary bg-secondary px-3 py-1 rounded-full">{simColabs}</span>
+                </div>
+                <Slider
+                  value={[simColabs]}
+                  onValueChange={(v) => setSimColabs(v[0])}
+                  min={5}
+                  max={100}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between mt-1">
+                  <span className="text-[9px] text-muted-foreground">5</span>
+                  <span className="text-[9px] text-muted-foreground">100</span>
+                </div>
+              </div>
+
+              {/* Impressões */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-primary" />
+                    <span className="text-xs font-semibold text-accent-foreground">Impressões/mês por colaborador</span>
+                  </div>
+                  <span className="text-sm font-bold text-primary bg-secondary px-3 py-1 rounded-full">{simImpressions.toLocaleString('pt-BR')}</span>
+                </div>
+                <Slider
+                  value={[simImpressions]}
+                  onValueChange={(v) => setSimImpressions(v[0])}
+                  min={1000}
+                  max={50000}
+                  step={1000}
+                  className="w-full"
+                />
+                <div className="flex justify-between mt-1">
+                  <span className="text-[9px] text-muted-foreground">1.000</span>
+                  <span className="text-[9px] text-muted-foreground">50.000</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Results */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              {/* Total de impressões */}
+              <div className="bg-secondary rounded-xl p-4 text-center">
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Impressões totais/mês</p>
+                <p className="font-headline text-lg font-bold text-accent-foreground">
+                  {simResults.totalImpressions.toLocaleString('pt-BR')}
+                </p>
+              </div>
+
+              {/* Valor equivalente */}
+              <div className="bg-secondary rounded-xl p-4 text-center border-2 border-primary">
+                <p className="text-[9px] font-semibold text-primary uppercase tracking-wide mb-1">Valor de mídia equivalente</p>
+                <p className="font-headline text-lg font-bold text-primary">
+                  R$ {simResults.valorBoldfy.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-[8px] text-muted-foreground">a R$ 0,30/impressão</p>
+              </div>
+
+              {/* Custo equivalente em Ads */}
+              <div className="bg-secondary rounded-xl p-4 text-center">
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Mesmo alcance via Ads</p>
+                <p className="font-headline text-lg font-bold text-accent-foreground">
+                  R$ {simResults.custoAdsLow.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  <span className="text-xs font-normal text-muted-foreground"> a </span>
+                  R$ {simResults.custoAdsHigh.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-[8px] text-muted-foreground">CPM de R$ 0,20 a R$ 0,50</p>
+              </div>
+
+              {/* Custo Boldfy */}
+              <div className="bg-secondary rounded-xl p-4 text-center">
+                <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Custo Boldfy/mês</p>
+                <p className="font-headline text-lg font-bold text-accent-foreground">
+                  R$ {simResults.custoMensal.toLocaleString('pt-BR')}
+                </p>
+                <p className="text-[8px] text-muted-foreground">R$ {simResults.custoBoldfySeat}/seat</p>
+              </div>
+            </div>
+
+            {/* ROI highlight */}
+            {simResults.roi > 0 && (
+              <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="text-xs font-bold text-accent-foreground">Retorno sobre investimento</p>
+                    <p className="text-[10px] text-muted-foreground">Valor de mídia gerado vs. custo da plataforma</p>
+                  </div>
+                </div>
+                <span className="font-headline text-2xl font-bold text-primary">
+                  {simResults.roi > 0 ? '+' : ''}{simResults.roi.toFixed(0)}%
+                </span>
+              </div>
+            )}
+
+            {/* Context note */}
+            <p className="text-[9px] text-muted-foreground text-center mt-4 leading-relaxed max-w-xl mx-auto">
+              Referência: no LinkedIn Ads, o CPM (custo por mil impressões) varia de R$ 20 a R$ 50 — ou seja, R$ 0,20 a R$ 0,50 por impressão.
+              Com Employee Advocacy, essas impressões vêm de perfis pessoais (alcance orgânico), sem custo de mídia.
+              O valor de R$ 0,30/impressão é uma estimativa conservadora de mercado.
+            </p>
+          </div>
         </section>
 
         {/* ═══ FLOW ═══ */}
