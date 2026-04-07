@@ -37,11 +37,14 @@ function BetaTestContent() {
     const valorBoldfy = totalImpressions * CPM_BOLDFY;
     const custoAdsLow = totalImpressions * CPM_ADS_LOW;
     const custoAdsHigh = totalImpressions * CPM_ADS_HIGH;
-    // Monthly cost at first tier (R$499/seat) for comparison
-    const custoBoldfySeat = simColabs <= 10 ? 499 : simColabs <= 30 ? 399 : simColabs <= 99 ? 299 : 199;
+    // Monthly cost per seat based on tier
+    const custoBoldfySeat = simColabs <= 10 ? 499 : simColabs <= 20 ? 449 : simColabs <= 40 ? 399 : 349;
     const custoMensal = simColabs * custoBoldfySeat;
-    const roi = valorBoldfy > 0 ? ((valorBoldfy - custoMensal) / custoMensal * 100) : 0;
-    return { totalImpressions, valorBoldfy, custoAdsLow, custoAdsHigh, custoMensal, custoBoldfySeat, roi };
+    // Beta price (30% off)
+    const custoBetaSeat = Math.round(custoBoldfySeat * 0.7);
+    const custoMensalBeta = simColabs * custoBetaSeat;
+    const roi = valorBoldfy > 0 ? ((valorBoldfy - custoMensalBeta) / custoMensalBeta * 100) : 0;
+    return { totalImpressions, valorBoldfy, custoAdsLow, custoAdsHigh, custoMensal, custoBoldfySeat, custoMensalBeta, custoBetaSeat, roi };
   }, [simColabs, simImpressions]);
 
   // Locale-aware data arrays
@@ -130,10 +133,11 @@ function BetaTestContent() {
   ];
 
   const pricingTiers = [
-    { range: '5 \u2013 10 seats', price: 'R$ 499', featured: false },
-    { range: '11 \u2013 30 seats', price: 'R$ 399', featured: false },
-    { range: '31 \u2013 99 seats', price: 'R$ 299', featured: false },
-    { range: '100+ seats', price: 'R$ 199', featured: true },
+    { range: '5 \u2013 10 seats', price: 'R$ 499', betaPrice: 'R$ 349', featured: false, enterprise: false },
+    { range: '11 \u2013 20 seats', price: 'R$ 449', betaPrice: 'R$ 315', featured: false, enterprise: false },
+    { range: '21 \u2013 40 seats', price: 'R$ 399', betaPrice: 'R$ 279', featured: true, enterprise: false },
+    { range: '41 \u2013 70 seats', price: 'R$ 349', betaPrice: 'R$ 245', featured: false, enterprise: false },
+    { range: '70+ seats', price: '', betaPrice: '', featured: false, enterprise: true },
   ];
 
   const showcaseLabels = locale === 'en'
@@ -404,13 +408,13 @@ function BetaTestContent() {
                   value={[simColabs]}
                   onValueChange={(v) => setSimColabs(v[0])}
                   min={5}
-                  max={100}
+                  max={70}
                   step={1}
                   className="w-full"
                 />
                 <div className="flex justify-between mt-1">
                   <span className="text-[9px] text-muted-foreground">5</span>
-                  <span className="text-[9px] text-muted-foreground">100</span>
+                  <span className="text-[9px] text-muted-foreground">70</span>
                 </div>
               </div>
 
@@ -469,12 +473,16 @@ function BetaTestContent() {
               </div>
 
               {/* Boldfy cost */}
-              <div className="bg-secondary rounded-xl p-4 text-center">
+              <div className="bg-secondary rounded-xl p-4 text-center border-2 border-primary/30">
                 <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t.betaTest.boldfyCostMonth}</p>
-                <p className="font-headline text-lg font-bold text-accent-foreground">
+                <p className="text-[10px] text-muted-foreground line-through">
                   R$ {simResults.custoMensal.toLocaleString('pt-BR')}
                 </p>
-                <p className="text-[8px] text-muted-foreground">R$ {simResults.custoBoldfySeat}{t.betaTest.perSeat}</p>
+                <p className="font-headline text-lg font-bold text-primary">
+                  R$ {simResults.custoMensalBeta.toLocaleString('pt-BR')}
+                </p>
+                <p className="text-[8px] text-muted-foreground">R$ {simResults.custoBetaSeat}{t.betaTest.perSeat}</p>
+                <span className="inline-flex text-[7px] font-bold uppercase tracking-wide bg-primary/15 text-primary px-2 py-0.5 rounded-full mt-1">{t.betaTest.betaPriceLabel}</span>
               </div>
             </div>
 
@@ -626,6 +634,7 @@ function BetaTestContent() {
               <span className="text-primary">{t.betaTest.betaBannerTitle}</span> {t.betaTest.betaBannerTitleSuffix}
             </h3>
             <p className="text-[11px] text-white/50">{t.betaTest.betaBannerSubtitle}</p>
+            <p className="text-[10px] text-primary/70 font-semibold mt-1">{t.betaTest.betaContractTerms}</p>
           </div>
           <div className="flex gap-2 shrink-0">
             {[t.betaTest.freeSetup, t.betaTest.strategyIncluded, t.betaTest.directSupport].map((f) => (
@@ -635,12 +644,25 @@ function BetaTestContent() {
         </section>
 
         {/* PRICING */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <section className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
           {pricingTiers.map((p) => (
-            <div key={p.range} className={`bg-card rounded-xl p-4 text-center ${p.featured ? 'border-2 border-primary bg-secondary' : 'border'}`}>
-              <p className="text-[10px] font-semibold text-primary/70 mb-1">{p.range}</p>
-              <p className="font-headline text-xl font-bold text-accent-foreground">{p.price}</p>
-              <p className="text-[9px] text-muted-foreground">{t.betaTest.seatMonth}</p>
+            <div key={p.range} className={`bg-card rounded-xl p-4 text-center ${p.featured ? 'border-2 border-primary bg-secondary' : 'border'} ${p.enterprise ? 'bg-gradient-to-br from-[#1A0E2E] to-[#0F0A18] border-primary/30' : ''}`}>
+              <p className={`text-[10px] font-semibold mb-1 ${p.enterprise ? 'text-primary' : 'text-primary/70'}`}>{p.range}</p>
+              {p.enterprise ? (
+                <>
+                  <p className="font-headline text-sm font-bold text-white mt-2">{t.betaTest.enterprisePrice}</p>
+                  <button onClick={scrollToForm} className="mt-2 text-[9px] font-bold text-primary hover:text-primary/80 underline underline-offset-2 transition-colors">
+                    {t.betaTest.enterpriseCta}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-[10px] text-muted-foreground line-through mb-0.5">{p.price}</p>
+                  <p className="font-headline text-xl font-bold text-accent-foreground">{p.betaPrice}</p>
+                  <p className="text-[9px] text-muted-foreground">{t.betaTest.seatMonth}</p>
+                  <span className="inline-flex text-[8px] font-bold uppercase tracking-wide bg-primary/15 text-primary px-2 py-0.5 rounded-full mt-1.5">{t.betaTest.betaPriceLabel}</span>
+                </>
+              )}
             </div>
           ))}
         </section>
