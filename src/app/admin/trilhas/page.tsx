@@ -26,10 +26,13 @@ import { TrailBuilder, TrailCard, AnalyticsDialog, calcPontuacao, type TrailForm
 import type { TrilhaAnalytics } from '@/types/trilhas';
 import { Header } from '@/components/dashboard/header';
 import { SuggestTrailDialog } from '@/components/suggest-trail-dialog';
+import { useLocale, useT } from '@/lib/i18n/context';
 
 export default function AdminTrilhasPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const locale = useLocale();
+  const t = useT();
   const companyId = user?.companyId || null;
 
   const [loading, setLoading] = useState(true);
@@ -75,7 +78,9 @@ export default function AdminTrilhasPage() {
     setLoading(true);
     try {
       const sessSnap = await getDocs(query(collection(db, 'globalSessions'), orderBy('ordem', 'asc')));
-      const sessions = sessSnap.docs.map(d => ({ id: d.id, ...d.data() } as Sessao)).filter(s => s.ativa);
+      const sessions = sessSnap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Sessao))
+        .filter(s => s.ativa && (s.locale || 'pt-BR') === locale);
       setGlobalSessions(sessions);
 
       const trailsMap: Record<string, Trilha[]> = {};
@@ -89,11 +94,11 @@ export default function AdminTrilhasPage() {
       setActivatedTrailIds(new Set(actSnap.docs.map(d => d.id)));
     } catch (err) {
       console.error('Erro ao carregar trilhas globais:', err);
-      toast({ variant: 'destructive', title: 'Erro ao carregar trilhas', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: t.adminTrails.toastTrailLoadError, description: err instanceof Error ? err.message : '' });
     } finally {
       setLoading(false);
     }
-  }, [companyId, toast]);
+  }, [companyId, locale, toast]);
 
   // ============================================================
   // Load company custom sessions + trails
@@ -113,7 +118,7 @@ export default function AdminTrilhasPage() {
       setCompanyTrailsBySession(trailsBySession);
     } catch (err) {
       console.error('Erro ao carregar sessoes da empresa:', err);
-      toast({ variant: 'destructive', title: 'Erro ao carregar sessoes', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: t.adminTrails.toastSessionLoadError, description: err instanceof Error ? err.message : '' });
     }
   }, [companyId, toast]);
 
@@ -142,10 +147,10 @@ export default function AdminTrilhasPage() {
         });
         setActivatedTrailIds(prev => { const next = new Set(prev); next.add(trail.id); return next; });
       }
-      toast({ title: 'Trilha alterada com sucesso!' });
+      toast({ title: t.adminTrails.toastTrailToggled });
     } catch (err) {
       console.error('Erro ao alterar trilha:', err);
-      toast({ variant: 'destructive', title: 'Erro ao alterar trilha', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: t.adminTrails.toastTrailToggleError, description: err instanceof Error ? err.message : '' });
     } finally {
       setTogglingTrail(null);
     }
@@ -162,13 +167,13 @@ export default function AdminTrilhasPage() {
         titulo: sessionForm.titulo, descricao: sessionForm.descricao,
         ordem: companySessions.length + 1, ativa: true, criadaEm: Timestamp.now(),
       });
-      toast({ title: 'Sessao criada com sucesso!' });
+      toast({ title: t.adminTrails.toastSessionCreated });
       setSessionDialogOpen(false);
       setSessionForm({ titulo: '', descricao: '' });
       loadCompanyData();
     } catch (err) {
       console.error('Erro ao criar sessao:', err);
-      toast({ variant: 'destructive', title: 'Erro ao criar sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: t.adminTrails.toastSessionCreateError, description: err instanceof Error ? err.message : '' });
     } finally {
       setSaving(false);
     }
@@ -181,12 +186,12 @@ export default function AdminTrilhasPage() {
       await updateDoc(doc(db, `companies/${companyId}/sessions`, editingCompanySession.id), {
         titulo: editSessionForm.titulo, descricao: editSessionForm.descricao, atualizadaEm: Timestamp.now(),
       });
-      toast({ title: 'Sessao atualizada com sucesso!' });
+      toast({ title: t.adminTrails.toastSessionUpdated });
       setEditSessionDialogOpen(false);
       loadCompanyData();
     } catch (err) {
       console.error('Erro ao atualizar sessao:', err);
-      toast({ variant: 'destructive', title: 'Erro ao atualizar sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: t.adminTrails.toastSessionUpdateError, description: err instanceof Error ? err.message : '' });
     } finally {
       setSaving(false);
     }
@@ -199,11 +204,11 @@ export default function AdminTrilhasPage() {
       await updateDoc(doc(db, `companies/${companyId}/sessions`, session.id), {
         ativa: !session.ativa, atualizadaEm: Timestamp.now(),
       });
-      toast({ title: `Sessao ${session.ativa ? 'desativada' : 'ativada'} com sucesso!` });
+      toast({ title: session.ativa ? t.adminTrails.toastSessionDeactivated : t.adminTrails.toastSessionActivated });
       loadCompanyData();
     } catch (err) {
       console.error('Erro ao alterar sessao:', err);
-      toast({ variant: 'destructive', title: 'Erro ao alterar sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: t.adminTrails.toastSessionToggleError, description: err instanceof Error ? err.message : '' });
     } finally {
       setTogglingSession(null);
     }
@@ -215,11 +220,11 @@ export default function AdminTrilhasPage() {
       await updateDoc(doc(db, `companies/${companyId}/sessions/${sessionId}/trails`, trail.id), {
         ativa: !trail.ativa, atualizadaEm: Timestamp.now(),
       });
-      toast({ title: `Trilha ${trail.ativa ? 'desativada' : 'ativada'} com sucesso!` });
+      toast({ title: trail.ativa ? t.adminTrails.toastTrailDeactivated : t.adminTrails.toastTrailActivated });
       loadCompanyData();
     } catch (err) {
       console.error('Erro ao alterar trilha:', err);
-      toast({ variant: 'destructive', title: 'Erro ao alterar trilha', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: t.adminTrails.toastTrailToggleError, description: err instanceof Error ? err.message : '' });
     }
   };
 
@@ -243,7 +248,7 @@ export default function AdminTrilhasPage() {
   const saveCompanyTrail = async () => {
     if (!companyId || !selectedSession) return;
     if (!trailForm.titulo.trim()) {
-      toast({ variant: 'destructive', title: 'Titulo obrigatorio', description: 'Preencha o titulo da trilha para salvar.' });
+      toast({ variant: 'destructive', title: t.adminTrails.validationTitleRequired, description: t.adminTrails.validationTitleMessage });
       return;
     }
     setSaving(true);
@@ -265,10 +270,10 @@ export default function AdminTrilhasPage() {
       }
       setBuilderOpen(false);
       loadCompanyData();
-      toast({ title: 'Trilha salva com sucesso!' });
+      toast({ title: t.adminTrails.toastTrailSaved });
     } catch (err) {
       console.error('Erro ao salvar trilha:', err);
-      toast({ variant: 'destructive', title: 'Erro ao salvar', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: t.adminTrails.toastTrailSaveError, description: err instanceof Error ? err.message : '' });
     } finally {
       setSaving(false);
     }
@@ -303,7 +308,7 @@ export default function AdminTrilhasPage() {
   // ============================================================
   return (
     <>
-      <Header title="Trilhas" />
+      <Header title={t.adminTrails.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
 
       {loading ? (
@@ -312,10 +317,10 @@ export default function AdminTrilhasPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="global" className="flex items-center gap-2">
-              <Globe className="w-4 h-4" /> Trilhas Globais
+              <Globe className="w-4 h-4" /> {t.adminTrails.globalTrails}
             </TabsTrigger>
             <TabsTrigger value="custom" className="flex items-center gap-2">
-              <Building2 className="w-4 h-4" /> Trilhas da Empresa
+              <Building2 className="w-4 h-4" /> {t.adminTrails.companyTrails}
             </TabsTrigger>
           </TabsList>
 
@@ -325,8 +330,8 @@ export default function AdminTrilhasPage() {
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Globe className="w-12 h-12 text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium">Nenhuma trilha global disponivel</p>
-                  <p className="text-muted-foreground">O administrador master ainda nao criou trilhas globais</p>
+                  <p className="text-lg font-medium">{t.adminTrails.noGlobalTrails}</p>
+                  <p className="text-muted-foreground">{t.adminTrails.noGlobalTrailsDescription}</p>
                 </CardContent>
               </Card>
             ) : (
@@ -341,7 +346,7 @@ export default function AdminTrilhasPage() {
                   </CardHeader>
                   <CardContent>
                     {(globalTrailsBySession[session.id] || []).length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma trilha nesta sessao</p>
+                      <p className="text-sm text-muted-foreground py-4 text-center">{t.adminTrails.noTrailsInSession}</p>
                     ) : (
                       <div className="space-y-2">
                         {(globalTrailsBySession[session.id] || []).map(trail => (
@@ -366,7 +371,7 @@ export default function AdminTrilhasPage() {
           <TabsContent value="custom" className="space-y-4 mt-4">
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setSessionForm({ titulo: '', descricao: '' }); setSessionDialogOpen(true); }}>
-                <FolderOpen className="w-4 h-4 mr-2" /> Nova Sessao
+                <FolderOpen className="w-4 h-4 mr-2" /> {t.adminTrails.newSession}
               </Button>
             </div>
 
@@ -374,10 +379,10 @@ export default function AdminTrilhasPage() {
               <Card className="border-dashed">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Building2 className="w-12 h-12 text-muted-foreground mb-4" />
-                  <p className="text-lg font-medium">Nenhuma sessao personalizada</p>
-                  <p className="text-muted-foreground mb-4">Crie sessoes e trilhas exclusivas da sua empresa</p>
+                  <p className="text-lg font-medium">{t.adminTrails.noCustomSessions}</p>
+                  <p className="text-muted-foreground mb-4">{t.adminTrails.noCustomSessionsDescription}</p>
                   <Button variant="outline" onClick={() => { setSessionForm({ titulo: '', descricao: '' }); setSessionDialogOpen(true); }}>
-                    <Plus className="w-4 h-4 mr-2" /> Criar Sessao
+                    <Plus className="w-4 h-4 mr-2" /> {t.adminTrails.createSession}
                   </Button>
                 </CardContent>
               </Card>
@@ -398,7 +403,7 @@ export default function AdminTrilhasPage() {
                           {isSessionToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                             <Switch checked={session.ativa} onCheckedChange={() => toggleCompanySessionActive(session)} />
                           )}
-                          <span className="text-xs text-muted-foreground w-16">{session.ativa ? 'Ativa' : 'Inativa'}</span>
+                          <span className="text-xs text-muted-foreground w-16">{session.ativa ? t.adminTrails.sessionActive : t.adminTrails.sessionInactive}</span>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => {
                           setEditingCompanySession(session);
@@ -408,7 +413,7 @@ export default function AdminTrilhasPage() {
                           <Pencil className="w-4 h-4" />
                         </Button>
                         <Button size="sm" onClick={() => openBuilder(session)} className="bg-purple-600 hover:bg-purple-700">
-                          <Plus className="w-4 h-4 mr-2" /> Nova Trilha
+                          <Plus className="w-4 h-4 mr-2" /> {t.adminTrails.newTrail}
                         </Button>
                       </div>
                     </div>
@@ -416,7 +421,7 @@ export default function AdminTrilhasPage() {
                   </CardHeader>
                   <CardContent>
                     {sessionTrails.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">Nenhuma trilha nesta sessao. Clique em &quot;Nova Trilha&quot; para criar.</p>
+                      <p className="text-sm text-muted-foreground text-center py-4">{t.adminTrails.noTrailsInSessionCreate}</p>
                     ) : (
                       <div className="space-y-2">
                         {sessionTrails.map(trail => (
@@ -425,13 +430,13 @@ export default function AdminTrilhasPage() {
                             trail={trail}
                             onEdit={() => openBuilder(session, trail)}
                             onDelete={async () => {
-                              if (!companyId || !confirm('Excluir esta trilha?')) return;
+                              if (!companyId || !confirm(t.adminTrails.deleteTrailConfirm)) return;
                               try {
                                 await deleteDoc(doc(db, `companies/${companyId}/sessions/${session.id}/trails`, trail.id));
                                 loadCompanyData();
-                                toast({ title: 'Trilha excluida com sucesso' });
+                                toast({ title: t.adminTrails.toastTrailDeleted });
                               } catch (err) {
-                                toast({ variant: 'destructive', title: 'Erro ao excluir', description: err instanceof Error ? err.message : 'Erro' });
+                                toast({ variant: 'destructive', title: t.adminTrails.toastTrailDeleteError, description: err instanceof Error ? err.message : '' });
                               }
                             }}
                             onAnalytics={() => openAnalytics(trail)}
@@ -452,15 +457,15 @@ export default function AdminTrilhasPage() {
       {/* SESSION DIALOG */}
       <Dialog open={sessionDialogOpen} onOpenChange={setSessionDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Nova Sessao</DialogTitle><DialogDescription>Crie uma sessao personalizada</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{t.adminTrails.newSessionTitle}</DialogTitle><DialogDescription>{t.adminTrails.newSessionDescription}</DialogDescription></DialogHeader>
           <div className="space-y-4">
-            <div><Label>Titulo</Label><Input value={sessionForm.titulo} onChange={e => setSessionForm({ ...sessionForm, titulo: e.target.value })} /></div>
-            <div><Label>Descricao</Label><Textarea value={sessionForm.descricao} onChange={e => setSessionForm({ ...sessionForm, descricao: e.target.value })} /></div>
+            <div><Label>{t.adminTrails.titleLabel}</Label><Input value={sessionForm.titulo} onChange={e => setSessionForm({ ...sessionForm, titulo: e.target.value })} /></div>
+            <div><Label>{t.adminTrails.descriptionLabel}</Label><Textarea value={sessionForm.descricao} onChange={e => setSessionForm({ ...sessionForm, descricao: e.target.value })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSessionDialogOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setSessionDialogOpen(false)}>{t.common.cancel}</Button>
             <Button onClick={saveCompanySession} disabled={saving} className="bg-purple-600 hover:bg-purple-700">
-              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Criar
+              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} {t.common.create}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -469,15 +474,15 @@ export default function AdminTrilhasPage() {
       {/* EDIT SESSION DIALOG */}
       <Dialog open={editSessionDialogOpen} onOpenChange={setEditSessionDialogOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar Sessao</DialogTitle><DialogDescription>Atualize os dados da sessao</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{t.adminTrails.editSessionTitle}</DialogTitle><DialogDescription>{t.adminTrails.editSessionDescription}</DialogDescription></DialogHeader>
           <div className="space-y-4">
-            <div><Label>Titulo</Label><Input value={editSessionForm.titulo} onChange={e => setEditSessionForm({ ...editSessionForm, titulo: e.target.value })} /></div>
-            <div><Label>Descricao</Label><Textarea value={editSessionForm.descricao} onChange={e => setEditSessionForm({ ...editSessionForm, descricao: e.target.value })} /></div>
+            <div><Label>{t.adminTrails.titleLabel}</Label><Input value={editSessionForm.titulo} onChange={e => setEditSessionForm({ ...editSessionForm, titulo: e.target.value })} /></div>
+            <div><Label>{t.adminTrails.descriptionLabel}</Label><Textarea value={editSessionForm.descricao} onChange={e => setEditSessionForm({ ...editSessionForm, descricao: e.target.value })} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditSessionDialogOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setEditSessionDialogOpen(false)}>{t.common.cancel}</Button>
             <Button onClick={updateCompanySession} disabled={saving} className="bg-purple-600 hover:bg-purple-700">
-              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} Salvar
+              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null} {t.common.save}
             </Button>
           </DialogFooter>
         </DialogContent>

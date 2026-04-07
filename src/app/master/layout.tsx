@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogOut, Loader2 } from "lucide-react";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { LocaleProvider } from "@/lib/i18n/context";
 
 function MasterLayoutInner({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -94,9 +95,11 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <DashboardLayout sidebar={sidebarContent}>
-      {children}
-    </DashboardLayout>
+    <LocaleProvider locale="pt-BR">
+      <DashboardLayout sidebar={sidebarContent}>
+        {children}
+      </DashboardLayout>
+    </LocaleProvider>
   );
 }
 

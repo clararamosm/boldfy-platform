@@ -3,7 +3,8 @@
 import type React from "react";
 import { useState, useEffect } from 'react';
 import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { SidebarHeader, SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
 import Logo from "@/components/logo";
 import { ColaboradorSidebarNav } from "@/components/dashboard/colaborador-sidebar-nav";
@@ -16,6 +17,9 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { LogOut, User as UserIcon, Loader2, AlertTriangle, Linkedin, HelpCircle } from "lucide-react";
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { FeedbackDialog } from "@/components/feedback-dialog";
+import { LocaleProvider, useT } from "@/lib/i18n/context";
+import { interpolate } from "@/lib/i18n/interpolate";
+import type { Locale } from "@/lib/i18n/types";
 
 type TokenStatus = 'valid' | 'expiring_soon' | 'expired' | 'not_connected';
 
@@ -31,9 +35,11 @@ function getTokenStatus(rawData: Record<string, unknown>): { status: TokenStatus
 }
 
 function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
+    const t = useT();
     const { user, loading } = useAuth();
     const router = useRouter();
     const [tokenStatus, setTokenStatus] = useState<{ status: TokenStatus; daysLeft: number }>({ status: 'not_connected', daysLeft: 0 });
+    const [companyLocale, setCompanyLocale] = useState<Locale>('pt-BR');
 
     useEffect(() => {
         if (loading) return;
@@ -47,6 +53,14 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
         }
         if (user.rawData) {
             setTokenStatus(getTokenStatus(user.rawData));
+        }
+        // Buscar locale da empresa
+        if (user.companyId) {
+            getDoc(doc(db, 'companies', user.companyId)).then((compDoc) => {
+                if (compDoc.exists()) {
+                    setCompanyLocale((compDoc.data().locale as Locale) || 'pt-BR');
+                }
+            });
         }
     }, [user, loading, router]);
 
@@ -91,7 +105,7 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
                             </Avatar>
                             <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
                                 <span className="text-sm font-medium truncate max-w-[130px]">{(user.name || '').split(' ')[0]}</span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[130px]">Colaborador</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[130px]">{t.roles.collaborator}</span>
                             </div>
                         </Button>
                     </DropdownMenuTrigger>
@@ -108,19 +122,19 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
                         <DropdownMenuItem asChild>
                             <Link href="/colaborador/configuracoes">
                                 <UserIcon className="mr-2 h-4 w-4" />
-                                <span>Configurações</span>
+                                <span>{t.nav.settings}</span>
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                             <Link href="/colaborador/suporte">
                                 <HelpCircle className="mr-2 h-4 w-4" />
-                                <span>Suporte</span>
+                                <span>{t.nav.support}</span>
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout}>
                             <LogOut className="mr-2 h-4 w-4" />
-                            Sair
+                            {t.nav.signOut}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -129,15 +143,16 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
     );
 
     return (
+        <LocaleProvider locale={companyLocale}>
         <DashboardLayout sidebar={sidebarContent}>
             {tokenStatus.status === 'expired' && (
                 <div className="bg-red-50 border-b border-red-200 px-4 py-2.5 flex items-center justify-between dark:bg-red-950/30 dark:border-red-900">
                     <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
                         <AlertTriangle className="h-4 w-4 shrink-0" />
-                        <span className="text-sm font-medium">Seu token do LinkedIn expirou. Reconecte para continuar publicando.</span>
+                        <span className="text-sm font-medium">{t.colabLayout.tokenExpired}</span>
                     </div>
                     <Link href="/colaborador/configuracoes" className="text-sm font-medium text-red-700 dark:text-red-400 hover:underline whitespace-nowrap flex items-center gap-1">
-                        <Linkedin className="h-3.5 w-3.5" /> Reconectar
+                        <Linkedin className="h-3.5 w-3.5" /> {t.colabLayout.reconnect}
                     </Link>
                 </div>
             )}
@@ -146,16 +161,17 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
                     <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
                         <AlertTriangle className="h-4 w-4 shrink-0" />
                         <span className="text-sm font-medium">
-                            Seu token do LinkedIn expira em {tokenStatus.daysLeft} dia{tokenStatus.daysLeft !== 1 ? 's' : ''}. Reconecte para evitar interrupções.
+                            {interpolate(t.colabLayout.tokenExpiring, { days: tokenStatus.daysLeft })}
                         </span>
                     </div>
                     <Link href="/colaborador/configuracoes" className="text-sm font-medium text-amber-700 dark:text-amber-400 hover:underline whitespace-nowrap flex items-center gap-1">
-                        <Linkedin className="h-3.5 w-3.5" /> Reconectar
+                        <Linkedin className="h-3.5 w-3.5" /> {t.colabLayout.reconnect}
                     </Link>
                 </div>
             )}
             {children}
         </DashboardLayout>
+        </LocaleProvider>
     );
 }
 

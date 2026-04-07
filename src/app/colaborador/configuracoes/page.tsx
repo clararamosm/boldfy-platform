@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInAuthUrl, disconnectLinkedIn } from "@/app/actions/linkedin";
+import { useT } from '@/lib/i18n/context';
 
 type ProfileData = {
     name: string;
@@ -74,6 +75,7 @@ function SettingsSkeleton() {
 }
 
 function SettingsPageContent() {
+    const t = useT();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -249,7 +251,7 @@ function SettingsPageContent() {
             <main className="flex-1 p-6 md:p-10">
                 <div className="mx-auto max-w-4xl space-y-8">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
+                        <h1 className="text-3xl font-bold tracking-tight">{t.adminSettings.title}</h1>
                         <p className="text-muted-foreground">
                             Gerencie suas configurações de conta e preferências de marca pessoal.
                         </p>
@@ -517,9 +519,9 @@ function SettingsPageContent() {
                             {/* Notificações */}
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Notificações</CardTitle>
+                                    <CardTitle>{t.adminSettings.notificationsTitle}</CardTitle>
                                     <CardDescription>
-                                        Configure como e quando deseja receber notificações.
+                                        {t.adminSettings.notificationsDescription}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
@@ -559,10 +561,10 @@ function SettingsPageContent() {
                                     {isSaving ? (
                                         <>
                                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                            Salvando...
+                                            {t.common.saving}
                                         </>
                                     ) : (
-                                        "Salvar configurações"
+                                        t.common.saveChanges
                                     )}
                                 </Button>
                             </div>
@@ -575,7 +577,7 @@ function SettingsPageContent() {
                                     rel="noopener noreferrer"
                                     className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
                                 >
-                                    Política de Privacidade
+                                    {t.common.privacyPolicy}
                                 </a>
                             </div>
                         </>

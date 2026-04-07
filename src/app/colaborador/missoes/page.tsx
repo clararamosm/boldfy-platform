@@ -20,8 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAuthToken } from '@/lib/auth-client';
 import { submitMissionProof, completeMissionSelf } from "@/app/actions";
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { useT } from '@/lib/i18n/context';
+import { useFormat } from '@/hooks/use-format-date';
 
 type MissionStatus = 'completa' | 'pendente' | 'aguardando' | 'rejeitada' | 'agendada' | 'expirada';
 
@@ -41,16 +41,21 @@ type Mission = {
     assignedTo?: string;
 };
 
-const formatDate = (d: any) => {
-    if (!d) return '';
-    const date = d.toDate ? d.toDate() : new Date(d);
-    return format(date, "dd/MM/yyyy", { locale: ptBR });
+const toDate = (d: any): Date | null => {
+    if (!d) return null;
+    return d.toDate ? d.toDate() : new Date(d);
 };
 
 // ---- Sub-components ----
 const MissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: { mission: Mission, onSubmitProof: (missionId: string, file: File) => Promise<void>, onAutoComplete: (missionId: string) => Promise<void>, isSubmitting: boolean }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const t = useT();
+    const { fmtDate } = useFormat();
+    const formatDate = (d: any) => {
+        const date = toDate(d);
+        return date ? fmtDate(date, 'dd/MM/yyyy') : '';
+    };
 
     const handleSubmit = async () => {
         if (!selectedFile) return;
@@ -62,44 +67,44 @@ const MissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: {
     const statusConfig: Record<MissionStatus, { icon: React.ReactNode; text: string; color: string; badge?: string; badgeClass?: string; button: React.ReactNode }> = {
         completa: {
             icon: <CheckCircle className="h-4 w-4 mr-2" />,
-            text: "Missão Concluída",
+            text: t.colabMissions.completed,
             color: "text-green-600",
-            badge: "Concluída",
+            badge: t.colabMissions.completed,
             badgeClass: "bg-green-100 text-green-700",
-            button: <Button disabled variant="secondary"><CheckCircle className="mr-2 h-4 w-4" />Concluída</Button>
+            button: <Button disabled variant="secondary"><CheckCircle className="mr-2 h-4 w-4" />{t.colabMissions.completedButton}</Button>
         },
         aguardando: {
             icon: <HourglassIcon className="h-4 w-4 mr-2" />,
-            text: "Aguardando aprovação do admin",
+            text: t.colabMissions.waitingApproval,
             color: "text-yellow-600",
-            badge: "Aguardando",
+            badge: t.colabMissions.waiting,
             badgeClass: "bg-yellow-100 text-yellow-700",
-            button: <Button disabled variant="outline"><HourglassIcon className="mr-2 h-4 w-4" />Aguardando aprovação</Button>
+            button: <Button disabled variant="outline"><HourglassIcon className="mr-2 h-4 w-4" />{t.colabMissions.waitingApproval}</Button>
         },
         rejeitada: {
             icon: <XCircle className="h-4 w-4 mr-2" />,
-            text: mission.submissionFeedback ? `Motivo: ${mission.submissionFeedback}` : "Comprovação rejeitada. Envie novamente.",
+            text: mission.submissionFeedback ? t.colabMissions.rejectionReason.replace('{feedback}', mission.submissionFeedback) : t.colabMissions.rejected,
             color: "text-red-600",
-            badge: "Rejeitada",
+            badge: t.colabMissions.rejected,
             badgeClass: "bg-red-100 text-red-700",
             button: (
                 <ActionDialog
-                    title="Reenviar Comprovação"
-                    description={`Envie um novo anexo para a missão "${mission.name}".`}
-                    trigger={<Button variant="destructive"><Upload className="mr-2 h-4 w-4" /> Reenviar</Button>}
-                    actionText={selectedFile ? "Enviar Comprovação" : "Selecione um arquivo"}
+                    title={t.colabMissions.resubmitProof}
+                    description={t.colabMissions.resubmitDescription.replace('{name}', mission.name)}
+                    trigger={<Button variant="destructive"><Upload className="mr-2 h-4 w-4" /> {t.colabMissions.resubmitProof}</Button>}
+                    actionText={selectedFile ? t.colabMissions.submitProof : t.colabMissions.selectFile}
                     onAction={handleSubmit}
                     showCancel
                     open={dialogOpen}
                     onOpenChange={setDialogOpen}
                 >
                     <div className="space-y-2">
-                        <Label htmlFor={`file-${mission.id}`} className="sr-only">Arquivo</Label>
+                        <Label htmlFor={`file-${mission.id}`} className="sr-only">{t.colabMissions.fileLabel}</Label>
                         <Input id={`file-${mission.id}`} type="file" accept="image/*,video/*,.pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} disabled={isSubmitting} />
-                        <p className="text-xs text-muted-foreground">Envie uma imagem, vídeo ou PDF como comprovação.</p>
+                        <p className="text-xs text-muted-foreground">{t.colabMissions.fileHelp}</p>
                         {mission.submissionFeedback && (
                             <div className="bg-red-50 border border-red-200 rounded-md p-2 mt-2">
-                                <p className="text-xs text-red-700"><AlertCircle className="h-3 w-3 inline mr-1" />Feedback: {mission.submissionFeedback}</p>
+                                <p className="text-xs text-red-700"><AlertCircle className="h-3 w-3 inline mr-1" />{t.colabMissions.feedbackLabel.replace('{feedback}', mission.submissionFeedback)}</p>
                             </div>
                         )}
                     </div>
@@ -113,42 +118,42 @@ const MissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: {
             button: mission.completionMode === 'auto' ? (
                 <Button onClick={() => onAutoComplete(mission.id)} disabled={isSubmitting}>
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                    Concluir
+                    {t.colabMissions.conclude}
                 </Button>
             ) : (
                 <ActionDialog
-                    title="Enviar Comprovacao"
-                    description={`Envie um anexo para completar a missao "${mission.name}".`}
-                    trigger={<Button><Upload className="mr-2 h-4 w-4" /> Enviar Comprovacao</Button>}
-                    actionText={selectedFile ? "Enviar Comprovacao" : "Selecione um arquivo"}
+                    title={t.colabMissions.submitProofTitle}
+                    description={t.colabMissions.submitProofDescription.replace('{name}', mission.name)}
+                    trigger={<Button><Upload className="mr-2 h-4 w-4" /> {t.colabMissions.submitProof}</Button>}
+                    actionText={selectedFile ? t.colabMissions.submitProof : t.colabMissions.selectFile}
                     onAction={handleSubmit}
                     showCancel
                     open={dialogOpen}
                     onOpenChange={setDialogOpen}
                 >
                     <div className="space-y-2">
-                        <Label htmlFor={`file-${mission.id}`} className="sr-only">Arquivo</Label>
+                        <Label htmlFor={`file-${mission.id}`} className="sr-only">{t.colabMissions.fileLabel}</Label>
                         <Input id={`file-${mission.id}`} type="file" accept="image/*,video/*,.pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} disabled={isSubmitting} />
-                        <p className="text-xs text-muted-foreground">Envie uma imagem, video ou PDF como comprovacao.</p>
+                        <p className="text-xs text-muted-foreground">{t.colabMissions.fileHelp}</p>
                     </div>
                 </ActionDialog>
             )
         },
         agendada: {
             icon: <Clock className="h-4 w-4 mr-2" />,
-            text: "Missão Agendada",
+            text: t.colabMissions.scheduled,
             color: "text-blue-600",
-            badge: "Agendada",
+            badge: t.colabMissions.scheduled,
             badgeClass: "bg-blue-100 text-blue-700",
-            button: <Button disabled variant="outline">Em breve</Button>
+            button: <Button disabled variant="outline">{t.colabMissions.scheduledButton}</Button>
         },
         expirada: {
             icon: <Clock className="h-4 w-4 mr-2" />,
-            text: "Missão Expirada",
+            text: t.colabMissions.expired,
             color: "text-muted-foreground",
-            badge: "Expirada",
+            badge: t.colabMissions.expired,
             badgeClass: "bg-gray-100 text-gray-600",
-            button: <Button disabled variant="outline">Expirada</Button>
+            button: <Button disabled variant="outline">{t.colabMissions.expired}</Button>
         },
     };
 
@@ -177,7 +182,7 @@ const MissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: {
                 {mission.startDate && mission.endDate && (
                     <div className="text-xs text-muted-foreground flex items-center">
                         <CalendarDays className="h-3 w-3 mr-1.5" />
-                        <span>Período: {formatDate(mission.startDate)} — {formatDate(mission.endDate)}</span>
+                        <span>{t.colabMissions.period} {formatDate(mission.startDate)} — {formatDate(mission.endDate)}</span>
                     </div>
                 )}
             </CardContent>
@@ -230,6 +235,7 @@ export default function ColaboradorMissoesPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [userInfo, setUserInfo] = useState<{ uid: string; companyId: string; name: string } | null>(null);
     const { toast } = useToast();
+    const t = useT();
 
     const fetchMissions = useCallback(async (user: User) => {
         setIsLoading(true);
@@ -358,7 +364,7 @@ export default function ColaboradorMissoesPage() {
             });
         } catch (error) {
             console.error("Error fetching missions: ", error);
-            toast({ variant: 'destructive', title: 'Erro ao buscar missões.', description: (error as Error).message });
+            toast({ variant: 'destructive', title: t.colabMissions.toastFetchError, description: (error as Error).message });
         } finally {
             setIsLoading(false);
         }
@@ -402,11 +408,11 @@ export default function ColaboradorMissoesPage() {
                 return;
             }
 
-            toast({ title: 'Comprovação enviada!', description: 'Aguarde a aprovação do admin.' });
+            toast({ title: t.colabMissions.toastProofSent, description: t.colabMissions.toastProofSentDescription });
             fetchMissions(auth.currentUser!);
         } catch (error) {
             console.error("Error submitting proof:", error);
-            toast({ variant: 'destructive', title: 'Erro ao enviar comprovação.' });
+            toast({ variant: 'destructive', title: t.colabMissions.toastProofError });
         } finally {
             setIsSubmitting(false);
         }
@@ -428,11 +434,11 @@ export default function ColaboradorMissoesPage() {
                 toast({ variant: 'destructive', title: 'Erro', description: result.error });
                 return;
             }
-            toast({ title: 'Missao concluida!', description: 'Pontos adicionados ao seu saldo.' });
+            toast({ title: t.colabMissions.toastCompleted, description: t.colabMissions.toastCompletedDescription });
             fetchMissions(auth.currentUser!);
         } catch (error) {
             console.error("Error auto-completing mission:", error);
-            toast({ variant: 'destructive', title: 'Erro ao concluir missao.' });
+            toast({ variant: 'destructive', title: t.colabMissions.toastCompleteError });
         } finally {
             setIsSubmitting(false);
         }
@@ -444,7 +450,7 @@ export default function ColaboradorMissoesPage() {
     const renderMissions = (missionList: Mission[]) => {
         if (isLoading) return <MissionsPageSkeleton />;
         if (missionList.length === 0) {
-            return <p className="text-center text-muted-foreground py-8">Nenhuma missão nesta categoria.</p>;
+            return <p className="text-center text-muted-foreground py-8">{t.colabMissions.noMissions}</p>;
         }
         return (
             <div className="space-y-4">
@@ -457,34 +463,34 @@ export default function ColaboradorMissoesPage() {
 
     return (
         <>
-            <Header title="Missões" />
+            <Header title={t.colabMissions.title} />
             <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
                 <Card>
                     <CardContent className="grid gap-4 md:grid-cols-2 p-4">
                         <div className="p-2">
                             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <Zap className="h-4 w-4"/> Pontos de Missões da Semana
+                                <Zap className="h-4 w-4"/> {t.colabMissions.weeklyPoints}
                             </div>
                             <div className="text-3xl font-bold">{stats.weeklyPoints}</div>
                         </div>
                         <div className="p-2">
                             <div className="flex items-center justify-between gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <span>Progresso em Missões Fixas</span>
+                                <span>{t.colabMissions.fixedProgress}</span>
                                 <span>{stats.fixedCompleted} / {stats.fixedTotal}</span>
                             </div>
                             <Progress value={stats.fixedProgress} className="h-2" />
-                            {stats.fixedProgress === 100 && stats.fixedTotal > 0 && <p className="text-xs text-muted-foreground mt-2">Você completou todas as missões fixas!</p>}
+                            {stats.fixedProgress === 100 && stats.fixedTotal > 0 && <p className="text-xs text-muted-foreground mt-2">{t.colabMissions.allFixedCompleted}</p>}
                         </div>
                     </CardContent>
                 </Card>
 
                 <Tabs defaultValue="semana">
                     <TabsList className="mb-4 grid grid-cols-2 md:flex md:w-auto w-full">
-                        <TabsTrigger value="semana">Missoes da Semana</TabsTrigger>
-                        <TabsTrigger value="fixas">Missoes Fixas</TabsTrigger>
+                        <TabsTrigger value="semana">{t.colabMissions.tabWeekly}</TabsTrigger>
+                        <TabsTrigger value="fixas">{t.colabMissions.tabFixed}</TabsTrigger>
                         <TabsTrigger value="trilha" className="flex items-center gap-1.5">
                             <Target className="h-3.5 w-3.5" />
-                            Missoes de Trilha
+                            {t.colabMissions.tabTrail}
                             {trailMissions.length > 0 && (
                                 <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
                                     {trailMissions.length}
@@ -493,7 +499,7 @@ export default function ColaboradorMissoesPage() {
                         </TabsTrigger>
                         <TabsTrigger value="historico" className="flex items-center gap-1.5">
                             <History className="h-3.5 w-3.5" />
-                            Histórico
+                            {t.colabMissions.tabHistory}
                             {historyMissions.length > 0 && (
                                 <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
                                     {historyMissions.length}
@@ -516,8 +522,8 @@ export default function ColaboradorMissoesPage() {
                         ) : historyMissions.length === 0 ? (
                             <div className="text-center py-12">
                                 <History className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-                                <p className="text-muted-foreground font-medium">Nenhuma missão no histórico</p>
-                                <p className="text-sm text-muted-foreground mt-1">Missões concluídas ou expiradas aparecerão aqui.</p>
+                                <p className="text-muted-foreground font-medium">{t.colabMissions.noHistory}</p>
+                                <p className="text-sm text-muted-foreground mt-1">{t.colabMissions.noHistoryDescription}</p>
                             </div>
                         ) : (
                             <div className="space-y-4">

@@ -13,6 +13,7 @@ import { Users, Building2, BookOpen, Globe, LogIn, Loader2 } from "lucide-react"
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useT } from '@/lib/i18n/context';
 
 
 type Company = {
@@ -49,6 +50,7 @@ const StatCard = ({ title, value, description, icon: Icon, isLoading }: { title:
 );
 
 export default function MasterDashboardPage() {
+    const t = useT();
     const [stats, setStats] = useState<MasterStats | null>(null);
     const [recentCompanies, setRecentCompanies] = useState<Company[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -82,7 +84,7 @@ export default function MasterDashboardPage() {
                 setRecentCompanies(companiesList); 
             } catch (error) {
                 console.error("Error fetching master data:", error);
-                 toast({ variant: 'destructive', title: 'Erro ao buscar dados mestre' });
+                 toast({ variant: 'destructive', title: t.masterDashboard.fetchError });
             } finally {
                 setIsLoading(false);
             }
@@ -92,30 +94,30 @@ export default function MasterDashboardPage() {
 
   return (
     <>
-      <Header title="Master Dashboard" />
+      <Header title={t.masterDashboard.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-           <StatCard title="Empresas Ativas" value={stats?.activeCompanies.toString() || '0'} description="+2 novas este mês" icon={Building2} isLoading={isLoading} />
-           <StatCard title="Colaboradores Totais" value={stats?.totalCollaborators.toString() || '0'} description="Em todas as empresas" icon={Users} isLoading={isLoading} />
-           <StatCard title="Trilhas Globais" value={stats?.globalTrails.toString() || '0'} description="Conteúdos disponíveis" icon={Globe} isLoading={isLoading} />
-           <StatCard title="Engajamento Médio" value={`${stats?.avgEngagement || 0}%`} description="Atividade na plataforma" icon={BookOpen} isLoading={isLoading} />
+           <StatCard title={t.masterDashboard.activeCompanies} value={stats?.activeCompanies.toString() || '0'} description={t.masterDashboard.activeCompaniesDescription} icon={Building2} isLoading={isLoading} />
+           <StatCard title={t.masterDashboard.totalCollaborators} value={stats?.totalCollaborators.toString() || '0'} description={t.masterDashboard.totalCollaboratorsDescription} icon={Users} isLoading={isLoading} />
+           <StatCard title={t.masterDashboard.globalTrails} value={stats?.globalTrails.toString() || '0'} description={t.masterDashboard.globalTrailsDescription} icon={Globe} isLoading={isLoading} />
+           <StatCard title={t.masterDashboard.avgEngagement} value={`${stats?.avgEngagement || 0}%`} description={t.masterDashboard.avgEngagementDescription} icon={BookOpen} isLoading={isLoading} />
         </div>
          <Card>
           <CardHeader>
-            <CardTitle>Empresas Recentes</CardTitle>
+            <CardTitle>{t.masterDashboard.recentCompanies}</CardTitle>
             <CardDescription>
-              As últimas empresas que se juntaram à plataforma.
+              {t.masterDashboard.recentCompaniesDescription}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Empresa</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Licenças</TableHead>
-                        <TableHead>Admin</TableHead>
-                        <TableHead><span className="sr-only">Ações</span></TableHead>
+                        <TableHead>{t.masterCompanies.tableCompany}</TableHead>
+                        <TableHead>{t.masterCompanies.tableStatus}</TableHead>
+                        <TableHead>{t.masterCompanies.tableLicenses}</TableHead>
+                        <TableHead>{t.masterCompanies.tableAdmin}</TableHead>
+                        <TableHead><span className="sr-only">{t.common.actions}</span></TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>

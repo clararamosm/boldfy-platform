@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
+import { useT } from '@/lib/i18n/context';
 
 type Asset = {
     id: string;
@@ -36,34 +37,37 @@ const getAssetIcon = (type: string) => {
     return <FileText className="h-5 w-5 text-muted-foreground" />;
 };
 
-const AssetForm = ({ asset, isSubmitting, formRef, fileRef }: { asset?: Asset, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement>, fileRef: React.RefObject<HTMLInputElement> }) => (
+const AssetForm = ({ asset, isSubmitting, formRef, fileRef }: { asset?: Asset, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement>, fileRef: React.RefObject<HTMLInputElement> }) => {
+    const t = useT();
+    return (
     <form id="asset-form" ref={formRef}>
         <div className="space-y-4">
             <div className="space-y-2">
-                <Label htmlFor="asset-name">Nome do Ativo</Label>
-                <Input id="asset-name" name="name" placeholder="Ex: Banner para LinkedIn" defaultValue={asset?.name} required disabled={isSubmitting} />
+                <Label htmlFor="asset-name">{t.adminLibrary.assetName}</Label>
+                <Input id="asset-name" name="name" placeholder={t.adminLibrary.assetNamePlaceholder} defaultValue={asset?.name} required disabled={isSubmitting} />
             </div>
             <div className="space-y-2">
-                <Label htmlFor="asset-category">Categoria</Label>
+                <Label htmlFor="asset-category">{t.adminLibrary.category}</Label>
                 <Select name="category" defaultValue={asset?.category} required disabled={isSubmitting}>
                     <SelectTrigger id="asset-category">
-                        <SelectValue placeholder="Selecione uma categoria" />
+                        <SelectValue placeholder={t.adminLibrary.categoryPlaceholder} />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="Posts">Posts</SelectItem>
-                        <SelectItem value="Materiais Ricos">Materiais Ricos</SelectItem>
-                        <SelectItem value="Assets de Marca">Assets de Marca</SelectItem>
+                        <SelectItem value="Posts">{t.adminLibrary.categoryPosts}</SelectItem>
+                        <SelectItem value="Materiais Ricos">{t.adminLibrary.categoryRichMaterials}</SelectItem>
+                        <SelectItem value="Assets de Marca">{t.adminLibrary.categoryBrandAssets}</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
             <div className="space-y-2">
-                <Label htmlFor="asset-file">Arquivo</Label>
+                <Label htmlFor="asset-file">{t.adminLibrary.file}</Label>
                 <Input id="asset-file" name="file" type="file" required={!asset} disabled={isSubmitting} ref={fileRef} />
-                {asset && <p className="text-xs text-muted-foreground">Deixe em branco para manter o arquivo atual.</p>}
+                {asset && <p className="text-xs text-muted-foreground">{t.adminLibrary.fileKeepCurrent}</p>}
             </div>
         </div>
     </form>
-);
+    );
+};
 
 
 export default function AdminBibliotecaPage() {
@@ -74,6 +78,7 @@ export default function AdminBibliotecaPage() {
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState<string | null>(null);
     const { toast } = useToast();
+    const t = useT();
     const formRef = useRef<HTMLFormElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,7 +91,7 @@ export default function AdminBibliotecaPage() {
             setAssets(assetsList);
         } catch (error) {
             console.error("Error fetching assets: ", error);
-            toast({ variant: "destructive", title: "Erro ao buscar ativos."});
+            toast({ variant: "destructive", title: t.adminLibrary.toastFetchError});
         } finally {
             setIsLoading(false);
         }
@@ -102,7 +107,7 @@ export default function AdminBibliotecaPage() {
                     setCompanyId(userCompanyId);
                     fetchAssets(userCompanyId);
                 } else {
-                     toast({ variant: "destructive", title: "Usuário não encontrado no banco de dados."});
+                     toast({ variant: "destructive", title: t.adminLibrary.toastUserNotFound});
                      setIsLoading(false);
                 }
             } else {
@@ -122,7 +127,7 @@ export default function AdminBibliotecaPage() {
 
         try {
             if (!assetId && !file) {
-                throw new Error("Um arquivo é obrigatório para um novo ativo.");
+                throw new Error(t.adminLibrary.fileRequired);
             }
 
             let fileUrl = '';
@@ -162,8 +167,8 @@ export default function AdminBibliotecaPage() {
             }
 
             toast({
-                title: "Sucesso!",
-                description: `Ativo ${assetId ? 'atualizado' : 'criado'} com sucesso.`,
+                title: t.common.success,
+                description: assetId ? t.adminLibrary.toastUpdated : t.adminLibrary.toastCreated,
             });
 
             // Close dialog and clean up form
@@ -178,14 +183,14 @@ export default function AdminBibliotecaPage() {
             fetchAssets(companyId);
         } catch (error) {
             console.error("Error submitting asset:", error);
-            toast({ variant: "destructive", title: "Erro ao salvar ativo.", description: (error as Error).message });
+            toast({ variant: "destructive", title: t.adminLibrary.toastSaveError, description: (error as Error).message });
         } finally {
             setIsSubmitting(false);
         }
     };
     
     const handleDelete = async (asset: Asset) => {
-        if (!companyId || !confirm(`Tem certeza que deseja excluir o ativo "${asset.name}"?`)) return;
+        if (!companyId || !confirm(t.adminLibrary.deleteConfirm.replace('{name}', asset.name))) return;
         
         try {
             if (asset.filePath) {
@@ -197,29 +202,29 @@ export default function AdminBibliotecaPage() {
             await deleteDoc(assetDoc);
             
             toast({
-                title: `Ativo excluído.`,
-                description: "O ativo foi removido com sucesso.",
+                title: t.adminLibrary.toastDeleted,
+                description: t.adminLibrary.toastDeletedDescription,
             });
             fetchAssets(companyId);
         } catch(error) {
             console.error("Error deleting asset:", error);
-             toast({ variant: "destructive", title: "Erro ao excluir ativo." });
+             toast({ variant: "destructive", title: t.adminLibrary.toastDeleteError });
         }
     }
 
     const uploadButton = (
         <Button size="sm" disabled={isSubmitting || !companyId}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Novo Upload
+            {t.adminLibrary.newUpload}
         </Button>
     );
 
     const EditAssetButton = ({ asset }: { asset: Asset }) => (
         <ActionDialog
-            title="Editar Ativo"
-            description="Atualize as informações ou troque o arquivo do ativo."
-            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar</DropdownMenuItem>}
-            actionText={isSubmitting ? "Salvando..." : "Salvar Alterações"}
+            title={t.adminLibrary.editTitle}
+            description={t.adminLibrary.editDescription}
+            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>{t.common.edit}</DropdownMenuItem>}
+            actionText={isSubmitting ? t.common.saving : t.common.saveChanges}
             onAction={() => handleAction(asset.id)}
             formId="asset-form"
             open={editDialogOpen === asset.id}
@@ -231,19 +236,19 @@ export default function AdminBibliotecaPage() {
 
   return (
     <>
-      <Header title="Biblioteca" />
+      <Header title={t.adminLibrary.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="font-headline">Gerenciar Ativos</CardTitle>
-              <CardDescription>Faça upload e gerencie os ativos da sua marca.</CardDescription>
+              <CardTitle className="font-headline">{t.adminLibrary.manageAssets}</CardTitle>
+              <CardDescription>{t.adminLibrary.manageAssetsDescription}</CardDescription>
             </div>
              <ActionDialog
-              title="Novo Upload"
-              description="Faça o upload de um novo ativo para a biblioteca da sua marca."
+              title={t.adminLibrary.uploadTitle}
+              description={t.adminLibrary.uploadDescription}
               trigger={uploadButton}
-              actionText={isSubmitting ? "Enviando..." : "Fazer Upload"}
+              actionText={isSubmitting ? t.adminLibrary.uploading : t.adminLibrary.upload}
               onAction={() => handleAction()}
               formId="asset-form"
               open={uploadDialogOpen}
@@ -256,11 +261,11 @@ export default function AdminBibliotecaPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome do Ativo</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Categoria</TableHead>
-                   <TableHead>Data de Upload</TableHead>
-                  <TableHead><span className="sr-only">Ações</span></TableHead>
+                  <TableHead>{t.adminLibrary.tableAssetName}</TableHead>
+                  <TableHead>{t.adminLibrary.tableType}</TableHead>
+                  <TableHead>{t.adminLibrary.tableCategory}</TableHead>
+                   <TableHead>{t.adminLibrary.tableUploadDate}</TableHead>
+                  <TableHead><span className="sr-only">{t.common.actions}</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -269,14 +274,14 @@ export default function AdminBibliotecaPage() {
                         <TableCell colSpan={5} className="text-center">
                             <div className="flex justify-center items-center p-4">
                                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                <span className="ml-2">Carregando ativos...</span>
+                                <span className="ml-2">{t.adminLibrary.loading}</span>
                             </div>
                         </TableCell>
                     </TableRow>
                 ) : assets.length === 0 ? (
                      <TableRow>
                         <TableCell colSpan={5} className="text-center py-8">
-                           Nenhum ativo encontrado. Comece fazendo um novo upload.
+                           {t.adminLibrary.empty}
                         </TableCell>
                     </TableRow>
                 ) : assets.map((asset) => (
@@ -297,11 +302,11 @@ export default function AdminBibliotecaPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem asChild>
-                                    <a href={asset.fileUrl} target="_blank" rel="noopener noreferrer">Baixar</a>
+                                    <a href={asset.fileUrl} target="_blank" rel="noopener noreferrer">{t.adminLibrary.download}</a>
                                 </DropdownMenuItem>
                                 <EditAssetButton asset={asset} />
                                 <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(asset)}>
-                                    Excluir
+                                    {t.common.delete}
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                             </DropdownMenu>

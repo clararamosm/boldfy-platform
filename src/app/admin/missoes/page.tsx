@@ -24,8 +24,11 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { reviewMissionProof } from "@/app/actions";
+import { useT } from '@/lib/i18n/context';
+import { useFormat } from '@/hooks/use-format-date';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getDateLocale } from '@/lib/i18n/date-utils';
 
 type Mission = {
   id: string;
@@ -75,18 +78,20 @@ const deriveMissionStatus = (mission: Mission, now: Date): DerivedStatus => {
   return 'ativa';
 };
 
-const getStatusBadge = (status: DerivedStatus) => {
+const getStatusBadge = (status: DerivedStatus, labels: { active: string; scheduled: string; ended: string }) => {
   switch (status) {
     case 'ativa':
-      return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 className="h-3 w-3 mr-1" />Ativa</Badge>;
+      return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 className="h-3 w-3 mr-1" />{labels.active}</Badge>;
     case 'agendada':
-      return <Badge className="bg-blue-100 text-blue-700 border-blue-200"><Clock className="h-3 w-3 mr-1" />Agendada</Badge>;
+      return <Badge className="bg-blue-100 text-blue-700 border-blue-200"><Clock className="h-3 w-3 mr-1" />{labels.scheduled}</Badge>;
     case 'encerrada':
-      return <Badge variant="outline" className="text-muted-foreground"><History className="h-3 w-3 mr-1" />Encerrada</Badge>;
+      return <Badge variant="outline" className="text-muted-foreground"><History className="h-3 w-3 mr-1" />{labels.ended}</Badge>;
   }
 };
 
 const MissionForm = ({ mission, isSubmitting, formRef, isFixed = false }: { mission?: Mission, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement>, isFixed?: boolean }) => {
+  const t = useT();
+  const { fmtDate, locale } = useFormat();
   const [startDate, setStartDate] = useState<Date | undefined>(
     mission?.startDate?.toDate ? mission.startDate.toDate() : mission?.startDate ? new Date(mission.startDate) : undefined
   );
@@ -101,59 +106,59 @@ const MissionForm = ({ mission, isSubmitting, formRef, isFixed = false }: { miss
       <input type="hidden" name="endDate" value={endDate?.toISOString() || ''} />
       <input type="hidden" name="completionMode" value={completionMode} />
       <div className="space-y-2">
-        <Label htmlFor="mission-name">Nome da Missao</Label>
-        <Input id="mission-name" name="name" placeholder={isFixed ? "Ex: Atualize seu banner do LinkedIn" : "Ex: Compartilhar post no LinkedIn"} disabled={isSubmitting} defaultValue={mission?.name} required/>
+        <Label htmlFor="mission-name">{t.adminMissions.missionName}</Label>
+        <Input id="mission-name" name="name" placeholder={isFixed ? t.adminMissions.missionNamePlaceholderFixed : t.adminMissions.missionNamePlaceholderTimed} disabled={isSubmitting} defaultValue={mission?.name} required/>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="mission-description">Descricao</Label>
-        <Textarea id="mission-description" name="description" placeholder="Descreva o que o colaborador precisa fazer." disabled={isSubmitting} defaultValue={mission?.description} required />
+        <Label htmlFor="mission-description">{t.adminMissions.description}</Label>
+        <Textarea id="mission-description" name="description" placeholder={t.adminMissions.descriptionPlaceholder} disabled={isSubmitting} defaultValue={mission?.description} required />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="mission-points">Pontos</Label>
-        <Input id="mission-points" name="points" type="number" placeholder="Ex: 100" disabled={isSubmitting} defaultValue={mission?.points} required/>
+        <Label htmlFor="mission-points">{t.adminMissions.pointsLabel}</Label>
+        <Input id="mission-points" name="points" type="number" placeholder={t.adminMissions.pointsPlaceholder} disabled={isSubmitting} defaultValue={mission?.points} required/>
       </div>
       <div className="space-y-2">
-        <Label>Modo de Conclusao</Label>
+        <Label>{t.adminMissions.completionMode}</Label>
         <Select value={completionMode} onValueChange={setCompletionMode}>
           <SelectTrigger>
-            <SelectValue placeholder="Selecione o modo" />
+            <SelectValue placeholder={t.adminMissions.completionModePlaceholder} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="proof">Com comprovacao (admin aprova)</SelectItem>
-            <SelectItem value="auto">Auto-conclusao (sem comprovacao)</SelectItem>
+            <SelectItem value="proof">{t.adminMissions.completionProof}</SelectItem>
+            <SelectItem value="auto">{t.adminMissions.completionAuto}</SelectItem>
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          {completionMode === 'auto' ? 'O colaborador conclui com um clique. Pontos sao dados automaticamente.' : 'O colaborador envia um arquivo e o admin precisa aprovar.'}
+          {completionMode === 'auto' ? t.adminMissions.completionAutoHelp : t.adminMissions.completionProofHelp}
         </p>
       </div>
       {!isFixed && (
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Data de Inicio</Label>
+            <Label>{t.adminMissions.startDate}</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSubmitting}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {startDate ? format(startDate, "dd/MM/yyyy", { locale: ptBR }) : <span className="text-muted-foreground">Selecione</span>}
+                  {startDate ? fmtDate(startDate, "dd/MM/yyyy") : <span className="text-muted-foreground">{t.common.select}</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={ptBR} initialFocus />
+                <Calendar mode="single" selected={startDate} onSelect={setStartDate} locale={getDateLocale(locale)} initialFocus />
               </PopoverContent>
             </Popover>
           </div>
           <div className="space-y-2">
-            <Label>Data de Termino</Label>
+            <Label>{t.adminMissions.endDate}</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSubmitting}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {endDate ? format(endDate, "dd/MM/yyyy", { locale: ptBR }) : <span className="text-muted-foreground">Selecione</span>}
+                  {endDate ? fmtDate(endDate, "dd/MM/yyyy") : <span className="text-muted-foreground">{t.common.select}</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={endDate} onSelect={setEndDate} locale={ptBR} initialFocus />
+                <Calendar mode="single" selected={endDate} onSelect={setEndDate} locale={getDateLocale(locale)} initialFocus />
               </PopoverContent>
             </Popover>
           </div>
@@ -163,12 +168,12 @@ const MissionForm = ({ mission, isSubmitting, formRef, isFixed = false }: { miss
   );
 };
 
-const TableSkeleton = ({ cols }: { cols: number }) => (
+const TableSkeleton = ({ cols, loadingText }: { cols: number; loadingText: string }) => (
   <TableRow>
     <TableCell colSpan={cols} className="h-24 text-center">
       <div className="flex justify-center items-center">
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        Carregando missões...
+        {loadingText}
       </div>
     </TableCell>
   </TableRow>
@@ -197,29 +202,31 @@ const MissionTable = ({
   onOpenReview: () => void;
   cols: number;
 }) => {
+  const t = useT();
+  const { fmtDate } = useFormat();
   const showPeriod = status !== 'ativa' || missions.some(m => m.type === 'timed');
 
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Nome</TableHead>
-          <TableHead>Tipo</TableHead>
-          <TableHead>Modo</TableHead>
-          {showPeriod && <TableHead>Periodo</TableHead>}
-          <TableHead>Pontos</TableHead>
-          <TableHead>Status</TableHead>
-          {status === 'ativa' && <TableHead>Envios</TableHead>}
-          <TableHead><span className="sr-only">Acoes</span></TableHead>
+          <TableHead>{t.adminMissions.missionName}</TableHead>
+          <TableHead>{t.adminMissions.fixed}/{t.adminMissions.timed}</TableHead>
+          <TableHead>{t.adminMissions.completionMode}</TableHead>
+          {showPeriod && <TableHead>{t.adminMissions.startDate}</TableHead>}
+          <TableHead>{t.adminMissions.pointsLabel}</TableHead>
+          <TableHead>{t.common.status}</TableHead>
+          {status === 'ativa' && <TableHead>{t.adminMissions.submissions}</TableHead>}
+          <TableHead><span className="sr-only">{t.common.actions}</span></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {isLoading ? <TableSkeleton cols={cols} /> : missions.length === 0 ? (
+        {isLoading ? <TableSkeleton cols={cols} loadingText={t.common.loading} /> : missions.length === 0 ? (
           <TableRow>
             <TableCell colSpan={cols} className="text-center py-8 text-muted-foreground">
-              {status === 'ativa' ? 'Nenhuma missao ativa no momento.' :
-               status === 'agendada' ? 'Nenhuma missao agendada.' :
-               'Nenhuma missao no historico.'}
+              {status === 'ativa' ? t.adminMissions.noActiveMissions :
+               status === 'agendada' ? t.adminMissions.noScheduledMissions :
+               t.adminMissions.noHistoryMissions}
             </TableCell>
           </TableRow>
         ) : missions.map((mission) => {
@@ -227,7 +234,7 @@ const MissionTable = ({
           const formatDate = (d: any) => {
             if (!d) return '';
             const date = d.toDate ? d.toDate() : new Date(d);
-            return format(date, "dd/MM/yyyy", { locale: ptBR });
+            return fmtDate(date, "dd/MM/yyyy");
           };
 
           return (
@@ -235,31 +242,31 @@ const MissionTable = ({
               <TableCell className="font-medium">{mission.name}</TableCell>
               <TableCell>
                 <Badge variant="outline" className="text-xs">
-                  {mission.type === 'fixed' ? 'Fixa' : 'Temporaria'}
+                  {mission.type === 'fixed' ? t.adminMissions.fixed : t.adminMissions.timed}
                 </Badge>
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className={`text-xs ${mission.completionMode === 'auto' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-orange-50 text-orange-700 border-orange-200'}`}>
-                  {mission.completionMode === 'auto' ? 'Auto' : 'Comprovacao'}
+                  {mission.completionMode === 'auto' ? t.adminMissions.auto : t.adminMissions.proof}
                 </Badge>
               </TableCell>
               {showPeriod && (
                 <TableCell className="text-sm">
                   {mission.type === 'fixed' ? (
-                    <span className="text-muted-foreground">Sempre ativa</span>
+                    <span className="text-muted-foreground">{t.adminMissions.alwaysActive}</span>
                   ) : (
                     `${formatDate(mission.startDate)} — ${formatDate(mission.endDate)}`
                   )}
                 </TableCell>
               )}
               <TableCell>{mission.points}</TableCell>
-              <TableCell>{getStatusBadge(derivedStatus)}</TableCell>
+              <TableCell>{getStatusBadge(derivedStatus, { active: t.adminMissions.statusActive, scheduled: t.adminMissions.statusScheduled, ended: t.adminMissions.statusEnded })}</TableCell>
               {status === 'ativa' && (
                 <TableCell>
                   {(mission.pendingSubmissions || 0) > 0 ? (
                     <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 cursor-pointer hover:bg-yellow-200 transition-colors" onClick={onOpenReview}>
                       <FileCheck className="h-3 w-3 mr-1" />
-                      {mission.pendingSubmissions} pendente{(mission.pendingSubmissions || 0) > 1 ? 's' : ''}
+                      {t.adminMissions.pendingProofs.replace('{count}', String(mission.pendingSubmissions))}
                     </Badge>
                   ) : (
                     <span className="text-sm text-muted-foreground">—</span>
@@ -274,10 +281,10 @@ const MissionTable = ({
                   <DropdownMenuContent align="end">
                     {status !== 'encerrada' && (
                       <ActionDialog
-                        title="Editar Missao"
-                        description="Atualize os detalhes desta missao."
-                        trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar</DropdownMenuItem>}
-                        actionText="Salvar Alteracoes"
+                        title={t.adminMissions.editMission}
+                        description={t.adminMissions.editMissionDescription}
+                        trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>{t.common.edit}</DropdownMenuItem>}
+                        actionText={t.common.saveChanges}
                         onAction={() => onEdit(mission.id, mission.type === 'fixed')}
                         formId="mission-form"
                       >
@@ -286,7 +293,7 @@ const MissionTable = ({
                     )}
                     <DropdownMenuItem className="text-destructive" onClick={() => onDelete(mission.id)}>
                       <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
+                      {t.common.delete}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -319,6 +326,8 @@ export default function AdminMissoesPage() {
   const [feedbackMap, setFeedbackMap] = useState<Record<string, string>>({});
 
   const { toast } = useToast();
+  const t = useT();
+  const { fmtDate, locale } = useFormat();
   const formRef = useRef<HTMLFormElement>(null);
 
   const fetchMissions = useCallback(async (currentCompanyId: string) => {
@@ -360,7 +369,7 @@ export default function AdminMissoesPage() {
       setPendingSubmissions(pendingSubs);
     } catch(error) {
       console.error("Error fetching missions:", error);
-      toast({ variant: 'destructive', title: 'Erro ao buscar missões.' });
+      toast({ variant: 'destructive', title: t.adminMissions.toastFetchError });
     } finally {
       setIsLoading(false);
     }
@@ -418,18 +427,18 @@ export default function AdminMissoesPage() {
     try {
       if (missionId) {
         await updateDoc(doc(db, "companies", companyId, "missions", missionId), missionData);
-        toast({ title: "Missão atualizada com sucesso!" });
+        toast({ title: t.adminMissions.toastUpdated });
       } else {
         missionData.createdAt = serverTimestamp();
         await addDoc(collection(db, "companies", companyId, "missions"), missionData);
-        toast({ title: "Missão criada com sucesso!" });
+        toast({ title: t.adminMissions.toastCreated });
       }
       setCreateDialogOpen(false);
       setCreateFixedDialogOpen(false);
       fetchMissions(companyId);
     } catch(error) {
       console.error("Error saving mission: ", error);
-      toast({ variant: "destructive", title: "Erro ao salvar missão." });
+      toast({ variant: "destructive", title: t.adminMissions.toastSaveError });
     } finally {
       setIsSubmitting(false);
     }
@@ -439,11 +448,11 @@ export default function AdminMissoesPage() {
     if (!companyId) return;
     try {
       await deleteDoc(doc(db, "companies", companyId, "missions", missionId));
-      toast({ title: "Missão excluída." });
+      toast({ title: t.common.success });
       fetchMissions(companyId);
     } catch (error) {
       console.error("Error deleting mission:", error);
-      toast({ variant: "destructive", title: "Erro ao excluir missão." });
+      toast({ variant: "destructive", title: t.common.error });
     }
   };
 
@@ -461,7 +470,7 @@ export default function AdminMissoesPage() {
       const res = await fetch('/api/ai/missions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ brandContext, companyName }),
+        body: JSON.stringify({ brandContext, companyName, locale }),
       });
 
       if (!res.ok) throw new Error('Erro na geração de missões.');
@@ -478,7 +487,7 @@ export default function AdminMissoesPage() {
       setAiSuggestions(suggestions);
     } catch (error) {
       console.error("Error generating AI missions:", error);
-      toast({ variant: 'destructive', title: 'Erro ao gerar sugestões de missões.' });
+      toast({ variant: 'destructive', title: t.adminMissions.toastGenerateError });
     } finally {
       setAiLoading(false);
     }
@@ -500,13 +509,13 @@ export default function AdminMissoesPage() {
     if (!companyId) return;
     const selected = aiSuggestions.filter(s => s.selected);
     if (selected.length === 0) {
-      toast({ variant: 'destructive', title: 'Selecione ao menos uma missão.' });
+      toast({ variant: 'destructive', title: t.adminMissions.selectAtLeastOne });
       return;
     }
 
     const timedWithoutDates = selected.some(s => s.type === 'timed' && (!s.startDate || !s.endDate));
     if (timedWithoutDates) {
-      toast({ variant: 'destructive', title: 'Defina as datas de inicio e termino das missoes temporarias selecionadas.' });
+      toast({ variant: 'destructive', title: t.adminMissions.setDates });
       return;
     }
 

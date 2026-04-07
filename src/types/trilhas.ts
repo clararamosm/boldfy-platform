@@ -88,6 +88,7 @@ export interface Sessao {
   descricao: string;
   ordem: number;
   ativa: boolean;
+  locale?: 'pt-BR' | 'en';
   criadaEm: Timestamp;
   atualizadaEm?: Timestamp;
 }

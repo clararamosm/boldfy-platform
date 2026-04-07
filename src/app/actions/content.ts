@@ -153,6 +153,7 @@ type GenerateHooksInput = {
   userId: string;
   format: 'linkedin' | 'text-heavy' | 'hybrid';
   length: 'short' | 'medium' | 'long';
+  locale?: 'pt-BR' | 'en';
 };
 
 type GenerateHooksResult = {
@@ -176,7 +177,14 @@ export async function generateHooks(input: GenerateHooksInput): Promise<Generate
     const cp = companyProfile;
     const pb = personalBranding;
 
-    const systemPrompt = `Voce e um especialista em hooks para LinkedIn. Seu trabalho e gerar opcoes de hook (as 2 primeiras linhas de um post) que param o scroll e fazem a pessoa querer ler o resto.
+    const isEN = input.locale === 'en';
+    const langDirective = isEN
+      ? 'LANGUAGE: Write entirely in English.'
+      : 'LANGUAGE: Write entirely in Brazilian Portuguese.';
+
+    const systemPrompt = `${langDirective}
+
+Voce e um especialista em hooks para LinkedIn. Seu trabalho e gerar opcoes de hook (as 2 primeiras linhas de um post) que param o scroll e fazem a pessoa querer ler o resto.
 
 REGRAS:
 -> Cada hook tem EXATAMENTE 2 linhas. A primeira linha (L1) e a segunda linha (L2).
@@ -192,7 +200,7 @@ REGRAS:
   * Provocacao direta ao leitor
   * Negacao + revelacao
 -> Os hooks devem considerar o tom de voz e expertise do autor.
--> Escreva no mesmo idioma do conteudo original.
+-> ${isEN ? 'Write entirely in English.' : 'Escreva inteiramente em portugues brasileiro.'}
 
 CONTEXTO DA MARCA (use sutilmente):
 Empresa: ${cp.companyName || 'N/A'}
@@ -254,6 +262,7 @@ type GenerateWithHookInput = {
   userId: string;
   format: 'linkedin' | 'text-heavy' | 'hybrid';
   length: 'short' | 'medium' | 'long';
+  locale?: 'pt-BR' | 'en';
 };
 
 export async function generateWithHook(input: GenerateWithHookInput): Promise<AlignContentState> {
@@ -280,7 +289,7 @@ export async function generateWithHook(input: GenerateWithHookInput): Promise<Al
 
     const formatGuide: Record<string, string> = getFormatGuides();
 
-    const systemPrompt = buildSystemPrompt(cp, pb, formatGuide, input.format, lengthGuide, input.length);
+    const systemPrompt = buildSystemPrompt(cp, pb, formatGuide, input.format, lengthGuide, input.length, input.locale);
 
     const { text: alignedContent } = await ai.generate({
       system: systemPrompt,
@@ -361,8 +370,15 @@ function buildSystemPrompt(
   format: string,
   lengthGuide: Record<string, string>,
   length: string,
+  locale?: 'pt-BR' | 'en',
 ): string {
-  return `Voce e um assistente de criacao de captions para LinkedIn. Seu objetivo e ajudar o autor a criar captions de alta performance que alinham a marca corporativa da empresa com a autenticidade da marca pessoal do autor.
+  const langDirective = locale === 'en'
+    ? 'LANGUAGE: Write entirely in English. All output must be in English.'
+    : 'LANGUAGE: Write entirely in Brazilian Portuguese. All output must be in Brazilian Portuguese.';
+
+  return `${langDirective}
+
+Voce e um assistente de criacao de captions para LinkedIn. Seu objetivo e ajudar o autor a criar captions de alta performance que alinham a marca corporativa da empresa com a autenticidade da marca pessoal do autor.
 
 Voce NUNCA fala da marca de forma explicita ou forcada. Voce tece a marca dentro da narrativa pessoal do autor, de forma organica.
 Voce so gera captions (legendas de texto puro). Nao gera designs, carousels, nem instrucoes visuais.

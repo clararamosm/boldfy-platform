@@ -21,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { inviteCollaborator, deleteCollaborator } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
 import { useRouter } from 'next/navigation';
+import { useT } from '@/lib/i18n/context';
 
 type Collaborator = {
   id: string;
@@ -60,15 +61,16 @@ const StatCard = ({ title, value, icon: Icon, isLoading }: { title: string, valu
 
 function InviteFormContent() {
   const { pending } = useFormStatus();
+  const t = useT();
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="name">Nome do Colaborador</Label>
-        <Input name="name" id="name" placeholder="Ex: Maria Souza" required disabled={pending} />
+        <Label htmlFor="name">{t.adminCollaborators.inviteName}</Label>
+        <Input name="name" id="name" placeholder={t.adminCollaborators.inviteNamePlaceholder} required disabled={pending} />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="email">E-mail do Colaborador</Label>
-        <Input name="email" id="email" type="email" placeholder="nome@empresa.com.br" required disabled={pending} />
+        <Label htmlFor="email">{t.adminCollaborators.inviteEmail}</Label>
+        <Input name="email" id="email" type="email" placeholder={t.adminCollaborators.inviteEmailPlaceholder} required disabled={pending} />
       </div>
     </div>
   );
@@ -90,6 +92,7 @@ export default function AdminColaboradoresPage() {
   const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const t = useT();
 
   const [inviteState, formAction] = useActionState(inviteCollaborator, { error: undefined, success: undefined });
 
@@ -121,7 +124,7 @@ export default function AdminColaboradoresPage() {
 
     } catch (error) {
       console.error("Error fetching collaborators: ", error);
-      toast({ variant: "destructive", title: "Erro ao buscar colaboradores."});
+      toast({ variant: "destructive", title: t.adminCollaborators.errorFetch});
     } finally {
       setIsLoading(false);
     }
@@ -146,16 +149,16 @@ export default function AdminColaboradoresPage() {
             setCompanyId(userCompanyId);
             fetchData(userCompanyId);
           } else {
-            toast({ variant: "destructive", title: "Empresa não encontrada no perfil do usuário." });
+            toast({ variant: "destructive", title: t.adminCollaborators.errorCompanyNotFound });
             setIsLoading(false);
           }
         } else {
-          toast({ variant: "destructive", title: "Dados do usuário não encontrados." });
+          toast({ variant: "destructive", title: t.adminCollaborators.errorUserNotFound });
           setIsLoading(false);
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
-        toast({ variant: "destructive", title: "Erro ao carregar dados do usuário." });
+        toast({ variant: "destructive", title: t.adminCollaborators.errorLoadUser });
         setIsLoading(false);
       }
     });
@@ -165,19 +168,19 @@ export default function AdminColaboradoresPage() {
 
   useEffect(() => {
     if (inviteState.success) {
-      toast({ title: "Convite enviado!", description: "O colaborador receberá um e-mail para definir sua senha." });
+      toast({ title: t.adminCollaborators.toastInviteSent, description: t.adminCollaborators.toastInviteDescription });
       setIsDialogOpen(false);
       if (companyId) fetchData(companyId);
     }
     if (inviteState.error) {
-      toast({ variant: "destructive", title: "Erro ao convidar", description: inviteState.error });
+      toast({ variant: "destructive", title: t.adminCollaborators.toastInviteError, description: inviteState.error });
     }
   }, [inviteState, toast, companyId, fetchData]);
 
   const inviteButton = (
     <Button size="sm" disabled={isLoading || !companyId || collaborators.length >= totalLicenses}>
       <PlusCircle className="mr-2 h-4 w-4" />
-      Convidar Colaborador
+      {t.adminCollaborators.invite}
     </Button>
   );
 
@@ -187,7 +190,12 @@ export default function AdminColaboradoresPage() {
       'Pendente': 'secondary',
       'Inativo': 'outline',
     };
-    return <Badge variant={variants[status] || 'outline'}>{status}</Badge>;
+    const statusLabels: Record<string, string> = {
+      'Ativo': t.common.active,
+      'Pendente': t.adminCollaborators.statusPending,
+      'Inativo': t.common.inactive,
+    };
+    return <Badge variant={variants[status] || 'outline'}>{statusLabels[status] || status}</Badge>;
   };
 
 
@@ -230,12 +238,12 @@ export default function AdminColaboradoresPage() {
         'profile.name': editName,
         'profile.email': editEmail,
       });
-      toast({ title: "Colaborador atualizado com sucesso!" });
+      toast({ title: t.adminCollaborators.toastUpdated });
       setIsEditDialogOpen(false);
       setEditingCollaborator(null);
       await refreshCollaborators();
     } catch (error) {
-      toast({ title: "Erro ao atualizar colaborador", variant: "destructive" });
+      toast({ title: t.adminCollaborators.toastUpdateError, variant: "destructive" });
     }
   };
 
@@ -243,10 +251,10 @@ export default function AdminColaboradoresPage() {
     const newStatus = collab.status === "Ativo" ? "Inativo" : "Ativo";
     try {
       await updateDoc(doc(db, "users", collab.id), { status: newStatus });
-      toast({ title: `Colaborador ${newStatus === "Ativo" ? "ativado" : "desativado"} com sucesso!` });
+      toast({ title: newStatus === "Ativo" ? t.adminCollaborators.toastActivated : t.adminCollaborators.toastDeactivated });
       await refreshCollaborators();
     } catch (error) {
-      toast({ title: "Erro ao alterar status", variant: "destructive" });
+      toast({ title: t.adminCollaborators.toastToggleError, variant: "destructive" });
     }
   };
 
@@ -261,25 +269,25 @@ export default function AdminColaboradoresPage() {
       const token = await getAuthToken();
       const result = await deleteCollaborator(token, confirmDeleteId);
       if (result.error) {
-        toast({ title: "Erro ao remover colaborador", description: result.error, variant: "destructive" });
+        toast({ title: t.adminCollaborators.toastRemoveError, description: result.error, variant: "destructive" });
       } else {
-        toast({ title: "Colaborador removido com sucesso!" });
+        toast({ title: t.adminCollaborators.toastRemoved });
       }
       setConfirmDeleteId(null);
       setConfirmDeleteName("");
       await refreshCollaborators();
     } catch (error) {
-      toast({ title: "Erro ao remover colaborador", variant: "destructive" });
+      toast({ title: t.adminCollaborators.toastRemoveError, variant: "destructive" });
     }
   };
 
   return (
     <>
-      <Header title="Colaboradores" action={
+      <Header title={t.adminCollaborators.title} action={
         <ActionDialog
           trigger={inviteButton}
-          title="Convidar Novo Colaborador"
-          description="Envie um convite para um novo membro da equipe. Ele receberá um e-mail para criar sua senha."
+          title={t.adminCollaborators.inviteTitle}
+          description={t.adminCollaborators.inviteDescription}
           open={isDialogOpen}
           onOpenChange={async (open) => {
             if (open) {
@@ -294,32 +302,32 @@ export default function AdminColaboradoresPage() {
             <input type="hidden" name="idToken" value={cachedToken} />
             <InviteFormContent />
             <div className="flex justify-end mt-6">
-              <Button type="submit">Enviar Convite</Button>
+              <Button type="submit">{t.adminCollaborators.sendInvite}</Button>
             </div>
           </form>
         </ActionDialog>
       } />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
-          <StatCard title="Total de Colaboradores" value={String(collaborators.length)} icon={Users} isLoading={isLoading} />
-          <StatCard title="Colaboradores Ativos" value={String(collaborators.filter(c => c.status === 'Ativo').length)} icon={UserCheck} isLoading={isLoading} />
-          <StatCard title="Licenças Disponíveis" value={`${collaborators.length} / ${totalLicenses}`} icon={Users} isLoading={isLoading} />
+          <StatCard title={t.adminCollaborators.totalCollaborators} value={String(collaborators.length)} icon={Users} isLoading={isLoading} />
+          <StatCard title={t.adminCollaborators.activeCollaborators} value={String(collaborators.filter(c => c.status === 'Ativo').length)} icon={UserCheck} isLoading={isLoading} />
+          <StatCard title={t.adminCollaborators.availableLicenses} value={`${collaborators.length} / ${totalLicenses}`} icon={Users} isLoading={isLoading} />
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Equipe</CardTitle>
-            <CardDescription>Gerencie os colaboradores da sua empresa.</CardDescription>
+            <CardTitle>{t.adminCollaborators.teamTitle}</CardTitle>
+            <CardDescription>{t.adminCollaborators.teamDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Colaborador</TableHead>
-                  <TableHead>Pontos</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>LinkedIn</TableHead>
-                  <TableHead>Data de Adesão</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead>{t.adminCollaborators.tableCollaborator}</TableHead>
+                  <TableHead>{t.adminCollaborators.tablePoints}</TableHead>
+                  <TableHead>{t.adminCollaborators.tableStatus}</TableHead>
+                  <TableHead>{t.adminCollaborators.tableLinkedin}</TableHead>
+                  <TableHead>{t.adminCollaborators.tableJoinDate}</TableHead>
+                  <TableHead className="text-right">{t.common.actions}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -328,14 +336,14 @@ export default function AdminColaboradoresPage() {
                     <TableCell colSpan={6} className="text-center">
                       <div className="flex justify-center items-center p-4">
                         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        <span className="ml-2">Carregando colaboradores...</span>
+                        <span className="ml-2">{t.adminCollaborators.loading}</span>
                       </div>
                     </TableCell>
                   </TableRow>
                 ) : collaborators.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8">
-                      Nenhum colaborador encontrado. Convide o primeiro!
+                      {t.adminCollaborators.empty}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -358,17 +366,17 @@ export default function AdminColaboradoresPage() {
                       <TableCell>
                         {user.linkedinStatus === 'connected' && (
                           <Badge variant="outline" className="text-[#0A66C2] border-[#0A66C2]/30 bg-[#0A66C2]/5">
-                            <Linkedin className="h-3 w-3 mr-1" /> Conectado
+                            <Linkedin className="h-3 w-3 mr-1" /> {t.adminCollaborators.linkedinConnected}
                           </Badge>
                         )}
                         {user.linkedinStatus === 'expiring' && (
                           <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
-                            <Linkedin className="h-3 w-3 mr-1" /> Expirando
+                            <Linkedin className="h-3 w-3 mr-1" /> {t.adminCollaborators.linkedinExpiring}
                           </Badge>
                         )}
                         {user.linkedinStatus === 'expired' && (
                           <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50 dark:bg-red-950/30">
-                            <Linkedin className="h-3 w-3 mr-1" /> Expirado
+                            <Linkedin className="h-3 w-3 mr-1" /> {t.adminCollaborators.linkedinExpired}
                           </Badge>
                         )}
                         {user.linkedinStatus === 'not_connected' && (
@@ -382,11 +390,11 @@ export default function AdminColaboradoresPage() {
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver Perfil</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditOpen(user)}>Editar</DropdownMenuItem>
+                            <DropdownMenuItem>{t.common.viewProfile}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditOpen(user)}>{t.common.edit}</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleToggleStatus(user)}>{user.status === "Ativo" ? "Desativar" : "Ativar"}</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive" onClick={() => handleRemoveConfirm(user)}>Remover</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleToggleStatus(user)}>{user.status === "Ativo" ? t.common.deactivate : t.common.activate}</DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive" onClick={() => handleRemoveConfirm(user)}>{t.common.remove}</DropdownMenuItem>
                     </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -402,19 +410,19 @@ export default function AdminColaboradoresPage() {
         <ActionDialog
           open={isEditDialogOpen}
           onOpenChange={setIsEditDialogOpen}
-          title="Editar Colaborador"
-          description="Atualize os dados do colaborador."
+          title={t.adminCollaborators.editTitle}
+          description={t.adminCollaborators.editDescription}
         >
           <div className="space-y-4">
             <div>
-              <Label htmlFor="editName">Nome</Label>
+              <Label htmlFor="editName">{t.adminCollaborators.nameLabel}</Label>
               <Input id="editName" value={editName} onChange={(e) => setEditName(e.target.value)} />
             </div>
             <div>
-              <Label htmlFor="editEmail">Email</Label>
+              <Label htmlFor="editEmail">{t.adminCollaborators.emailLabel}</Label>
               <Input id="editEmail" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
             </div>
-            <Button onClick={handleSaveEdit} className="w-full">Salvar</Button>
+            <Button onClick={handleSaveEdit} className="w-full">{t.common.save}</Button>
           </div>
         </ActionDialog>
 
@@ -422,12 +430,12 @@ export default function AdminColaboradoresPage() {
         <ActionDialog
           open={!!confirmDeleteId}
           onOpenChange={(open) => { if (!open) { setConfirmDeleteId(null); setConfirmDeleteName(""); } }}
-          title="Remover Colaborador"
-          description={`Tem certeza que deseja remover ${confirmDeleteName}? Esta ação não pode ser desfeita.`}
+          title={t.adminCollaborators.removeTitle}
+          description={t.adminCollaborators.removeConfirm.replace('{name}', confirmDeleteName)}
         >
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => { setConfirmDeleteId(null); setConfirmDeleteName(""); }}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleRemoveCollaborator}>Remover</Button>
+            <Button variant="outline" onClick={() => { setConfirmDeleteId(null); setConfirmDeleteName(""); }}>{t.common.cancel}</Button>
+            <Button variant="destructive" onClick={handleRemoveCollaborator}>{t.common.remove}</Button>
           </div>
         </ActionDialog>
       </main>

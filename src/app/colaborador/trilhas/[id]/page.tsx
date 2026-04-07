@@ -24,6 +24,8 @@ import type {
 } from '@/types/trilhas';
 import { recalculatePoints } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
+import { useT } from '@/lib/i18n/context';
+import { interpolate } from '@/lib/i18n';
 
 const MODO_ICONS: Record<ModuloModo, any> = {
   aula: Play,
@@ -33,20 +35,21 @@ const MODO_ICONS: Record<ModuloModo, any> = {
   missao_conteudo: Target,
 };
 
-const MODO_LABELS: Record<ModuloModo, string> = {
-  aula: 'Aula',
-  leitura: 'Leitura',
-  desafio: 'Desafio',
-  faca_voce_mesmo: 'Pratica',
-  missao_conteudo: 'Missao',
-};
-
 const DESAFIO_FAIXA_MIN = 0.6;
 const DESAFIO_FAIXA_BONUS = 0.8;
 
 export default function TrilhaFullscreenPage() {
   const { id } = useParams();
   const router = useRouter();
+  const t = useT();
+  const tp = t.trailPlayer;
+  const MODO_LABELS: Record<ModuloModo, string> = {
+    aula: tp.modoAula,
+    leitura: tp.modoLeitura,
+    desafio: tp.modoDesafio,
+    faca_voce_mesmo: tp.modoPratica,
+    missao_conteudo: tp.modoMissao,
+  };
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -255,7 +258,7 @@ export default function TrilhaFullscreenPage() {
       // Register trail completion in pointsHistory
       try {
         await addDoc(collection(db, 'users', user!.uid, 'pointsHistory'), {
-          description: `Trilha concluída: ${trail.titulo}`,
+          description: interpolate(tp.trailCompletedHistory, { title: trail.titulo }),
           date: Timestamp.now(),
           points: updatedProgress.pontosGanhos,
           type: 'gain',
@@ -478,7 +481,7 @@ export default function TrilhaFullscreenPage() {
       <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
         <div className="text-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground">Carregando trilha...</p>
+          <p className="text-muted-foreground">{tp.loading}</p>
         </div>
       </div>
     );
@@ -489,9 +492,9 @@ export default function TrilhaFullscreenPage() {
       <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
         <div className="text-center space-y-4">
           <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
-          <p className="text-lg font-semibold">Trilha nao encontrada</p>
+          <p className="text-lg font-semibold">{tp.notFound}</p>
           <Button onClick={() => router.push('/colaborador/trilhas')}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Trilhas
+            <ArrowLeft className="mr-2 h-4 w-4" /> {tp.backToTrails}
           </Button>
         </div>
       </div>
@@ -505,7 +508,7 @@ export default function TrilhaFullscreenPage() {
       <div className="fixed inset-0 bg-background z-50 overflow-auto">
         <div className="max-w-2xl mx-auto px-4 py-12">
           <Button variant="ghost" onClick={() => router.push('/colaborador/trilhas')} className="mb-8">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Trilhas
+            <ArrowLeft className="mr-2 h-4 w-4" /> {tp.backToTrails}
           </Button>
 
           <Card>
@@ -525,29 +528,29 @@ export default function TrilhaFullscreenPage() {
                     <Zap className="h-5 w-5 text-yellow-500" />
                     {trail.pontuacaoTotal || 0}
                   </div>
-                  <p className="text-xs text-muted-foreground">Pontos disponiveis</p>
+                  <p className="text-xs text-muted-foreground">{tp.pointsAvailable}</p>
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-center gap-1 text-2xl font-bold">
                     <BookOpen className="h-5 w-5" />
                     {sortedModules.length}
                   </div>
-                  <p className="text-xs text-muted-foreground">Modulos</p>
+                  <p className="text-xs text-muted-foreground">{tp.modulesLabel}</p>
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-center gap-1 text-2xl font-bold">
                     <Clock className="h-5 w-5" />
                     {trail.tempoEstimadoMin || '?'}
                   </div>
-                  <p className="text-xs text-muted-foreground">Minutos</p>
+                  <p className="text-xs text-muted-foreground">{tp.minutesLabel}</p>
                 </div>
               </div>
 
               {hasStarted && (
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Progresso</span>
-                    <span>{completedCount}/{totalModules} modulos</span>
+                    <span>{tp.progress}</span>
+                    <span>{interpolate(tp.modulesCount, { done: completedCount, total: totalModules })}</span>
                   </div>
                   <Progress value={progressPercent} className="h-2" />
                 </div>
@@ -557,16 +560,16 @@ export default function TrilhaFullscreenPage() {
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
                   <p className="text-sm text-amber-800">
                     <Trophy className="inline h-4 w-4 mr-1" />
-                    Bonus de conclusao: <strong>+{trail.pontuacaoBonus} pontos</strong>
+                    {interpolate(tp.completionBonus, { points: trail.pontuacaoBonus })}
                   </p>
                 </div>
               )}
 
               <Button className="w-full" size="lg" onClick={startTrail}>
                 {hasStarted ? (
-                  <><ArrowRight className="mr-2 h-5 w-5" /> Continuar de onde parei</>
+                  <><ArrowRight className="mr-2 h-5 w-5" /> {tp.continueTrail}</>
                 ) : (
-                  <><Rocket className="mr-2 h-5 w-5" /> Comecar trilha</>
+                  <><Rocket className="mr-2 h-5 w-5" /> {tp.startTrail}</>
                 )}
               </Button>
             </CardContent>
@@ -587,40 +590,40 @@ export default function TrilhaFullscreenPage() {
               <div className="mx-auto w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4">
                 <Trophy className="h-10 w-10 text-green-600" />
               </div>
-              <CardTitle className="text-2xl text-green-800">Trilha Concluida!</CardTitle>
+              <CardTitle className="text-2xl text-green-800">{tp.trailCompleted}</CardTitle>
               <CardDescription className="text-green-700 text-base">
-                Parabens! Voce completou a trilha "{trail.titulo}"
+                {interpolate(tp.congratulations, { title: trail.titulo })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="bg-white rounded-lg p-4 space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Pontos dos modulos</span>
+                  <span className="text-muted-foreground">{tp.modulePoints}</span>
                   <span className="font-semibold">{modulePoints > 0 ? modulePoints : 0}</span>
                 </div>
                 {trail.pontuacaoBonus > 0 && (
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Bonus de conclusao</span>
+                    <span className="text-muted-foreground">{tp.completionBonusLabel}</span>
                     <span className="font-semibold text-amber-600">+{trail.pontuacaoBonus}</span>
                   </div>
                 )}
                 <hr />
                 <div className="flex justify-between items-center text-lg">
-                  <span className="font-bold">Total</span>
-                  <span className="font-bold text-primary">{progress?.pontosGanhos || 0} pontos</span>
+                  <span className="font-bold">{tp.total}</span>
+                  <span className="font-bold text-primary">{interpolate(tp.pointsValue, { points: progress?.pontosGanhos || 0 })}</span>
                 </div>
               </div>
 
               {trail.missaoGatilho && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
                   <Rocket className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-blue-800">Uma nova missao foi criada para voce!</p>
+                  <p className="text-sm font-semibold text-blue-800">{tp.newMissionCreated}</p>
                   <Button
                     variant="outline"
                     className="mt-2 border-blue-300 text-blue-700"
                     onClick={() => router.push('/colaborador/missoes')}
                   >
-                    Ver Missoes
+                    {tp.viewMissions}
                   </Button>
                 </div>
               )}
@@ -631,7 +634,7 @@ export default function TrilhaFullscreenPage() {
                   className="flex-1"
                   onClick={() => router.push('/colaborador/trilhas')}
                 >
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Voltar para Trilhas
+                  <ArrowLeft className="mr-2 h-4 w-4" /> {tp.backToTrails}
                 </Button>
                 <Button
                   className="flex-1"
@@ -643,7 +646,7 @@ export default function TrilhaFullscreenPage() {
                     resetModuleState();
                   }}
                 >
-                  <BookOpen className="mr-2 h-4 w-4" /> Refazer Trilha
+                  <BookOpen className="mr-2 h-4 w-4" /> {tp.reviewTrail}
                 </Button>
               </div>
             </CardContent>
@@ -672,7 +675,7 @@ export default function TrilhaFullscreenPage() {
           <span className="text-sm font-medium hidden sm:inline">{trail.titulo}</span>
           {reviewMode && (
             <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
-              Modo Revisao
+              {tp.reviewMode}
             </Badge>
           )}
         </div>
@@ -690,8 +693,8 @@ export default function TrilhaFullscreenPage() {
             <Badge variant="secondary">
               <Star className="h-3 w-3 mr-1" />
               {currentModule.tipo === 'desafio'
-                ? (currentModule.conteudo?.pontuacaoBase || 0) + ' pontos'
-                : (currentModule.pontuacaoBase || 0) + ' pontos'}
+                ? (currentModule.conteudo?.pontuacaoBase || 0) + ' ' + tp.points
+                : (currentModule.pontuacaoBase || 0) + ' ' + tp.points}
             </Badge>
           )}
           {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
@@ -703,7 +706,7 @@ export default function TrilhaFullscreenPage() {
         {sidebarOpen && (
           <div className="w-72 border-r bg-card overflow-y-auto shrink-0">
             <div className="p-4 space-y-1">
-              <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">Modulos</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">{tp.modulesLabel}</p>
               {sortedModules.map((mod, idx) => {
                 const Icon = MODO_ICONS[mod.tipo] || BookOpen;
                 const completed = isModuleCompleted(mod.id);
@@ -735,7 +738,7 @@ export default function TrilhaFullscreenPage() {
                       <p className="truncate">{mod.titulo}</p>
                       <div className="flex items-center gap-1 mt-0.5">
                         {!mod.obrigatorio && (
-                          <span className="text-xs text-muted-foreground">Opcional</span>
+                          <span className="text-xs text-muted-foreground">{tp.optional}</span>
                         )}
                       </div>
                     </div>
@@ -757,7 +760,7 @@ export default function TrilhaFullscreenPage() {
                   <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
                   {moduleCompleted && (
                     <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Concluido
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
                     </Badge>
                   )}
                 </div>
@@ -790,11 +793,11 @@ export default function TrilhaFullscreenPage() {
                 {!moduleCompleted && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>Progresso do video</span>
+                      <span>{tp.videoProgress}</span>
                       <span>{Math.round(videoProgress)}%</span>
                     </div>
                     <Progress value={videoProgress} className="h-2" />
-                    <p className="text-xs text-muted-foreground">Assista pelo menos 80% do video para liberar a conclusao</p>
+                    <p className="text-xs text-muted-foreground">{tp.videoMinWatch}</p>
                   </div>
                 )}
               </div>
@@ -807,13 +810,13 @@ export default function TrilhaFullscreenPage() {
                   <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
                   {moduleCompleted && (
                     <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Concluido
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
                     </Badge>
                   )}
                 </div>
                 <div
                   className="prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentModule.conteudo?.texto || '<p>Conteudo nao disponivel.</p>') }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentModule.conteudo?.texto || `<p>${tp.contentUnavailable}</p>`) }}
                 />
               </div>
             )}
@@ -825,7 +828,7 @@ export default function TrilhaFullscreenPage() {
                   <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
                   {moduleCompleted && (
                     <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Concluido
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
                     </Badge>
                   )}
                 </div>
@@ -834,35 +837,35 @@ export default function TrilhaFullscreenPage() {
                   <Card className="border-amber-200 bg-amber-50">
                     <CardContent className="p-6 text-center space-y-3">
                       <AlertCircle className="h-8 w-8 text-amber-600 mx-auto" />
-                      <p className="font-semibold text-amber-800">Pontuacao ja fixada</p>
+                      <p className="font-semibold text-amber-800">{tp.scoreAlreadyFixed}</p>
                       <p className="text-sm text-amber-700">
-                        Voce ja fez este desafio. Sua pontuacao foi fixada na primeira tentativa:
-                        {quizScore && <strong> {quizScore.percent}% = {quizScore.points} pontos</strong>}
+                        {tp.alreadyAttemptedMsg}
+                        {quizScore && <strong> {quizScore.percent}% = {quizScore.points} {tp.points}</strong>}
                       </p>
-                      <p className="text-xs text-amber-600">Voce pode refazer para estudar, mas a pontuacao nao sera alterada.</p>
+                      <p className="text-xs text-amber-600">{tp.alreadyAttemptedNote}</p>
                     </CardContent>
                   </Card>
                 ) : quizSubmitted && quizScore ? (
                   <Card className="border-green-200 bg-green-50">
                     <CardContent className="p-6 text-center space-y-4">
                       <Trophy className="h-10 w-10 text-green-600 mx-auto" />
-                      <p className="text-xl font-bold text-green-800">Resultado do Desafio</p>
+                      <p className="text-xl font-bold text-green-800">{tp.challengeResult}</p>
                       <div className="grid grid-cols-3 gap-4">
                         <div>
                           <p className="text-2xl font-bold">{quizScore.correct}/{quizScore.total}</p>
-                          <p className="text-xs text-muted-foreground">Acertos</p>
+                          <p className="text-xs text-muted-foreground">{tp.correctAnswers}</p>
                         </div>
                         <div>
                           <p className="text-2xl font-bold">{quizScore.percent}%</p>
-                          <p className="text-xs text-muted-foreground">Percentual</p>
+                          <p className="text-xs text-muted-foreground">{tp.percentage}</p>
                         </div>
                         <div>
                           <p className="text-2xl font-bold text-primary">{quizScore.points}</p>
-                          <p className="text-xs text-muted-foreground">Pontos</p>
+                          <p className="text-xs text-muted-foreground">{tp.pointsLabel}</p>
                         </div>
                       </div>
                       {quizScore.percent < 60 && (
-                        <p className="text-sm text-red-600">Abaixo de 60% = 0 pontos. Pontuacao fixada na primeira tentativa.</p>
+                        <p className="text-sm text-red-600">{tp.belowMinimum}</p>
                       )}
                     </CardContent>
                   </Card>
@@ -872,7 +875,7 @@ export default function TrilhaFullscreenPage() {
                     {(() => {
                       const questions = currentModule.conteudo?.questoes || [];
                       const q = questions[currentQuestionIndex];
-                      if (!q) return <p>Nenhuma questao encontrada.</p>;
+                      if (!q) return <p>{tp.noQuestions}</p>;
                       const isAnswered = answeredQuestions.has(currentQuestionIndex);
                       const selectedIdx = selectedAnswers[currentQuestionIndex];
                       const isCorrect = selectedIdx === q.respostaCorreta;
@@ -880,7 +883,7 @@ export default function TrilhaFullscreenPage() {
                       return (
                         <div className="space-y-4">
                           <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>Questao {currentQuestionIndex + 1} de {questions.length}</span>
+                            <span>{interpolate(tp.questionOf, { current: currentQuestionIndex + 1, total: questions.length })}</span>
                             <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} className="w-24 h-2" />
                           </div>
 
@@ -913,7 +916,7 @@ export default function TrilhaFullscreenPage() {
                               {isAnswered && (
                                 <div className={`mt-4 p-3 rounded-lg ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
                                   <p className={`text-sm font-semibold ${isCorrect ? 'text-green-800' : 'text-red-800'}`}>
-                                    {isCorrect ? 'Correto!' : 'Incorreto'}
+                                    {isCorrect ? tp.correct : tp.incorrect}
                                   </p>
                                   {q.explicacao && (
                                     <p className="text-sm text-muted-foreground mt-1">{q.explicacao}</p>
@@ -929,15 +932,15 @@ export default function TrilhaFullscreenPage() {
                                 onClick={handleConfirmAnswer}
                                 disabled={selectedIdx === undefined}
                               >
-                                Confirmar resposta
+                                {tp.confirmAnswer}
                               </Button>
                             ) : currentQuestionIndex < questions.length - 1 ? (
                               <Button onClick={handleNextQuestion}>
-                                Proxima questao <ChevronRight className="ml-2 h-4 w-4" />
+                                {tp.nextQuestion} <ChevronRight className="ml-2 h-4 w-4" />
                               </Button>
                             ) : (
                               <Button onClick={handleSubmitDesafio}>
-                                <Trophy className="mr-2 h-4 w-4" /> Ver resultado
+                                <Trophy className="mr-2 h-4 w-4" /> {tp.viewResult}
                               </Button>
                             )}
                           </div>
@@ -956,7 +959,7 @@ export default function TrilhaFullscreenPage() {
                   <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
                   {moduleCompleted && (
                     <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Concluido
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
                     </Badge>
                   )}
                 </div>
@@ -965,14 +968,14 @@ export default function TrilhaFullscreenPage() {
                     <div className="flex items-start gap-3">
                       <Wrench className="h-6 w-6 text-amber-600 shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-semibold text-amber-800 mb-2">Pratica</p>
-                        <p className="text-sm whitespace-pre-wrap">{currentModule.conteudo?.instrucao || 'Siga as instrucoes.'}</p>
+                        <p className="font-semibold text-amber-800 mb-2">{tp.practice}</p>
+                        <p className="text-sm whitespace-pre-wrap">{currentModule.conteudo?.instrucao || tp.followInstructions}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
                 <p className="text-xs text-muted-foreground text-center">
-                  Modulo sem pontuacao. Necessario visualizar para concluir a trilha.
+                  {tp.noPointsModule}
                 </p>
               </div>
             )}
@@ -984,7 +987,7 @@ export default function TrilhaFullscreenPage() {
                   <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
                   {moduleCompleted && (
                     <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> Missao desbloqueada
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.missionUnlocked}
                     </Badge>
                   )}
                 </div>
@@ -993,20 +996,20 @@ export default function TrilhaFullscreenPage() {
                     <div className="flex items-start gap-3">
                       <Target className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-semibold text-blue-800 mb-2">Missao de Conteudo</p>
+                        <p className="font-semibold text-blue-800 mb-2">{tp.contentMission}</p>
                         <p className="text-sm whitespace-pre-wrap">{currentModule.conteudo?.instrucao || ''}</p>
                       </div>
                     </div>
                     {currentModule.conteudo?.exemplos && (
                       <div className="bg-blue-50 rounded-lg p-4">
-                        <p className="text-xs font-semibold text-blue-700 uppercase mb-2">Exemplos</p>
+                        <p className="text-xs font-semibold text-blue-700 uppercase mb-2">{tp.examples}</p>
                         <p className="text-sm whitespace-pre-wrap">{currentModule.conteudo.exemplos}</p>
                       </div>
                     )}
                   </CardContent>
                 </Card>
                 <p className="text-xs text-muted-foreground text-center">
-                  Modulo sem pontuacao. Desbloquear a missao e necessario para concluir a trilha.
+                  {tp.noPointsMission}
                 </p>
               </div>
             )}
@@ -1017,7 +1020,7 @@ export default function TrilhaFullscreenPage() {
           <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4 z-10">
             <div className="max-w-3xl mx-auto flex items-center justify-between">
               <Button variant="outline" size="sm" onClick={goPrev} disabled={activeModuleIndex === 0}>
-                <ChevronLeft className="mr-1 h-4 w-4" /> Anterior
+                <ChevronLeft className="mr-1 h-4 w-4" /> {tp.previous}
               </Button>
 
               <div className="flex items-center gap-2">
@@ -1029,29 +1032,29 @@ export default function TrilhaFullscreenPage() {
                         onClick={() => completeModule(currentModule.id, currentModule.pontuacaoBase || 0)}
                         disabled={!videoCompleted && !(currentModule.conteudo?.videoUrl?.includes('youtube') || currentModule.conteudo?.videoUrl?.includes('vimeo'))}
                       >
-                        <CheckCircle2 className="mr-2 h-4 w-4" /> Modulo concluido
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> {tp.moduleCompleted}
                       </Button>
                     )}
                     {currentModule.tipo === 'leitura' && (
                       <Button onClick={() => completeModule(currentModule.id, currentModule.pontuacaoBase || 0)}>
-                        <CheckCircle2 className="mr-2 h-4 w-4" /> Conclui a leitura
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> {tp.readingCompleted}
                       </Button>
                     )}
                     {currentModule.tipo === 'faca_voce_mesmo' && (
                       <Button onClick={() => completeModule(currentModule.id, 0)}>
-                        <Eye className="mr-2 h-4 w-4" /> Visualizei
+                        <Eye className="mr-2 h-4 w-4" /> {tp.viewed}
                       </Button>
                     )}
                     {currentModule.tipo === 'missao_conteudo' && (
                       <Button onClick={handleUnlockMission} disabled={saving}>
                         {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
-                        Desbloquear Missao
+                        {tp.unlockMission}
                       </Button>
                     )}
                     {/* Skip button for optional modules */}
                     {!currentModule.obrigatorio && currentModule.tipo !== 'desafio' && (
                       <Button variant="ghost" size="sm" onClick={goNext}>
-                        <SkipForward className="mr-1 h-4 w-4" /> Pular
+                        <SkipForward className="mr-1 h-4 w-4" /> {tp.skip}
                       </Button>
                     )}
                   </>
@@ -1059,7 +1062,7 @@ export default function TrilhaFullscreenPage() {
 
                 {moduleCompleted && (
                   <Badge variant="outline" className="text-green-700 border-green-300">
-                    <CheckCircle2 className="h-3 w-3 mr-1" /> Concluido
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
                   </Badge>
                 )}
               </div>
@@ -1070,7 +1073,7 @@ export default function TrilhaFullscreenPage() {
                 onClick={goNext}
                 disabled={activeModuleIndex === null || activeModuleIndex >= sortedModules.length - 1}
               >
-                Proximo <ChevronRight className="ml-1 h-4 w-4" />
+                {tp.next} <ChevronRight className="ml-1 h-4 w-4" />
               </Button>
             </div>
           </div>

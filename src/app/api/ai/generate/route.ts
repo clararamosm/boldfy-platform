@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { content, companyProfile, personalBranding, format, length } = body;
+    const { content, companyProfile, personalBranding, format, length, locale } = body;
+    const isEN = locale === 'en';
 
     if (!content) {
       return NextResponse.json(
@@ -69,7 +70,13 @@ Regras de formatacao:
 - Frases variam entre curtas (impacto) e medias (desenvolvimento). Evite frases muito longas.`,
     };
 
-    const systemPrompt = `Voce e um assistente de criacao de captions para LinkedIn. Seu objetivo e ajudar o autor a criar captions de alta performance que alinham a marca corporativa da empresa com a autenticidade da marca pessoal do autor.
+    const languageDirective = isEN
+      ? `LANGUAGE: Write entirely in English. All output must be in English regardless of the input language.`
+      : `LANGUAGE: Write entirely in Brazilian Portuguese. All output must be in Brazilian Portuguese regardless of the input language.`;
+
+    const systemPrompt = `${languageDirective}
+
+Voce e um assistente de criacao de captions para LinkedIn. Seu objetivo e ajudar o autor a criar captions de alta performance que alinham a marca corporativa da empresa com a autenticidade da marca pessoal do autor.
 
 Voce NUNCA fala da marca de forma explicita ou forcada. Voce tece a marca dentro da narrativa pessoal do autor, de forma organica.
 Voce so gera captions (legendas de texto). Nao gera designs, carousels, nem instrucoes visuais.
@@ -184,7 +191,7 @@ Tamanho: ${lengthGuide[length] || lengthGuide.medium}
 - Se o pedido esta vago, peca esclarecimento em vez de assumir.
 - Se o pedido esta fora dos pilares de conteudo do autor, mencione e sugira um angulo dentro do nicho.
 - NUNCA inclua hashtags. Nem no final, nem no meio, em nenhum lugar.
-- Escreva no mesmo idioma do conteudo original.`;
+- ${isEN ? 'Write entirely in English.' : 'Escreva inteiramente em portugues brasileiro.'}`;
 
     const { text } = await ai.generate({
       system: systemPrompt,

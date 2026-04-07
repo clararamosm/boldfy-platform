@@ -16,6 +16,8 @@ import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { toggleStarContent } from '@/app/actions';
 import { useRouter } from 'next/navigation';
+import { useT, useLocale } from '@/lib/i18n/context';
+import { interpolate } from '@/lib/i18n/interpolate';
 
 const ITEMS_PER_PAGE = 15;
 
@@ -57,28 +59,32 @@ const getAssetIcon = (type: string, fileUrl?: string) => {
     return <FileText className="h-12 w-12 text-muted-foreground" />;
 };
 
-const AssetCard = ({ asset }: { asset: Asset }) => (
-    <Card>
-        <CardHeader className="p-0">
-            <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg overflow-hidden">
-                 {getAssetIcon(asset.type, asset.fileUrl)}
-            </div>
-        </CardHeader>
-        <CardContent className="p-4 space-y-1">
-            <CardTitle className="text-base font-semibold">{asset.name}</CardTitle>
-            <p className="text-sm text-muted-foreground">{asset.type}</p>
-            <p className="text-xs text-muted-foreground">Adicionado em {asset.uploadDate?.toDate().toLocaleDateString() || 'N/A'}</p>
-        </CardContent>
-        <CardFooter>
-            <Button className="w-full" variant="secondary" asChild>
-                <a href={asset.fileUrl} target="_blank" rel="noopener noreferrer">
-                    <Download className="mr-2 h-4 w-4" />
-                    Baixar
-                </a>
-            </Button>
-        </CardFooter>
-    </Card>
-);
+const AssetCard = ({ asset }: { asset: Asset }) => {
+    const t = useT();
+    const locale = useLocale();
+    return (
+        <Card>
+            <CardHeader className="p-0">
+                <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg overflow-hidden">
+                     {getAssetIcon(asset.type, asset.fileUrl)}
+                </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-1">
+                <CardTitle className="text-base font-semibold">{asset.name}</CardTitle>
+                <p className="text-sm text-muted-foreground">{asset.type}</p>
+                <p className="text-xs text-muted-foreground">{interpolate(t.colabLibrary.addedOn, { date: asset.uploadDate?.toDate().toLocaleDateString(locale === 'en' ? 'en-US' : 'pt-BR') || 'N/A' })}</p>
+            </CardContent>
+            <CardFooter>
+                <Button className="w-full" variant="secondary" asChild>
+                    <a href={asset.fileUrl} target="_blank" rel="noopener noreferrer">
+                        <Download className="mr-2 h-4 w-4" />
+                        {t.colabLibrary.download}
+                    </a>
+                </Button>
+            </CardFooter>
+        </Card>
+    );
+};
 
 // ─── Generated content card ─────────────────────────────────────
 const GeneratedContentCard = ({
@@ -94,6 +100,8 @@ const GeneratedContentCard = ({
     onDelete: (id: string) => void;
     onUseLegenda: (content: string) => void;
 }) => {
+    const t = useT();
+    const locale = useLocale();
     const [isCopied, setIsCopied] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
 
@@ -130,8 +138,8 @@ const GeneratedContentCard = ({
                     </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    {createdDate.toLocaleDateString('pt-BR')} · {daysAgo === 0 ? 'Hoje' : `${daysAgo}d atrás`}
-                    {!item.starred && daysAgo > 20 && <span className="text-orange-400 ml-1">· Expira em {30 - daysAgo}d</span>}
+                    {createdDate.toLocaleDateString(locale === 'en' ? 'en-US' : 'pt-BR')} · {daysAgo === 0 ? t.colabLibrary.today : interpolate(t.colabLibrary.daysAgo, { days: daysAgo })}
+                    {!item.starred && daysAgo > 20 && <span className="text-orange-400 ml-1">· {interpolate(t.colabLibrary.expiresIn, { days: 30 - daysAgo })}</span>}
                 </p>
             </CardHeader>
             <CardContent className="flex-1 pb-2">
@@ -142,7 +150,7 @@ const GeneratedContentCard = ({
             <CardFooter className="gap-2 flex-wrap">
                 <Button variant="secondary" size="sm" className="flex-1" onClick={handleCopy}>
                     {isCopied ? <Check className="mr-1 h-3 w-3" /> : <ClipboardCopy className="mr-1 h-3 w-3" />}
-                    {isCopied ? 'Copiado' : 'Copiar'}
+                    {isCopied ? t.colabLibrary.copied : t.colabLibrary.copy}
                 </Button>
                 <Button
                     size="sm"
@@ -150,7 +158,7 @@ const GeneratedContentCard = ({
                     onClick={() => onUseLegenda(item.output)}
                 >
                     <ArrowRight className="mr-1 h-3 w-3" />
-                    Usar legenda
+                    {t.colabLibrary.useCaption}
                 </Button>
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => onDelete(item.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
@@ -212,6 +220,7 @@ const Pagination = ({
     totalItems: number;
     onPageChange: (page: number) => void;
 }) => {
+    const t = useT();
     if (totalPages <= 1) return null;
 
     const start = (currentPage - 1) * ITEMS_PER_PAGE + 1;
@@ -220,7 +229,7 @@ const Pagination = ({
     return (
         <div className="flex items-center justify-between pt-4">
             <p className="text-sm text-muted-foreground">
-                {start}-{end} de {totalItems}
+                {start}-{end} / {totalItems}
             </p>
             <div className="flex items-center gap-2">
                 <Button
@@ -230,7 +239,7 @@ const Pagination = ({
                     disabled={currentPage === 1}
                 >
                     <ChevronLeft className="h-4 w-4 mr-1" />
-                    Anterior
+                    {t.colabLibrary.previous}
                 </Button>
                 <span className="text-sm text-muted-foreground px-2">
                     {currentPage} / {totalPages}
@@ -241,7 +250,7 @@ const Pagination = ({
                     onClick={() => onPageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
                 >
-                    Próximo
+                    {t.colabLibrary.next}
                     <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
             </div>
@@ -251,6 +260,7 @@ const Pagination = ({
 
 // ─── Main page ──────────────────────────────────────────────────
 export default function ColaboradorBibliotecaPage() {
+    const t = useT();
     const [assets, setAssets] = useState<Asset[]>([]);
     const [generatedContent, setGeneratedContent] = useState<GeneratedContent[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -278,7 +288,7 @@ export default function ColaboradorBibliotecaPage() {
             setAssets(assetsList);
         } catch (error) {
             console.error("Failed to fetch assets:", error);
-            toast({ variant: 'destructive', title: 'Erro ao buscar ativos.' });
+            toast({ variant: 'destructive', title: t.colabLibrary.fetchError });
         } finally {
             setIsLoading(false);
         }
@@ -322,7 +332,7 @@ export default function ColaboradorBibliotecaPage() {
                     fetchAssets(cId);
                     fetchGeneratedContent(user.uid);
                 } else {
-                    toast({ variant: 'destructive', title: "Erro de usuário" });
+                    toast({ variant: 'destructive', title: t.colabLibrary.userError });
                     setIsLoading(false);
                     setIsLoadingContent(false);
                 }
@@ -351,9 +361,9 @@ export default function ColaboradorBibliotecaPage() {
         try {
             await deleteDoc(doc(db, 'users', userId, 'generatedContent', contentId));
             setGeneratedContent(prev => prev.filter(item => item.id !== contentId));
-            toast({ title: "Conteúdo removido." });
+            toast({ title: t.colabLibrary.contentRemoved });
         } catch {
-            toast({ variant: 'destructive', title: "Erro ao remover conteúdo." });
+            toast({ variant: 'destructive', title: t.colabLibrary.contentRemoveError });
         }
     };
 
@@ -382,7 +392,7 @@ export default function ColaboradorBibliotecaPage() {
         if (isLoading) return <AssetGridSkeleton />;
         const filteredAssets = category ? assets.filter(asset => asset.category === category) : assets;
         if (filteredAssets.length === 0) {
-            return <p className="text-muted-foreground text-center py-8">Nenhum ativo encontrado nesta categoria.</p>;
+            return <p className="text-muted-foreground text-center py-8">{t.colabLibrary.noAssets}</p>;
         }
         return (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -412,7 +422,7 @@ export default function ColaboradorBibliotecaPage() {
     // ── UI ───────────────────────────────────────────────────────
     return (
         <>
-            <Header title="Biblioteca" />
+            <Header title={t.nav.library} />
             <main className="flex-1 overflow-auto p-4 md:p-6">
                 {/* Section switcher */}
                 <div className="flex gap-2 mb-6">
@@ -422,7 +432,7 @@ export default function ColaboradorBibliotecaPage() {
                         className="gap-2"
                     >
                         <Sparkles className="h-4 w-4" />
-                        Meus Conteúdos
+                        {t.colabLibrary.myContent}
                         {generatedContent.length > 0 && (
                             <span className="ml-1 text-xs bg-primary-foreground/20 rounded-full px-2 py-0.5">
                                 {generatedContent.length}
@@ -435,7 +445,7 @@ export default function ColaboradorBibliotecaPage() {
                         className="gap-2"
                     >
                         <FolderOpen className="h-4 w-4" />
-                        Assets de Marca
+                        {t.colabLibrary.brandAssets}
                         {assets.length > 0 && (
                             <span className="ml-1 text-xs bg-primary-foreground/20 rounded-full px-2 py-0.5">
                                 {assets.length}
@@ -449,22 +459,22 @@ export default function ColaboradorBibliotecaPage() {
                     <Tabs defaultValue="todos-conteudos">
                         <TabsList className="mb-4">
                             <TabsTrigger value="todos-conteudos">
-                                Todos {generatedContent.length > 0 && `(${generatedContent.length})`}
+                                {t.colabLibrary.all} {generatedContent.length > 0 && `(${generatedContent.length})`}
                             </TabsTrigger>
                             <TabsTrigger value="favoritos">
-                                Favoritos {starredItems.length > 0 && `(${starredItems.length})`}
+                                {t.colabLibrary.favorites} {starredItems.length > 0 && `(${starredItems.length})`}
                             </TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="todos-conteudos">
                             <p className="text-sm text-muted-foreground mb-4">
-                                Conteúdos gerados pelo Assistente IA. Favorite com a estrela para manter permanentemente — os demais expiram em 30 dias.
+                                {t.colabLibrary.contentDescription}
                             </p>
                             {isLoadingContent ? (
                                 <ContentGridSkeleton />
                             ) : generatedContent.length === 0 ? (
                                 <p className="text-muted-foreground text-center py-8">
-                                    Nenhum conteúdo gerado ainda. Use o Assistente IA para criar captions.
+                                    {t.colabLibrary.noContent}
                                 </p>
                             ) : (
                                 <>
@@ -484,7 +494,7 @@ export default function ColaboradorBibliotecaPage() {
                                 <ContentGridSkeleton />
                             ) : starredItems.length === 0 ? (
                                 <p className="text-muted-foreground text-center py-8">
-                                    Nenhum conteúdo favoritado. Use a estrela para salvar seus melhores conteúdos.
+                                    {t.colabLibrary.noFavorites}
                                 </p>
                             ) : (
                                 <>
@@ -505,10 +515,10 @@ export default function ColaboradorBibliotecaPage() {
                 {activeSection === 'assets' && (
                     <Tabs defaultValue="todos-assets">
                         <TabsList className="mb-4">
-                            <TabsTrigger value="todos-assets">Todos</TabsTrigger>
-                            <TabsTrigger value="posts">Posts</TabsTrigger>
-                            <TabsTrigger value="materiais-ricos">Materiais Ricos</TabsTrigger>
-                            <TabsTrigger value="assets-marca">Assets de Marca</TabsTrigger>
+                            <TabsTrigger value="todos-assets">{t.colabLibrary.all}</TabsTrigger>
+                            <TabsTrigger value="posts">{t.colabLibrary.posts}</TabsTrigger>
+                            <TabsTrigger value="materiais-ricos">{t.colabLibrary.richMaterials}</TabsTrigger>
+                            <TabsTrigger value="assets-marca">{t.colabLibrary.brandAssets}</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="todos-assets">

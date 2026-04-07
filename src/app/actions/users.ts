@@ -10,12 +10,13 @@ import crypto from 'crypto';
 
 // ---- Email Invitation Helper ----
 
-async function sendInvitationEmail({ to, name, companyName, role, resetLink }: {
+async function sendInvitationEmail({ to, name, companyName, role, resetLink, locale = 'pt-BR' }: {
   to: string;
   name: string;
   companyName: string;
   role: string;
   resetLink: string;
+  locale?: 'pt-BR' | 'en';
 }) {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -27,37 +28,60 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink }: {
 
   const appUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br';
 
+  const isEN = locale === 'en';
+
+  const subject = isEN
+    ? `You've been invited to ${companyName} on Boldfy!`
+    : `Você foi convidado para a ${companyName} na Boldfy!`;
+
+  const subtitle = isEN
+    ? 'Employee Gamification Platform'
+    : 'Plataforma de Gamificação para Colaboradores';
+
+  const greeting = isEN ? `Hi, ${name}!` : `Olá, ${name}!`;
+
+  const inviteText = isEN
+    ? `You've been invited as <strong>${role}</strong> at <strong>${companyName}</strong> on the Boldfy platform.`
+    : `Você foi convidado como <strong>${role}</strong> na empresa <strong>${companyName}</strong> na plataforma Boldfy.`;
+
+  const ctaText = isEN
+    ? 'To get started, click the button below to set your password and access your account:'
+    : 'Para começar, clique no botão abaixo para criar sua senha e acessar sua conta:';
+
+  const buttonText = isEN ? 'Set My Password & Sign In' : 'Criar Minha Senha e Acessar';
+
+  const afterLabel = isEN ? '<strong>After setting your password:</strong>' : '<strong>Depois de criar sua senha:</strong>';
+  const afterText = isEN
+    ? `Access the platform at <a href="${appUrl}/login" style="color: #bd58e7;">${appUrl}/login</a> and sign in with your email and the password you just created.`
+    : `Acesse a plataforma em <a href="${appUrl}/login" style="color: #bd58e7;">${appUrl}/login</a> e faça login com seu e-mail e a senha que acabou de criar.`;
+
+  const footer = isEN
+    ? 'If you were not expecting this invitation, you can safely ignore this email.'
+    : 'Se você não esperava este convite, pode ignorar este e-mail com segurança.';
+
   await transporter.sendMail({
     from: `"Boldfy" <${process.env.SMTP_EMAIL}>`,
     to,
-    subject: `Você foi convidado para a ${companyName} na Boldfy!`,
+    subject,
     html: `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
         <h1 style="color: #7C3AED; margin: 0;">Boldfy</h1>
-        <p style="color: #6B7280; margin-top: 5px;">Plataforma de Gamificação para Colaboradores</p>
+        <p style="color: #6B7280; margin-top: 5px;">${subtitle}</p>
       </div>
-      <h2 style="color: #1F2937;">Olá, ${name}!</h2>
-      <p style="color: #4B5563; line-height: 1.6;">
-        Você foi convidado como <strong>${role}</strong> na empresa <strong>${companyName}</strong>
-        na plataforma Boldfy.
-      </p>
-      <p style="color: #4B5563; line-height: 1.6;">
-        Para começar, clique no botão abaixo para criar sua senha e acessar sua conta:
-      </p>
+      <h2 style="color: #1F2937;">${greeting}</h2>
+      <p style="color: #4B5563; line-height: 1.6;">${inviteText}</p>
+      <p style="color: #4B5563; line-height: 1.6;">${ctaText}</p>
       <div style="text-align: center; margin: 30px 0;">
         <a href="${resetLink}"
            style="background-color: #7C3AED; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
-          Criar Minha Senha e Acessar
+          ${buttonText}
         </a>
       </div>
       <p style="color: #666; font-size: 14px; margin-top: 20px; padding: 15px; background-color: #f3e8ff; border-radius: 8px;">
-        <strong>Depois de criar sua senha:</strong><br/>
-        Acesse a plataforma em <a href="${appUrl}/login" style="color: #bd58e7;">${appUrl}/login</a> e faça login com seu e-mail e a senha que acabou de criar.
+        ${afterLabel}<br/>${afterText}
       </p>
-      <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin-top: 30px;">
-        Se você não esperava este convite, pode ignorar este e-mail com segurança.
-      </p>
+      <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin-top: 30px;">${footer}</p>
     </div>
     `,
   });
@@ -70,6 +94,7 @@ const InviteAdminSchema = z.object({
   adminName: z.string().min(1, 'Nome do admin é obrigatório.'),
   adminEmail: z.string().email('E-mail inválido.'),
   licenses: z.coerce.number().int().min(5, 'O número de licenças deve ser no mínimo 5.').positive('Número de licenças deve ser positivo.'),
+  locale: z.enum(['pt-BR', 'en']).default('pt-BR'),
 });
 
 type InviteAdminState = {
@@ -92,19 +117,21 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     adminName: formData.get('adminName'),
     adminEmail: formData.get('adminEmail'),
     licenses: formData.get('licenses'),
+    locale: formData.get('locale') || 'pt-BR',
   });
 
   if (!validatedData.success) {
     return { error: validatedData.error.errors.map(e => e.message).join(', ') };
   }
 
-  const { companyName, adminName, adminEmail, licenses } = validatedData.data;
+  const { companyName, adminName, adminEmail, licenses, locale } = validatedData.data;
 
   try {
     const companyRef = await adminDb.collection("companies").add({
       companyName: companyName,
       status: 'Ativa',
       licenses: licenses,
+      locale: locale,
       adminProfile: { email: adminEmail, name: adminName },
       brandContext: { valueProposition: '', tagline: '', businessKeywords: [], solutions: [], targetPainPoints: [], targetAudience: '', approvedTopics: [], prohibitedPhrases: [] },
       subscription: {
@@ -140,8 +167,9 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       to: adminEmail,
       name: adminName,
       companyName: companyName,
-      role: 'Administrador',
+      role: locale === 'en' ? 'Administrator' : 'Administrador',
       resetLink,
+      locale,
     }).catch((emailError) => {
       console.error("Error sending admin invitation email:", emailError);
     });
@@ -200,6 +228,7 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     }
     const companyData = companyDocSnap.data();
     const companyName = companyData?.companyName || '';
+    const companyLocale = (companyData?.locale as 'pt-BR' | 'en') || 'pt-BR';
 
     const currentLicenses = companyData?.licenses || 0;
     const usersQuery = await adminDb.collection("users")
@@ -242,8 +271,9 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
       to: email,
       name: name,
       companyName: companyName,
-      role: 'Colaborador',
+      role: companyLocale === 'en' ? 'Collaborator' : 'Colaborador',
       resetLink,
+      locale: companyLocale,
     }).catch((emailError) => {
       console.error("Error sending collaborator invitation email:", emailError);
     });

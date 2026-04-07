@@ -17,6 +17,7 @@ import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ActionDialog } from '@/components/dashboard/action-dialog';
+import { useT } from '@/lib/i18n/context';
 
 type Reward = {
     id: string;
@@ -44,37 +45,40 @@ type HistoryItem = {
     source?: 'missao' | 'trilha' | 'resgate';
 };
 
-const RewardCard = ({ reward, onRedeem, disabled, isSubmitting }: { reward: Reward, onRedeem: () => void, disabled: boolean, isSubmitting: boolean }) => (
-    <Card className="hover:shadow-lg transition-shadow flex flex-col">
-        <CardHeader className="p-0">
-            <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg overflow-hidden">
-                {reward.imageUrl ? <Image src={reward.imageUrl} alt={reward.name} width={300} height={168} className="w-full h-full object-cover" data-ai-hint="reward gift" /> : <Gift className="h-12 w-12 text-muted-foreground" />}
-            </div>
-        </CardHeader>
-        <CardContent className="p-4 flex-grow">
-            <CardTitle className="text-base font-semibold">{reward.name}</CardTitle>
-        </CardContent>
-        <CardFooter className="flex justify-between items-center">
-            <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
-                <Zap className="h-3 w-3 mr-1"/> {reward.points.toLocaleString()}
-            </Badge>
-            <ActionDialog
-                title={`Resgatar ${reward.name}?`}
-                description={`Isso custará ${reward.points.toLocaleString()} pontos. Esta ação não pode ser desfeita.`}
-                trigger={
-                    <Button size="sm" disabled={disabled || isSubmitting}>
-                        {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : disabled ? 'Pontos insuficientes' : 'Resgatar'}
-                    </Button>
-                }
-                actionText="Confirmar Resgate"
-                onAction={onRedeem}
-                showCancel
-            >
-                <p>Você tem certeza que quer resgatar esta recompensa?</p>
-            </ActionDialog>
-        </CardFooter>
-    </Card>
-);
+const RewardCard = ({ reward, onRedeem, disabled, isSubmitting }: { reward: Reward, onRedeem: () => void, disabled: boolean, isSubmitting: boolean }) => {
+    const t = useT();
+    return (
+        <Card className="hover:shadow-lg transition-shadow flex flex-col">
+            <CardHeader className="p-0">
+                <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg overflow-hidden">
+                    {reward.imageUrl ? <Image src={reward.imageUrl} alt={reward.name} width={300} height={168} className="w-full h-full object-cover" data-ai-hint="reward gift" /> : <Gift className="h-12 w-12 text-muted-foreground" />}
+                </div>
+            </CardHeader>
+            <CardContent className="p-4 flex-grow">
+                <CardTitle className="text-base font-semibold">{reward.name}</CardTitle>
+            </CardContent>
+            <CardFooter className="flex justify-between items-center">
+                <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
+                    <Zap className="h-3 w-3 mr-1"/> {reward.points.toLocaleString()}
+                </Badge>
+                <ActionDialog
+                    title={`${t.colabRewards.redeem} ${reward.name}?`}
+                    description={t.colabRewards.redeemConfirmDescription}
+                    trigger={
+                        <Button size="sm" disabled={disabled || isSubmitting}>
+                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : disabled ? t.colabRewards.insufficientPoints : t.colabRewards.redeem}
+                        </Button>
+                    }
+                    actionText={t.colabRewards.confirmRedeem}
+                    onAction={onRedeem}
+                    showCancel
+                >
+                    <p>{t.colabRewards.redeemConfirmQuestion}</p>
+                </ActionDialog>
+            </CardFooter>
+        </Card>
+    );
+};
 
 const getHistoryIcon = (source: HistoryItem['source'], type: HistoryItem['type']) => {
     if (type === 'spend') return <MinusCircle className="h-6 w-6 text-destructive" />;
@@ -112,19 +116,21 @@ const StatCard = ({ title, value, icon: Icon, isLoading }: {title: string, value
     </Card>
 );
 
-const PageSkeleton = () => (
+const PageSkeleton = () => {
+    const t = useT();
+    return (
     <>
         <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-            <StatCard title="Pontos Disponíveis" value="0" icon={Zap} isLoading={true} />
-            <StatCard title="Pontos Ganhos (Total)" value="0" icon={TrendingUp} isLoading={true} />
-            <StatCard title="Pontos Gastos (Total)" value="0" icon={TrendingDown} isLoading={true} />
-            <StatCard title="Prêmios Resgatados" value="0" icon={Gift} isLoading={true} />
+            <StatCard title={t.colabRewards.availablePoints} value="0" icon={Zap} isLoading={true} />
+            <StatCard title={t.colabRewards.totalGained} value="0" icon={TrendingUp} isLoading={true} />
+            <StatCard title={t.colabRewards.totalSpent} value="0" icon={TrendingDown} isLoading={true} />
+            <StatCard title={t.colabRewards.redeemed} value="0" icon={Gift} isLoading={true} />
         </div>
         <Tabs defaultValue="loja">
             <TabsList>
-                <TabsTrigger value="loja">Loja</TabsTrigger>
-                <TabsTrigger value="meus-resgates">Meus Resgates</TabsTrigger>
-                <TabsTrigger value="historico-pontos">Histórico de Pontos</TabsTrigger>
+                <TabsTrigger value="loja">{t.colabRewards.shopTab}</TabsTrigger>
+                <TabsTrigger value="meus-resgates">{t.colabRewards.myRedemptions}</TabsTrigger>
+                <TabsTrigger value="historico-pontos">{t.colabRewards.pointsHistory}</TabsTrigger>
             </TabsList>
             <TabsContent value="loja" className="mt-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -142,9 +148,11 @@ const PageSkeleton = () => (
             </TabsContent>
         </Tabs>
     </>
-);
+    );
+};
 
 export default function InfluencerRecompensasPage() {
+    const t = useT();
     const { toast } = useToast();
     const [rewards, setRewards] = useState<Reward[]>([]);
     const [rescues, setRescues] = useState<Rescue[]>([]);
@@ -162,7 +170,7 @@ export default function InfluencerRecompensasPage() {
             const userDocSnap = await getDoc(userDocRef);
 
             if (!userDocSnap.exists()) {
-                toast({ variant: 'destructive', title: "Erro", description: "Usuário não encontrado." });
+                toast({ variant: 'destructive', title: t.common.error, description: t.colabRewards.toastUserNotFound });
                 setIsLoading(false);
                 return;
             }
@@ -171,7 +179,7 @@ export default function InfluencerRecompensasPage() {
             const companyId = userData.companyId;
 
             if (!companyId) {
-                toast({ variant: 'destructive', title: "Erro", description: "Empresa não associada ao usuário." });
+                toast({ variant: 'destructive', title: t.common.error, description: t.colabRewards.toastCompanyNotFound });
                 setIsLoading(false);
                 return;
             }
@@ -245,8 +253,8 @@ export default function InfluencerRecompensasPage() {
             console.error("Erro ao buscar dados de recompensas:", error);
             toast({
                 variant: 'destructive',
-                title: "Erro ao carregar dados",
-                description: "Não foi possível carregar as recompensas. Tente novamente.",
+                title: t.common.error,
+                description: t.colabRewards.toastLoadError,
             });
         } finally {
             setIsLoading(false);
@@ -261,8 +269,8 @@ export default function InfluencerRecompensasPage() {
                 setIsLoading(false);
                 toast({
                     variant: 'destructive',
-                    title: "Usuário não autenticado",
-                    description: "Faça login para acessar as recompensas.",
+                    title: t.common.error,
+                    description: t.colabRewards.toastAuthError,
                 });
             }
         });
@@ -272,7 +280,7 @@ export default function InfluencerRecompensasPage() {
     const handleRedeem = async (reward: Reward) => {
         if (!userInfo) return;
         if (stats.available < reward.points) {
-            toast({ variant: 'destructive', title: "Pontos insuficientes!" });
+            toast({ variant: 'destructive', title: t.colabRewards.insufficientPoints });
             return;
         }
 
@@ -288,15 +296,15 @@ export default function InfluencerRecompensasPage() {
             );
 
             if (result.error) {
-                toast({ variant: 'destructive', title: "Erro no resgate", description: result.error });
+                toast({ variant: 'destructive', title: t.colabRewards.toastRedeemError, description: result.error });
                 return;
             }
 
-            toast({ title: "Recompensa resgatada com sucesso!" });
+            toast({ title: t.colabRewards.toastRedeemed });
             fetchData(userInfo.uid);
         } catch (error) {
             console.error("Erro ao resgatar recompensa:", error);
-            toast({ variant: 'destructive', title: "Erro ao resgatar recompensa." });
+            toast({ variant: 'destructive', title: t.colabRewards.toastRedeemError });
         } finally {
             setIsSubmitting(false);
         }
@@ -305,7 +313,7 @@ export default function InfluencerRecompensasPage() {
     if (isLoading || !userInfo) {
         return (
             <>
-                <Header title="Recompensas" />
+                <Header title={t.colabRewards.title} />
                 <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
                     <PageSkeleton />
                 </main>
@@ -318,17 +326,17 @@ export default function InfluencerRecompensasPage() {
             <Header title="Recompensas" />
             <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-                    <StatCard title="Pontos Disponíveis" value={stats.available} icon={Zap} isLoading={isLoading} />
-                    <StatCard title="Pontos Ganhos (Total)" value={stats.gained} icon={TrendingUp} isLoading={isLoading} />
-                    <StatCard title="Pontos Gastos (Total)" value={stats.spent} icon={TrendingDown} isLoading={isLoading} />
-                    <StatCard title="Prêmios Resgatados" value={stats.redeemed} icon={Gift} isLoading={isLoading} />
+                    <StatCard title={t.colabRewards.availablePoints} value={stats.available} icon={Zap} isLoading={isLoading} />
+                    <StatCard title={t.colabRewards.totalGained} value={stats.gained} icon={TrendingUp} isLoading={isLoading} />
+                    <StatCard title={t.colabRewards.totalSpent} value={stats.spent} icon={TrendingDown} isLoading={isLoading} />
+                    <StatCard title={t.colabRewards.redeemed} value={stats.redeemed} icon={Gift} isLoading={isLoading} />
                 </div>
 
                 <Tabs defaultValue="loja">
                     <TabsList>
-                        <TabsTrigger value="loja">Loja</TabsTrigger>
-                        <TabsTrigger value="meus-resgates">Meus Resgates</TabsTrigger>
-                        <TabsTrigger value="historico-pontos">Histórico de Pontos</TabsTrigger>
+                        <TabsTrigger value="loja">{t.colabRewards.shopTab}</TabsTrigger>
+                        <TabsTrigger value="meus-resgates">{t.colabRewards.myRedemptions}</TabsTrigger>
+                        <TabsTrigger value="historico-pontos">{t.colabRewards.pointsHistory}</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="loja" className="mt-4">
@@ -336,7 +344,7 @@ export default function InfluencerRecompensasPage() {
                             {rewards.length > 0 ? (
                                 rewards.map(reward => <RewardCard key={reward.id} reward={reward} onRedeem={() => handleRedeem(reward)} disabled={stats.available < reward.points} isSubmitting={isSubmitting} />)
                             ) : (
-                                <p className="text-muted-foreground col-span-full text-center py-8">Nenhuma recompensa disponível no momento.</p>
+                                <p className="text-muted-foreground col-span-full text-center py-8">{t.colabRewards.noRewards}</p>
                             )}
                         </div>
                     </TabsContent>
@@ -346,7 +354,7 @@ export default function InfluencerRecompensasPage() {
                             <CardHeader>
                                 <CardTitle className="font-headline flex items-center gap-2">
                                     <History className="h-5 w-5 text-muted-foreground" />
-                                    Meus Resgates
+                                    {t.colabRewards.myRedemptions}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -361,7 +369,7 @@ export default function InfluencerRecompensasPage() {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-muted-foreground text-center py-8">Você ainda não resgatou nenhuma recompensa.</p>
+                                    <p className="text-muted-foreground text-center py-8">{t.colabRewards.noRedemptions}</p>
                                 )}
                             </CardContent>
                         </Card>
@@ -372,15 +380,15 @@ export default function InfluencerRecompensasPage() {
                             <CardHeader>
                                 <CardTitle className="font-headline flex items-center gap-2">
                                     <History className="h-5 w-5 text-muted-foreground" />
-                                    Histórico de Pontos
+                                    {t.colabRewards.pointsHistory}
                                 </CardTitle>
-                                <CardDescription>Acompanhe aqui seus pontos ganhos e gastos.</CardDescription>
+                                <CardDescription>{t.colabRewards.pointsHistoryDescription}</CardDescription>
                             </CardHeader>
                             <CardContent className="divide-y divide-border -mt-2">
                                 {history.length > 0 ? (
                                     history.map(item => <PointHistoryItem key={item.id} {...item} />)
                                 ) : (
-                                    <p className="text-muted-foreground text-center py-8">Nenhuma transação de pontos registrada.</p>
+                                    <p className="text-muted-foreground text-center py-8">{t.colabRewards.noTransactions}</p>
                                 )}
                             </CardContent>
                         </Card>

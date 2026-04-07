@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Sparkles, Loader2, ClipboardCopy, Check, ThumbsUp, MessageSquare, Repeat2, Send, ArrowRight, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useLocale } from '@/lib/i18n/context';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Skeleton } from './ui/skeleton';
@@ -247,6 +248,7 @@ export function AiAssistantForm({
   userProfile?: UserProfile;
 }) {
   const { toast } = useToast();
+  const locale = useLocale();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -299,6 +301,7 @@ export function AiAssistantForm({
         userId,
         format: format as 'linkedin' | 'text-heavy' | 'hybrid',
         length: length as 'short' | 'medium' | 'long',
+        locale,
       });
 
       if (result.error) {
@@ -332,6 +335,7 @@ export function AiAssistantForm({
         userId,
         format: format as 'linkedin' | 'text-heavy' | 'hybrid',
         length: length as 'short' | 'medium' | 'long',
+        locale,
       });
 
       if (result.error) {
@@ -365,6 +369,7 @@ export function AiAssistantForm({
         userId,
         format: format as 'linkedin' | 'text-heavy' | 'hybrid',
         length: length as 'short' | 'medium' | 'long',
+        locale,
       });
 
       if (result.error) {

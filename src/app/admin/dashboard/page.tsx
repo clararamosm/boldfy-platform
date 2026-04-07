@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { useT } from '@/lib/i18n/context';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -30,13 +31,15 @@ import { useAuth } from '@/contexts/auth-context';
 // ─── Period Filter ──────────────────────────────────────────────────
 type PeriodKey = 'this_week' | 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months';
 
-const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
-  { key: 'this_week', label: 'Esta semana' },
-  { key: 'this_month', label: 'Este mês' },
-  { key: 'last_month', label: 'Último mês' },
-  { key: 'last_3_months', label: 'Últimos 3 meses' },
-  { key: 'last_6_months', label: 'Últimos 6 meses' },
-];
+const PERIOD_KEYS: PeriodKey[] = ['this_week', 'this_month', 'last_month', 'last_3_months', 'last_6_months'];
+
+const PERIOD_DICT_MAP: Record<PeriodKey, keyof typeof import('@/lib/i18n/dictionaries/pt-BR').default.adminDashboard.periods> = {
+  this_week: 'thisWeek',
+  this_month: 'thisMonth',
+  last_month: 'lastMonth',
+  last_3_months: 'last3Months',
+  last_6_months: 'last6Months',
+};
 
 function getPeriodRange(key: PeriodKey) {
   const now = new Date();
@@ -163,7 +166,7 @@ function ComingSoonOverlay({ children, message }: { children: React.ReactNode; m
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[2px] rounded-lg">
         <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-full border shadow-sm">
           <Lock className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-muted-foreground">{message || 'Em breve'}</span>
+          <span className="text-sm font-medium text-muted-foreground">{message || 'Coming soon'}</span>
         </div>
       </div>
     </div>
@@ -197,6 +200,7 @@ export default function AdminDashboardPage() {
   const [period, setPeriod] = useState<PeriodKey>('this_month');
   const { user } = useAuth();
   const { toast } = useToast();
+  const t = useT();
 
   const fetchData = useCallback(async (companyId: string) => {
     setIsLoading(true);
@@ -205,13 +209,13 @@ export default function AdminDashboardPage() {
       const result = await getAdminDashboardData(token, companyId, getPeriodRange(period));
 
       if (result.error) {
-        toast({ variant: 'destructive', title: 'Erro ao carregar dashboard', description: result.error });
+        toast({ variant: 'destructive', title: t.adminDashboard.loadingError, description: result.error });
       } else if (result.data) {
         setData(result.data);
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
-      toast({ variant: 'destructive', title: 'Erro ao carregar dashboard' });
+      toast({ variant: 'destructive', title: t.adminDashboard.loadingError });
     } finally {
       setIsLoading(false);
     }
@@ -241,7 +245,7 @@ export default function AdminDashboardPage() {
   if (isLoading || !data) {
     return (
       <>
-        <Header title="Dashboard" />
+        <Header title={t.adminDashboard.title} />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <DashboardSkeleton />
         </main>
@@ -267,7 +271,7 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-      <Header title="Dashboard" />
+      <Header title={t.adminDashboard.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         {/* Period filter */}
         <div className="flex items-center justify-end">
@@ -276,8 +280,8 @@ export default function AdminDashboardPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PERIOD_OPTIONS.map(o => (
-                <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>
+              {PERIOD_KEYS.map(key => (
+                <SelectItem key={key} value={key}>{t.adminDashboard.periods[PERIOD_DICT_MAP[key]]}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -286,10 +290,10 @@ export default function AdminDashboardPage() {
         {/* ─── BLOCO 1: KPIs de topo ─────────────────────────────────── */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Card 1: Valor equivalente (COMING SOON) */}
-          <ComingSoonOverlay message="Em breve com LinkedIn Track">
+          <ComingSoonOverlay message={t.adminDashboard.comingSoonOverlay}>
             <Card className="border-purple-200 dark:border-purple-900/50">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Valor equivalente</CardTitle>
+                <CardTitle className="text-sm font-medium">{t.adminDashboard.equivalentValue}</CardTitle>
                 <TrendingUp className="h-4 w-4 text-purple-500" />
               </CardHeader>
               <CardContent>
@@ -297,23 +301,23 @@ export default function AdminDashboardPage() {
                   {formatCurrency(data.estimatedValue)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Estimativa: {data.activeCollaborators} colaboradores
+                  {t.adminDashboard.estimateCollaborators.replace('{count}', String(data.activeCollaborators))}
                 </p>
               </CardContent>
             </Card>
           </ComingSoonOverlay>
 
           {/* Card 2: Impressões (COMING SOON) */}
-          <ComingSoonOverlay message="Em breve com LinkedIn Track">
+          <ComingSoonOverlay message={t.adminDashboard.comingSoonOverlay}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Impressões geradas</CardTitle>
+                <CardTitle className="text-sm font-medium">{t.adminDashboard.impressionsGenerated}</CardTitle>
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{formatNumber(data.estimatedImpressions)}</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  × R$0,30 = valor acima
+                  {t.adminDashboard.impressionsCost}
                 </p>
               </CardContent>
             </Card>
@@ -322,7 +326,7 @@ export default function AdminDashboardPage() {
           {/* Card 3: Colaboradores ativos (WORKS) */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Colaboradores ativos</CardTitle>
+              <CardTitle className="text-sm font-medium">{t.adminDashboard.activeCollaborators}</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -331,23 +335,23 @@ export default function AdminDashboardPage() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 <span className={adhesionRate >= 70 ? 'text-green-600' : adhesionRate >= 40 ? 'text-orange-500' : 'text-red-500'}>
-                  {adhesionRate}% de adesão
+                  {t.adminDashboard.adhesionRate.replace('{rate}', String(adhesionRate))}
                 </span>
               </p>
             </CardContent>
           </Card>
 
           {/* Card 4: ROI (COMING SOON) */}
-          <ComingSoonOverlay message="Em breve com LinkedIn Track">
+          <ComingSoonOverlay message={t.adminDashboard.comingSoonOverlay}>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">ROI do programa</CardTitle>
+                <CardTitle className="text-sm font-medium">{t.adminDashboard.programROI}</CardTitle>
                 <Award className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">2.4x</div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Valor gerado ÷ custo
+                  {t.adminDashboard.roiSubtitle}
                 </p>
               </CardContent>
             </Card>
@@ -357,14 +361,14 @@ export default function AdminDashboardPage() {
         {/* ─── BLOCO 2: Gráfico + Donut ──────────────────────────────── */}
         <div className="grid gap-6 md:grid-cols-[3fr_2fr]">
           {/* Evolução mensal (COMING SOON) */}
-          <ComingSoonOverlay message="Disponível com LinkedIn Track">
+          <ComingSoonOverlay message={t.adminDashboard.availableWithLinkedinTrack}>
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <BarChart3 className="h-5 w-5 text-muted-foreground" />
-                  Impressões e valor equivalente
+                  {t.adminDashboard.impressionsAndValue}
                 </CardTitle>
-                <CardDescription>Evolução mensal — efeito composto</CardDescription>
+                <CardDescription>{t.adminDashboard.monthlyEvolution}</CardDescription>
               </CardHeader>
               <CardContent>
                 {/* Placeholder chart */}
@@ -387,9 +391,9 @@ export default function AdminDashboardPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Activity className="h-5 w-5 text-muted-foreground" />
-                Engajamento no programa
+                {t.adminDashboard.engagement}
               </CardTitle>
-              <CardDescription>Distribuição de atividade</CardDescription>
+              <CardDescription>{t.adminDashboard.activityDistribution}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-center py-2">
@@ -410,7 +414,7 @@ export default function AdminDashboardPage() {
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
                     <span className="text-2xl font-bold">{data.activeCollaborators}</span>
-                    <span className="text-[10px] text-muted-foreground">colaboradores</span>
+                    <span className="text-[10px] text-muted-foreground">{t.adminDashboard.collaborators}</span>
                   </div>
                 </div>
               </div>
@@ -418,16 +422,16 @@ export default function AdminDashboardPage() {
               <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-2 text-xs">
                 <span className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#9840AD]" />
-                  Engajados ({data.collaboratorsWithActivity})
+                  {t.adminDashboard.engaged.replace('{count}', String(data.collaboratorsWithActivity))}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="h-2.5 w-2.5 rounded-full bg-[#CD50F1]" />
-                  Sem atividade ({data.activeCollaborators - data.collaboratorsWithActivity})
+                  {t.adminDashboard.noActivity.replace('{count}', String(data.activeCollaborators - data.collaboratorsWithActivity))}
                 </span>
                 {data.totalLicenses > data.activeCollaborators && (
                   <span className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-full bg-[#E8D8F5] dark:bg-purple-900/40" />
-                    Inativos ({data.totalLicenses - data.activeCollaborators})
+                    {t.adminDashboard.inactive.replace('{count}', String(data.totalLicenses - data.activeCollaborators))}
                   </span>
                 )}
               </div>
@@ -441,7 +445,7 @@ export default function AdminDashboardPage() {
           <Card>
             <CardContent className="pt-6 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Missões concluídas</span>
+                <span className="text-sm font-medium text-muted-foreground">{t.adminDashboard.missionsCompleted}</span>
                 <Target className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="flex items-baseline gap-2">
@@ -450,7 +454,7 @@ export default function AdminDashboardPage() {
               </div>
               <ComparisonBadge current={data.missionsApproved} previous={data.prevMissionsApproved} />
               {data.missionsPending > 0 && (
-                <p className="text-xs text-orange-500">{data.missionsPending} pendente{data.missionsPending > 1 ? 's' : ''} de revisão</p>
+                <p className="text-xs text-orange-500">{t.adminDashboard.pendingReview.replace('{count}', String(data.missionsPending))}</p>
               )}
             </CardContent>
           </Card>
@@ -459,12 +463,12 @@ export default function AdminDashboardPage() {
           <Card>
             <CardContent className="pt-6 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Trilhas concluídas</span>
+                <span className="text-sm font-medium text-muted-foreground">{t.adminDashboard.trailsCompleted}</span>
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-bold">{data.trailsCompleted}</span>
-                <span className="text-sm text-muted-foreground">/ {data.trailsStarted + data.trailsCompleted} iniciadas</span>
+                <span className="text-sm text-muted-foreground">/ {data.trailsStarted + data.trailsCompleted} {t.adminDashboard.started}</span>
               </div>
               {(data.trailsStarted + data.trailsCompleted) > 0 && (
                 <Progress
@@ -479,13 +483,13 @@ export default function AdminDashboardPage() {
           <Card>
             <CardContent className="pt-6 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Pontos distribuídos</span>
+                <span className="text-sm font-medium text-muted-foreground">{t.adminDashboard.pointsDistributed}</span>
                 <Zap className="h-4 w-4 text-amber-500" />
               </div>
               <div className="text-3xl font-bold">{data.totalPointsDistributed.toLocaleString()}</div>
               <ComparisonBadge current={data.totalPointsDistributed} previous={data.prevPointsDistributed} />
               {data.rewardsRedeemed > 0 && (
-                <p className="text-xs text-muted-foreground">{data.rewardsRedeemed} recompensa{data.rewardsRedeemed > 1 ? 's' : ''} resgatada{data.rewardsRedeemed > 1 ? 's' : ''}</p>
+                <p className="text-xs text-muted-foreground">{t.adminDashboard.rewardsRedeemed.replace('{count}', String(data.rewardsRedeemed))}</p>
               )}
             </CardContent>
           </Card>
@@ -498,14 +502,14 @@ export default function AdminDashboardPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-muted-foreground" />
-                Top 5 colaboradores
+                {t.adminDashboard.top5}
               </CardTitle>
-              <CardDescription>Ranking por pontos no período</CardDescription>
+              <CardDescription>{t.adminDashboard.rankingByPoints}</CardDescription>
             </CardHeader>
             <CardContent>
               {data.topCollaborators.length === 0 ? (
                 <p className="text-center text-muted-foreground py-6 text-sm">
-                  Nenhum colaborador com pontos ainda.
+                  {t.adminDashboard.noPointsYet}
                 </p>
               ) : (
                 <div className="space-y-3">
@@ -528,7 +532,7 @@ export default function AdminDashboardPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{collab.name}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {collab.missionsCompleted} missão{collab.missionsCompleted !== 1 ? 'ões' : ''} · {collab.points.toLocaleString()} pts
+                          {t.adminDashboard.missionsStat.replace('{count}', String(collab.missionsCompleted)).replace('{points}', collab.points.toLocaleString())}
                         </p>
                       </div>
                       <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0 text-xs">
@@ -546,23 +550,23 @@ export default function AdminDashboardPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Activity className="h-5 w-5 text-muted-foreground" />
-                Saúde do programa
+                {t.adminDashboard.programHealth}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <HealthBar label="Adesão ao programa" value={adhesionRate} thresholdGreen={70} thresholdOrange={40} />
-              <HealthBar label="Missões completadas (semana)" value={missionCompletionRate} thresholdGreen={60} thresholdOrange={30} />
-              <HealthBar label="Trilhas em andamento" value={trailProgressRate} thresholdGreen={50} thresholdOrange={25} />
-              <HealthBar label="Recompensas resgatadas" value={redemptionRate} thresholdGreen={30} thresholdOrange={15} />
+              <HealthBar label={t.adminDashboard.healthAdhesion} value={adhesionRate} thresholdGreen={70} thresholdOrange={40} />
+              <HealthBar label={t.adminDashboard.healthMissionsWeek} value={missionCompletionRate} thresholdGreen={60} thresholdOrange={30} />
+              <HealthBar label={t.adminDashboard.healthTrailsProgress} value={trailProgressRate} thresholdGreen={50} thresholdOrange={25} />
+              <HealthBar label={t.adminDashboard.healthRewardsRedeemed} value={redemptionRate} thresholdGreen={30} thresholdOrange={15} />
 
               {/* Custo por impressão (COMING SOON) */}
-              <ComingSoonOverlay message="Em breve">
+              <ComingSoonOverlay message={t.common.comingSoon}>
                 <div className="mt-2 rounded-lg bg-muted/50 p-4">
-                  <p className="text-xs text-muted-foreground">Custo por impressão efetivo</p>
+                  <p className="text-xs text-muted-foreground">{t.adminDashboard.costPerImpression}</p>
                   <div className="flex items-baseline gap-2 mt-1">
                     <span className="text-xl font-bold text-primary">R$ 0,13</span>
                     <span className="text-xs text-muted-foreground">
-                      vs R$0,30 em Ads = 57% mais barato
+                      {t.adminDashboard.costComparison}
                     </span>
                   </div>
                 </div>

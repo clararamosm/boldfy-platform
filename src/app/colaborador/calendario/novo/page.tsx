@@ -35,11 +35,15 @@ import {
   Upload,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
 import { HotTopicsBox } from '@/components/hot-topics-box';
+import { useT, useLocale } from '@/lib/i18n/context';
+import { getDateLocale } from '@/lib/i18n/date-utils';
 
 function EditorContent() {
+  const t = useT();
+  const locale = useLocale();
+  const dateFnsLocale = getDateLocale(locale);
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -103,7 +107,7 @@ function EditorContent() {
 
     // Validate file size (10MB max)
     if (file.size > 10 * 1024 * 1024) {
-      toast({ variant: 'destructive', title: 'Arquivo muito grande', description: 'Máximo 10MB.' });
+      toast({ variant: 'destructive', title: t.colabNewPost.fileTooLarge, description: t.colabNewPost.fileTooLargeDescription });
       return;
     }
 
@@ -122,11 +126,11 @@ function EditorContent() {
   const handleSubmit = async () => {
     if (!userId) return;
     if (!caption.trim()) {
-      toast({ variant: 'destructive', title: 'Legenda obrigatória', description: 'Escreva uma legenda para o post.' });
+      toast({ variant: 'destructive', title: t.colabNewPost.captionRequired, description: t.colabNewPost.captionRequiredDescription });
       return;
     }
     if (!scheduledDate) {
-      toast({ variant: 'destructive', title: 'Data obrigatória', description: 'Escolha uma data para agendar.' });
+      toast({ variant: 'destructive', title: t.colabNewPost.dateRequired, description: t.colabNewPost.dateRequiredDescription });
       return;
     }
 
@@ -156,14 +160,14 @@ function EditorContent() {
       });
 
       if (result.success) {
-        toast({ title: 'Post agendado!', description: 'Seu post foi adicionado ao calendário.' });
+        toast({ title: t.colabNewPost.postScheduled, description: t.colabNewPost.postScheduledDescription });
         router.push('/colaborador/calendario');
       } else {
-        toast({ variant: 'destructive', title: 'Erro', description: result.error });
+        toast({ variant: 'destructive', title: t.common.error, description: result.error });
       }
     } catch (error) {
       console.error('Error saving post:', error);
-      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível agendar o post.' });
+      toast({ variant: 'destructive', title: t.common.error, description: t.colabNewPost.scheduleError });
     }
 
     setIsSaving(false);
@@ -173,7 +177,7 @@ function EditorContent() {
   const handlePublishNow = async () => {
     if (!userId) return;
     if (!caption.trim()) {
-      toast({ variant: 'destructive', title: 'Legenda obrigatória', description: 'Escreva uma legenda para o post.' });
+      toast({ variant: 'destructive', title: t.colabNewPost.captionRequired, description: t.colabNewPost.captionRequiredDescription });
       return;
     }
 
@@ -200,7 +204,7 @@ function EditorContent() {
       });
 
       if (!createResult.success || !createResult.postId) {
-        toast({ variant: 'destructive', title: 'Erro', description: createResult.error || 'Erro ao salvar post.' });
+        toast({ variant: 'destructive', title: t.common.error, description: createResult.error || t.colabNewPost.scheduleError });
         setIsPublishing(false);
         return;
       }
@@ -210,17 +214,17 @@ function EditorContent() {
 
       if (result.success) {
         setPublishedUrl(result.postUrl || null);
-        toast({ title: 'Publicado no LinkedIn!', description: 'Seu post está no ar.' });
+        toast({ title: t.colabNewPost.publishedOnLinkedin, description: t.colabNewPost.publishedDescription });
       } else {
-        toast({ variant: 'destructive', title: 'Erro ao publicar', description: result.error });
+        toast({ variant: 'destructive', title: t.colabNewPost.publishError, description: result.error });
         if (result.needsReconnect) {
           router.push('/colaborador/configuracoes');
         }
       }
     } catch (error) {
       console.error('Error publishing:', error);
-      const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
-      toast({ variant: 'destructive', title: 'Erro ao publicar', description: msg });
+      const msg = error instanceof Error ? error.message : t.colabNewPost.scheduleError;
+      toast({ variant: 'destructive', title: t.colabNewPost.publishError, description: msg });
     }
 
     setIsPublishing(false);
@@ -256,7 +260,7 @@ function EditorContent() {
       <div className="space-y-4">
         <Button variant="ghost" size="sm" onClick={() => router.push('/colaborador/calendario')} className="gap-1.5 -ml-2 mb-2">
           <ArrowLeft className="h-4 w-4" />
-          Voltar ao calendário
+          {t.colabNewPost.backToCalendar}
         </Button>
 
         {/* Hot Topics — inspiração rápida */}
@@ -264,26 +268,26 @@ function EditorContent() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Editor de Post</CardTitle>
-            <CardDescription>Escreva sua legenda, adicione mídia e escolha quando publicar.</CardDescription>
+            <CardTitle className="text-lg">{t.colabNewPost.editorTitle}</CardTitle>
+            <CardDescription>{t.colabNewPost.editorDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {/* Caption */}
             <div className="space-y-1.5">
-              <Label htmlFor="caption">Legenda</Label>
+              <Label htmlFor="caption">{t.colabNewPost.caption}</Label>
               <Textarea
                 id="caption"
-                placeholder="Escreva sua legenda aqui..."
+                placeholder={t.colabNewPost.captionPlaceholder}
                 value={caption}
                 onChange={(e) => setCaption(e.target.value)}
                 rows={8}
               />
-              <p className="text-xs text-muted-foreground text-right">{caption.length} caracteres</p>
+              <p className="text-xs text-muted-foreground text-right">{caption.length} {t.colabNewPost.characters}</p>
             </div>
 
             {/* Media upload */}
             <div className="space-y-1.5">
-              <Label>Mídia</Label>
+              <Label>{t.colabNewPost.media}</Label>
               {mediaPreview ? (
                 <div className="relative rounded-lg overflow-hidden border">
                   <Image
@@ -306,8 +310,8 @@ function EditorContent() {
               ) : (
                 <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/30 transition-colors">
                   <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                  <span className="text-sm text-muted-foreground">Clique para adicionar imagem</span>
-                  <span className="text-xs text-muted-foreground mt-0.5">PNG, JPG ou GIF (máx. 10MB)</span>
+                  <span className="text-sm text-muted-foreground">{t.colabNewPost.clickToAdd}</span>
+                  <span className="text-xs text-muted-foreground mt-0.5">{t.colabNewPost.maxFileSize}</span>
                   <input
                     type="file"
                     accept="image/*"
@@ -329,7 +333,7 @@ function EditorContent() {
                   className="flex items-center justify-center gap-2 w-full rounded-md bg-green-600 hover:bg-green-700 text-white px-4 py-2 text-sm font-medium transition-colors"
                 >
                   <Linkedin className="h-4 w-4" />
-                  Ver post no LinkedIn
+                  {t.colabNewPost.viewOnLinkedin}
                 </a>
               ) : (
                 <Button
@@ -340,12 +344,12 @@ function EditorContent() {
                   {isPublishing ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Publicando...
+                      {t.colabNewPost.publishing}
                     </>
                   ) : (
                     <>
                       <Linkedin className="h-4 w-4" />
-                      Publicar agora no LinkedIn
+                      {t.colabNewPost.publishNow}
                     </>
                   )}
                 </Button>
@@ -354,16 +358,16 @@ function EditorContent() {
               {!linkedinConnected && !publishedUrl && (
                 <p className="text-xs text-muted-foreground text-center">
                   <a href="/colaborador/configuracoes" className="text-[#0A66C2] hover:underline">
-                    Conecte seu LinkedIn
+                    {t.colabNewPost.connectLinkedin}
                   </a>
-                  {' '}para publicar diretamente.
+                  {' '}{t.colabNewPost.connectToPublish}
                 </p>
               )}
 
               {/* Divider */}
               <div className="relative py-1">
                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">ou</span></div>
+                <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">{t.colabNewPost.or}</span></div>
               </div>
 
               {/* Date & time */}
@@ -371,7 +375,7 @@ function EditorContent() {
                 <div className="space-y-1.5">
                   <Label htmlFor="date" className="flex items-center gap-1.5">
                     <CalendarDays className="h-3.5 w-3.5" />
-                    Data
+                    {t.colabNewPost.dateLabel}
                   </Label>
                   <Input
                     id="date"
@@ -384,7 +388,7 @@ function EditorContent() {
                 <div className="space-y-1.5">
                   <Label htmlFor="time" className="flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5" />
-                    Horário
+                    {t.colabNewPost.timeLabel}
                   </Label>
                   <Input
                     id="time"
@@ -405,12 +409,12 @@ function EditorContent() {
                 {isSaving ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Agendando...
+                    {t.colabNewPost.scheduling}
                   </>
                 ) : (
                   <>
                     <CalendarDays className="h-4 w-4" />
-                    Agendar para depois
+                    {t.colabNewPost.scheduleForLater}
                   </>
                 )}
               </Button>
@@ -421,7 +425,7 @@ function EditorContent() {
 
       {/* RIGHT — Live Preview */}
       <div className="lg:sticky lg:top-6 space-y-4">
-        <div className="text-sm font-medium text-muted-foreground">Preview do Post</div>
+        <div className="text-sm font-medium text-muted-foreground">{t.colabNewPost.previewTitle}</div>
 
         <div className="bg-white dark:bg-zinc-900 rounded-xl border shadow-sm overflow-hidden">
           {/* Header */}
@@ -434,12 +438,12 @@ function EditorContent() {
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm text-foreground">{profileName || 'Seu Nome'}</p>
-                <p className="text-xs text-muted-foreground truncate">{profileHeadline || 'Sua headline profissional'}</p>
+                <p className="font-semibold text-sm text-foreground">{profileName || t.colabNewPost.yourName}</p>
+                <p className="text-xs text-muted-foreground truncate">{profileHeadline || t.colabNewPost.yourHeadline}</p>
                 <p className="text-xs text-muted-foreground">
                   {scheduledDate
-                    ? format(new Date(`${scheduledDate}T${scheduledTime}`), "d MMM 'às' HH:mm", { locale: ptBR })
-                    : 'Agora'
+                    ? format(new Date(`${scheduledDate}T${scheduledTime}`), "d MMM, HH:mm", { locale: dateFnsLocale })
+                    : t.colabNewPost.nowLabel
                   } · 🌐
                 </p>
               </div>
@@ -459,12 +463,12 @@ function EditorContent() {
                     onClick={() => setExpanded(true)}
                     className="text-sm text-muted-foreground hover:text-foreground hover:underline mt-1"
                   >
-                    ...ver mais
+                    {t.ai.seeMore}
                   </button>
                 )}
               </>
             ) : (
-              <p className="text-sm text-muted-foreground italic">Sua legenda aparecerá aqui...</p>
+              <p className="text-sm text-muted-foreground italic">{t.colabNewPost.captionPreviewPlaceholder}</p>
             )}
           </div>
 
@@ -480,7 +484,7 @@ function EditorContent() {
           ) : (
             <div className="bg-muted/50 border-y h-48 flex flex-col items-center justify-center gap-2">
               <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-              <p className="text-xs text-muted-foreground">Adicione uma imagem</p>
+              <p className="text-xs text-muted-foreground">{t.colabNewPost.addImage}</p>
             </div>
           )}
 
@@ -491,16 +495,16 @@ function EditorContent() {
               <span className="text-xs">❤️</span>
               <span className="text-xs">💡</span>
             </div>
-            <span className="text-xs text-muted-foreground ml-1">Você e outras pessoas</span>
+            <span className="text-xs text-muted-foreground ml-1">{t.colabNewPost.youAndOthers}</span>
           </div>
 
           {/* Action buttons */}
           <div className="px-2 py-1 flex justify-between">
             {[
-              { icon: ThumbsUp, label: 'Gostei' },
-              { icon: MessageSquare, label: 'Comentar' },
-              { icon: Repeat2, label: 'Repostar' },
-              { icon: Send, label: 'Enviar' },
+              { icon: ThumbsUp, label: t.colabNewPost.like },
+              { icon: MessageSquare, label: t.colabNewPost.comment },
+              { icon: Repeat2, label: t.colabNewPost.repost },
+              { icon: Send, label: t.colabNewPost.send },
             ].map(({ icon: Icon, label }) => (
               <button
                 key={label}
@@ -520,9 +524,9 @@ function EditorContent() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-lg p-3">
             <CalendarDays className="h-4 w-4 text-primary flex-shrink-0" />
             <span>
-              Agendado para{' '}
+              {t.colabNewPost.scheduledFor}{' '}
               <strong className="text-foreground">
-                {format(new Date(`${scheduledDate}T${scheduledTime}`), "EEEE, d 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                {format(new Date(`${scheduledDate}T${scheduledTime}`), "EEEE, d MMMM, HH:mm", { locale: dateFnsLocale })}
               </strong>
             </span>
           </div>
@@ -533,9 +537,10 @@ function EditorContent() {
 }
 
 export default function NovoPostPage() {
+  const t = useT();
   return (
     <>
-      <Header title="Novo Post" />
+      <Header title={t.colabNewPost.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <Suspense fallback={
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

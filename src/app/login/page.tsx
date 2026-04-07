@@ -11,8 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { LogoFull } from '@/components/logo';
+import { PublicLocaleWrapper } from '@/components/public-locale-wrapper';
+import { LanguageToggle } from '@/components/language-toggle';
+import { useT } from '@/lib/i18n/context';
 
-export default function LoginPage() {
+function LoginForm() {
+  const t = useT();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -37,23 +41,23 @@ export default function LoginPage() {
         if (userRole === 'master') { router.push('/master/empresas'); }
         else if (userRole === 'admin') { router.push('/admin/dashboard'); }
         else if (userRole === 'colaborador') { router.push('/colaborador/dashboard'); }
-        else { setError('Perfil de usuário não reconhecido.'); setLoading(false); return; }
+        else { setError(t.auth.errors.profileNotRecognized); setLoading(false); return; }
       } else {
-        setError('Perfil de usuário não reconhecido.');
+        setError(t.auth.errors.profileNotRecognized);
         setLoading(false);
       }
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'code' in err) {
         const code = (err as { code: string }).code;
         if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
-          setError('Email ou senha incorretos.');
+          setError(t.auth.errors.wrongCredentials);
         } else if (code === 'auth/too-many-requests') {
-          setError('Muitas tentativas. Tente novamente em alguns minutos.');
+          setError(t.auth.errors.tooManyRequests);
         } else {
-          setError('Erro ao fazer login. Tente novamente.');
+          setError(t.auth.errors.generic);
         }
       } else {
-        setError('Erro ao fazer login. Tente novamente.');
+        setError(t.auth.errors.generic);
       }
       setLoading(false);
     }
@@ -71,16 +75,16 @@ export default function LoginPage() {
       if (err && typeof err === 'object' && 'code' in err) {
         const code = (err as { code: string }).code;
         if (code === 'auth/user-not-found') {
-          setError('Nenhuma conta encontrada com este e-mail.');
+          setError(t.auth.errors.userNotFound);
         } else if (code === 'auth/invalid-email') {
-          setError('E-mail inválido. Verifique e tente novamente.');
+          setError(t.auth.errors.invalidEmail);
         } else if (code === 'auth/too-many-requests') {
-          setError('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
+          setError(t.auth.errors.tooManyResetAttempts);
         } else {
-          setError('Erro ao enviar e-mail de recuperação. Tente novamente.');
+          setError(t.auth.errors.resetGeneric);
         }
       } else {
-        setError('Erro ao enviar e-mail de recuperação. Tente novamente.');
+        setError(t.auth.errors.resetGeneric);
       }
     } finally {
       setResetLoading(false);
@@ -91,62 +95,75 @@ export default function LoginPage() {
   const switchToLogin = () => { setMode('login'); setError(''); setResetSuccess(false); };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4">
-            <LogoFull height={48} />
+    <Card className="w-full max-w-md">
+      <CardHeader className="text-center">
+        <div className="mx-auto mb-4">
+          <LogoFull height={48} />
+        </div>
+        <CardTitle className="text-2xl">
+          {mode === 'login' ? t.auth.welcomeBack : t.auth.resetPassword}
+        </CardTitle>
+        <CardDescription>
+          {mode === 'login'
+            ? t.auth.loginSubtitle
+            : t.auth.resetSubtitle}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {mode === 'login' ? (
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">{t.auth.email}</Label>
+              <Input id="email" type="email" placeholder={t.auth.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">{t.auth.password}</Label>
+              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            {error && (<div className="text-sm text-red-500 text-center">{error}</div>)}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t.auth.loggingIn}</>) : (t.auth.login)}
+            </Button>
+            <button type="button" onClick={switchToForgotPassword} className="w-full text-sm text-muted-foreground hover:text-primary transition-colors">
+              {t.auth.forgotPassword}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">{t.auth.email}</Label>
+              <Input id="reset-email" type="email" placeholder={t.auth.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            {error && (<div className="text-sm text-red-500 text-center">{error}</div>)}
+            {resetSuccess && (
+              <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
+                {t.auth.resetEmailSent}
+              </div>
+            )}
+            <Button type="submit" className="w-full" disabled={resetLoading}>
+              {resetLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t.common.loading}</>) : (t.auth.sendResetLink)}
+            </Button>
+            <button type="button" onClick={switchToLogin} className="w-full text-sm text-muted-foreground hover:text-primary transition-colors">
+              {t.auth.backToLogin}
+            </button>
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <PublicLocaleWrapper>
+      {(locale, setLocale) => (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 p-4 relative">
+          <div className="absolute top-4 right-4">
+            <LanguageToggle locale={locale} onChange={setLocale} />
           </div>
-          <CardTitle className="text-2xl">
-            {mode === 'login' ? 'Bem-vindo de volta' : 'Recuperar senha'}
-          </CardTitle>
-          <CardDescription>
-            {mode === 'login'
-              ? 'Entre com suas credenciais para acessar a plataforma'
-              : 'Digite seu e-mail para receber o link de recuperação'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {mode === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
-              </div>
-              {error && (<div className="text-sm text-red-500 text-center">{error}</div>)}
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Entrando...</>) : ('Entrar')}
-              </Button>
-              <button type="button" onClick={switchToForgotPassword} className="w-full text-sm text-muted-foreground hover:text-primary transition-colors">
-                Esqueci minha senha
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleForgotPassword} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="reset-email">Email</Label>
-                <Input id="reset-email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
-              {error && (<div className="text-sm text-red-500 text-center">{error}</div>)}
-              {resetSuccess && (
-                <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
-                  Email de recuperação enviado! Verifique sua caixa de entrada e a pasta de spam.
-                </div>
-              )}
-              <Button type="submit" className="w-full" disabled={resetLoading}>
-                {resetLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Enviando...</>) : ('Enviar link de recuperação')}
-              </Button>
-              <button type="button" onClick={switchToLogin} className="w-full text-sm text-muted-foreground hover:text-primary transition-colors">
-                Voltar para o login
-              </button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          <LoginForm />
+        </div>
+      )}
+    </PublicLocaleWrapper>
   );
 }

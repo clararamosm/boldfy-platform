@@ -18,6 +18,8 @@ import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, He
 import { differenceInDays, parseISO } from 'date-fns';
 import { AuthProvider, useAuth } from "@/contexts/auth-context";
 import { FeedbackDialog } from "@/components/feedback-dialog";
+import { LocaleProvider, useT } from "@/lib/i18n/context";
+import type { Locale } from "@/lib/i18n/types";
 
 type CompanyStatus = 'Ativa' | 'Inativa' | 'Trial';
 
@@ -66,8 +68,10 @@ const TrialNotification = ({ companyId }: { companyId: string | undefined }) => 
 };
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
+    const t = useT();
     const { user, loading } = useAuth();
     const [companyId, setCompanyId] = useState<string | undefined>(undefined);
+    const [companyLocale, setCompanyLocale] = useState<Locale>('pt-BR');
     const router = useRouter();
     const searchParams = useSearchParams();
     const [isMaster, setIsMaster] = useState(false);
@@ -91,10 +95,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             if (urlCompanyId) {
                 setCompanyId(urlCompanyId);
                 setIsMaster(true);
-                // Buscar nome da empresa para o banner
+                // Buscar nome + locale da empresa para o banner
                 getDoc(doc(db, 'companies', urlCompanyId)).then((compDoc) => {
                     if (compDoc.exists()) {
-                        setMasterCompanyName(compDoc.data().companyName || '');
+                        const data = compDoc.data();
+                        setMasterCompanyName(data.companyName || '');
+                        setCompanyLocale((data.locale as Locale) || 'pt-BR');
                     }
                 });
             } else {
@@ -103,6 +109,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             }
         } else {
             setCompanyId(user.companyId);
+            // Buscar locale da empresa do admin
+            if (user.companyId) {
+                getDoc(doc(db, 'companies', user.companyId)).then((compDoc) => {
+                    if (compDoc.exists()) {
+                        setCompanyLocale((compDoc.data().locale as Locale) || 'pt-BR');
+                    }
+                });
+            }
         }
         setReady(true);
     }, [user, loading, router, searchParams]);
@@ -148,7 +162,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                             </Avatar>
                             <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
                                 <span className="text-sm font-medium truncate max-w-[130px]">{(user.name || '').split(' ')[0]}</span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[130px]">Admin</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[130px]">{t.roles.admin}</span>
                             </div>
                         </Button>
                     </DropdownMenuTrigger>
@@ -165,19 +179,19 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                         <DropdownMenuItem asChild>
                             <Link href="/admin/configuracoes">
                                 <UserIcon className="mr-2 h-4 w-4" />
-                                <span>Configurações</span>
+                                <span>{t.nav.settings}</span>
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                             <Link href="/admin/suporte">
                                 <HelpCircle className="mr-2 h-4 w-4" />
-                                <span>Suporte</span>
+                                <span>{t.nav.support}</span>
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout}>
                             <LogOut className="mr-2 h-4 w-4" />
-                            Sair
+                            {t.nav.signOut}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -186,24 +200,26 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     );
 
     return (
-        <DashboardLayout sidebar={sidebarContent}>
-            {isMaster && (
-              <div className="bg-purple-600 text-white px-4 py-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  <span className="text-sm font-medium">Modo Master — Visualizando: {masterCompanyName}</span>
-                </div>
-                <Link href="/master/empresas">
-                  <Button variant="ghost" size="sm" className="text-white hover:bg-purple-700 h-7 text-xs">
-                    <ArrowLeft className="h-3 w-3 mr-1" />
-                    Voltar ao Painel Master
-                  </Button>
-                </Link>
-              </div>
-            )}
-            <TrialNotification companyId={companyId} />
-            {children}
-        </DashboardLayout>
+        <LocaleProvider locale={companyLocale}>
+            <DashboardLayout sidebar={sidebarContent}>
+                {isMaster && (
+                  <div className="bg-purple-600 text-white px-4 py-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      <span className="text-sm font-medium">Modo Master — Visualizando: {masterCompanyName}</span>
+                    </div>
+                    <Link href="/master/empresas">
+                      <Button variant="ghost" size="sm" className="text-white hover:bg-purple-700 h-7 text-xs">
+                        <ArrowLeft className="h-3 w-3 mr-1" />
+                        Voltar ao Painel Master
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+                <TrialNotification companyId={companyId} />
+                {children}
+            </DashboardLayout>
+        </LocaleProvider>
     );
 }
 

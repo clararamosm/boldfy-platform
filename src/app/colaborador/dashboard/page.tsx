@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { getLinkedInDashboardMetrics, type PostWithMetrics, type DashboardMetrics } from '@/app/actions/linkedin';
 import { getAuthToken } from '@/lib/auth-client';
+import { useT } from '@/lib/i18n/context';
 
 // ---- Types ----
 type Mission = {
@@ -50,7 +51,7 @@ type DashboardData = {
 };
 
 // ---- Sub-components ----
-const MissionItem = ({ title, points }: { title: string; points: number }) => (
+const MissionItem = ({ title, points, pointsLabel }: { title: string; points: number; pointsLabel: string }) => (
     <Link href="/colaborador/missoes" className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors">
         <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-amber-100 flex items-center justify-center">
@@ -59,7 +60,7 @@ const MissionItem = ({ title, points }: { title: string; points: number }) => (
             <span className="text-sm font-medium">{title}</span>
         </div>
         <div className="flex items-center gap-2">
-            <span className="text-xs text-amber-600 font-medium">+{points} pontos</span>
+            <span className="text-xs text-amber-600 font-medium">+{points} {pointsLabel}</span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </div>
     </Link>
@@ -170,6 +171,7 @@ export default function ColaboradorDashboardPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [linkedinLoading, setLinkedinLoading] = useState(true);
     const { toast } = useToast();
+    const t = useT();
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
@@ -260,8 +262,8 @@ export default function ColaboradorDashboardPage() {
             } catch (err) {
                 console.error('Dashboard error:', err);
                 toast({
-                    title: "Erro ao carregar dashboard",
-                    description: "Tente novamente mais tarde.",
+                    title: t.colabDashboard.loadingError,
+                    description: t.colabDashboard.loadingErrorDescription,
                     variant: "destructive"
                 });
                 setIsLoading(false);
@@ -275,7 +277,7 @@ export default function ColaboradorDashboardPage() {
     if (isLoading) {
         return (
             <div>
-                <Header title="Dashboard" subtitle="Carregando..." />
+                <Header title={t.nav.dashboard} subtitle={t.common.loading} />
                 <div className="p-6">
                     <DashboardSkeleton />
                 </div>
@@ -286,9 +288,9 @@ export default function ColaboradorDashboardPage() {
     if (!data) {
         return (
             <div>
-                <Header title="Dashboard" subtitle="Erro ao carregar dados" />
+                <Header title={t.nav.dashboard} subtitle={t.colabDashboard.loadingError} />
                 <div className="p-6 text-center text-muted-foreground">
-                    Nenhum dado encontrado. Verifique sua conta.
+                    {t.colabDashboard.noData}
                 </div>
             </div>
         );
@@ -300,8 +302,8 @@ export default function ColaboradorDashboardPage() {
     return (
         <div>
             <Header
-                title={`Ola, ${data.userName}!`}
-                subtitle="Acompanhe seu progresso e conquistas"
+                title={t.colabDashboard.greeting.replace('{name}', data.userName)}
+                subtitle={t.colabDashboard.subtitle}
             />
             <div className="p-6 space-y-6">
                 {/* Stats Cards */}
@@ -310,7 +312,7 @@ export default function ColaboradorDashboardPage() {
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 text-muted-foreground mb-1">
                                 <Trophy className="h-4 w-4 text-amber-500" />
-                                <span className="text-xs font-medium">Pontos</span>
+                                <span className="text-xs font-medium">{t.colabDashboard.points}</span>
                             </div>
                             <p className="text-2xl font-bold">{data.points}</p>
                         </CardContent>
@@ -319,7 +321,7 @@ export default function ColaboradorDashboardPage() {
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 text-muted-foreground mb-1">
                                 <Target className="h-4 w-4 text-green-500" />
-                                <span className="text-xs font-medium">Missoes Ativas</span>
+                                <span className="text-xs font-medium">{t.colabDashboard.activeMissions}</span>
                             </div>
                             <p className="text-2xl font-bold">{data.activeMissions.length}</p>
                         </CardContent>
@@ -328,7 +330,7 @@ export default function ColaboradorDashboardPage() {
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 text-muted-foreground mb-1">
                                 <BookOpen className="h-4 w-4 text-blue-500" />
-                                <span className="text-xs font-medium">Trilhas</span>
+                                <span className="text-xs font-medium">{t.colabDashboard.trails}</span>
                             </div>
                             <p className="text-2xl font-bold">{data.completedTrails}/{data.totalTrails}</p>
                         </CardContent>
@@ -337,7 +339,7 @@ export default function ColaboradorDashboardPage() {
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 text-muted-foreground mb-1">
                                 <Gift className="h-4 w-4 text-purple-500" />
-                                <span className="text-xs font-medium">Recompensas</span>
+                                <span className="text-xs font-medium">{t.colabDashboard.rewards}</span>
                             </div>
                             <p className="text-2xl font-bold">{data.availableRewards}</p>
                         </CardContent>
@@ -355,14 +357,14 @@ export default function ColaboradorDashboardPage() {
                                     <Linkedin className="h-6 w-6 text-[#0A66C2]" />
                                 </div>
                                 <div>
-                                    <p className="font-semibold">Conecte seu LinkedIn</p>
+                                    <p className="font-semibold">{t.colabDashboard.connectLinkedin}</p>
                                     <p className="text-sm text-muted-foreground mt-1">
-                                        Conecte sua conta para ver metricas dos seus posts aqui no dashboard.
+                                        {t.colabDashboard.connectLinkedinDescription}
                                     </p>
                                 </div>
                                 <Button asChild variant="outline" className="mt-2 border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2]/5">
                                     <Link href="/colaborador/configuracoes">
-                                        <Linkedin className="mr-2 h-4 w-4" /> Conectar LinkedIn
+                                        <Linkedin className="mr-2 h-4 w-4" /> {t.colabDashboard.connectButton}
                                     </Link>
                                 </Button>
                             </div>
@@ -376,7 +378,7 @@ export default function ColaboradorDashboardPage() {
                                 <div>
                                     <p className="font-medium text-sm">{linkedinMetrics.error}</p>
                                     <Link href="/colaborador/configuracoes" className="text-xs text-[#0A66C2] hover:underline mt-1 inline-block">
-                                        Ir para Configuracoes
+                                        {t.colabDashboard.goToSettings}
                                     </Link>
                                 </div>
                             </div>
@@ -388,10 +390,10 @@ export default function ColaboradorDashboardPage() {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Linkedin className="h-5 w-5 text-[#0A66C2]" />
-                                    <CardTitle className="text-lg">LinkedIn Performance</CardTitle>
+                                    <CardTitle className="text-lg">{t.colabDashboard.linkedinPerformance}</CardTitle>
                                 </div>
                                 <Link href="/colaborador/calendario" className="text-xs text-primary hover:underline">
-                                    Ver calendario
+                                    {t.colabDashboard.seeCalendar}
                                 </Link>
                             </div>
                         </CardHeader>
@@ -400,25 +402,25 @@ export default function ColaboradorDashboardPage() {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                 <div className="bg-[#0A66C2]/5 rounded-lg p-3 text-center">
                                     <p className="text-2xl font-bold text-[#0A66C2]">{linkedinMetrics!.totals.totalPosts}</p>
-                                    <p className="text-[11px] text-muted-foreground mt-0.5">Posts publicados</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">{t.colabDashboard.publishedPosts}</p>
                                 </div>
                                 <div className="bg-rose-50 rounded-lg p-3 text-center">
                                     <p className="text-2xl font-bold text-rose-600">{linkedinMetrics!.totals.totalReactions}</p>
-                                    <p className="text-[11px] text-muted-foreground mt-0.5">Reacoes totais</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">{t.colabDashboard.totalReactions}</p>
                                 </div>
                                 <div className="bg-blue-50 rounded-lg p-3 text-center">
                                     <p className="text-2xl font-bold text-blue-600">{linkedinMetrics!.totals.totalComments}</p>
-                                    <p className="text-[11px] text-muted-foreground mt-0.5">Comentarios</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">{t.colabDashboard.comments}</p>
                                 </div>
                                 <div className="bg-green-50 rounded-lg p-3 text-center">
                                     <p className="text-2xl font-bold text-green-600">{linkedinMetrics!.totals.avgReactionsPerPost}</p>
-                                    <p className="text-[11px] text-muted-foreground mt-0.5">Media reacoes/post</p>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">{t.colabDashboard.avgReactionsPerPost}</p>
                                 </div>
                             </div>
 
                             {/* Recent Posts */}
                             <div>
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Posts recentes</p>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{t.colabDashboard.recentPosts}</p>
                                 <div className="space-y-1">
                                     {linkedinMetrics!.posts.slice(0, 5).map(post => (
                                         <LinkedInPostCard key={post.id} post={post} />
@@ -429,7 +431,7 @@ export default function ColaboradorDashboardPage() {
                             {linkedinMetrics!.posts.length > 5 && (
                                 <div className="text-center pt-1">
                                     <Link href="/colaborador/calendario" className="text-xs text-[#0A66C2] hover:underline">
-                                        Ver todos os {linkedinMetrics!.totals.totalPosts} posts
+                                        {t.colabDashboard.seeAllPosts.replace('{count}', String(linkedinMetrics!.totals.totalPosts))}
                                     </Link>
                                 </div>
                             )}
@@ -440,7 +442,7 @@ export default function ColaboradorDashboardPage() {
                         <CardHeader className="pb-3">
                             <div className="flex items-center gap-2">
                                 <Linkedin className="h-5 w-5 text-[#0A66C2]" />
-                                <CardTitle className="text-lg">LinkedIn Performance</CardTitle>
+                                <CardTitle className="text-lg">{t.colabDashboard.linkedinPerformance}</CardTitle>
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -449,14 +451,14 @@ export default function ColaboradorDashboardPage() {
                                     <CalendarDays className="h-6 w-6 text-[#0A66C2]" />
                                 </div>
                                 <div>
-                                    <p className="font-medium">Nenhum post publicado ainda</p>
+                                    <p className="font-medium">{t.colabDashboard.noPostsYet}</p>
                                     <p className="text-sm text-muted-foreground mt-1">
-                                        Publique seu primeiro post pelo Calendario para ver as metricas aqui.
+                                        {t.colabDashboard.noPostsDescription}
                                     </p>
                                 </div>
                                 <Button asChild variant="outline" className="mt-1">
                                     <Link href="/colaborador/calendario/novo">
-                                        <CalendarDays className="mr-2 h-4 w-4" /> Criar post
+                                        <CalendarDays className="mr-2 h-4 w-4" /> {t.colabDashboard.createPost}
                                     </Link>
                                 </Button>
                             </div>
@@ -470,21 +472,21 @@ export default function ColaboradorDashboardPage() {
                     <Card>
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-lg">Missoes Ativas</CardTitle>
+                                <CardTitle className="text-lg">{t.colabDashboard.activeMissionsTitle}</CardTitle>
                                 <Link href="/colaborador/missoes" className="text-xs text-primary hover:underline">
-                                    Ver todas
+                                    {t.common.seeAll}
                                 </Link>
                             </div>
                         </CardHeader>
                         <CardContent>
                             {data.activeMissions.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center py-4">
-                                    Nenhuma missao ativa no momento
+                                    {t.colabDashboard.noActiveMissions}
                                 </p>
                             ) : (
                                 <div className="space-y-1">
                                     {data.activeMissions.slice(0, 4).map(m => (
-                                        <MissionItem key={m.id} title={m.title} points={m.points} />
+                                        <MissionItem key={m.id} title={m.title} points={m.points} pointsLabel={t.common.points} />
                                     ))}
                                 </div>
                             )}
@@ -495,16 +497,16 @@ export default function ColaboradorDashboardPage() {
                     <Card>
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-lg">Trilhas de Aprendizado</CardTitle>
+                                <CardTitle className="text-lg">{t.colabDashboard.learningTrails}</CardTitle>
                                 <Link href="/colaborador/trilhas" className="text-xs text-primary hover:underline">
-                                    Ver todas
+                                    {t.common.seeAll}
                                 </Link>
                             </div>
                         </CardHeader>
                         <CardContent>
                             {data.trails.length === 0 ? (
                                 <p className="text-sm text-muted-foreground text-center py-4">
-                                    Nenhuma trilha disponivel
+                                    {t.colabDashboard.noTrails}
                                 </p>
                             ) : (
                                 <div className="space-y-3">

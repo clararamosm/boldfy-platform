@@ -40,45 +40,49 @@ import {
   isToday,
   parseISO,
 } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { useT, useLocale } from '@/lib/i18n/context';
+import { getDateLocale } from '@/lib/i18n/date-utils';
+import type { Dictionary } from '@/lib/i18n/dictionaries/pt-BR';
 
-const statusConfig = {
-  published: {
-    label: 'Publicado',
-    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-    cardBorder: 'border-l-4 border-l-purple-500',
-    calendarDot: 'bg-purple-500',
-    icon: CheckCircle2,
-  },
-  scheduled: {
-    label: 'Agendado',
-    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    cardBorder: 'border-l-4 border-l-blue-500',
-    calendarDot: 'bg-blue-500',
-    icon: Clock,
-  },
-  in_progress: {
-    label: 'Em andamento',
-    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    cardBorder: 'border-l-4 border-l-yellow-500',
-    calendarDot: 'bg-yellow-500',
-    icon: Edit3,
-  },
-  draft: {
-    label: 'Ideia',
-    color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-    cardBorder: 'border-l-4 border-l-gray-400',
-    calendarDot: 'bg-gray-400',
-    icon: Edit3,
-  },
-  failed: {
-    label: 'Falhou',
-    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    cardBorder: 'border-l-4 border-l-red-500',
-    calendarDot: 'bg-red-500',
-    icon: AlertCircle,
-  },
-};
+function getStatusConfig(t: Dictionary) {
+  return {
+    published: {
+      label: t.colabCalendar.statusPublished,
+      color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+      cardBorder: 'border-l-4 border-l-purple-500',
+      calendarDot: 'bg-purple-500',
+      icon: CheckCircle2,
+    },
+    scheduled: {
+      label: t.colabCalendar.statusScheduled,
+      color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      cardBorder: 'border-l-4 border-l-blue-500',
+      calendarDot: 'bg-blue-500',
+      icon: Clock,
+    },
+    in_progress: {
+      label: t.colabCalendar.filterInProgress,
+      color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+      cardBorder: 'border-l-4 border-l-yellow-500',
+      calendarDot: 'bg-yellow-500',
+      icon: Edit3,
+    },
+    draft: {
+      label: t.colabCalendar.statusIdea,
+      color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+      cardBorder: 'border-l-4 border-l-gray-400',
+      calendarDot: 'bg-gray-400',
+      icon: Edit3,
+    },
+    failed: {
+      label: t.colabCalendar.statusFailed,
+      color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      cardBorder: 'border-l-4 border-l-red-500',
+      calendarDot: 'bg-red-500',
+      icon: AlertCircle,
+    },
+  };
+}
 
 function CalendarSkeleton() {
   return (
@@ -102,6 +106,10 @@ function CalendarSkeleton() {
 type StatusFilter = 'all' | 'published' | 'scheduled' | 'in_progress' | 'draft' | 'failed';
 
 export default function CalendarioPage() {
+  const t = useT();
+  const locale = useLocale();
+  const dateFnsLocale = getDateLocale(locale);
+  const statusConfig = useMemo(() => getStatusConfig(t), [t]);
   const [userId, setUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
@@ -132,7 +140,7 @@ export default function CalendarioPage() {
     if (result.posts) {
       setPosts(result.posts);
     } else if (result.error) {
-      toast({ variant: 'destructive', title: 'Erro', description: result.error });
+      toast({ variant: 'destructive', title: t.common.error, description: result.error });
     }
     setIsLoading(false);
   }, [userId, toast]);
@@ -199,9 +207,9 @@ export default function CalendarioPage() {
     const result = await deleteScheduledPost(token, userId, postId);
     if (result.success) {
       setPosts(prev => prev.filter(p => p.id !== postId));
-      toast({ title: 'Post removido.' });
+      toast({ title: t.colabCalendar.postRemoved });
     } else {
-      toast({ variant: 'destructive', title: 'Erro', description: result.error });
+      toast({ variant: 'destructive', title: t.common.error, description: result.error });
     }
   };
 
@@ -213,12 +221,12 @@ export default function CalendarioPage() {
     router.push(`/colaborador/calendario/novo?${params.toString()}`);
   };
 
-  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const weekDays = t.colabCalendar.dayNames;
 
   if (isLoading && !userId) {
     return (
       <>
-        <Header title="Calendário" />
+        <Header title={t.colabCalendar.title} />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <CalendarSkeleton />
         </main>
@@ -240,7 +248,7 @@ export default function CalendarioPage() {
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
                 <h2 className="text-xl font-semibold capitalize min-w-[180px] text-center">
-                  {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+                  {format(currentMonth, 'MMMM yyyy', { locale: dateFnsLocale })}
                 </h2>
                 <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => addMonths(prev, 1))}>
                   <ChevronRight className="h-5 w-5" />
@@ -248,19 +256,19 @@ export default function CalendarioPage() {
               </div>
               <Button onClick={() => handleNewPost()} className="gap-2">
                 <Plus className="h-4 w-4" />
-                Novo Post
+                {t.colabCalendar.newPost}
               </Button>
             </div>
 
             {/* Status filters */}
             <div className="flex flex-wrap items-center gap-2">
               {([
-                { key: 'all' as StatusFilter, label: 'Todos', color: 'bg-muted text-foreground' },
-                { key: 'published' as StatusFilter, label: 'Publicados', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-                { key: 'scheduled' as StatusFilter, label: 'Agendados', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-                { key: 'in_progress' as StatusFilter, label: 'Em andamento', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
-                { key: 'draft' as StatusFilter, label: 'Ideias', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
-                { key: 'failed' as StatusFilter, label: 'Falhou', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+                { key: 'all' as StatusFilter, label: t.colabCalendar.filterAll, color: 'bg-muted text-foreground' },
+                { key: 'published' as StatusFilter, label: t.colabCalendar.filterPublished, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+                { key: 'scheduled' as StatusFilter, label: t.colabCalendar.filterScheduled, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+                { key: 'in_progress' as StatusFilter, label: t.colabCalendar.filterInProgress, color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
+                { key: 'draft' as StatusFilter, label: t.colabCalendar.filterIdeas, color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
+                { key: 'failed' as StatusFilter, label: t.colabCalendar.filterFailed, color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
               ]).map(f => (
                 <button
                   key={f.key}
@@ -339,7 +347,7 @@ export default function CalendarioPage() {
                         })}
                         {dayPosts.length > 2 && (
                           <div className="text-[10px] text-muted-foreground px-1">
-                            +{dayPosts.length - 2} mais
+                            +{dayPosts.length - 2}
                           </div>
                         )}
                       </div>
@@ -355,13 +363,13 @@ export default function CalendarioPage() {
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">
                 {selectedDay
-                  ? format(selectedDay, "d 'de' MMMM", { locale: ptBR })
-                  : 'Selecione um dia'}
+                  ? format(selectedDay, "d 'de' MMMM", { locale: dateFnsLocale })
+                  : t.colabCalendar.selectDay}
               </h3>
               {selectedDay && (
                 <Button size="sm" variant="outline" onClick={() => handleNewPost(selectedDay)} className="gap-1.5">
                   <Plus className="h-3.5 w-3.5" />
-                  Agendar
+                  {t.colabCalendar.schedule}
                 </Button>
               )}
             </div>
@@ -415,7 +423,7 @@ export default function CalendarioPage() {
                           {post.mediaUrl && (
                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                               <ImageIcon className="h-3.5 w-3.5" />
-                              Mídia anexada
+                              {t.colabCalendar.mediaAttached}
                             </div>
                           )}
 
@@ -428,14 +436,14 @@ export default function CalendarioPage() {
                               className="flex items-center gap-1.5 text-xs text-[#0A66C2] hover:underline font-medium"
                             >
                               <Linkedin className="h-3.5 w-3.5" />
-                              Ver no LinkedIn ↗
+                              {t.colabCalendar.viewOnLinkedin} ↗
                             </a>
                           )}
 
                           {/* Published date */}
                           {post.status === 'published' && post.publishedAt && (
                             <p className="text-[11px] text-muted-foreground">
-                              Publicado em {format(parseISO(post.publishedAt), "d MMM 'às' HH:mm", { locale: ptBR })}
+                              {t.colabCalendar.statusPublished} {format(parseISO(post.publishedAt), "d MMM, HH:mm", { locale: dateFnsLocale })}
                             </p>
                           )}
                         </CardContent>
@@ -449,14 +457,14 @@ export default function CalendarioPage() {
                     <div className="rounded-full bg-muted p-3 mb-3">
                       <Linkedin className="h-6 w-6 text-muted-foreground" />
                     </div>
-                    <p className="text-sm text-muted-foreground">Nenhum post agendado</p>
+                    <p className="text-sm text-muted-foreground">{t.colabCalendar.noPostsScheduled}</p>
                     <Button
                       variant="link"
                       size="sm"
                       onClick={() => handleNewPost(selectedDay)}
                       className="mt-1 text-xs"
                     >
-                      Criar post para este dia
+                      {t.colabCalendar.createForDay}
                     </Button>
                   </CardContent>
                 </Card>
@@ -465,7 +473,7 @@ export default function CalendarioPage() {
               <div className="space-y-3">
                 {upcomingPosts.length > 0 ? (
                   <>
-                    <p className="text-xs text-muted-foreground">Próximos agendamentos:</p>
+                    <p className="text-xs text-muted-foreground">{t.colabCalendar.nextScheduled}</p>
                     {upcomingPosts.map(post => {
                       const config = statusConfig[post.status] || statusConfig.draft;
                       const StatusIcon = config.icon;
@@ -478,7 +486,7 @@ export default function CalendarioPage() {
                                 {config.label}
                               </Badge>
                               <span className="text-xs text-muted-foreground">
-                                {format(parseISO(post.scheduledFor), "d MMM, HH:mm", { locale: ptBR })}
+                                {format(parseISO(post.scheduledFor), "d MMM, HH:mm", { locale: dateFnsLocale })}
                               </span>
                             </div>
                             <p className="text-sm line-clamp-2 whitespace-pre-line">{post.caption}</p>
@@ -491,7 +499,7 @@ export default function CalendarioPage() {
                   <Card className="border-dashed">
                     <CardContent className="flex flex-col items-center justify-center py-10 text-center">
                       <p className="text-sm text-muted-foreground">
-                        Nenhum post agendado. Clique em um dia ou use o botão "Novo Post".
+                        {t.colabCalendar.emptyState}
                       </p>
                     </CardContent>
                   </Card>

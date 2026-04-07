@@ -17,6 +17,7 @@ import { Bug, Loader2, ImagePlus, X, CheckCircle2, Lightbulb, AlertCircle } from
 import { useToast } from '@/hooks/use-toast';
 import { sendFeedbackToNotion } from '@/app/actions/feedback';
 import { useAuth } from '@/contexts/auth-context';
+import { useT } from '@/lib/i18n/context';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
 
@@ -27,6 +28,7 @@ type FeedbackDialogProps = {
 };
 
 export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [tipo, setTipo] = useState<FeedbackType>('Feedback');
   const [titulo, setTitulo] = useState('');
@@ -43,7 +45,7 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      toast({ variant: 'destructive', title: 'Imagem muito grande', description: 'Máximo 5MB.' });
+      toast({ variant: 'destructive', title: t.feedback.imageTooLarge, description: 'Máximo 5MB.' });
       return;
     }
     setImageFile(file);
@@ -60,11 +62,11 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
 
   const handleSubmit = async () => {
     if (!titulo.trim()) {
-      toast({ variant: 'destructive', title: 'Título obrigatório', description: 'Dê um título curto ao seu report.' });
+      toast({ variant: 'destructive', title: t.feedback.titleRequired, description: t.feedback.titleRequiredMessage });
       return;
     }
     if (!descricao.trim()) {
-      toast({ variant: 'destructive', title: 'Descrição obrigatória', description: 'Escreva uma descrição do feedback ou bug.' });
+      toast({ variant: 'destructive', title: t.feedback.descriptionRequired, description: t.feedback.descriptionRequiredMessage });
       return;
     }
 
@@ -110,10 +112,10 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
           }, 300);
         }, 1500);
       } else {
-        toast({ variant: 'destructive', title: 'Erro ao enviar', description: result.error });
+        toast({ variant: 'destructive', title: t.feedback.submitError, description: result.error });
       }
     } catch {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível enviar o feedback.' });
+      toast({ variant: 'destructive', title: t.feedback.submitError, description: t.feedback.submitError });
     } finally {
       setSending(false);
     }
@@ -124,7 +126,7 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
       <DialogTrigger asChild>
         <button
           className="h-8 w-8 rounded-full border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors"
-          title="Reportar bug ou dar feedback"
+          title={t.feedback.title}
         >
           <Bug className="h-4 w-4 text-muted-foreground" />
         </button>
@@ -133,25 +135,25 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
         {sent ? (
           <div className="flex flex-col items-center justify-center py-8 gap-3">
             <CheckCircle2 className="h-12 w-12 text-green-500" />
-            <p className="font-semibold text-lg">Enviado com sucesso!</p>
-            <p className="text-sm text-muted-foreground">Obrigado pelo seu feedback.</p>
+            <p className="font-semibold text-lg">{t.feedback.submitSuccess}</p>
+            <p className="text-sm text-muted-foreground">{t.feedback.submitSuccessMessage}</p>
           </div>
         ) : (
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Bug className="h-5 w-5" />
-                Feedback & Bugs
+                {t.feedback.title}
               </DialogTitle>
               <DialogDescription>
-                Encontrou um problema ou tem uma sugestão? Nos conte!
+                {t.feedback.description}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 mt-2">
               {/* Type selector */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Tipo</Label>
+                <Label className="text-sm font-medium">{t.feedback.type}</Label>
                 <RadioGroup
                   value={tipo}
                   onValueChange={(v) => setTipo(v as FeedbackType)}
@@ -164,7 +166,7 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
                   >
                     <RadioGroupItem value="Feedback" id="tipo-feedback" />
                     <Lightbulb className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm font-medium">Feedback</span>
+                    <span className="text-sm font-medium">{t.feedback.typeFeedback}</span>
                   </label>
                   <label
                     htmlFor="tipo-bug"
@@ -173,7 +175,7 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
                   >
                     <RadioGroupItem value="Bug" id="tipo-bug" />
                     <AlertCircle className="h-4 w-4 text-red-500" />
-                    <span className="text-sm font-medium">Bug</span>
+                    <span className="text-sm font-medium">{t.feedback.typeBug}</span>
                   </label>
                 </RadioGroup>
               </div>
@@ -181,12 +183,12 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
               {/* Title */}
               <div className="space-y-2">
                 <Label htmlFor="feedback-title" className="text-sm font-medium">
-                  Título
+                  {t.feedback.titleLabel}
                 </Label>
                 <input
                   id="feedback-title"
                   type="text"
-                  placeholder={tipo === 'Bug' ? 'Ex: Botão não funciona na página X' : 'Ex: Sugestão para melhorar Y'}
+                  placeholder={tipo === 'Bug' ? t.feedback.titlePlaceholderBug : t.feedback.titlePlaceholderFeedback}
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
                   className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -196,13 +198,13 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
               {/* Description */}
               <div className="space-y-2">
                 <Label htmlFor="feedback-desc" className="text-sm font-medium">
-                  Descrição
+                  {t.feedback.descriptionLabel}
                 </Label>
                 <Textarea
                   id="feedback-desc"
                   placeholder={tipo === 'Bug'
-                    ? 'O que aconteceu? O que você esperava que acontecesse?'
-                    : 'O que podemos melhorar? Tem alguma ideia?'
+                    ? t.feedback.descriptionPlaceholderBug
+                    : t.feedback.descriptionPlaceholderFeedback
                   }
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
@@ -212,7 +214,7 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
 
               {/* Image upload */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Screenshot (opcional)</Label>
+                <Label className="text-sm font-medium">{t.feedback.screenshotLabel}</Label>
                 {imagePreview ? (
                   <div className="relative rounded-lg border overflow-hidden">
                     <img
@@ -235,7 +237,7 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
                     className="w-full border-2 border-dashed rounded-lg p-4 flex items-center justify-center gap-2 text-muted-foreground hover:bg-muted/30 transition-colors"
                   >
                     <ImagePlus className="h-4 w-4" />
-                    <span className="text-sm">Anexar imagem</span>
+                    <span className="text-sm">{t.feedback.attachImage}</span>
                   </button>
                 )}
                 <input
@@ -254,9 +256,9 @@ export function FeedbackDialog({ pagina = 'Sidebar' }: FeedbackDialogProps) {
                 className="w-full"
               >
                 {sending ? (
-                  <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Enviando...</>
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" /> {t.feedback.sending}</>
                 ) : (
-                  'Enviar'
+                  t.feedback.send
                 )}
               </Button>
             </div>

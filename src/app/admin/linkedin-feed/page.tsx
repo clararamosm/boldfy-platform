@@ -13,9 +13,10 @@ import {
 import { getCompanyFeed, markFeedAsRead, type FeedPost } from '@/app/actions/posts';
 import { getAuthToken } from '@/lib/auth-client';
 import { useAuth } from '@/contexts/auth-context';
+import { useT } from '@/lib/i18n/context';
 
 // ─── Time ago helper ────────────────────────────────────────────
-function timeAgo(dateStr: string): string {
+function timeAgo(dateStr: string, nowLabel: string): string {
   const now = new Date();
   const date = new Date(dateStr);
   const diffMs = now.getTime() - date.getTime();
@@ -23,15 +24,16 @@ function timeAgo(dateStr: string): string {
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
 
-  if (diffMins < 1) return 'agora';
+  if (diffMins < 1) return nowLabel;
   if (diffMins < 60) return `${diffMins}min`;
   if (diffHours < 24) return `${diffHours}h`;
   if (diffDays < 7) return `${diffDays}d`;
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  return date.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
 }
 
 // ─── Feed Post Card (Admin view — no "Voce" badge) ─────────────
 function FeedPostCard({ post }: { post: FeedPost }) {
+  const t = useT();
   const isLong = post.caption.length > 400;
   const [expanded, setExpanded] = useState(false);
 
@@ -57,7 +59,7 @@ function FeedPostCard({ post }: { post: FeedPost }) {
             {post.authorPosition && (
               <p className="text-xs text-muted-foreground truncate">{post.authorPosition}</p>
             )}
-            <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(post.publishedAt)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(post.publishedAt, t.linkedinFeed.now)}</p>
           </div>
           {post.linkedinPostUrl && (
             <a
@@ -65,7 +67,7 @@ function FeedPostCard({ post }: { post: FeedPost }) {
               target="_blank"
               rel="noopener noreferrer"
               className="shrink-0 text-muted-foreground hover:text-[#0A66C2] transition-colors p-1"
-              title="Ver no LinkedIn"
+              title={t.linkedinFeed.viewOnLinkedin}
             >
               <ExternalLink className="h-4 w-4" />
             </a>
@@ -83,7 +85,7 @@ function FeedPostCard({ post }: { post: FeedPost }) {
               onClick={() => setExpanded(!expanded)}
               className="text-xs text-primary font-medium mt-1 hover:underline"
             >
-              {expanded ? 'ver menos' : 'ver mais'}
+              {expanded ? t.linkedinFeed.seeLess : t.linkedinFeed.seeMore}
             </button>
           )}
         </div>
@@ -94,7 +96,7 @@ function FeedPostCard({ post }: { post: FeedPost }) {
             {post.mediaType?.startsWith('video') ? (
               <div className="flex items-center justify-center py-8 text-muted-foreground">
                 <Video className="h-8 w-8 mr-2" />
-                <span className="text-sm">Video publicado</span>
+                <span className="text-sm">{t.linkedinFeed.videoPublished}</span>
               </div>
             ) : (
               <img
@@ -111,7 +113,7 @@ function FeedPostCard({ post }: { post: FeedPost }) {
         <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/20">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Linkedin className="h-3.5 w-3.5 text-[#0A66C2]" />
-            <span>Publicado no LinkedIn</span>
+            <span>{t.linkedinFeed.publishedOnLinkedin}</span>
           </div>
           {post.linkedinPostUrl && (
             <a
@@ -120,7 +122,7 @@ function FeedPostCard({ post }: { post: FeedPost }) {
               rel="noopener noreferrer"
               className="text-xs text-[#0A66C2] hover:underline flex items-center gap-1"
             >
-              Abrir post <ExternalLink className="h-3 w-3" />
+              {t.linkedinFeed.openPost} <ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>
@@ -154,6 +156,7 @@ function FeedSkeleton() {
 
 // ─── Empty State (Admin version) ────────────────────────────────
 function EmptyFeed() {
+  const t = useT();
   return (
     <div className="max-w-2xl mx-auto">
       <Card className="border-dashed">
@@ -163,10 +166,9 @@ function EmptyFeed() {
               <Newspaper className="h-8 w-8 text-[#0A66C2]" />
             </div>
             <div>
-              <h3 className="font-semibold text-lg">Nenhum post publicado ainda</h3>
+              <h3 className="font-semibold text-lg">{t.linkedinFeed.emptyTitle}</h3>
               <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                Quando seus colaboradores publicarem posts no LinkedIn pela Boldfy,
-                eles aparecerao aqui para voce acompanhar o que a equipe esta compartilhando.
+                {t.linkedinFeed.emptyDescription}
               </p>
             </div>
           </div>
@@ -183,6 +185,7 @@ export default function AdminLinkedInFeedPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const t = useT();
 
   useEffect(() => {
     if (!user) return;
@@ -194,7 +197,7 @@ export default function AdminLinkedInFeedPage() {
 
         if (result.error) {
           setError(result.error);
-          toast({ variant: 'destructive', title: 'Erro', description: result.error });
+          toast({ variant: 'destructive', title: t.common.error, description: result.error });
         } else {
           setPosts(result.posts || []);
           // Mark feed as read to reset unread badge
@@ -202,8 +205,8 @@ export default function AdminLinkedInFeedPage() {
         }
       } catch (err) {
         console.error('Feed error:', err);
-        setError('Erro ao carregar feed.');
-        toast({ variant: 'destructive', title: 'Erro ao carregar feed' });
+        setError(t.linkedinFeed.errorLoading);
+        toast({ variant: 'destructive', title: t.linkedinFeed.errorLoading });
       } finally {
         setIsLoading(false);
       }
@@ -216,18 +219,18 @@ export default function AdminLinkedInFeedPage() {
 
   return (
     <>
-      <Header title="LinkedIn Feed" subtitle="Acompanhe os posts dos seus colaboradores" />
+      <Header title={t.linkedinFeed.title} subtitle={t.linkedinFeed.subtitle} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         {/* Stats bar */}
         {!isLoading && posts.length > 0 && (
           <div className="max-w-2xl mx-auto mb-4 flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <Newspaper className="h-4 w-4" />
-              <span>{posts.length} post{posts.length !== 1 ? 's' : ''}</span>
+              <span>{posts.length} {posts.length !== 1 ? t.linkedinFeed.posts : t.linkedinFeed.post}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Users className="h-4 w-4" />
-              <span>{uniqueAuthors} colaborador{uniqueAuthors !== 1 ? 'es' : ''}</span>
+              <span>{uniqueAuthors} {uniqueAuthors !== 1 ? t.linkedinFeed.collaborators : t.linkedinFeed.collaborator}</span>
             </div>
           </div>
         )}

@@ -4,6 +4,7 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { Header } from "@/components/dashboard/header";
+import { useT } from '@/lib/i18n/context';
 import { AiAssistantForm } from "@/components/ai-assistant-form";
 import { HotTopicsBox } from "@/components/hot-topics-box";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -49,6 +50,7 @@ const AssistantPageSkeleton = () => (
 );
 
 export default function AiAssistantPage() {
+  const t = useT();
   const { user, loading } = useAuth();
   const [topicPrompt, setTopicPrompt] = useState<string | undefined>();
 
@@ -65,7 +67,7 @@ export default function AiAssistantPage() {
 
   return (
     <>
-      <Header title="Assistente de Conteúdo IA" />
+      <Header title={t.ai.pageTitle} />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-4">
         {/* Hot Topics Box */}
         {!loading && user && (
@@ -83,7 +85,7 @@ export default function AiAssistantPage() {
             userProfile={userProfile}
           />
         ) : (
-          <p className="text-center text-muted-foreground">Ocorreu um erro ao carregar os dados do usuario.</p>
+          <p className="text-center text-muted-foreground">{t.ai.errorLoadUser}</p>
         )}
       </main>
     </>

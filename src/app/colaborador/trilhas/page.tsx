@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Header } from '@/components/dashboard/header';
 import { SuggestTrailDialog } from '@/components/suggest-trail-dialog';
+import { useT } from '@/lib/i18n/context';
 import type { Sessao, Trilha, ProgressoTrilha, ModuloModo } from '@/types/trilhas';
 
 const MODO_ICONS: Record<ModuloModo, any> = {
@@ -103,6 +104,7 @@ export default function ColaboradorTrilhasPage() {
   const [sessionsWithTrails, setSessionsWithTrails] = useState<SessionWithTrails[]>([]);
   const [stats, setStats] = useState({ total: 0, emProgresso: 0, concluidas: 0, pontos: 0 });
   const router = useRouter();
+  const t = useT();
 
   // Get company ID
   useEffect(() => {
@@ -201,7 +203,7 @@ export default function ColaboradorTrilhasPage() {
   // ============================================================
   return (
     <>
-      <Header title="Trilhas" />
+      <Header title={t.colabTrails.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
 
       {/* Stats */}
@@ -209,22 +211,22 @@ export default function ColaboradorTrilhasPage() {
         <Card><CardContent className="pt-6 text-center">
           <BookOpen className="w-6 h-6 mx-auto mb-2 text-purple-500" />
           <p className="text-2xl font-bold">{stats.total}</p>
-          <p className="text-xs text-muted-foreground">Total Trilhas</p>
+          <p className="text-xs text-muted-foreground">{t.colabTrails.totalTrails}</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6 text-center">
           <Clock className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
           <p className="text-2xl font-bold">{stats.emProgresso}</p>
-          <p className="text-xs text-muted-foreground">Em Progresso</p>
+          <p className="text-xs text-muted-foreground">{t.colabTrails.inProgress}</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6 text-center">
           <CheckCircle2 className="w-6 h-6 mx-auto mb-2 text-green-500" />
           <p className="text-2xl font-bold">{stats.concluidas}</p>
-          <p className="text-xs text-muted-foreground">Concluidas</p>
+          <p className="text-xs text-muted-foreground">{t.colabTrails.completed}</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6 text-center">
           <Star className="w-6 h-6 mx-auto mb-2 text-amber-500" />
           <p className="text-2xl font-bold">{stats.pontos}</p>
-          <p className="text-xs text-muted-foreground">Pontos Ganhos</p>
+          <p className="text-xs text-muted-foreground">{t.colabTrails.pointsEarned}</p>
         </CardContent></Card>
       </div>
 
@@ -234,8 +236,8 @@ export default function ColaboradorTrilhasPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FolderOpen className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">Nenhuma trilha disponivel</p>
-            <p className="text-muted-foreground">Seu administrador ainda nao ativou trilhas para sua empresa</p>
+            <p className="text-lg font-medium">{t.colabTrails.noTrails}</p>
+            <p className="text-muted-foreground">{t.colabTrails.noTrailsDescription}</p>
           </CardContent>
         </Card>
       ) : (
@@ -274,14 +276,14 @@ export default function ColaboradorTrilhasPage() {
                     <CardContent className="space-y-3">
                       <div className="flex gap-2 flex-wrap">
                         <Badge variant="secondary" className="text-xs">
-                          {totalModulos} modulo{totalModulos !== 1 ? 's' : ''}
+                          {totalModulos} {totalModulos !== 1 ? t.colabTrails.modules : t.colabTrails.module}
                         </Badge>
                         <Badge variant="secondary" className="text-xs">
-                          <Zap className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} pontos
+                          <Zap className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} {t.common.points}
                         </Badge>
                         {trail.tempoEstimadoMin > 0 && (
                           <Badge variant="outline" className="text-xs">
-                            <Clock className="w-3 h-3 mr-1" />{trail.tempoEstimadoMin} min
+                            <Clock className="w-3 h-3 mr-1" />{trail.tempoEstimadoMin} {t.colabTrails.min}
                           </Badge>
                         )}
                       </div>
@@ -289,7 +291,7 @@ export default function ColaboradorTrilhasPage() {
                       {progress && !isConcluida && (
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>{completedModulos}/{totalModulos} modulos</span>
+                            <span>{completedModulos}/{totalModulos} {t.colabTrails.modules}</span>
                             <span>{percentual}%</span>
                           </div>
                           <Progress value={percentual} className="h-2" />
@@ -299,13 +301,13 @@ export default function ColaboradorTrilhasPage() {
                       {isConcluida && (
                         <div className="flex items-center gap-2 text-sm text-green-600">
                           <Trophy className="w-4 h-4" />
-                          <span>{progress?.pontosGanhos || 0} pontos conquistados</span>
+                          <span>{progress?.pontosGanhos || 0} {t.colabTrails.pointsConquered}</span>
                         </div>
                       )}
 
                       {!progress && (
                         <Button variant="outline" size="sm" className="w-full">
-                          Comecar Trilha <ChevronRight className="w-4 h-4 ml-2" />
+                          {t.colabTrails.startTrail} <ChevronRight className="w-4 h-4 ml-2" />
                         </Button>
                       )}
                     </CardContent>

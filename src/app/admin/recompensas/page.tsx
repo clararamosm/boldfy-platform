@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
+import { useT } from '@/lib/i18n/context';
 
 type Reward = {
     id: string;
@@ -39,26 +40,30 @@ type Rescue = {
     status: 'Pendente' | 'Pago';
 }
 
-const RewardForm = ({ reward, isSubmitting, formRef }: { reward?: Reward, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement> }) => (
+const RewardForm = ({ reward, isSubmitting, formRef }: { reward?: Reward, isSubmitting: boolean, formRef: React.RefObject<HTMLFormElement> }) => {
+    const t = useT();
+    return (
     <form id="reward-form" ref={formRef} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="reward-name">Nome da Recompensa</Label>
-        <Input id="reward-name" name="name" placeholder="Ex: Vale-presente iFood R$50" defaultValue={reward?.name} disabled={isSubmitting} required />
+        <Label htmlFor="reward-name">{t.adminRewards.rewardName}</Label>
+        <Input id="reward-name" name="name" placeholder={t.adminRewards.rewardNamePlaceholder} defaultValue={reward?.name} disabled={isSubmitting} required />
       </div>
        <div className="space-y-2">
-        <Label htmlFor="reward-points">Custo (Pontos)</Label>
-        <Input id="reward-points" name="points" type="number" placeholder="Ex: 5000" defaultValue={reward?.points} disabled={isSubmitting} required />
+        <Label htmlFor="reward-points">{t.adminRewards.costPoints}</Label>
+        <Input id="reward-points" name="points" type="number" placeholder={t.adminRewards.costPlaceholder} defaultValue={reward?.points} disabled={isSubmitting} required />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="reward-stock">Estoque</Label>
-        <Input id="reward-stock" name="stock" type="number" placeholder="Deixe em branco para ilimitado" defaultValue={reward?.stock === 'Ilimitado' ? '' : reward?.stock} disabled={isSubmitting} />
+        <Label htmlFor="reward-stock">{t.adminRewards.stock}</Label>
+        <Input id="reward-stock" name="stock" type="number" placeholder={t.adminRewards.stockHelp} defaultValue={reward?.stock === 'Ilimitado' ? '' : reward?.stock} disabled={isSubmitting} />
       </div>
     </form>
-);
+    );
+};
 
 
 export default function AdminRecompensasPage() {
     const { toast } = useToast();
+    const t = useT();
     const [rewards, setRewards] = useState<Reward[]>([]);
     const [rescues, setRescues] = useState<Rescue[]>([]);
     const [monthlyPrize, setMonthlyPrize] = useState('');
@@ -76,7 +81,7 @@ export default function AdminRecompensasPage() {
             setRewards(rewardsList);
         } catch (error) {
             console.error("Error fetching rewards:", error);
-            toast({ variant: 'destructive', title: 'Erro ao buscar recompensas.' });
+            toast({ variant: 'destructive', title: t.adminRewards.toastFetchError });
         }
     }, [toast]);
 
@@ -88,7 +93,7 @@ export default function AdminRecompensasPage() {
             setRescues(rescuesList);
         } catch (error) {
             console.error("Error fetching rescues:", error);
-            toast({ variant: 'destructive', title: 'Erro ao buscar resgates.' });
+            toast({ variant: 'destructive', title: t.adminRewards.toastFetchHistoryError });
         }
     }, [toast]);
     
@@ -124,7 +129,7 @@ export default function AdminRecompensasPage() {
                     setCompanyId(userCompanyId);
                     fetchData(userCompanyId);
                 } else {
-                     toast({ variant: "destructive", title: "Usuário não encontrado."});
+                     toast({ variant: "destructive", title: t.adminRewards.toastUserNotFound});
                      setIsLoading(false);
                 }
             } else {
@@ -145,7 +150,7 @@ export default function AdminRecompensasPage() {
         const stock = stockInput && !isNaN(Number(stockInput)) ? Number(stockInput) : 'Ilimitado';
 
         if(!name || !points) {
-            toast({ variant: 'destructive', title: 'Campos obrigatórios', description: 'Nome e pontos são obrigatórios.' });
+            toast({ variant: 'destructive', title: t.adminRewards.requiredFields, description: t.adminRewards.requiredFieldsMessage });
             setIsSubmitting(false);
             return;
         }
@@ -156,16 +161,16 @@ export default function AdminRecompensasPage() {
             if (rewardId) {
                 const rewardDoc = doc(db, "companies", companyId, "rewards", rewardId);
                 await updateDoc(rewardDoc, rewardData);
-                toast({ title: 'Recompensa atualizada!' });
+                toast({ title: t.adminRewards.toastUpdated });
             } else {
                 await addDoc(collection(db, "companies", companyId, "rewards"), rewardData);
-                toast({ title: 'Recompensa criada!' });
+                toast({ title: t.adminRewards.toastCreated });
             }
             fetchRewards(companyId);
             setIsDialogOpen(false); // Close dialog on success
         } catch (error) {
             console.error("Error saving reward:", error);
-            toast({ variant: 'destructive', title: 'Erro ao salvar recompensa.' });
+            toast({ variant: 'destructive', title: t.adminRewards.toastSaveError });
         } finally {
             setIsSubmitting(false);
         }
@@ -177,24 +182,24 @@ export default function AdminRecompensasPage() {
             const rewardDoc = doc(db, "companies", companyId, "rewards", reward.id);
             const newStatus = reward.status === 'Disponível' ? 'Desativada' : 'Disponível';
             await updateDoc(rewardDoc, { status: newStatus });
-            toast({ title: `Status alterado para ${newStatus}` });
+            toast({ title: t.adminRewards.toastStatusChanged.replace('{status}', newStatus) });
             fetchRewards(companyId);
         } catch(error) {
              console.error("Error toggling status:", error);
-            toast({ variant: 'destructive', title: 'Erro ao alterar status.' });
+            toast({ variant: 'destructive', title: t.adminRewards.toastStatusError });
         }
     }
 
     const handleDelete = async (rewardId: string) => {
-        if (!companyId || !confirm('Tem certeza que deseja excluir esta recompensa?')) return;
+        if (!companyId || !confirm(t.adminRewards.deleteConfirm)) return;
         try {
             const rewardDoc = doc(db, "companies", companyId, "rewards", rewardId);
             await deleteDoc(rewardDoc);
-            toast({ title: 'Recompensa excluída.' });
+            toast({ title: t.adminRewards.toastDeleted });
             fetchRewards(companyId);
         } catch (error) {
             console.error("Error deleting reward:", error);
-            toast({ variant: 'destructive', title: 'Erro ao excluir recompensa.' });
+            toast({ variant: 'destructive', title: t.adminRewards.toastDeleteError });
         }
     }
 
@@ -204,14 +209,14 @@ export default function AdminRecompensasPage() {
             const token = await getAuthToken();
             const result = await markRescueAsPaid(token, rescue.id, companyId, rescue.userId);
             if (result.error) {
-                toast({ variant: 'destructive', title: 'Erro ao marcar como pago.', description: result.error });
+                toast({ variant: 'destructive', title: t.adminRewards.toastPaidError, description: result.error });
                 return;
             }
-            toast({ title: 'Resgate marcado como pago.' });
+            toast({ title: t.adminRewards.toastPaid });
             fetchRescues(companyId);
         } catch (error) {
             console.error("Error marking as paid:", error);
-            toast({ variant: 'destructive', title: 'Erro ao marcar como pago.' });
+            toast({ variant: 'destructive', title: t.adminRewards.toastPaidError });
         }
     }
     
@@ -221,10 +226,10 @@ export default function AdminRecompensasPage() {
         try {
             const companyDocRef = doc(db, "companies", companyId);
             await setDoc(companyDocRef, { monthlyPrize }, { merge: true });
-            toast({ title: "Prêmio do mês salvo com sucesso!"});
+            toast({ title: t.adminRewards.toastMonthlyPrizeSaved});
         } catch(error) {
             console.error("Error saving monthly prize: ", error);
-            toast({ variant: 'destructive', title: "Erro ao salvar prêmio do mês."});
+            toast({ variant: 'destructive', title: t.adminRewards.toastMonthlyPrizeSaveError});
         } finally {
             setIsSubmitting(false);
         }
@@ -233,16 +238,16 @@ export default function AdminRecompensasPage() {
     const addRewardButton = (
         <Button size="sm" disabled={isSubmitting || !companyId}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            Adicionar Recompensa
+            {t.adminRewards.addReward}
         </Button>
     );
 
     const EditRewardButton = ({ reward }: { reward: Reward }) => (
         <ActionDialog
-            title="Editar Recompensa"
-            description="Atualize os detalhes da recompensa."
-            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Editar</DropdownMenuItem>}
-            actionText={isSubmitting ? "Salvando..." : "Salvar Alterações"}
+            title={t.adminRewards.editTitle}
+            description={t.adminRewards.editDescription}
+            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>{t.common.edit}</DropdownMenuItem>}
+            actionText={isSubmitting ? t.common.saving : t.common.saveChanges}
             onAction={() => handleAction(reward.id)}
             formId="reward-form"
         >
@@ -255,7 +260,7 @@ export default function AdminRecompensasPage() {
             <TableCell colSpan={cols} className="text-center">
                 <div className="flex justify-center items-center p-4">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    <span className="ml-2">Carregando...</span>
+                    <span className="ml-2">{t.common.loading}</span>
                 </div>
             </TableCell>
         </TableRow>
@@ -263,19 +268,19 @@ export default function AdminRecompensasPage() {
 
   return (
     <>
-      <Header title="Recompensas" />
+      <Header title={t.adminRewards.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         <Tabs defaultValue="loja">
           <div className="flex items-center justify-between mb-4">
             <TabsList>
-              <TabsTrigger value="loja">Loja de Recompensas</TabsTrigger>
-              <TabsTrigger value="historico">Histórico de Resgates</TabsTrigger>
+              <TabsTrigger value="loja">{t.adminRewards.shopTab}</TabsTrigger>
+              <TabsTrigger value="historico">{t.adminRewards.historyTab}</TabsTrigger>
             </TabsList>
             <ActionDialog
-              title="Adicionar Nova Recompensa"
-              description="Cadastre uma nova recompensa na loja para seus colaboradores."
+              title={t.adminRewards.addTitle}
+              description={t.adminRewards.addDescription}
               trigger={addRewardButton}
-              actionText={isSubmitting ? "Salvando..." : "Salvar Recompensa"}
+              actionText={isSubmitting ? t.common.saving : t.adminRewards.saveReward}
               onAction={() => handleAction()}
               formId="reward-form"
               open={isDialogOpen}
@@ -289,16 +294,16 @@ export default function AdminRecompensasPage() {
                 <CardHeader>
                     <CardTitle className="font-headline flex items-center gap-2">
                         <Trophy className="h-5 w-5 text-muted-foreground" />
-                        Prêmio do Mês (Top 1 Ranking)
+                        {t.adminRewards.monthlyPrize}
                     </CardTitle>
-                    <CardDescription>Selecione qual recompensa da loja será o prêmio para o primeiro lugar do ranking neste mês.</CardDescription>
+                    <CardDescription>{t.adminRewards.monthlyPrizeDescription}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="max-w-xs">
-                        <Label htmlFor="monthly-prize">Recompensa</Label>
+                        <Label htmlFor="monthly-prize">{t.adminRewards.tableReward}</Label>
                         <Select value={monthlyPrize} onValueChange={setMonthlyPrize} disabled={isLoading || !companyId}>
                             <SelectTrigger id="monthly-prize">
-                                <SelectValue placeholder="Selecione uma recompensa" />
+                                <SelectValue placeholder={t.adminRewards.monthlyPrizeSelect} />
                             </SelectTrigger>
                             <SelectContent>
                                 {rewards.filter(r => r.status === 'Disponível').map(r => (
@@ -311,35 +316,35 @@ export default function AdminRecompensasPage() {
                 <CardFooter>
                     <Button disabled={isSubmitting || !companyId} onClick={handleSaveMonthlyPrize}>
                         {isSubmitting && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
-                        Salvar Prêmio do Mês
+                        {t.adminRewards.monthlyPrizeSave}
                     </Button>
                 </CardFooter>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Gerenciar Loja de Recompensas</CardTitle>
-                <CardDescription>Adicione, edite ou remova as recompensas disponíveis.</CardDescription>
+                <CardTitle>{t.adminRewards.manageTitle}</CardTitle>
+                <CardDescription>{t.adminRewards.manageDescription}</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Recompensa</TableHead>
-                      <TableHead>Custo (Pontos)</TableHead>
-                      <TableHead>Estoque</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead><span className="sr-only">Ações</span></TableHead>
+                      <TableHead>{t.adminRewards.tableReward}</TableHead>
+                      <TableHead>{t.adminRewards.tableCost}</TableHead>
+                      <TableHead>{t.adminRewards.tableStock}</TableHead>
+                      <TableHead>{t.common.status}</TableHead>
+                      <TableHead><span className="sr-only">{t.common.actions}</span></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? <TableSkeleton cols={5} /> : rewards.length === 0 ? (
-                        <TableRow><TableCell colSpan={5} className="text-center py-8">Nenhuma recompensa encontrada.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-8">{t.adminRewards.empty}</TableCell></TableRow>
                     ) : rewards.map((reward) => (
                         <TableRow key={reward.id} className={reward.status === 'Desativada' ? 'text-muted-foreground' : ''}>
                           <TableCell className="font-medium">{reward.name}</TableCell>
                           <TableCell>{reward.points}</TableCell>
-                          <TableCell>{reward.stock}</TableCell>
-                          <TableCell><Badge variant={reward.status === 'Disponível' ? 'default' : 'outline'}>{reward.status}</Badge></TableCell>
+                          <TableCell>{reward.stock === 'Ilimitado' ? t.adminRewards.stockUnlimited : reward.stock}</TableCell>
+                          <TableCell><Badge variant={reward.status === 'Disponível' ? 'default' : 'outline'}>{reward.status === 'Disponível' ? t.adminRewards.statusAvailable : t.adminRewards.statusDisabled}</Badge></TableCell>
                            <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -347,8 +352,8 @@ export default function AdminRecompensasPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <EditRewardButton reward={reward} />
-                                <DropdownMenuItem onSelect={() => handleToggleStatus(reward)}>{reward.status === 'Disponível' ? 'Desativar' : 'Ativar'}</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(reward.id)}>Excluir</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => handleToggleStatus(reward)}>{reward.status === 'Disponível' ? t.common.deactivate : t.common.activate}</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(reward.id)}>{t.common.delete}</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -362,24 +367,24 @@ export default function AdminRecompensasPage() {
           <TabsContent value="historico">
             <Card>
               <CardHeader>
-                <CardTitle>Histórico de Resgates</CardTitle>
-                <CardDescription>Acompanhe os resgates feitos pelos colaboradores.</CardDescription>
+                <CardTitle>{t.adminRewards.historyTitle}</CardTitle>
+                <CardDescription>{t.adminRewards.historyDescription}</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Colaborador</TableHead>
-                      <TableHead>Recompensa</TableHead>
-                      <TableHead>Pontos</TableHead>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Ação</TableHead>
+                      <TableHead>{t.adminRewards.historyCollaborator}</TableHead>
+                      <TableHead>{t.adminRewards.historyReward}</TableHead>
+                      <TableHead>{t.adminRewards.historyPoints}</TableHead>
+                      <TableHead>{t.adminRewards.historyDate}</TableHead>
+                      <TableHead>{t.common.status}</TableHead>
+                      <TableHead>{t.adminRewards.historyAction}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? <TableSkeleton cols={5} /> : rescues.length === 0 ? (
-                        <TableRow><TableCell colSpan={6} className="text-center py-8">Nenhum resgate encontrado.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={6} className="text-center py-8">{t.adminRewards.historyEmpty}</TableCell></TableRow>
                     ) : rescues.map((rescue) => (
                          <TableRow key={rescue.id}>
                           <TableCell className="font-medium">{rescue.userName}</TableCell>
@@ -387,11 +392,11 @@ export default function AdminRecompensasPage() {
                           <TableCell>{rescue.points?.toLocaleString() || '—'}</TableCell>
                           <TableCell>{rescue.date?.toDate ? rescue.date.toDate().toLocaleDateString() : 'N/A'}</TableCell>
                           <TableCell>
-                            <Badge variant={rescue.status === 'Pendente' ? 'destructive' : 'default'} className={rescue.status === 'Pago' ? "bg-green-600 hover:bg-green-700" : ""}>{rescue.status}</Badge>
+                            <Badge variant={rescue.status === 'Pendente' ? 'destructive' : 'default'} className={rescue.status === 'Pago' ? "bg-green-600 hover:bg-green-700" : ""}>{rescue.status === 'Pendente' ? t.adminRewards.statusPending : t.adminRewards.paid}</Badge>
                           </TableCell>
                           <TableCell>
                             <Button size="sm" variant="outline" disabled={rescue.status === 'Pago'} onClick={() => handleMarkAsPaid(rescue)}>
-                                {rescue.status === 'Pendente' ? 'Marcar como Pago' : 'Pago'}
+                                {rescue.status === 'Pendente' ? t.adminRewards.markPaid : t.adminRewards.paid}
                             </Button>
                           </TableCell>
                         </TableRow>

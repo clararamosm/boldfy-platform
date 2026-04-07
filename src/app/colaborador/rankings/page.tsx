@@ -15,13 +15,16 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAuthToken } from '@/lib/auth-client';
 import { getCompanyRanking, type RankedUser } from "@/app/actions";
+import { useT } from '@/lib/i18n/context';
 
 type UserRanking = RankedUser & {
   isCurrentUser?: boolean;
 };
 
 const PodiumCard = ({ rank, user, highlight = false }: { rank: number, user: UserRanking, highlight?: boolean }) => {
+  const t = useT();
   const isZeroPoints = user.points === 0;
+  const rankLabels: Record<number, string> = { 1: t.colabRankings.rank1, 2: t.colabRankings.rank2, 3: t.colabRankings.rank3 };
 
   return (
     <Card className={`flex flex-col items-center p-4 text-center ${highlight ? 'bg-secondary' : ''} ${isZeroPoints ? 'opacity-50 grayscale border-gray-300 bg-gray-50' : ''} h-full`}>
@@ -38,7 +41,7 @@ const PodiumCard = ({ rank, user, highlight = false }: { rank: number, user: Use
           <Zap className="h-3 w-3 mr-1"/>
           {user.points.toLocaleString()}
         </Badge>
-        <p className={`font-bold text-lg mt-1 ${isZeroPoints ? 'text-gray-400' : ''}`}>{rank}º Lugar</p>
+        <p className={`font-bold text-lg mt-1 ${isZeroPoints ? 'text-gray-400' : ''}`}>{rankLabels[rank] || `${rank}º`}</p>
       </div>
     </Card>
   );
@@ -69,6 +72,7 @@ const PageSkeleton = () => (
 );
 
 export default function RankingsPage() {
+  const t = useT();
   const [generalRanking, setGeneralRanking] = useState<UserRanking[]>([]);
   const [monthlyPrizeName, setMonthlyPrizeName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,7 +86,7 @@ export default function RankingsPage() {
       const result = await getCompanyRanking(token, userId);
 
       if (result.error) {
-        toast({ variant: 'destructive', title: "Erro", description: result.error });
+        toast({ variant: 'destructive', title: t.common.error, description: result.error });
         setIsLoading(false);
         return;
       }
@@ -99,8 +103,8 @@ export default function RankingsPage() {
       console.error("Erro ao buscar dados do ranking:", error);
       toast({
         variant: 'destructive',
-        title: "Erro ao carregar ranking",
-        description: "Não foi possível carregar os dados. Tente novamente.",
+        title: t.colabRankings.fetchError,
+        description: t.colabRankings.fetchErrorDescription,
       });
     } finally {
       setIsLoading(false);
@@ -117,8 +121,8 @@ export default function RankingsPage() {
         setIsLoading(false);
         toast({
           variant: 'destructive',
-          title: "Usuário não autenticado",
-          description: "Faça login para ver o ranking.",
+          title: t.colabRankings.authError,
+          description: t.colabRankings.authErrorDescription,
         });
       }
     });
@@ -130,7 +134,7 @@ export default function RankingsPage() {
   if (isLoading) {
     return (
       <>
-        <Header title="Rankings" />
+        <Header title={t.colabRankings.title} />
         <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
           <PageSkeleton />
         </main>
@@ -169,7 +173,7 @@ export default function RankingsPage() {
     return (
       <Card>
         <CardContent className="p-4 text-center text-muted-foreground">
-          Nenhum participante no ranking ainda.
+          {t.colabRankings.noParticipants}
         </CardContent>
       </Card>
     );
@@ -195,14 +199,14 @@ export default function RankingsPage() {
               </div>
               <div className="flex-grow text-center sm:text-left">
                 <p className="font-bold">
-                  Prêmio do Mês: {monthlyPrizeName || 'Prêmio não definido'}
+                  {t.colabRankings.monthlyPrize} {monthlyPrizeName || t.colabRankings.monthlyPrizeDefault}
                 </p>
-                <p className="text-sm text-muted-foreground">O top 1 do ranking este mês ganha esta recompensa.</p>
+                <p className="text-sm text-muted-foreground">{t.colabRankings.monthlyPrizeDescription}</p>
               </div>
               <div className="w-full sm:w-48 text-center sm:text-right">
                 <div className="flex items-center justify-center sm:justify-end gap-2 text-xs text-muted-foreground mb-1">
                   <Calendar className="h-3 w-3" />
-                  <span>{currentDay} de {daysInMonth} dias</span>
+                  <span>{currentDay} {t.colabRankings.daysOf.replace('{total}', String(daysInMonth))}</span>
                 </div>
                 <Progress value={(currentDay / daysInMonth) * 100} className="h-2" />
               </div>
@@ -215,23 +219,23 @@ export default function RankingsPage() {
           <CardHeader>
             <CardTitle className="font-headline flex items-center gap-2">
               <Trophy className="h-5 w-5 text-muted-foreground" />
-              Ranking Geral
+              {t.colabRankings.generalRanking}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Posição</TableHead>
-                  <TableHead>Colaborador</TableHead>
-                  <TableHead className="text-right">Pontos</TableHead>
+                  <TableHead>{t.colabRankings.position}</TableHead>
+                  <TableHead>{t.colabRankings.collaborator}</TableHead>
+                  <TableHead className="text-right">{t.colabRankings.points}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {generalRanking.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                      Nenhum participante no ranking ainda.
+                      {t.colabRankings.noParticipants}
                     </TableCell>
                   </TableRow>
                 ) : generalRanking.map((user, index) => {
@@ -245,7 +249,7 @@ export default function RankingsPage() {
                             <AvatarImage src={user.avatarUrl} data-ai-hint="person avatar" />
                             <AvatarFallback className={isZeroPoints ? 'bg-gray-200 text-gray-400' : ''}>{user.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
                           </Avatar>
-                          <span className={`${user.isCurrentUser ? 'font-bold' : ''} ${isZeroPoints ? 'text-gray-400' : ''}`}>{user.isCurrentUser ? 'Você' : user.name}</span>
+                          <span className={`${user.isCurrentUser ? 'font-bold' : ''} ${isZeroPoints ? 'text-gray-400' : ''}`}>{user.isCurrentUser ? t.colabRankings.you : user.name}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

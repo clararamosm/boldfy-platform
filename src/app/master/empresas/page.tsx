@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, LogIn, Loader2, Pencil, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MoreHorizontal, PlusCircle, LogIn, Loader2, Pencil, Trash2, Globe } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -27,12 +28,14 @@ type Company = {
     companyName: string;
     status: 'Ativa' | 'Inativa' | 'Trial';
     licenses: number;
+    locale?: 'pt-BR' | 'en';
     adminProfile: { email: string; name: string; };
     createdAt: any;
 };
 
 function CompanyFormContent() {
     const { pending } = useFormStatus();
+    const [locale, setLocale] = useState('pt-BR');
     return (
         <div className="space-y-4">
             <div className="space-y-2">
@@ -50,6 +53,20 @@ function CompanyFormContent() {
              <div className="space-y-2">
                 <Label htmlFor="licenses">Número de Licenças (mín. 5)</Label>
                 <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="5" defaultValue="5" disabled={pending} required />
+             </div>
+             <div className="space-y-2">
+                <Label htmlFor="locale">Idioma da Plataforma</Label>
+                <input type="hidden" name="locale" value={locale} />
+                <Select defaultValue="pt-BR" disabled={pending} onValueChange={setLocale}>
+                    <SelectTrigger id="locale">
+                        <SelectValue placeholder="Selecione o idioma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="pt-BR">🇧🇷 Português (BR)</SelectItem>
+                        <SelectItem value="en">🇺🇸 English</SelectItem>
+                    </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Define o idioma de toda a interface para esta empresa.</p>
              </div>
              <p className="text-xs text-muted-foreground">Licenças contam apenas colaboradores (a conta de admin é gratuita). Mínimo de 5 licenças.</p>
         </div>
@@ -239,6 +256,7 @@ export default function MasterEmpresasPage() {
                             <TableHead>Status</TableHead>
                             <TableHead>Licenças</TableHead>
                             <TableHead>Admin</TableHead>
+                            <TableHead>Idioma</TableHead>
                             <TableHead>Data de Início</TableHead>
                             <TableHead><span className="sr-only">Ações</span></TableHead>
                         </TableRow>
@@ -246,7 +264,7 @@ export default function MasterEmpresasPage() {
                     <TableBody>
                          {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center h-24">
+                                <TableCell colSpan={7} className="text-center h-24">
                                      <div className="flex justify-center items-center">
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando empresas...
                                     </div>
@@ -254,7 +272,7 @@ export default function MasterEmpresasPage() {
                             </TableRow>
                         ) : companies.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
+                                <TableCell colSpan={7} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
                             </TableRow>
                         ) : (
                             companies.map(company => (
@@ -263,6 +281,12 @@ export default function MasterEmpresasPage() {
                                     <TableCell>{getStatusBadge(company.status)}</TableCell>
                                     <TableCell>{seatCounts[company.id] || 0} / {company.licenses}</TableCell>
                                     <TableCell>{company.adminProfile?.email}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline" className="gap-1 text-xs">
+                                            <Globe className="h-3 w-3" />
+                                            {company.locale === 'en' ? 'EN' : 'PT'}
+                                        </Badge>
+                                    </TableCell>
                                     <TableCell>{company.createdAt?.toDate ? format(company.createdAt.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                     <TableCell>
                                         <DropdownMenu>

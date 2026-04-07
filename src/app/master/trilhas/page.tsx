@@ -14,6 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
@@ -42,7 +45,7 @@ export default function MasterTrilhasPage() {
   // Session Dialog
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<Sessao | null>(null);
-  const [sessionForm, setSessionForm] = useState({ titulo: '', descricao: '', ordem: 0 });
+  const [sessionForm, setSessionForm] = useState({ titulo: '', descricao: '', ordem: 0, locale: 'pt-BR' as 'pt-BR' | 'en' });
 
   // Trail Builder
   const [trailForm, setTrailForm] = useState<TrailFormData>({ titulo: '', descricao: '', tempoEstimadoMin: 30, pontuacaoBonusTrilha: 0 });
@@ -90,10 +93,10 @@ export default function MasterTrilhasPage() {
   const openSessionDialog = (session?: Sessao) => {
     if (session) {
       setEditingSession(session);
-      setSessionForm({ titulo: session.titulo, descricao: session.descricao, ordem: session.ordem });
+      setSessionForm({ titulo: session.titulo, descricao: session.descricao, ordem: session.ordem, locale: session.locale || 'pt-BR' });
     } else {
       setEditingSession(null);
-      setSessionForm({ titulo: '', descricao: '', ordem: sessions.length + 1 });
+      setSessionForm({ titulo: '', descricao: '', ordem: sessions.length + 1, locale: 'pt-BR' });
     }
     setSessionDialogOpen(true);
   };
@@ -105,12 +108,14 @@ export default function MasterTrilhasPage() {
       if (editingSession) {
         await updateDoc(doc(db, 'globalSessions', editingSession.id), {
           titulo: sessionForm.titulo, descricao: sessionForm.descricao,
-          ordem: sessionForm.ordem, atualizadaEm: Timestamp.now(),
+          ordem: sessionForm.ordem, locale: sessionForm.locale,
+          atualizadaEm: Timestamp.now(),
         });
       } else {
         await addDoc(collection(db, 'globalSessions'), {
           titulo: sessionForm.titulo, descricao: sessionForm.descricao,
-          ordem: sessionForm.ordem, ativa: true, criadaEm: Timestamp.now(),
+          ordem: sessionForm.ordem, locale: sessionForm.locale,
+          ativa: true, criadaEm: Timestamp.now(),
         });
       }
       toast({ title: 'Sessao salva com sucesso!' });
@@ -272,7 +277,10 @@ export default function MasterTrilhasPage() {
                 <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => openSessionTrails(session)}>
                   <FolderOpen className="w-5 h-5 text-purple-500" />
                   <div>
-                    <h3 className="font-semibold">{session.titulo}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{session.titulo}</h3>
+                      <Badge variant="outline" className="text-xs">{session.locale === 'en' ? '🇺🇸 EN' : '🇧🇷 PT'}</Badge>
+                    </div>
                     <p className="text-sm text-muted-foreground">{session.descricao}</p>
                   </div>
                 </div>
@@ -386,6 +394,21 @@ export default function MasterTrilhasPage() {
                 <Label>Ordem</Label>
                 <Input type="number" value={sessionForm.ordem} onChange={e => setSessionForm({ ...sessionForm, ordem: parseInt(e.target.value) || 0 })} />
               </div>
+              {!editingSession && (
+                <div>
+                  <Label>Idioma</Label>
+                  <Select value={sessionForm.locale} onValueChange={(v: 'pt-BR' | 'en') => setSessionForm({ ...sessionForm, locale: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pt-BR">🇧🇷 Português</SelectItem>
+                      <SelectItem value="en">🇺🇸 English</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Empresas só veem sessões no seu idioma.</p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setSessionDialogOpen(false)}>Cancelar</Button>

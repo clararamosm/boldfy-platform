@@ -18,6 +18,7 @@ import { Loader2, Camera } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { getAuthToken } from "@/lib/auth-client";
+import { useT } from '@/lib/i18n/context';
 
 type CompanyData = {
     id: string;
@@ -75,6 +76,7 @@ const SettingsSkeleton = () => (
     </>
 );
 function ConfiguracoesPageContent() {
+    const t = useT();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -107,11 +109,11 @@ function ConfiguracoesPageContent() {
                     trialEndsAt: data.trialEndsAt
                 });
             } else {
-                toast({ variant: 'destructive', title: "Erro ao carregar empresa", description: "Os dados da sua empresa não foram encontrados." });
+                toast({ variant: 'destructive', title: t.adminSettings.toastLoadCompanyError, description: t.adminSettings.toastLoadCompanyErrorDescription });
             }
         } catch (error) {
             console.error("Error fetching settings: ", error);
-            toast({ variant: 'destructive', title: "Erro ao carregar configurações", description: "Não foi possível buscar os dados. Tente novamente mais tarde." });
+            toast({ variant: 'destructive', title: t.adminSettings.toastLoadError, description: t.adminSettings.toastLoadErrorDescription });
         } finally {
             setIsLoading(false);
         }
@@ -151,10 +153,10 @@ function ConfiguracoesPageContent() {
             const companyDocRef = doc(db, "companies", companyData.id);
             await setDoc(companyDocRef, { adminPhotoURL: downloadURL }, { merge: true });
             setCompanyData(prev => prev ? { ...prev, adminPhotoURL: downloadURL } : prev);
-            toast({ title: "Foto atualizada!", description: "Sua foto de perfil foi salva com sucesso." });
+            toast({ title: t.adminSettings.toastPhotoUpdated, description: t.adminSettings.toastPhotoUpdatedDescription });
         } catch (error) {
             console.error("Error uploading photo: ", error);
-            toast({ variant: "destructive", title: "Erro no upload", description: "N\u00e3o foi poss\u00edvel atualizar a foto." });
+            toast({ variant: "destructive", title: t.adminSettings.toastPhotoError, description: t.adminSettings.toastPhotoErrorDescription });
         } finally {
             setIsUploadingPhoto(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
@@ -184,10 +186,10 @@ function ConfiguracoesPageContent() {
                 };
             }
             await setDoc(companyDocRef, dataToSave, { merge: true });
-            toast({ title: "Sucesso!", description: "O Brand Context da empresa foi salvo." });
+            toast({ title: t.adminSettings.toastBrandSaved, description: t.adminSettings.toastBrandSavedDescription });
         } catch (error) {
             console.error("Error saving settings: ", error);
-            toast({ variant: 'destructive', title: "Erro ao salvar", description: "Não foi possível salvar as alterações." });
+            toast({ variant: 'destructive', title: t.adminSettings.toastBrandError, description: t.adminSettings.toastBrandErrorDescription });
         } finally {
             setIsSaving(false);
         }
@@ -207,13 +209,13 @@ function ConfiguracoesPageContent() {
     }
     return (
         <>
-            <Header title="Configurações" />
+            <Header title={t.adminSettings.title} />
             <main className="flex-1 overflow-auto p-4 md:p-6">
                 <div className="grid gap-6 max-w-4xl mx-auto">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Perfil do Administrador</CardTitle>
-                            <CardDescription>Gerencie as informações da sua conta e empresa.</CardDescription>
+                            <CardTitle>{t.adminSettings.profileTitle}</CardTitle>
+                            <CardDescription>{t.adminSettings.profileDescription}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex items-center gap-4">
@@ -242,12 +244,12 @@ function ConfiguracoesPageContent() {
                                     onClick={() => fileInputRef.current?.click()}
                                 >
                                     <Camera className="h-4 w-4 mr-2" />
-                                    {isUploadingPhoto ? "Enviando..." : "Mudar foto"}
+                                    {isUploadingPhoto ? t.common.uploading : t.common.changePhoto}
                                 </Button>
                             </div>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="adminName">Nome do Admin</Label>
+                                <Label htmlFor="adminName">{t.adminSettings.adminName}</Label>
                                 <Input id="adminName" value={companyData.adminName} disabled />
                             </div>
                             <div className="space-y-2">
@@ -255,87 +257,87 @@ function ConfiguracoesPageContent() {
                                 <Input id="email" value={companyData.email} disabled />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="companyName">Nome da Empresa</Label>
+                                <Label htmlFor="companyName">{t.adminSettings.companyName}</Label>
                                 <Input id="companyName" value={companyData.companyName} disabled />
                             </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle>Brand Context da Empresa</CardTitle>
-                            <CardDescription>Essas informações alimentam a IA para alinhar o conteúdo dos colaboradores com a marca. A IA tece a marca de forma orgânica na narrativa pessoal de cada autor.</CardDescription>
+                            <CardTitle>{t.adminSettings.brandContextTitle}</CardTitle>
+                            <CardDescription>{t.adminSettings.brandContextDescription}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="valueProposition">Proposta de Valor</Label>
-                                <Textarea id="valueProposition" placeholder="O que a empresa entrega de único para o mercado?" value={companyData.valueProposition} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <Label htmlFor="valueProposition">{t.adminSettings.valueProposition}</Label>
+                                <Textarea id="valueProposition" placeholder={t.adminSettings.valuePropositionPlaceholder} value={companyData.valueProposition} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="tagline">Tagline</Label>
-                                <Input id="tagline" placeholder="Frase-síntese da marca (ex: 'Gamificação que transforma colaboradores em embaixadores')" value={companyData.tagline} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <Label htmlFor="tagline">{t.adminSettings.tagline}</Label>
+                                <Input id="tagline" placeholder={t.adminSettings.taglinePlaceholder} value={companyData.tagline} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="businessKeywords">Keywords de Negócio</Label>
-                                <Textarea id="businessKeywords" placeholder="Termos do nicho da empresa, separados por vírgula (ex: employee advocacy, gamificação, marca empregadora)" value={companyData.businessKeywords} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">Separe por vírgula. A IA usa esses termos naturalmente nos textos.</p>
+                                <Label htmlFor="businessKeywords">{t.adminSettings.businessKeywords}</Label>
+                                <Textarea id="businessKeywords" placeholder={t.adminSettings.businessKeywordsPlaceholder} value={companyData.businessKeywords} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">{t.adminSettings.businessKeywordsHelp}</p>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="solutions">Soluções que a Empresa Oferece</Label>
-                                <Textarea id="solutions" placeholder="O que a empresa vende ou faz, separado por vírgula (ex: plataforma de advocacy, trilhas de capacitação, assistente IA)" value={companyData.solutions} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">Separe por vírgula.</p>
+                                <Label htmlFor="solutions">{t.adminSettings.solutions}</Label>
+                                <Textarea id="solutions" placeholder={t.adminSettings.solutionsPlaceholder} value={companyData.solutions} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">{t.adminSettings.solutionsHelp}</p>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="targetPainPoints">Dores do Público-alvo</Label>
-                                <Textarea id="targetPainPoints" placeholder="Problemas que seu público enfrenta, separados por vírgula (ex: baixo engajamento no LinkedIn, colaboradores não postam, marca sem presença)" value={companyData.targetPainPoints} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">Separe por vírgula. A IA usa isso para gerar identificação no leitor.</p>
+                                <Label htmlFor="targetPainPoints">{t.adminSettings.targetPainPoints}</Label>
+                                <Textarea id="targetPainPoints" placeholder={t.adminSettings.targetPainPointsPlaceholder} value={companyData.targetPainPoints} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">{t.adminSettings.targetPainPointsHelp}</p>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="targetAudience">Público-alvo</Label>
-                                <Textarea id="targetAudience" placeholder="Quem a empresa atende (ex: líderes de RH e marketing de empresas B2B com 50+ colaboradores)" value={companyData.targetAudience} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <Label htmlFor="targetAudience">{t.adminSettings.targetAudience}</Label>
+                                <Textarea id="targetAudience" placeholder={t.adminSettings.targetAudiencePlaceholder} value={companyData.targetAudience} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="approvedTopics">Tópicos Aprovados</Label>
-                                <Textarea id="approvedTopics" placeholder="Temas que os colaboradores devem abordar, separados por vírgula (ex: employee advocacy, cultura organizacional, liderança)" value={companyData.approvedTopics} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">Separe por vírgula. O conteúdo gerado girará em torno desses temas.</p>
+                                <Label htmlFor="approvedTopics">{t.adminSettings.approvedTopics}</Label>
+                                <Textarea id="approvedTopics" placeholder={t.adminSettings.approvedTopicsPlaceholder} value={companyData.approvedTopics} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">{t.adminSettings.approvedTopicsHelp}</p>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="prohibitedPhrases">Frases / Tópicos Proibidos</Label>
-                                <Textarea id="prohibitedPhrases" placeholder="O que NUNCA deve aparecer no conteúdo, separado por vírgula (ex: nome de concorrente X, preços, termos técnicos internos)" value={companyData.prohibitedPhrases} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">Separe por vírgula.</p>
+                                <Label htmlFor="prohibitedPhrases">{t.adminSettings.prohibitedPhrases}</Label>
+                                <Textarea id="prohibitedPhrases" placeholder={t.adminSettings.prohibitedPhrasesPlaceholder} value={companyData.prohibitedPhrases} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
+                                <p className="text-xs text-muted-foreground">{t.adminSettings.prohibitedPhrasesHelp}</p>
                             </div>
                         </CardContent>
                         <CardFooter className="border-t px-6 py-4">
                             <Button onClick={() => handleSaveChanges('brandContext')} disabled={isSaving || isReadOnly}>
                                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Salvar Brand Context
+                                {t.adminSettings.saveBrandContext}
                             </Button>
                         </CardFooter>
                     </Card>
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Notificações</CardTitle>
-                            <CardDescription>Gerencie como você recebe as notificações.</CardDescription>
+                            <CardTitle>{t.adminSettings.notificationsTitle}</CardTitle>
+                            <CardDescription>{t.adminSettings.notificationsDescription}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex items-center justify-between rounded-lg border p-4">
                                 <div className="space-y-0.5">
-                                    <Label htmlFor="new-missions" className={isReadOnly ? 'text-muted-foreground' : ''}>Resgates de Recompensas</Label>
-                                    <p className="text-sm text-muted-foreground">Receba alertas quando um colaborador resgatar uma recompensa.</p>
+                                    <Label htmlFor="new-missions" className={isReadOnly ? 'text-muted-foreground' : ''}>{t.adminSettings.notifRewards}</Label>
+                                    <p className="text-sm text-muted-foreground">{t.adminSettings.notifRewardsDescription}</p>
                                 </div>
                                 <Switch id="new-missions" defaultChecked disabled={isReadOnly}/>
                             </div>
                             <div className="flex items-center justify-between rounded-lg border p-4">
                                 <div className="space-y-0.5">
-                                    <Label htmlFor="new-trails" className={isReadOnly ? 'text-muted-foreground' : ''}>Novos Colaboradores</Label>
-                                    <p className="text-sm text-muted-foreground">Seja notificado quando um novo colaborador entrar na plataforma.</p>
+                                    <Label htmlFor="new-trails" className={isReadOnly ? 'text-muted-foreground' : ''}>{t.adminSettings.notifNewCollaborators}</Label>
+                                    <p className="text-sm text-muted-foreground">{t.adminSettings.notifNewCollaboratorsDescription}</p>
                                 </div>
                                 <Switch id="new-trails" defaultChecked disabled={isReadOnly}/>
                             </div>
                             <div className="flex items-center justify-between rounded-lg border p-4">
                                 <div className="space-y-0.5">
-                                    <Label htmlFor="points-available" className={isReadOnly ? 'text-muted-foreground' : ''}>Relatórios Semanais</Label>
-                                    <p className="text-sm text-muted-foreground">Receba relatórios de engajamento da plataforma.</p>
+                                    <Label htmlFor="points-available" className={isReadOnly ? 'text-muted-foreground' : ''}>{t.adminSettings.notifWeeklyReports}</Label>
+                                    <p className="text-sm text-muted-foreground">{t.adminSettings.notifWeeklyReportsDescription}</p>
                                 </div>
                                 <Switch id="points-available" defaultChecked disabled={isReadOnly}/>
                             </div>
@@ -350,7 +352,7 @@ function ConfiguracoesPageContent() {
                             rel="noopener noreferrer"
                             className="text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
                         >
-                            Política de Privacidade
+                            {t.common.privacyPolicy}
                         </a>
                     </div>
                 </div>
