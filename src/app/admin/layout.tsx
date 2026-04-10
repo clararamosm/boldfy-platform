@@ -4,7 +4,6 @@ import type React from "react";
 import { Suspense } from 'react';
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { useCompanyData } from "@/hooks/use-company-data";
 import { SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 import Logo from "@/components/logo";
 import { AdminSidebarNav } from "@/components/dashboard/admin-sidebar-nav";
@@ -14,36 +13,34 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle } from "lucide-react";
-import { differenceInDays, parseISO } from 'date-fns';
+import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle, Clock } from "lucide-react";
 import { AuthProvider } from "@/contexts/auth-context";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
+import { useSubscription } from "@/hooks/use-subscription";
+import { SubscriptionGate } from "@/components/subscription-gate";
 
-const TrialNotification = ({ companyId }: { companyId: string | undefined }) => {
-    const { company } = useCompanyData(companyId);
+const TrialBanner = ({ daysLeft, plan }: { daysLeft: number; plan: string }) => {
+    if (plan !== 'trial' || daysLeft > 7) return null;
 
-    if (!company || company.status !== 'Trial') return null;
-    const trialEnd = company.trialEndDate || company.trialEndsAt;
-    if (!trialEnd) return null;
-
-    const daysLeft = differenceInDays(parseISO(trialEnd), new Date());
-    if (daysLeft < 0) return null;
+    const isUrgent = daysLeft <= 3;
+    const bgClass = isUrgent ? 'bg-red-100 border-red-200 text-red-800' : 'bg-yellow-100 border-yellow-200 text-yellow-800';
+    const btnClass = isUrgent ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-yellow-400 text-yellow-900 hover:bg-yellow-500';
 
     const getMessage = () => {
-        if (daysLeft === 0) return 'Seu trial expira hoje! Faça upgrade agora.';
-        if (daysLeft === 1) return 'Seu trial expira amanhã! Faça upgrade agora.';
-        return `Seu trial expira em ${daysLeft} dias. Faça upgrade para não perder acesso.`;
+        if (daysLeft === 0) return 'Seu período de teste expira hoje! Ative sua assinatura agora.';
+        if (daysLeft === 1) return 'Seu período de teste expira amanhã! Ative sua assinatura.';
+        return `Seu período de teste expira em ${daysLeft} dias. Ative sua assinatura para não perder acesso.`;
     };
 
     return (
-        <div className="bg-yellow-100 border-b border-yellow-200 text-yellow-800 text-sm font-medium text-center p-2.5">
+        <div className={`${bgClass} border-b text-sm font-medium text-center p-2.5`}>
             <div className="max-w-7xl mx-auto flex items-center justify-center gap-3">
-                <AlertTriangle className="h-4 w-4" />
+                {isUrgent ? <AlertTriangle className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
                 <span>{getMessage()}</span>
-                <Button size="sm" className="h-7 bg-yellow-400 text-yellow-900 hover:bg-yellow-500" asChild>
-                    <Link href="/admin/configuracoes">Fazer Upgrade</Link>
+                <Button size="sm" className={`h-7 ${btnClass}`} asChild>
+                    <Link href="/admin/configuracoes">Ativar Assinatura</Link>
                 </Button>
             </div>
         </div>
@@ -53,7 +50,9 @@ const TrialNotification = ({ companyId }: { companyId: string | undefined }) => 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
     const { user, companyId, locale, loading, ready, isMasterMode, masterCompanyName } = useAuthGuard({ role: 'admin' });
+    const subscription = useSubscription(companyId);
     const router = useRouter();
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -150,8 +149,15 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                     </Link>
                   </div>
                 )}
-                <TrialNotification companyId={companyId} />
-                {children}
+                <TrialBanner daysLeft={subscription.daysLeft} plan={subscription.plan} />
+                {/* Block access when subscription is expired — except /admin/configuracoes (billing page) */}
+                {subscription.isBlocked && !isMasterMode && !pathname.includes('/configuracoes') ? (
+                    <SubscriptionGate role="admin" plan={subscription.plan}>
+                        {children}
+                    </SubscriptionGate>
+                ) : (
+                    children
+                )}
             </DashboardLayout>
         </LocaleProvider>
     );

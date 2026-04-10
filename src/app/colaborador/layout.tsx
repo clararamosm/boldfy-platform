@@ -20,13 +20,16 @@ import { FeedbackDialog } from "@/components/feedback-dialog";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { interpolate } from "@/lib/i18n/interpolate";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
+import { useSubscription } from "@/hooks/use-subscription";
+import { SubscriptionGate } from "@/components/subscription-gate";
 
 function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
-    const { user, loading, ready, locale, tokenStatus } = useAuthGuard({
+    const { user, companyId, loading, ready, locale, tokenStatus } = useAuthGuard({
         role: 'colaborador',
         checkLinkedInToken: true,
     });
+    const subscription = useSubscription(companyId);
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -134,7 +137,14 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
                     </Link>
                 </div>
             )}
-            {children}
+            {/* Block access when company subscription is expired */}
+            {subscription.isBlocked ? (
+                <SubscriptionGate role="colaborador" plan={subscription.plan}>
+                    {children}
+                </SubscriptionGate>
+            ) : (
+                children
+            )}
         </DashboardLayout>
         </LocaleProvider>
     );

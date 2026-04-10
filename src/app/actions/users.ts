@@ -139,7 +139,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
         status: 'trialing',
         totalLicenses: licenses,
         usedLicenses: 0,
-        trialEnd: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        trialEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 1 month free trial (beta)
       },
       createdAt: FieldValue.serverTimestamp(),
     });

@@ -1,10 +1,10 @@
 // src/app/admin/configuracoes/page.tsx
 'use client';
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { doc, setDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, auth as firebaseAuth } from "@/lib/firebase";
 import { Header } from "@/components/dashboard/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Camera } from "lucide-react";
+import { Loader2, Camera, CreditCard, ExternalLink, CheckCircle, AlertTriangle, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useT } from '@/lib/i18n/context';
 import { useAuth } from '@/contexts/auth-context';
 import { useCompanyData } from '@/hooks/use-company-data';
+import { useSubscription } from '@/hooks/use-subscription';
 
 type CompanyData = {
     id: string;
@@ -75,6 +77,189 @@ const SettingsSkeleton = () => (
         </main>
     </>
 );
+// ── Billing Card ───────────────────────────────────────────────
+
+function BillingCard({ companyId }: { companyId: string | undefined }) {
+    const sub = useSubscription(companyId);
+    const { toast } = useToast();
+    const [checkoutLoading, setCheckoutLoading] = useState(false);
+    const [portalLoading, setPortalLoading] = useState(false);
+
+    const getIdToken = useCallback(async () => {
+        const currentUser = firebaseAuth.currentUser;
+        if (!currentUser) throw new Error('Not authenticated');
+        return currentUser.getIdToken();
+    }, []);
+
+    const handleCheckout = async () => {
+        setCheckoutLoading(true);
+        try {
+            const idToken = await getIdToken();
+            const res = await fetch('/api/stripe/checkout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${idToken}`,
+                },
+                body: JSON.stringify({
+                    seats: sub.totalLicenses || 5,
+                    isBeta: true,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao criar checkout');
+            if (data.url) {
+                window.location.href = data.url;
+            }
+        } catch (err) {
+            console.error('Checkout error:', err);
+            toast({
+                variant: 'destructive',
+                title: 'Erro no checkout',
+                description: err instanceof Error ? err.message : 'Tente novamente.',
+            });
+        } finally {
+            setCheckoutLoading(false);
+        }
+    };
+
+    const handleManageBilling = async () => {
+        setPortalLoading(true);
+        try {
+            const idToken = await getIdToken();
+            const res = await fetch('/api/stripe/portal', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${idToken}`,
+                },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Erro ao abrir portal');
+            if (data.url) {
+                window.location.href = data.url;
+            }
+        } catch (err) {
+            console.error('Portal error:', err);
+            toast({
+                variant: 'destructive',
+                title: 'Erro ao abrir portal',
+                description: err instanceof Error ? err.message : 'Tente novamente.',
+            });
+        } finally {
+            setPortalLoading(false);
+        }
+    };
+
+    if (sub.loading) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle><Skeleton className="h-7 w-48" /></CardTitle>
+                    <CardDescription><Skeleton className="h-4 w-full max-w-sm" /></CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                </CardContent>
+            </Card>
+        );
+    }
+
+    const hasActiveSubscription = sub.stripeSubscriptionId && sub.status === 'active';
+    const isTrial = sub.plan === 'trial';
+    const isBlocked = sub.isBlocked;
+
+    const getStatusBadge = () => {
+        if (hasActiveSubscription) return <Badge className="bg-green-100 text-green-800 hover:bg-green-100"><CheckCircle className="h-3 w-3 mr-1" />Ativa</Badge>;
+        if (isTrial && !isBlocked) return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100"><Clock className="h-3 w-3 mr-1" />Teste gratuito — {sub.daysLeft} dias restantes</Badge>;
+        if (isBlocked) return <Badge className="bg-red-100 text-red-800 hover:bg-red-100"><AlertTriangle className="h-3 w-3 mr-1" />Expirada</Badge>;
+        return <Badge variant="outline">{sub.status}</Badge>;
+    };
+
+    return (
+        <Card className={isBlocked ? 'border-red-300 bg-red-50/30' : ''}>
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5" />
+                            Assinatura e Cobrança
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                            Gerencie seu plano e método de pagamento.
+                        </CardDescription>
+                    </div>
+                    {getStatusBadge()}
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {/* Plan info */}
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-lg border p-4">
+                        <p className="text-sm text-muted-foreground">Plano</p>
+                        <p className="text-lg font-semibold">
+                            {hasActiveSubscription ? `Beta — ${sub.tier}` : isTrial ? 'Teste Gratuito' : 'Sem assinatura'}
+                        </p>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                        <p className="text-sm text-muted-foreground">Licenças</p>
+                        <p className="text-lg font-semibold">{sub.totalLicenses || '—'}</p>
+                    </div>
+                </div>
+
+                {/* Trial info */}
+                {isTrial && !isBlocked && (
+                    <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+                        <div className="flex items-start gap-3">
+                            <Clock className="h-5 w-5 text-blue-600 mt-0.5 shrink-0" />
+                            <div>
+                                <p className="text-sm font-medium text-blue-900">
+                                    Período de teste ativo
+                                </p>
+                                <p className="text-sm text-blue-700 mt-1">
+                                    Você tem {sub.daysLeft} dias restantes no período gratuito. Ative sua assinatura para garantir acesso contínuo com preço beta (30% de desconto por 5 meses).
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Blocked warning */}
+                {isBlocked && (
+                    <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+                            <div>
+                                <p className="text-sm font-medium text-red-900">
+                                    Acesso bloqueado
+                                </p>
+                                <p className="text-sm text-red-700 mt-1">
+                                    Seu período de teste expirou. Ative sua assinatura abaixo para restaurar o acesso de toda a equipe.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </CardContent>
+            <CardFooter className="border-t px-6 py-4 flex gap-3">
+                {hasActiveSubscription ? (
+                    <Button onClick={handleManageBilling} disabled={portalLoading}>
+                        {portalLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Gerenciar Assinatura
+                    </Button>
+                ) : (
+                    <Button onClick={handleCheckout} disabled={checkoutLoading} className="bg-purple-600 hover:bg-purple-700">
+                        {checkoutLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Ativar Assinatura
+                    </Button>
+                )}
+            </CardFooter>
+        </Card>
+    );
+}
+
 function ConfiguracoesPageContent() {
     const t = useT();
     const { toast } = useToast();
@@ -236,6 +421,10 @@ function ConfiguracoesPageContent() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* Billing / Subscription card */}
+                    <BillingCard companyId={companyData.id} />
+
                     <Card>
                         <CardHeader>
                             <CardTitle>{t.adminSettings.brandContextTitle}</CardTitle>

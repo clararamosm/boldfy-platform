@@ -1,5 +1,7 @@
 // src/app/api/stripe/checkout/route.ts
 // Creates a Stripe Checkout Session for company subscription.
+// Beta flow: 5 months at beta price (30% off), then auto-switch to full price.
+// The transition is handled by creating a Subscription Schedule after checkout.
 import { NextRequest, NextResponse } from 'next/server';
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { getStripe, getTierForSeats } from '@/lib/stripe';
@@ -47,7 +49,6 @@ export async function POST(req: NextRequest) {
     }
 
     const pricePerSeat = isBeta ? tier.betaPricePerSeatCents : tier.pricePerSeatCents;
-    const totalCents = pricePerSeat * seats;
 
     const stripe = getStripe();
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
@@ -68,6 +69,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Create Checkout Session (subscription mode)
+    // Beta subscribers start at the discounted beta price.
+    // The webhook handler will create a Subscription Schedule to
+    // transition to the full price after 5 billing cycles.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
@@ -78,7 +82,9 @@ export async function POST(req: NextRequest) {
             currency: 'brl',
             product_data: {
               name: `Boldfy Platform — ${seats} licenças (${tier.name})`,
-              description: `Assinatura mensal: ${seats} colaboradores${isBeta ? ' (Beta 30% off)' : ''}`,
+              description: isBeta
+                ? `Beta: ${seats} colaboradores (30% off por 5 meses, depois preço normal)`
+                : `Assinatura mensal: ${seats} colaboradores`,
             },
             unit_amount: pricePerSeat,
             recurring: { interval: 'month' },
@@ -87,7 +93,15 @@ export async function POST(req: NextRequest) {
         },
       ],
       subscription_data: {
-        metadata: { companyId, seats: String(seats), tier: tier.name, isBeta: String(!!isBeta) },
+        metadata: {
+          companyId,
+          seats: String(seats),
+          tier: tier.name,
+          isBeta: String(!!isBeta),
+          // Store full price info so webhook can schedule the transition
+          fullPricePerSeatCents: String(tier.pricePerSeatCents),
+          betaPricePerSeatCents: String(tier.betaPricePerSeatCents),
+        },
       },
       success_url: `${baseUrl}/admin/configuracoes?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/admin/configuracoes?checkout=cancelled`,
