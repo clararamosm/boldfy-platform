@@ -3,16 +3,15 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { reviewMissionProof } from '@/app/actions';
 import { useT } from '@/lib/i18n/context';
 import { useFormat } from '@/hooks/use-format-date';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { useAuth } from '@/contexts/auth-context';
+import { useCompanyData } from '@/hooks/use-company-data';
 
 // ─── Types ────────────────────────────────────
 export type Mission = {
@@ -66,10 +65,13 @@ export const deriveMissionStatus = (mission: Mission, now: Date): DerivedStatus 
 
 // ─── Hook ─────────────────────────────────────
 export function useAdminMissions() {
+  const { user } = useAuth();
+  const companyId = user?.companyId || null;
+  const { company } = useCompanyData(companyId);
+
   const [allMissions, setAllMissions] = useState<Mission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [companyId, setCompanyId] = useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createFixedDialogOpen, setCreateFixedDialogOpen] = useState(false);
 
@@ -130,17 +132,12 @@ export function useAdminMissions() {
   }, [toast, t]);
 
   useEffect(() => {
-    onAuthStateChanged(auth, async (user: User | null) => {
-      if (user) {
-        const userDocSnap = await getDoc(doc(db, 'users', user.uid));
-        if (userDocSnap.exists()) {
-          const cId = userDocSnap.data().companyId;
-          setCompanyId(cId);
-          fetchMissions(cId);
-        } else { setIsLoading(false); }
-      } else { setIsLoading(false); }
-    });
-  }, [fetchMissions]);
+    if (!companyId) {
+      setIsLoading(false);
+      return;
+    }
+    fetchMissions(companyId);
+  }, [companyId, fetchMissions]);
 
   // ─── Derived lists ──────────────────────────
   const now = new Date();
@@ -213,9 +210,8 @@ export function useAdminMissions() {
     setAiLoading(true);
     setAiSuggestions([]);
     try {
-      const companyDoc = await getDoc(doc(db, 'companies', companyId));
-      const brandContext = companyDoc.exists() ? companyDoc.data().brandContext || {} : {};
-      const companyName = companyDoc.exists() ? companyDoc.data().companyName || '' : '';
+      const brandContext = company?.brandContext || {};
+      const companyName = company?.companyName || '';
 
       const token = await getAuthToken();
       const res = await fetch('/api/ai/missions', {

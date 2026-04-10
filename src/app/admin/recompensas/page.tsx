@@ -2,9 +2,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { markRescueAsPaid } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
 import { Header } from "@/components/dashboard/header";
@@ -21,6 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n/context';
+import { useAuth } from '@/contexts/auth-context';
+import { useCompanyData } from '@/hooks/use-company-data';
 
 type Reward = {
     id: string;
@@ -64,12 +65,15 @@ const RewardForm = ({ reward, isSubmitting, formRef }: { reward?: Reward, isSubm
 export default function AdminRecompensasPage() {
     const { toast } = useToast();
     const t = useT();
+    const { user } = useAuth();
+    const companyId = user?.companyId || null;
+    const { company } = useCompanyData(companyId);
+
     const [rewards, setRewards] = useState<Reward[]>([]);
     const [rescues, setRescues] = useState<Rescue[]>([]);
     const [monthlyPrize, setMonthlyPrize] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [companyId, setCompanyId] = useState<string | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const formRef = useRef<HTMLFormElement>(null);
 
@@ -97,47 +101,23 @@ export default function AdminRecompensasPage() {
         }
     }, [toast]);
     
-    const fetchMonthlyPrize = useCallback(async (currentCompanyId: string) => {
-        try {
-            const companyDocRef = doc(db, "companies", currentCompanyId);
-            const companyDoc = await getDoc(companyDocRef);
-            if(companyDoc.exists()) {
-                setMonthlyPrize(companyDoc.data()?.monthlyPrize || '');
-            }
-        } catch (error) {
-             console.error("Error fetching monthly prize:", error);
-        }
-    }, []);
-
-    const fetchData = useCallback(async (currentCompanyId: string) => {
-        setIsLoading(true);
-        await Promise.all([
-            fetchRewards(currentCompanyId), 
-            fetchRescues(currentCompanyId), 
-            fetchMonthlyPrize(currentCompanyId)
-        ]);
-        setIsLoading(false);
-    }, [fetchRewards, fetchRescues, fetchMonthlyPrize]);
-    
+    // Sync monthlyPrize from company doc
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-            if (user) {
-                const userDocRef = doc(db, "users", user.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    const userCompanyId = userDocSnap.data().companyId;
-                    setCompanyId(userCompanyId);
-                    fetchData(userCompanyId);
-                } else {
-                     toast({ variant: "destructive", title: t.adminRewards.toastUserNotFound});
-                     setIsLoading(false);
-                }
-            } else {
-                setIsLoading(false);
-            }
-        });
-        return () => unsubscribe();
-    }, [fetchData, toast]);
+        if (company?.monthlyPrize !== undefined) {
+            setMonthlyPrize(company.monthlyPrize || '');
+        }
+    }, [company]);
+
+    // Fetch rewards + rescues when companyId becomes available
+    useEffect(() => {
+        if (!companyId) return;
+        const fetchAll = async () => {
+            setIsLoading(true);
+            await Promise.all([fetchRewards(companyId), fetchRescues(companyId)]);
+            setIsLoading(false);
+        };
+        fetchAll();
+    }, [companyId, fetchRewards, fetchRescues]);
 
     const handleAction = async (rewardId?: string) => {
         if(!formRef.current || !companyId) return;

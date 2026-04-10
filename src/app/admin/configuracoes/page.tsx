@@ -1,10 +1,10 @@
 // src/app/admin/configuracoes/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { doc, setDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, auth, storage } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { Header } from "@/components/dashboard/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Camera } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { getAuthToken } from "@/lib/auth-client";
 import { useT } from '@/lib/i18n/context';
+import { useAuth } from '@/contexts/auth-context';
+import { useCompanyData } from '@/hooks/use-company-data';
 
 type CompanyData = {
     id: string;
@@ -78,69 +78,43 @@ const SettingsSkeleton = () => (
 function ConfiguracoesPageContent() {
     const t = useT();
     const { toast } = useToast();
+    const { user } = useAuth();
+    const { company, isLoading: companyLoading } = useCompanyData(user?.companyId);
+
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
-    const fetchData = useCallback(async (companyId: string) => {
-        try {
-            const companyDocRef = doc(db, "companies", companyId);
-            const companyDocSnap = await getDoc(companyDocRef);
 
-            if (companyDocSnap.exists()) {
-                const data = companyDocSnap.data();
-                const bc = data.brandContext || data.branding || {};
-                setCompanyData({
-                    id: companyDocSnap.id,
-                    adminName: data.adminProfile?.name || '',
-                    companyName: data.companyName || '',
-                    email: data.adminProfile?.email || '',
-                    valueProposition: bc.valueProposition || '',
-                    tagline: bc.tagline || '',
-                    businessKeywords: Array.isArray(bc.businessKeywords) ? bc.businessKeywords.join(', ') : (bc.businessKeywords || ''),
-                    solutions: Array.isArray(bc.solutions) ? bc.solutions.join(', ') : (bc.solutions || ''),
-                    targetPainPoints: Array.isArray(bc.targetPainPoints) ? bc.targetPainPoints.join(', ') : (bc.targetPainPoints || ''),
-                    targetAudience: bc.targetAudience || bc.audience || '',
-                    approvedTopics: Array.isArray(bc.approvedTopics) ? bc.approvedTopics.join(', ') : (bc.approvedTopics || ''),
-                    prohibitedPhrases: Array.isArray(bc.prohibitedPhrases) ? bc.prohibitedPhrases.join(', ') : (bc.prohibitedPhrases || ''),
-                    status: data.status || 'Trial',
-                    licenses: data.licenses || 5,
-                    trialEndsAt: data.trialEndsAt
-                });
-            } else {
-                toast({ variant: 'destructive', title: t.adminSettings.toastLoadCompanyError, description: t.adminSettings.toastLoadCompanyErrorDescription });
-            }
-        } catch (error) {
-            console.error("Error fetching settings: ", error);
-            toast({ variant: 'destructive', title: t.adminSettings.toastLoadError, description: t.adminSettings.toastLoadErrorDescription });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [toast]);
-
+    // Hydrate local form state from company doc
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-            if (user) {
-                const userDocSnap = await getDoc(doc(db, "users", user.uid));
-                if (userDocSnap.exists()) {
-                    const companyId = userDocSnap.data().companyId;
-                    if (companyId) {
-                        fetchData(companyId);
-                    } else {
-                        toast({ variant: 'destructive', title: "ID da empresa não encontrado no perfil do usuário." });
-                        setIsLoading(false);
-                    }
-                } else {
-                    toast({ variant: 'destructive', title: "Usuário não encontrado." });
-                    setIsLoading(false);
-                }
-            } else {
-                setIsLoading(false);
-            }
+        if (companyLoading || !company) {
+            if (!companyLoading) setIsLoading(false);
+            return;
+        }
+        const bc = company.brandContext || {} as NonNullable<typeof company.brandContext>;
+        const arrToStr = (v: string[] | string | undefined) => Array.isArray(v) ? v.join(', ') : (v || '');
+        setCompanyData({
+            id: company.id,
+            adminName: company.adminProfile?.name || '',
+            companyName: company.companyName || '',
+            email: company.adminProfile?.email || '',
+            adminPhotoURL: company.adminPhotoURL,
+            valueProposition: bc.valueProposition || '',
+            tagline: bc.tagline || '',
+            businessKeywords: arrToStr(bc.businessKeywords),
+            solutions: arrToStr(bc.solutions),
+            targetPainPoints: arrToStr(bc.targetPainPoints),
+            targetAudience: bc.targetAudience || '',
+            approvedTopics: arrToStr(bc.approvedTopics),
+            prohibitedPhrases: arrToStr(bc.prohibitedPhrases),
+            status: company.status || 'Trial',
+            licenses: company.licenses || 5,
+            trialEndsAt: company.trialEndsAt,
         });
-        return () => unsubscribe();
-    }, [fetchData, toast]);
+        setIsLoading(false);
+    }, [company, companyLoading]);
 
     const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

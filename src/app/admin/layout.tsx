@@ -1,10 +1,10 @@
 'use client';
 
 import type React from "react";
-import { useState, useEffect, Suspense } from 'react';
+import { Suspense } from 'react';
 import { signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
+import { useCompanyData } from "@/hooks/use-company-data";
 import { SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 import Logo from "@/components/logo";
 import { AdminSidebarNav } from "@/components/dashboard/admin-sidebar-nav";
@@ -21,31 +21,14 @@ import { FeedbackDialog } from "@/components/feedback-dialog";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 
-type CompanyStatus = 'Ativa' | 'Inativa' | 'Trial';
-
-type CompanyData = {
-    status: CompanyStatus;
-    trialEndDate?: string;
-    plan?: string;
-};
-
 const TrialNotification = ({ companyId }: { companyId: string | undefined }) => {
-    const [companyData, setCompanyData] = useState<CompanyData | null>(null);
+    const { company } = useCompanyData(companyId);
 
-    useEffect(() => {
-        if (!companyId) return;
-        const fetchCompany = async () => {
-            const companyDoc = await getDoc(doc(db, 'companies', companyId));
-            if (companyDoc.exists()) {
-                setCompanyData(companyDoc.data() as CompanyData);
-            }
-        };
-        fetchCompany();
-    }, [companyId]);
+    if (!company || company.status !== 'Trial') return null;
+    const trialEnd = company.trialEndDate || company.trialEndsAt;
+    if (!trialEnd) return null;
 
-    if (!companyData || companyData.status !== 'Trial' || !companyData.trialEndDate) return null;
-
-    const daysLeft = differenceInDays(parseISO(companyData.trialEndDate), new Date());
+    const daysLeft = differenceInDays(parseISO(trialEnd), new Date());
     if (daysLeft < 0) return null;
 
     const getMessage = () => {

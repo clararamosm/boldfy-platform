@@ -3,9 +3,8 @@
 
 import React, { useState, useEffect, useCallback, useActionState, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
-import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { collection, getDocs, doc, getDoc, query, where, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, doc, query, where, updateDoc } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,8 +19,9 @@ import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
 import { inviteCollaborator, deleteCollaborator } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
-import { useRouter } from 'next/navigation';
 import { useT } from '@/lib/i18n/context';
+import { useAuth } from '@/contexts/auth-context';
+import { useCompanyData } from '@/hooks/use-company-data';
 
 type Collaborator = {
   id: string;
@@ -77,10 +77,13 @@ function InviteFormContent() {
 }
 
 export default function AdminColaboradoresPage() {
+  const { user } = useAuth();
+  const companyId = user?.companyId || null;
+  const { company } = useCompanyData(companyId);
+  const totalLicenses = company?.licenses || 0;
+
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  const [totalLicenses, setTotalLicenses] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCollaborator, setEditingCollaborator] = useState<Collaborator | null>(null);
   const [editName, setEditName] = useState("");
@@ -91,20 +94,13 @@ export default function AdminColaboradoresPage() {
   const [cachedToken, setCachedToken] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
-  const router = useRouter();
   const t = useT();
 
   const [inviteState, formAction] = useActionState(inviteCollaborator, { error: undefined, success: undefined });
 
-  const fetchData = useCallback(async (currentCompanyId: string) => {
+  const fetchCollaborators = useCallback(async (currentCompanyId: string) => {
     setIsLoading(true);
     try {
-      const companyDocRef = doc(db, "companies", currentCompanyId);
-      const companyDocSnap = await getDoc(companyDocRef);
-      if(companyDocSnap.exists()) {
-        setTotalLicenses(companyDocSnap.data().licenses || 0);
-      }
-
       const collaboratorsQuery = query(collection(db, "users"), where("companyId", "==", currentCompanyId), where("role", "==", "colaborador"));
       const querySnapshot = await getDocs(collaboratorsQuery);
       const fetchedCollaborators = querySnapshot.docs.map(d => {
@@ -121,7 +117,6 @@ export default function AdminColaboradoresPage() {
         }
       }) as Collaborator[];
       setCollaborators(fetchedCollaborators);
-
     } catch (error) {
       console.error("Error fetching collaborators: ", error);
       toast({ variant: "destructive", title: t.adminCollaborators.errorFetch});
@@ -130,52 +125,23 @@ export default function AdminColaboradoresPage() {
     }
   }, [toast]);
 
-  // Real auth: get companyId from logged-in user
+  // Fetch collaborators + auth token when companyId becomes available
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        router.push('/login');
-        return;
-      }
-      try {
-        const token = await getAuthToken();
-        setCachedToken(token);
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          const userCompanyId = userData.companyId;
-          if (userCompanyId) {
-            setCompanyId(userCompanyId);
-            fetchData(userCompanyId);
-          } else {
-            toast({ variant: "destructive", title: t.adminCollaborators.errorCompanyNotFound });
-            setIsLoading(false);
-          }
-        } else {
-          toast({ variant: "destructive", title: t.adminCollaborators.errorUserNotFound });
-          setIsLoading(false);
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-        toast({ variant: "destructive", title: t.adminCollaborators.errorLoadUser });
-        setIsLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [fetchData, router, toast]);
+    if (!companyId) return;
+    fetchCollaborators(companyId);
+    getAuthToken().then(setCachedToken).catch(() => {});
+  }, [companyId, fetchCollaborators]);
 
   useEffect(() => {
     if (inviteState.success) {
       toast({ title: t.adminCollaborators.toastInviteSent, description: t.adminCollaborators.toastInviteDescription });
       setIsDialogOpen(false);
-      if (companyId) fetchData(companyId);
+      if (companyId) fetchCollaborators(companyId);
     }
     if (inviteState.error) {
       toast({ variant: "destructive", title: t.adminCollaborators.toastInviteError, description: inviteState.error });
     }
-  }, [inviteState, toast, companyId, fetchData]);
+  }, [inviteState, toast, companyId, fetchCollaborators]);
 
   const inviteButton = (
     <Button size="sm" disabled={isLoading || !companyId || collaborators.length >= totalLicenses}>
