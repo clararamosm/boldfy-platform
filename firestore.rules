@@ -125,9 +125,19 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (getCompanyId(request.auth.uid) == companyId || hasRole(request.auth.uid, 'master'));
 
+      // BILLING SECURITY: subscription and Stripe fields can ONLY be written by
+      // server-side code (Admin SDK / webhooks). Client writes are blocked.
+      // Without this, any admin could grant themselves a free subscription via DevTools.
+      function isNotChangingBillingFields() {
+        return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['subscription', 'stripeCustomerId']);
+      }
+
       // Only admins of the company or master admins can update company data.
+      // Billing-related fields are protected from client-side writes.
       allow update: if request.auth != null
-                   && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
+                   && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') )
+                   && isNotChangingBillingFields();
 
       // Only server actions can delete companies (via Admin SDK)
       allow delete: if false;

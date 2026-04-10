@@ -2,6 +2,8 @@
 // Creates a Stripe Checkout Session for company subscription.
 // Beta flow: 5 months at beta price (30% off), then auto-switch to full price.
 // The transition is handled by creating a Subscription Schedule after checkout.
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { getStripe, getTierForSeats } from '@/lib/stripe';

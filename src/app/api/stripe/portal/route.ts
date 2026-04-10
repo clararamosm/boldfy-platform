@@ -1,5 +1,7 @@
 // src/app/api/stripe/portal/route.ts
 // Creates a Stripe Customer Portal session for subscription management.
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { getStripe } from '@/lib/stripe';

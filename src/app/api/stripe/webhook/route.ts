@@ -2,6 +2,9 @@
 // Stripe webhook handler — updates company subscription status in Firestore.
 // Handles beta→full price transition via Subscription Schedules.
 // IMPORTANT: This route must NOT use bodyParser. We need the raw body for signature verification.
+// Force Node.js runtime — Edge doesn't support Stripe's constructEvent (needs Buffer)
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';
 import { getStripe } from '@/lib/stripe';
