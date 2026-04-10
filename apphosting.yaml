@@ -31,6 +31,14 @@ env:
   - variable: NOTION_API_KEY
     secret: NOTION_API_KEY
 
+  # --- Stripe (payments) ---
+  - variable: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+    value: pk_live_51RWi7iAkR3p87HetSpR9E2ccYJRhb0qZFy8NMunwFSTD5V5Tbmo0G3dxttnj6v5yJhjTkH5ZCOEAsJ84tX80McOJ00qSlbtB0v
+  - variable: STRIPE_SECRET_KEY
+    secret: STRIPE_SECRET_KEY
+  - variable: STRIPE_WEBHOOK_SECRET
+    secret: STRIPE_WEBHOOK_SECRET
+
   # --- Variáveis públicas do Notion ---
   - variable: NOTION_FEEDBACK_DB_ID
     value: 33994982dee4807eb456e291ca3f6dc4
