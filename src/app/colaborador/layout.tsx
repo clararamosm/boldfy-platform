@@ -1,6 +1,7 @@
 'use client';
 
 import type React from "react";
+import { Suspense } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { SidebarHeader, SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
@@ -13,6 +14,7 @@ import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { LogOut, User as UserIcon, Loader2, AlertTriangle, Linkedin, HelpCircle } from "lucide-react";
+const SuspenseFallback = () => <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-purple-600" /></div>;
 import { AuthProvider } from "@/contexts/auth-context";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
@@ -141,7 +143,9 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
 export default function ColaboradorLayout({ children }: { children: React.ReactNode }) {
     return (
         <AuthProvider>
-            <ColaboradorLayoutInner>{children}</ColaboradorLayoutInner>
+            <Suspense fallback={<SuspenseFallback />}>
+                <ColaboradorLayoutInner>{children}</ColaboradorLayoutInner>
+            </Suspense>
         </AuthProvider>
     );
 }
