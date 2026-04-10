@@ -8,9 +8,10 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Users, Trophy, Gift, Target, BookOpen, TrendingUp, Zap, Lock,
+  Users, Trophy, Gift, Target, BookOpen, TrendingUp, Lock,
   ChevronUp, ChevronDown, Minus, Award, BarChart3, Activity,
 } from "lucide-react";
+import { CoinIcon } from "@/components/coin-icon";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n/context';
@@ -484,7 +485,7 @@ export default function AdminDashboardPage() {
             <CardContent className="pt-6 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">{t.adminDashboard.pointsDistributed}</span>
-                <Zap className="h-4 w-4 text-amber-500" />
+                <CoinIcon className="h-4 w-4 text-amber-500" />
               </div>
               <div className="text-3xl font-bold">{data.totalPointsDistributed.toLocaleString()}</div>
               <ComparisonBadge current={data.totalPointsDistributed} previous={data.prevPointsDistributed} />
@@ -536,7 +537,7 @@ export default function AdminDashboardPage() {
                         </p>
                       </div>
                       <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0 text-xs">
-                        <Zap className="h-3 w-3 mr-0.5" /> {collab.points.toLocaleString()}
+                        <CoinIcon className="h-3 w-3 mr-0.5" /> {collab.points.toLocaleString()}
                       </Badge>
                     </div>
                   ))}

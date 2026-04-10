@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Plus, Pencil, Trash2, ChevronRight, BookOpen,
-  ArrowLeft, Loader2, FolderOpen, Zap,
+  ArrowLeft, Loader2, FolderOpen,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Sessao, Trilha, Modulo, TrilhaAnalytics } from '@/types/trilhas';

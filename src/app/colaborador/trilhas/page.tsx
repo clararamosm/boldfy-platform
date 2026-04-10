@@ -13,8 +13,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Play, BookOpen, HelpCircle, Wrench, Target,
-  ChevronLeft, ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2, Zap
+  ChevronLeft, ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2
 } from 'lucide-react';
+import { CoinIcon } from '@/components/coin-icon';
 import { Header } from '@/components/dashboard/header';
 import { SuggestTrailDialog } from '@/components/suggest-trail-dialog';
 import { useT } from '@/lib/i18n/context';
@@ -279,7 +280,7 @@ export default function ColaboradorTrilhasPage() {
                           {totalModulos} {totalModulos !== 1 ? t.colabTrails.modules : t.colabTrails.module}
                         </Badge>
                         <Badge variant="secondary" className="text-xs">
-                          <Zap className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} {t.common.points}
+                          <CoinIcon className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} {t.common.points}
                         </Badge>
                         {trail.tempoEstimadoMin > 0 && (
                           <Badge variant="outline" className="text-xs">

@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Gift, History, Zap, TrendingUp, TrendingDown, PlusCircle, MinusCircle, Loader2, BookOpen, Trophy } from "lucide-react";
+import { Gift, History, TrendingUp, TrendingDown, PlusCircle, MinusCircle, Loader2, BookOpen, Trophy } from "lucide-react";
+import { CoinIcon } from "@/components/coin-icon";
 import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
@@ -59,7 +60,7 @@ const RewardCard = ({ reward, onRedeem, disabled, isSubmitting }: { reward: Rewa
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                 <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
-                    <Zap className="h-3 w-3 mr-1"/> {reward.points.toLocaleString()}
+                    <CoinIcon className="h-3 w-3 mr-1"/> {reward.points.toLocaleString()}
                 </Badge>
                 <ActionDialog
                     title={`${t.colabRewards.redeem} ${reward.name}?`}
@@ -99,7 +100,7 @@ const PointHistoryItem = ({ icon, description, date, points, type }: HistoryItem
             </div>
         </div>
         <Badge variant="secondary" className={`${type === 'gain' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} whitespace-nowrap shrink-0`}>
-            <Zap className="h-3 w-3 mr-1"/> {type === 'gain' ? '+' : '-'}{points.toLocaleString()}
+            <CoinIcon className="h-3 w-3 mr-1"/> {type === 'gain' ? '+' : '-'}{points.toLocaleString()}
         </Badge>
     </div>
 );
@@ -121,7 +122,7 @@ const PageSkeleton = () => {
     return (
     <>
         <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-            <StatCard title={t.colabRewards.availablePoints} value="0" icon={Zap} isLoading={true} />
+            <StatCard title={t.colabRewards.availablePoints} value="0" icon={CoinIcon} isLoading={true} />
             <StatCard title={t.colabRewards.totalGained} value="0" icon={TrendingUp} isLoading={true} />
             <StatCard title={t.colabRewards.totalSpent} value="0" icon={TrendingDown} isLoading={true} />
             <StatCard title={t.colabRewards.redeemed} value="0" icon={Gift} isLoading={true} />
@@ -326,7 +327,7 @@ export default function InfluencerRecompensasPage() {
             <Header title="Recompensas" />
             <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
                 <div className="grid gap-4 grid-cols-1 md:grid-cols-4">
-                    <StatCard title={t.colabRewards.availablePoints} value={stats.available} icon={Zap} isLoading={isLoading} />
+                    <StatCard title={t.colabRewards.availablePoints} value={stats.available} icon={CoinIcon} isLoading={isLoading} />
                     <StatCard title={t.colabRewards.totalGained} value={stats.gained} icon={TrendingUp} isLoading={isLoading} />
                     <StatCard title={t.colabRewards.totalSpent} value={stats.spent} icon={TrendingDown} isLoading={isLoading} />
                     <StatCard title={t.colabRewards.redeemed} value={stats.redeemed} icon={Gift} isLoading={isLoading} />

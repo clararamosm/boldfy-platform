@@ -3,7 +3,8 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Pencil, Trash2, BarChart3, Loader2, Zap } from 'lucide-react';
+import { Pencil, Trash2, BarChart3, Loader2 } from 'lucide-react';
+import { CoinIcon } from '@/components/coin-icon';
 import type { Trilha } from '@/types/trilhas';
 
 export type TrailCardProps = {
@@ -37,7 +38,7 @@ export function TrailCard({
           <p className="text-xs text-muted-foreground line-clamp-1">{trail.descricao}</p>
           <div className="flex gap-2 mt-1">
             <Badge variant="secondary" className="text-xs">{(trail.modulos || []).length} modulos</Badge>
-            <Badge variant="secondary" className="text-xs"><Zap className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} pontos</Badge>
+            <Badge variant="secondary" className="text-xs"><CoinIcon className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} pontos</Badge>
             {trail.pontuacaoBonus > 0 && (
               <Badge variant="outline" className="text-xs text-yellow-600">+{trail.pontuacaoBonus} bonus</Badge>
             )}

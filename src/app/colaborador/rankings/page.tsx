@@ -5,7 +5,8 @@ import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Crown, Trophy, Gift, Calendar, Zap } from "lucide-react";
+import { Crown, Trophy, Gift, Calendar } from "lucide-react";
+import { CoinIcon } from "@/components/coin-icon";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import React, { useState, useEffect, useCallback } from 'react';
@@ -38,7 +39,7 @@ const PodiumCard = ({ rank, user, highlight = false }: { rank: number, user: Use
       <div className="flex flex-col flex-grow justify-center mt-4 items-center">
         <h3 className={`font-semibold text-lg ${isZeroPoints ? 'text-gray-400' : ''}`}>{user.name}</h3>
         <Badge variant="secondary" className={`whitespace-nowrap shrink-0 mt-1 ${isZeroPoints ? 'bg-gray-100 text-gray-400' : 'bg-primary/10 text-primary'}`}>
-          <Zap className="h-3 w-3 mr-1"/>
+          <CoinIcon className="h-3 w-3 mr-1"/>
           {user.points.toLocaleString()}
         </Badge>
         <p className={`font-bold text-lg mt-1 ${isZeroPoints ? 'text-gray-400' : ''}`}>{rankLabels[rank] || `${rank}º`}</p>
@@ -254,7 +255,7 @@ export default function RankingsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Badge variant="secondary" className={`whitespace-nowrap shrink-0 ${isZeroPoints ? 'bg-gray-100 text-gray-400' : 'bg-primary/10 text-primary'}`}>
-                          <Zap className="h-3 w-3 mr-1"/>
+                          <CoinIcon className="h-3 w-3 mr-1"/>
                           {user.points.toLocaleString()}
                         </Badge>
                       </TableCell>

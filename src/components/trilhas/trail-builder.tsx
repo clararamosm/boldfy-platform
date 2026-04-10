@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import {
   Plus, Pencil, Trash2, ChevronDown, GripVertical,
   Play, BookOpen, HelpCircle, Wrench, Target,
-  ArrowLeft, Loader2, Save, Zap,
+  ArrowLeft, Loader2, Save,
 } from 'lucide-react';
+import { CoinIcon } from '@/components/coin-icon';
 import type { Modulo, ModuloModo, QuestaoDesafio, Sessao } from '@/types/trilhas';
 import { MODO_LABELS, MODO_CONFIG } from '@/types/trilhas';
 import { ModuloDialog, type ModuloFormData } from './modulo-dialog';
@@ -167,7 +168,7 @@ export function TrailBuilder({
               <Input type="number" value={trailForm.tempoEstimadoMin} onChange={e => onTrailFormChange({ ...trailForm, tempoEstimadoMin: parseInt(e.target.value) || 0 })} />
             </div>
             <div>
-              <Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pontuacao por Completar</Label>
+              <Label className="flex items-center gap-1"><CoinIcon className="w-4 h-4 text-yellow-500" />Pontuacao por Completar</Label>
               <Input type="number" value={trailForm.pontuacaoBonusTrilha || 0} onChange={e => onTrailFormChange({ ...trailForm, pontuacaoBonusTrilha: parseInt(e.target.value) || 0 })} placeholder="Ex: 200" />
             </div>
           </div>
@@ -177,11 +178,11 @@ export function TrailBuilder({
       {/* Score Summary */}
       <div className="grid grid-cols-3 gap-4">
         <Card><CardContent className="pt-6 text-center">
-          <div className="flex items-center justify-center gap-1 mb-1"><Zap className="w-5 h-5 text-yellow-500" /><p className="text-2xl font-bold text-purple-600">{total}</p></div>
+          <div className="flex items-center justify-center gap-1 mb-1"><CoinIcon className="w-5 h-5 text-yellow-500" /><p className="text-2xl font-bold text-purple-600">{total}</p></div>
           <p className="text-sm text-muted-foreground">Pontuacao Total</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6 text-center">
-          <div className="flex items-center justify-center gap-1 mb-1"><Zap className="w-5 h-5 text-yellow-500" /><p className="text-2xl font-bold text-yellow-600">+{bonus}</p></div>
+          <div className="flex items-center justify-center gap-1 mb-1"><CoinIcon className="w-5 h-5 text-yellow-500" /><p className="text-2xl font-bold text-yellow-600">+{bonus}</p></div>
           <p className="text-sm text-muted-foreground">Bonus Possivel</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6 text-center">
@@ -230,7 +231,7 @@ export function TrailBuilder({
                       <p className="text-xs text-muted-foreground">{MODO_LABELS[m.modo]}</p>
                     </div>
                     {MODO_CONFIG[m.modo].temPontuacao && (
-                      <Badge variant="secondary"><Zap className="w-3 h-3 mr-1 text-yellow-500" />{m.pontuacaoBase || 0} pontos</Badge>
+                      <Badge variant="secondary"><CoinIcon className="w-3 h-3 mr-1 text-yellow-500" />{m.pontuacaoBase || 0} pontos</Badge>
                     )}
                     <Button variant="ghost" size="icon" onClick={() => openModuloDialog(i)}><Pencil className="w-4 h-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={() => removeModulo(i)}><Trash2 className="w-4 h-4 text-red-500" /></Button>

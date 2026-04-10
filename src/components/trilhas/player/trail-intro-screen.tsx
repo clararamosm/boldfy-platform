@@ -4,7 +4,8 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, BookOpen, Clock, Rocket, Trophy, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Clock, Rocket, Trophy } from 'lucide-react';
+import { CoinIcon } from '@/components/coin-icon';
 import { useT } from '@/lib/i18n/context';
 import { interpolate } from '@/lib/i18n';
 import type { Trilha } from '@/types/trilhas';
@@ -44,7 +45,7 @@ export function TrailIntroScreen({ trail, sortedModulesCount, completedCount, to
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="space-y-1">
                 <div className="flex items-center justify-center gap-1 text-2xl font-bold text-primary">
-                  <Zap className="h-5 w-5 text-yellow-500" />
+                  <CoinIcon className="h-5 w-5 text-yellow-500" />
                   {trail.pontuacaoTotal || 0}
                 </div>
                 <p className="text-xs text-muted-foreground">{tp.pointsAvailable}</p>

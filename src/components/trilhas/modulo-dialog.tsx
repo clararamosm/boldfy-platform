@@ -12,7 +12,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, Zap } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
+import { CoinIcon } from '@/components/coin-icon';
 import { SimpleRichEditor } from '@/components/ui/simple-rich-editor';
 import type { Modulo, ModuloModo, QuestaoDesafio } from '@/types/trilhas';
 import { MODO_LABELS, MODO_CONFIG } from '@/types/trilhas';
@@ -176,12 +177,12 @@ export function ModuloDialog({
           {MODO_CONFIG[modo]?.temPontuacao && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pontuacao Base</Label>
+                <Label className="flex items-center gap-1"><CoinIcon className="w-4 h-4 text-yellow-500" />Pontuacao Base</Label>
                 <Input type="number" value={form.pontuacaoBase} onChange={e => onFormChange({ ...form, pontuacaoBase: parseInt(e.target.value) || 0 })} />
               </div>
               {modo === 'desafio' && (
                 <div>
-                  <Label className="flex items-center gap-1"><Zap className="w-4 h-4 text-yellow-500" />Pontuacao Bonus</Label>
+                  <Label className="flex items-center gap-1"><CoinIcon className="w-4 h-4 text-yellow-500" />Pontuacao Bonus</Label>
                   <Input type="number" value={form.pontuacaoBonus} onChange={e => onFormChange({ ...form, pontuacaoBonus: parseInt(e.target.value) || 0 })} />
                 </div>
               )}

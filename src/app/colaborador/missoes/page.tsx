@@ -4,7 +4,8 @@
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, Upload, Clock, Zap, CalendarDays, Loader2, History, XCircle, AlertCircle, HourglassIcon, Target, ChevronDown, ChevronRight, Trophy } from "lucide-react";
+import { CheckCircle, Upload, Clock, CalendarDays, Loader2, History, XCircle, AlertCircle, HourglassIcon, Target, ChevronDown, ChevronRight, Trophy } from "lucide-react";
+import { CoinIcon } from "@/components/coin-icon";
 import { Badge } from "@/components/ui/badge";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -140,7 +141,7 @@ const WeeklyMissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
                 <div className="flex items-start justify-between gap-3">
                     <h3 className="font-headline text-sm font-semibold leading-tight line-clamp-1">{mission.name}</h3>
                     <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0 text-xs h-6">
-                        <Zap className="h-3 w-3 mr-1" /> {mission.points} pts
+                        <CoinIcon className="h-3 w-3 mr-1" /> {mission.points} pts
                     </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{mission.description}</p>
@@ -246,7 +247,7 @@ const CompactMissionRow = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
                     {mission.name}
                 </span>
                 <Badge variant="secondary" className="bg-primary/10 text-primary text-[11px] h-5 px-1.5 shrink-0">
-                    <Zap className="h-2.5 w-2.5 mr-0.5" /> {mission.points}
+                    <CoinIcon className="h-2.5 w-2.5 mr-0.5" /> {mission.points}
                 </Badge>
                 <div className="shrink-0 ml-1">{renderCompactAction()}</div>
             </button>
@@ -482,7 +483,7 @@ export default function ColaboradorMissoesPage() {
                     <CardContent className="grid gap-4 md:grid-cols-2 p-4">
                         <div className="p-2">
                             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <Zap className="h-4 w-4" /> {t.colabMissions.weeklyPoints}
+                                <CoinIcon className="h-4 w-4" /> {t.colabMissions.weeklyPoints}
                             </div>
                             <div className="text-3xl font-bold">{stats.weeklyPoints}</div>
                         </div>
