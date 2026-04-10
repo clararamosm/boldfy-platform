@@ -2,6 +2,7 @@
 // Cron endpoint: generates hot topics for all active companies.
 // Call once per week via Cloud Scheduler.
 // Secured via CRON_SECRET header.
+export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';

@@ -3,6 +3,8 @@
 //
 // The cookie value is: `role.hmac` where hmac = HMAC-SHA256(role, secret)
 // This prevents client-side tampering. The middleware validates the signature.
+// Force Node.js runtime — firebase-admin requires Node.js APIs
+export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth as adminAuth } from '@/lib/firebase-admin';

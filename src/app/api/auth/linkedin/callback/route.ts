@@ -1,4 +1,5 @@
 // src/app/api/auth/linkedin/callback/route.ts
+export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';
 import {

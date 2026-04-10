@@ -2,6 +2,7 @@
 // Cron endpoint: publishes scheduled LinkedIn posts whose time has arrived.
 // Call this every 5 minutes via Cloud Scheduler or a cron service.
 // Secured via CRON_SECRET header.
+export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';
