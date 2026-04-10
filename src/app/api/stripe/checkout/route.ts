@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { seats, isBeta } = body as { seats: number; isBeta?: boolean };
+    const { seats } = body as { seats: number };
 
     if (!seats || seats < 5 || seats > 70) {
       return NextResponse.json({ error: 'Seats must be between 5 and 70' }, { status: 400 });
@@ -48,14 +48,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No pricing tier found for this seat count' }, { status: 400 });
     }
 
-    const pricePerSeat = isBeta ? tier.betaPricePerSeatCents : tier.pricePerSeatCents;
-
     const stripe = getStripe();
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
     // Get or create Stripe customer for this company
     const companyDoc = await adminDb.collection('companies').doc(companyId).get();
     const companyData = companyDoc.data();
+
+    // GUARD: prevent duplicate subscriptions
+    const existingSub = companyData?.subscription;
+    if (existingSub?.stripeSubscriptionId && existingSub?.status === 'active') {
+      return NextResponse.json(
+        { error: 'Company already has an active subscription. Use the portal to manage it.' },
+        { status: 409 }
+      );
+    }
+
+    // SERVER decides if beta — not the client. Beta period is defined by env var or hardcoded cutoff.
+    const BETA_CUTOFF = process.env.BETA_CUTOFF_DATE
+      ? new Date(process.env.BETA_CUTOFF_DATE)
+      : new Date('2026-12-31'); // Default: beta available until end of 2026
+    const isBeta = new Date() < BETA_CUTOFF;
+
+    const pricePerSeat = isBeta ? tier.betaPricePerSeatCents : tier.pricePerSeatCents;
+
     let customerId = companyData?.stripeCustomerId as string | undefined;
 
     if (!customerId) {

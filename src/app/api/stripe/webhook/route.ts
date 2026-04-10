@@ -35,11 +35,24 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Idempotency: check if we already processed this event
+    const eventRef = adminDb.collection('stripeEvents').doc(event.id);
+    const eventDoc = await eventRef.get();
+    if (eventDoc.exists) {
+      console.log(`Webhook event ${event.id} already processed, skipping`);
+      return NextResponse.json({ received: true, skipped: true });
+    }
+    // Mark as processing immediately to prevent concurrent handling
+    await eventRef.set({ type: event.type, processedAt: new Date(), status: 'processing' });
+
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         const companyId = session.metadata?.companyId;
-        if (!companyId) break;
+        if (!companyId) {
+          console.error(`checkout.session.completed missing companyId in metadata. Session: ${session.id}`);
+          break;
+        }
 
         // Update company with Stripe subscription info
         if (session.subscription) {
@@ -97,7 +110,10 @@ export async function POST(req: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const subUpdated = event.data.object as any;
         const companyIdUpd = subUpdated.metadata?.companyId;
-        if (!companyIdUpd) break;
+        if (!companyIdUpd) {
+          console.error(`customer.subscription.updated missing companyId in metadata. Sub: ${subUpdated.id}`);
+          break;
+        }
 
         const statusMap: Record<string, string> = {
           active: 'active',
@@ -122,7 +138,10 @@ export async function POST(req: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const subDeleted = event.data.object as any;
         const companyIdDel = subDeleted.metadata?.companyId;
-        if (!companyIdDel) break;
+        if (!companyIdDel) {
+          console.error(`customer.subscription.deleted missing companyId in metadata. Sub: ${subDeleted.id}`);
+          break;
+        }
 
         await adminDb.collection('companies').doc(companyIdDel).update({
           'subscription.status': 'canceled',
@@ -158,9 +177,16 @@ export async function POST(req: NextRequest) {
         break;
     }
 
+    // Mark event as successfully processed
+    await eventRef.update({ status: 'completed', completedAt: new Date() });
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('Webhook handler error:', error);
+    // Mark event as failed so it can be retried
+    try {
+      const eventRef = adminDb.collection('stripeEvents').doc(event.id);
+      await eventRef.update({ status: 'failed', error: String(error), failedAt: new Date() });
+    } catch { /* ignore cleanup errors */ }
     return NextResponse.json({ error: 'Webhook handler failed' }, { status: 500 });
   }
 }

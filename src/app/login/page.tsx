@@ -38,8 +38,19 @@ function LoginForm() {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const userRole = userData.role;
-        // Set session cookie BEFORE redirect so middleware allows access
-        document.cookie = `boldfy-session=${userRole}; path=/; max-age=${60 * 60 * 24 * 14}; SameSite=Lax`;
+        // Set signed HttpOnly session cookie via server API BEFORE redirect
+        // The middleware requires HMAC-signed cookies — plain cookies get rejected
+        const idToken = await user.getIdToken();
+        const sessionRes = await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken }),
+        });
+        if (!sessionRes.ok) {
+          setError(t.auth.errors.generic);
+          setLoading(false);
+          return;
+        }
         if (userRole === 'master') { router.push('/master/empresas'); }
         else if (userRole === 'admin') { router.push('/admin/dashboard'); }
         else if (userRole === 'colaborador') { router.push('/colaborador/dashboard'); }

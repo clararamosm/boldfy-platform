@@ -11,7 +11,7 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle, Clock } from "lucide-react";
 import { AuthProvider } from "@/contexts/auth-context";
@@ -52,7 +52,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const { user, companyId, locale, loading, ready, isMasterMode, masterCompanyName } = useAuthGuard({ role: 'admin' });
     const subscription = useSubscription(companyId);
     const router = useRouter();
-    const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
+    const pathname = usePathname();
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -151,10 +151,8 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 )}
                 <TrialBanner daysLeft={subscription.daysLeft} plan={subscription.plan} />
                 {/* Block access when subscription is expired — except /admin/configuracoes (billing page) */}
-                {subscription.isBlocked && !isMasterMode && !pathname.includes('/configuracoes') ? (
-                    <SubscriptionGate role="admin" plan={subscription.plan}>
-                        {children}
-                    </SubscriptionGate>
+                {subscription.isBlocked && !isMasterMode && pathname !== '/admin/configuracoes' ? (
+                    <SubscriptionGate role="admin" plan={subscription.plan} />
                 ) : (
                     children
                 )}

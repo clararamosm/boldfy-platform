@@ -1,10 +1,11 @@
 // src/hooks/use-subscription.ts
 // Real-time subscription status hook.
 // Reads subscription data from company document and determines access level.
+// Includes a client-side timer to catch trial expiry without waiting for Firestore changes.
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -32,102 +33,153 @@ export type SubscriptionData = {
   loading: boolean;
 };
 
-const BLOCKED_STATUSES: string[] = ['canceled', 'expired', 'unpaid', 'incomplete_expired'];
+// Statuses that always block access
+const BLOCKED_STATUSES: string[] = ['canceled', 'expired', 'unpaid', 'incomplete_expired', 'past_due'];
+
+// SECURE default: blocked until we know the real status
+const BLOCKED_DEFAULT: SubscriptionData = {
+  plan: 'unknown',
+  status: 'blocked',
+  totalLicenses: 0,
+  usedLicenses: 0,
+  trialEnd: null,
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
+  stripeSubscriptionId: null,
+  tier: '',
+  daysLeft: 0,
+  isBlocked: true,
+  canAccessApp: false,
+  loading: true,
+};
+
+function computeSubscription(sub: Record<string, unknown>): Omit<SubscriptionData, 'loading'> {
+  const plan = (sub.plan as string) || 'trial';
+  const status = (sub.status as string) || 'trialing';
+
+  // Handle both Firestore Timestamps and plain dates
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const toDate = (v: any): Date | null => {
+    if (!v) return null;
+    if (typeof v.toDate === 'function') return v.toDate();
+    if (v instanceof Date) return v;
+    return new Date(v);
+  };
+
+  const trialEnd = toDate(sub.trialEnd);
+  const currentPeriodEnd = toDate(sub.currentPeriodEnd);
+  const now = new Date();
+
+  // Calculate days left
+  let daysLeft = 0;
+  if (plan === 'trial' && trialEnd) {
+    daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  } else if (currentPeriodEnd) {
+    daysLeft = Math.max(0, Math.ceil((currentPeriodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+  }
+
+  // Determine if blocked
+  let isBlocked = false;
+
+  // Trial expired and no active subscription
+  if (plan === 'trial' && trialEnd && trialEnd < now) {
+    isBlocked = true;
+  }
+
+  // No trialEnd at all and plan is trial = missing data, block to be safe
+  if (plan === 'trial' && !trialEnd) {
+    isBlocked = true;
+  }
+
+  // Explicitly blocked statuses (includes past_due now)
+  if (BLOCKED_STATUSES.includes(status)) {
+    isBlocked = true;
+  }
+
+  // Active subscription overrides trial expiry
+  if (status === 'active') {
+    isBlocked = false;
+  }
+  // If trialing and trial hasn't expired, don't block
+  if (status === 'trialing' && trialEnd && trialEnd >= now) {
+    isBlocked = false;
+  }
+
+  return {
+    plan,
+    status: isBlocked ? 'blocked' : (status as SubscriptionStatus),
+    totalLicenses: (sub.totalLicenses as number) || 0,
+    usedLicenses: (sub.usedLicenses as number) || 0,
+    trialEnd,
+    currentPeriodEnd,
+    cancelAtPeriodEnd: (sub.cancelAtPeriodEnd as boolean) || false,
+    stripeSubscriptionId: (sub.stripeSubscriptionId as string) || null,
+    tier: (sub.tier as string) || '',
+    daysLeft,
+    isBlocked,
+    canAccessApp: !isBlocked,
+  };
+}
 
 export function useSubscription(companyId: string | undefined | null): SubscriptionData {
-  const [data, setData] = useState<SubscriptionData>({
-    plan: 'trial',
-    status: 'trialing',
-    totalLicenses: 0,
-    usedLicenses: 0,
-    trialEnd: null,
-    currentPeriodEnd: null,
-    cancelAtPeriodEnd: false,
-    stripeSubscriptionId: null,
-    tier: '',
-    daysLeft: 30,
-    isBlocked: false,
-    canAccessApp: true,
-    loading: true,
-  });
+  const [data, setData] = useState<SubscriptionData>(BLOCKED_DEFAULT);
+  const lastSubRef = useRef<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (!companyId) {
-      setData(prev => ({ ...prev, loading: false }));
+      // No companyId = block (secure default). Don't grant free access.
+      setData({ ...BLOCKED_DEFAULT, loading: false });
       return;
     }
 
+    // Reset to loading when companyId changes
+    setData(BLOCKED_DEFAULT);
+
     const unsub = onSnapshot(doc(db, 'companies', companyId), (snap) => {
       if (!snap.exists()) {
-        setData(prev => ({ ...prev, loading: false, isBlocked: true, canAccessApp: false }));
+        setData({ ...BLOCKED_DEFAULT, loading: false });
         return;
       }
 
       const raw = snap.data();
-      const sub = raw.subscription || {};
+      const sub = (raw.subscription || {}) as Record<string, unknown>;
+      lastSubRef.current = sub;
 
-      const plan = sub.plan || 'trial';
-      const status = sub.status || 'trialing';
-      const trialEnd = sub.trialEnd?.toDate?.() || (sub.trialEnd ? new Date(sub.trialEnd) : null);
-      const currentPeriodEnd = sub.currentPeriodEnd?.toDate?.() || (sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : null);
-
-      const now = new Date();
-
-      // Calculate days left
-      let daysLeft = 30;
-      if (plan === 'trial' && trialEnd) {
-        daysLeft = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      } else if (currentPeriodEnd) {
-        daysLeft = Math.max(0, Math.ceil((currentPeriodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      }
-
-      // Determine if blocked
-      let isBlocked = false;
-
-      // Trial expired and no active subscription
-      if (plan === 'trial' && trialEnd && trialEnd < now) {
-        isBlocked = true;
-      }
-
-      // Explicitly blocked statuses
-      if (BLOCKED_STATUSES.includes(status)) {
-        isBlocked = true;
-      }
-
-      // Active subscription overrides trial expiry
-      if (status === 'active' || status === 'trialing') {
-        // If status is active (paid), never block
-        if (status === 'active') {
-          isBlocked = false;
-        }
-        // If trialing and trial hasn't expired, don't block
-        if (status === 'trialing' && trialEnd && trialEnd >= now) {
-          isBlocked = false;
-        }
-      }
-
-      setData({
-        plan,
-        status: isBlocked ? 'blocked' : (status as SubscriptionStatus),
-        totalLicenses: sub.totalLicenses || 0,
-        usedLicenses: sub.usedLicenses || 0,
-        trialEnd,
-        currentPeriodEnd,
-        cancelAtPeriodEnd: sub.cancelAtPeriodEnd || false,
-        stripeSubscriptionId: sub.stripeSubscriptionId || null,
-        tier: sub.tier || '',
-        daysLeft,
-        isBlocked,
-        canAccessApp: !isBlocked,
-        loading: false,
-      });
+      const computed = computeSubscription(sub);
+      setData({ ...computed, loading: false });
     }, (error) => {
       console.error('useSubscription: Error:', error);
-      setData(prev => ({ ...prev, loading: false }));
+      // On error, keep blocked (secure default)
+      setData({ ...BLOCKED_DEFAULT, loading: false });
     });
 
     return () => unsub();
   }, [companyId]);
+
+  // Client-side timer: recheck every 60s to catch trial expiry in real-time
+  // Without this, the gate only appears on Firestore doc changes or page refresh
+  useEffect(() => {
+    if (!companyId || data.loading) return;
+
+    // Only relevant for trials approaching expiry
+    if (data.plan !== 'trial' || !data.trialEnd) return;
+    if (data.isBlocked) return; // Already blocked, no need to recheck
+
+    const interval = setInterval(() => {
+      if (lastSubRef.current) {
+        const recomputed = computeSubscription(lastSubRef.current);
+        setData(prev => {
+          // Only update if blocking status changed
+          if (prev.isBlocked !== recomputed.isBlocked || prev.daysLeft !== recomputed.daysLeft) {
+            return { ...recomputed, loading: false };
+          }
+          return prev;
+        });
+      }
+    }, 60_000); // Every 60 seconds
+
+    return () => clearInterval(interval);
+  }, [companyId, data.loading, data.plan, data.trialEnd, data.isBlocked]);
 
   return data;
 }

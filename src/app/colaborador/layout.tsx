@@ -139,9 +139,7 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
             )}
             {/* Block access when company subscription is expired */}
             {subscription.isBlocked ? (
-                <SubscriptionGate role="colaborador" plan={subscription.plan}>
-                    {children}
-                </SubscriptionGate>
+                <SubscriptionGate role="colaborador" plan={subscription.plan} />
             ) : (
                 children
             )}
