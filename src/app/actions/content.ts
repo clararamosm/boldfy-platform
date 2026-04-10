@@ -102,6 +102,11 @@ export async function handleAlignContent(
 
     const { content, companyId, userId, format, length } = validatedData.data;
 
+    // Validate user can only access their own data
+    if (authUser.uid !== userId) {
+      return { error: 'Acesso negado: você só pode gerar conteúdo para si mesmo.', alignedContent: null };
+    }
+
     // Validate user belongs to the company
     if (authUser.companyId !== companyId) {
       return { error: 'Acesso negado: você não pertence a esta empresa.', alignedContent: null };
@@ -176,6 +181,11 @@ export async function generateHooks(input: GenerateHooksInput): Promise<Generate
       authUser = await requireAuth(input.idToken);
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Erro de autenticação.' };
+    }
+
+    // Validate user can only access their own data
+    if (authUser.uid !== input.userId) {
+      return { error: 'Acesso negado: você só pode gerar conteúdo para si mesmo.' };
     }
 
     // Validate user belongs to the company
@@ -286,6 +296,11 @@ export async function generateWithHook(input: GenerateWithHookInput): Promise<Al
       authUser = await requireAuth(input.idToken);
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Erro de autenticação.', alignedContent: null };
+    }
+
+    // Validate user can only access their own data
+    if (authUser.uid !== input.userId) {
+      return { error: 'Acesso negado: você só pode gerar conteúdo para si mesmo.', alignedContent: null };
     }
 
     // Validate user belongs to the company

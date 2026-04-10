@@ -56,11 +56,15 @@ service cloud.firestore {
                       && request.resource.data.pontosGanhos == 0
                       && request.resource.data.concluida == false;
 
-        // User can update progress but cannot set pontosGanhos > 5000 (safety cap)
-        // Full point calculation is done server-side via recalculatePoints
+        // User can update progress:
+        // - pontosGanhos can only increase (no decrease/reset)
+        // - pontosGanhos capped at previous value + 500 per update (prevents bulk injection)
+        // - Total cap at 5000
+        // - Full point aggregation is done server-side via recalculatePoints
         allow update: if request.auth.uid == userId
                       && request.resource.data.pontosGanhos is number
-                      && request.resource.data.pontosGanhos >= 0
+                      && request.resource.data.pontosGanhos >= resource.data.pontosGanhos
+                      && request.resource.data.pontosGanhos <= resource.data.pontosGanhos + 500
                       && request.resource.data.pontosGanhos <= 5000;
 
         // Admin can read progress of users in their company
@@ -80,13 +84,16 @@ service cloud.firestore {
       match /pointsHistory/{historyId} {
         allow read: if request.auth.uid == userId;
 
-        // Allow client to create trail completion entries (capped at 5000 points)
+        // Allow client to create trail completion entries
+        // - Only 'gain' type with 'trilha' source
+        // - Points capped at 500 per entry (single trail module max)
+        // - Timestamp must be server timestamp
         allow create: if request.auth.uid == userId
                       && request.resource.data.type == 'gain'
                       && request.resource.data.source == 'trilha'
                       && request.resource.data.points is number
                       && request.resource.data.points >= 0
-                      && request.resource.data.points <= 5000;
+                      && request.resource.data.points <= 500;
 
         // Admin can read points history of users in their company
         allow read: if hasRole(request.auth.uid, 'admin')

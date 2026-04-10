@@ -42,4 +42,5 @@ next-env.d.ts
 
 # firebase
 firebase-debug.log
-firestore-debug.logPROJECT_STATUS.md
+firestore-debug.log
+PROJECT_STATUS.md

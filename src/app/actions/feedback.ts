@@ -3,12 +3,14 @@
 // Server actions to send feedback, bugs, trail suggestions, and support requests to Notion
 
 import { db as adminDb } from '@/lib/firebase-admin';
+import { requireAuth } from '@/lib/auth-guard';
 
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const NOTION_DB_ID = process.env.NOTION_FEEDBACK_DB_ID;
 const NOTION_SUPPORT_DB_ID = process.env.NOTION_SUPPORT_DB_ID;
 
 type FeedbackInput = {
+  idToken: string;
   tipo: 'Bug' | 'Feedback' | 'Sugestão de Trilha';
   titulo: string;
   descricao: string;
@@ -20,20 +22,33 @@ type FeedbackInput = {
 };
 
 export async function sendFeedbackToNotion(input: FeedbackInput): Promise<{ success: boolean; error?: string }> {
+  // Require authentication and use server-side user data (not client-supplied)
+  let authUser;
+  try {
+    authUser = await requireAuth(input.idToken);
+  } catch {
+    return { success: false, error: 'Autenticação necessária.' };
+  }
+
+  // Override client-supplied identity with server-verified data
+  const verifiedCompanyId = authUser.companyId || input.companyId;
+  const verifiedUserName = authUser.name || input.userName;
+  const verifiedUserEmail = authUser.email || input.userEmail;
+
   if (!NOTION_API_KEY || !NOTION_DB_ID) {
     console.error('Notion credentials not configured');
     return { success: false, error: 'Integração com Notion não configurada.' };
   }
 
   try {
-    // Resolve company name from companyId
-    let companyName = input.companyId || 'N/A';
-    if (input.companyId) {
+    // Resolve company name from verified companyId
+    let companyName = verifiedCompanyId || 'N/A';
+    if (verifiedCompanyId) {
       try {
-        const companyDoc = await adminDb.collection('companies').doc(input.companyId).get();
+        const companyDoc = await adminDb.collection('companies').doc(verifiedCompanyId).get();
         if (companyDoc.exists) {
           const companyData = companyDoc.data();
-          companyName = companyData?.name || companyData?.companyName || input.companyId;
+          companyName = companyData?.name || companyData?.companyName || verifiedCompanyId;
         }
       } catch (err) {
         console.error('Error fetching company name:', err);
@@ -81,7 +96,7 @@ export async function sendFeedbackToNotion(input: FeedbackInput): Promise<{ succ
     addSelectIfExists('Status', 'Novo');
     addSelectIfExists('Prioridade', 'Média');
     addRichTextIfExists('Descrição', input.descricao);
-    addRichTextIfExists('Usuário', `${input.userName || 'Anônimo'} (${input.userEmail || 'sem email'})`);
+    addRichTextIfExists('Usuário', `${verifiedUserName || 'Anônimo'} (${verifiedUserEmail || 'sem email'})`);
     addRichTextIfExists('Empresa', companyName);
 
     if (dbProperties['Data'] && dbProperties['Data'].type === 'date') {
@@ -101,7 +116,7 @@ export async function sendFeedbackToNotion(input: FeedbackInput): Promise<{ succ
       { object: 'block' as const, type: 'heading_3' as const, heading_3: { rich_text: [{ type: 'text' as const, text: { content: `${input.tipo}: ${input.titulo}` } }] } },
       { object: 'block' as const, type: 'paragraph' as const, paragraph: { rich_text: [{ type: 'text' as const, text: { content: input.descricao } }] } },
       { object: 'block' as const, type: 'divider' as const, divider: {} },
-      { object: 'block' as const, type: 'paragraph' as const, paragraph: { rich_text: [{ type: 'text' as const, text: { content: `📍 Página: ${input.pagina} | 👤 ${input.userName || 'Anônimo'} (${input.userEmail || ''}) | 🏢 ${companyName} | 📅 ${new Date().toLocaleDateString('pt-BR')}` } }] } },
+      { object: 'block' as const, type: 'paragraph' as const, paragraph: { rich_text: [{ type: 'text' as const, text: { content: `📍 Página: ${input.pagina} | 👤 ${verifiedUserName || 'Anônimo'} (${verifiedUserEmail || ''}) | 🏢 ${companyName} | 📅 ${new Date().toLocaleDateString('pt-BR')}` } }] } },
     ];
 
     if (input.imageUrl) {
@@ -141,6 +156,7 @@ export async function sendFeedbackToNotion(input: FeedbackInput): Promise<{ succ
 // ─── Support Request to Notion ─────────────────────────────────
 
 type SupportInput = {
+  idToken: string;
   titulo: string;
   descricao: string;
   tipoConta: 'Colaborador' | 'Admin';
@@ -152,20 +168,33 @@ type SupportInput = {
 };
 
 export async function sendSupportToNotion(input: SupportInput): Promise<{ success: boolean; error?: string }> {
+  // Require authentication and use server-side user data
+  let authUser;
+  try {
+    authUser = await requireAuth(input.idToken);
+  } catch {
+    return { success: false, error: 'Autenticação necessária.' };
+  }
+
+  // Override client-supplied identity with server-verified data
+  const verifiedCompanyId = authUser.companyId || input.companyId;
+  const verifiedUserName = authUser.name || input.userName;
+  const verifiedUserEmail = authUser.email || input.userEmail;
+
   if (!NOTION_API_KEY || !NOTION_SUPPORT_DB_ID) {
     console.error('Notion support credentials not configured');
     return { success: false, error: 'Integração de suporte com Notion não configurada.' };
   }
 
   try {
-    // Resolve company name from companyId
-    let companyName = input.companyId || 'N/A';
-    if (input.companyId) {
+    // Resolve company name from verified companyId
+    let companyName = verifiedCompanyId || 'N/A';
+    if (verifiedCompanyId) {
       try {
-        const companyDoc = await adminDb.collection('companies').doc(input.companyId).get();
+        const companyDoc = await adminDb.collection('companies').doc(verifiedCompanyId).get();
         if (companyDoc.exists) {
           const companyData = companyDoc.data();
-          companyName = companyData?.name || companyData?.companyName || input.companyId;
+          companyName = companyData?.name || companyData?.companyName || verifiedCompanyId;
         }
       } catch (err) {
         console.error('Error fetching company name:', err);
@@ -212,7 +241,7 @@ export async function sendSupportToNotion(input: SupportInput): Promise<{ succes
     addSelectIfExists('Status', 'Novo');
     addSelectIfExists('Prioridade', 'Média');
     addRichTextIfExists('Descrição', input.descricao);
-    addRichTextIfExists('Usuário', `${input.userName || 'Anônimo'} (${input.userEmail || 'sem email'})`);
+    addRichTextIfExists('Usuário', `${verifiedUserName || 'Anônimo'} (${verifiedUserEmail || 'sem email'})`);
     addRichTextIfExists('Empresa', companyName);
 
     if (dbProperties['Data'] && dbProperties['Data'].type === 'date') {
@@ -232,7 +261,7 @@ export async function sendSupportToNotion(input: SupportInput): Promise<{ succes
       { object: 'block' as const, type: 'heading_3' as const, heading_3: { rich_text: [{ type: 'text' as const, text: { content: `Suporte: ${input.titulo}` } }] } },
       { object: 'block' as const, type: 'paragraph' as const, paragraph: { rich_text: [{ type: 'text' as const, text: { content: input.descricao } }] } },
       { object: 'block' as const, type: 'divider' as const, divider: {} },
-      { object: 'block' as const, type: 'paragraph' as const, paragraph: { rich_text: [{ type: 'text' as const, text: { content: `📍 Página: ${input.pagina} | 👤 ${input.userName || 'Anônimo'} (${input.userEmail || ''}) | 🏢 ${companyName} | 🔑 ${input.tipoConta} | 📅 ${new Date().toLocaleDateString('pt-BR')}` } }] } },
+      { object: 'block' as const, type: 'paragraph' as const, paragraph: { rich_text: [{ type: 'text' as const, text: { content: `📍 Página: ${input.pagina} | 👤 ${verifiedUserName || 'Anônimo'} (${verifiedUserEmail || ''}) | 🏢 ${companyName} | 🔑 ${input.tipoConta} | 📅 ${new Date().toLocaleDateString('pt-BR')}` } }] } },
     ];
 
     if (input.imageUrl) {

@@ -6,6 +6,7 @@ import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 
 export type AuthUser = {
   uid: string;
+  name?: string;
   email?: string;
   role?: string;
   companyId?: string;
@@ -29,7 +30,8 @@ export async function requireAuth(idToken: string): Promise<AuthUser> {
 
     return {
       uid: decoded.uid,
-      email: decoded.email,
+      name: data?.profile?.name || data?.name,
+      email: decoded.email || data?.profile?.email || data?.email,
       role: data?.role,
       companyId: data?.companyId,
     };

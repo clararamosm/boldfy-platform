@@ -1,18 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ai } from "@/ai/genkit";
-import { auth as adminAuth } from "@/lib/firebase-admin";
+import { auth as adminAuth, db as adminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
   try {
-    // Verificar autenticacao
+    // Verificar autenticacao + role
     const authHeader = req.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    let uid: string;
     try {
-      await adminAuth.verifyIdToken(authHeader.split('Bearer ')[1]);
+      const decoded = await adminAuth.verifyIdToken(authHeader.split('Bearer ')[1]);
+      uid = decoded.uid;
     } catch {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    // Verify user exists and has a valid role
+    const userDoc = await adminDb.collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return NextResponse.json({ error: "User not found" }, { status: 403 });
+    }
+    const userData = userDoc.data();
+    const role = userData?.role;
+    if (!role || !['colaborador', 'admin', 'master'].includes(role)) {
+      return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+    }
+
+    // Ensure user belongs to a company
+    if (!userData?.companyId && role !== 'master') {
+      return NextResponse.json({ error: "User has no associated company" }, { status: 403 });
     }
 
     const body = await req.json();

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useCallback, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { Bold, Italic, Underline, Highlighter, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,13 +23,17 @@ export function SimpleRichEditor({
   const isInternalChange = useRef(false);
 
   // Only set innerHTML when value changes externally (not from user typing)
+  // Sanitize with DOMPurify to prevent XSS
   useEffect(() => {
     if (isInternalChange.current) {
       isInternalChange.current = false;
       return;
     }
     if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value;
+      editorRef.current.innerHTML = DOMPurify.sanitize(value, {
+        ALLOWED_TAGS: ['b', 'i', 'u', 'strong', 'em', 'span', 'br', 'p', 'div', 'mark', 'font'],
+        ALLOWED_ATTR: ['style', 'color', 'face', 'size'],
+      });
     }
   }, [value]);
 

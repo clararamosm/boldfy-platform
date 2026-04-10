@@ -28,7 +28,7 @@ export function SuggestTrailDialog({ pagina }: SuggestTrailDialogProps) {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, firebaseUser } = useAuth();
 
   const handleSubmit = async () => {
     if (!titulo.trim()) {
@@ -43,7 +43,15 @@ export function SuggestTrailDialog({ pagina }: SuggestTrailDialogProps) {
     setSending(true);
 
     try {
+      const idToken = await firebaseUser?.getIdToken();
+      if (!idToken) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Sessão expirada. Faça login novamente.' });
+        setSending(false);
+        return;
+      }
+
       const result = await sendFeedbackToNotion({
+        idToken,
         tipo: 'Sugestão de Trilha',
         titulo,
         descricao,

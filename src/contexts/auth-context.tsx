@@ -6,12 +6,24 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
-// Session cookie helpers — used by middleware.ts for server-side route protection
-function setSessionCookie(role: string) {
-  document.cookie = `boldfy-session=${role}; path=/; max-age=${60 * 60 * 24 * 14}; SameSite=Lax`;
+// Session cookie helpers — calls server API to set signed HttpOnly cookie
+async function setSessionCookie(idToken: string) {
+  try {
+    await fetch('/api/auth/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+  } catch (err) {
+    console.error('Failed to set session cookie:', err);
+  }
 }
-function clearSessionCookie() {
-  document.cookie = 'boldfy-session=; path=/; max-age=0';
+async function clearSessionCookie() {
+  try {
+    await fetch('/api/auth/session', { method: 'DELETE' });
+  } catch (err) {
+    console.error('Failed to clear session cookie:', err);
+  }
 }
 
 // ─── Types ──────────────────────────────────────────────────
@@ -65,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!fbUser) {
         setUser(null);
         setFirebaseUser(null);
-        clearSessionCookie();
+        await clearSessionCookie();
         setLoading(false);
         return;
       }
@@ -77,6 +89,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userDoc.exists()) {
           const data = userDoc.data();
           const role = data.role || '';
+          // Strip sensitive tokens from rawData before storing in client state
+          const safeData = { ...data };
+          if (safeData.linkedinConnection) {
+            const { accessToken, refreshToken, ...safeConnection } = safeData.linkedinConnection as Record<string, unknown>;
+            safeData.linkedinConnection = safeConnection;
+          }
+
           setUser({
             uid: fbUser.uid,
             name: data.profile?.name || data.name || '',
@@ -84,17 +103,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             role,
             companyId: data.companyId,
             profile: data.profile,
-            rawData: data,
+            rawData: safeData,
           });
-          setSessionCookie(role);
+          // Set signed HttpOnly session cookie via server API
+          const idToken = await fbUser.getIdToken();
+          await setSessionCookie(idToken);
         } else {
           setUser(null);
-          clearSessionCookie();
+          await clearSessionCookie();
         }
       } catch (err) {
         console.error('AuthProvider: Error fetching user data:', err);
         setUser(null);
-        clearSessionCookie();
+        await clearSessionCookie();
       }
 
       setLoading(false);

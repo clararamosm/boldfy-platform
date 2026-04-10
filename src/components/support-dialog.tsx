@@ -33,7 +33,7 @@ export function SupportDialog({ pagina = 'Suporte' }: SupportDialogProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, firebaseUser } = useAuth();
 
   const tipoConta: 'Admin' | 'Colaborador' =
     user?.role === 'admin' || user?.role === 'master' ? 'Admin' : 'Colaborador';
@@ -82,7 +82,15 @@ export function SupportDialog({ pagina = 'Suporte' }: SupportDialogProps) {
         }
       }
 
+      const idToken = await firebaseUser?.getIdToken();
+      if (!idToken) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Sessão expirada. Faça login novamente.' });
+        setSending(false);
+        return;
+      }
+
       const result = await sendSupportToNotion({
+        idToken,
         titulo,
         descricao,
         tipoConta,

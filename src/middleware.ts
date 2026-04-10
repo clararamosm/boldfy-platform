@@ -1,11 +1,12 @@
 // src/middleware.ts
-// Server-side route protection using session cookie.
-// The cookie is set by AuthProvider (auth-context.tsx) and contains the user role.
-// This prevents the "flash of content" on protected routes before client-side auth kicks in.
+// Server-side route protection using HMAC-signed session cookie.
+// The cookie is set by the /api/auth/session endpoint (HttpOnly, Secure).
+// The HMAC signature prevents client-side tampering.
 // Full token verification still happens in layouts and server actions — this is a fast first gate.
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { verifySessionValue } from '@/lib/session';
 
 // Routes that require authentication
 const PROTECTED_PREFIXES = ['/admin', '/colaborador', '/master'];
@@ -17,24 +18,31 @@ const ROLE_ROUTES: Record<string, string> = {
   colaborador: '/colaborador',
 };
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Only check protected routes
   const isProtected = PROTECTED_PREFIXES.some(prefix => pathname.startsWith(prefix));
   if (!isProtected) return NextResponse.next();
 
-  // Check session cookie
-  const session = request.cookies.get('boldfy-session')?.value;
+  // Check signed session cookie
+  const sessionCookie = request.cookies.get('boldfy-session')?.value;
 
-  if (!session) {
-    // No session → redirect to login
+  if (!sessionCookie) {
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Check role matches route
-  const role = session; // Cookie value = role (master | admin | colaborador)
+  // Verify HMAC signature — returns the role if valid, null if tampered
+  const role = await verifySessionValue(sessionCookie);
+
+  if (!role) {
+    // Invalid/tampered cookie → clear it and redirect to login
+    const loginUrl = new URL('/login', request.url);
+    const response = NextResponse.redirect(loginUrl);
+    response.cookies.set('boldfy-session', '', { path: '/', maxAge: 0 });
+    return response;
+  }
 
   // Master can access /admin routes (with ?companyId=)
   if (pathname.startsWith('/admin') && (role === 'admin' || role === 'master')) {

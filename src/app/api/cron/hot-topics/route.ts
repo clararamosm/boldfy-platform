@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';
-import { generateHotTopicsForCompany } from '@/app/actions/hot-topics';
+import { generateHotTopicsForCompany } from '@/lib/hot-topics';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // 2 min — multiple AI calls
