@@ -106,9 +106,10 @@ function getPostStatusConfig(t: Dictionary) {
 }
 
 // ─── Helpers ──────
-const toDate = (d: any): Date | null => {
+const toDate = (d: { toDate?: () => Date } | string | null | undefined): Date | null => {
   if (!d) return null;
-  return d.toDate ? d.toDate() : new Date(d);
+  if (typeof d === 'object' && d !== null && 'toDate' in d && typeof d.toDate === 'function') return d.toDate();
+  return new Date(d as string);
 };
 
 function CalendarSkeleton() {

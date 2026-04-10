@@ -30,7 +30,7 @@ type Company = {
     licenses: number;
     locale?: 'pt-BR' | 'en';
     adminProfile: { email: string; name: string; };
-    createdAt: any;
+    createdAt: { toDate?: () => Date } | string | null;
 };
 
 function CompanyFormContent() {
@@ -287,7 +287,7 @@ export default function MasterEmpresasPage() {
                                             {company.locale === 'en' ? 'EN' : 'PT'}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>{company.createdAt?.toDate ? format(company.createdAt.toDate(), 'dd/MM/yyyy') : 'N/A'}</TableCell>
+                                    <TableCell>{company.createdAt && typeof company.createdAt === 'object' && company.createdAt !== null && 'toDate' in company.createdAt && typeof company.createdAt.toDate === 'function' ? format(company.createdAt.toDate(), 'dd/MM/yyyy') : company.createdAt ? format(new Date(company.createdAt as string), 'dd/MM/yyyy') : 'N/A'}</TableCell>
                                     <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>

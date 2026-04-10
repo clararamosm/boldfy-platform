@@ -33,7 +33,10 @@ export async function redeemReward(
       return { error: 'Recompensa não encontrada.' };
     }
 
-    const reward = rewardDoc.data()!;
+    const reward = rewardDoc.data();
+    if (!reward) {
+      return { error: 'Dados da recompensa inválidos.' };
+    }
 
     if (reward.status !== 'Disponível') {
       return { error: 'Esta recompensa não está mais disponível.' };
@@ -43,36 +46,10 @@ export async function redeemReward(
       return { error: 'Estoque esgotado para esta recompensa.' };
     }
 
-    // Recalculate current points to get authoritative balance
-    const progressSnap = await adminDb
-      .collection('users')
-      .doc(userId)
-      .collection('trailProgress')
-      .get();
-
-    let earnedPoints = 0;
-    progressSnap.docs.forEach(doc => {
-      const data = doc.data();
-      if (data.pontosGanhos && typeof data.pontosGanhos === 'number') {
-        earnedPoints += data.pontosGanhos;
-      }
-    });
-
-    const rescuesSnap = await adminDb
-      .collection('users')
-      .doc(userId)
-      .collection('rescues')
-      .get();
-
-    let spentPoints = 0;
-    rescuesSnap.docs.forEach(doc => {
-      const data = doc.data();
-      if (data.points && typeof data.points === 'number') {
-        spentPoints += data.points;
-      }
-    });
-
-    const currentPoints = Math.max(0, earnedPoints - spentPoints);
+    // Use cached points from user document (kept in sync by completeMissionSelf,
+    // reviewMissionProof, trail completion, and recalculatePoints)
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    const currentPoints = userDoc.exists ? (userDoc.data()?.points || 0) : 0;
 
     if (currentPoints < reward.points) {
       return { error: `Pontos insuficientes. Você tem ${currentPoints} pontos, mas precisa de ${reward.points}.` };
@@ -173,7 +150,10 @@ export async function markRescueAsPaid(
 
     batch.update(companyRescueRef, { status: 'Pago' });
 
-    const rescueData = companyRescueDoc.data()!;
+    const rescueData = companyRescueDoc.data();
+    if (!rescueData) {
+      return { error: 'Dados do resgate inválidos.' };
+    }
     const rescueUserId = userId || rescueData.userId;
 
     if (rescueUserId) {

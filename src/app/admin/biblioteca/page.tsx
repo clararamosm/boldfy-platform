@@ -25,7 +25,7 @@ type Asset = {
     name: string;
     type: string;
     category: 'Posts' | 'Materiais Ricos' | 'Assets de Marca';
-    uploadDate: any; 
+    uploadDate: { toDate?: () => Date } | string | null;
     fileUrl: string; 
     filePath: string;
 };
@@ -153,7 +153,7 @@ export default function AdminBibliotecaPage() {
                     fileUrl, 
                     filePath, 
                     type: file.type,
-                    uploadDate: serverTimestamp() 
+                    uploadDate: serverTimestamp() as unknown as Asset['uploadDate']
                 }),
             };
 
@@ -292,7 +292,7 @@ export default function AdminBibliotecaPage() {
                         <TableCell>
                             <Badge variant="outline">{asset.category}</Badge>
                         </TableCell>
-                        <TableCell>{asset.uploadDate?.toDate().toLocaleDateString() || 'N/A'}</TableCell>
+                        <TableCell>{asset.uploadDate && typeof asset.uploadDate === 'object' && asset.uploadDate !== null && 'toDate' in asset.uploadDate && typeof asset.uploadDate.toDate === 'function' ? asset.uploadDate.toDate().toLocaleDateString() : asset.uploadDate ? new Date(asset.uploadDate as string).toLocaleDateString() : 'N/A'}</TableCell>
                         <TableCell>
                             <DropdownMenu>
                             <DropdownMenuTrigger asChild>

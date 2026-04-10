@@ -127,7 +127,7 @@ service cloud.firestore {
 
       // Rules for company subcollections (sessions, activatedGlobalTrails, assets, etc.)
       match /{subcollection}/{docId} {
-        // Admins of the company and master admins can manage subcollections
+        // Admins of the company and master admins can manage all subcollections
         allow read: if request.auth != null
                     && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
 
@@ -135,9 +135,11 @@ service cloud.firestore {
                      && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') )
                      && isReasonableSize();
 
-        // Colaboradores can only read data from subcollections
+        // Colaboradores can only read specific subcollections they need
         allow read: if request.auth != null
-                    && hasRole(request.auth.uid, 'colaborador') && getCompanyId(request.auth.uid) == companyId;
+                    && hasRole(request.auth.uid, 'colaborador')
+                    && getCompanyId(request.auth.uid) == companyId
+                    && subcollection in ['missions', 'missionSubmissions', 'trails', 'rewards', 'rescues', 'assets', 'library', 'activatedGlobalTrails'];
 
         // Deep subcollections (e.g., sessions/{id}/trails/{id})
         match /{deepSub}/{deepDocId} {
@@ -148,8 +150,11 @@ service cloud.firestore {
                        && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') )
                        && isReasonableSize();
 
+          // Colaboradores: only read deep subs of allowed parent subcollections
           allow read: if request.auth != null
-                      && hasRole(request.auth.uid, 'colaborador') && getCompanyId(request.auth.uid) == companyId;
+                      && hasRole(request.auth.uid, 'colaborador')
+                      && getCompanyId(request.auth.uid) == companyId
+                      && subcollection in ['missions', 'missionSubmissions', 'trails', 'rewards', 'rescues', 'assets', 'library', 'activatedGlobalTrails'];
         }
       }
     }

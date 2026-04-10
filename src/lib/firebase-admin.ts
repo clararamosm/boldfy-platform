@@ -19,7 +19,6 @@ if (!admin.apps.length) {
         }
     } else {
         // Use Application Default Credentials (ADC) - works on Firebase App Hosting
-        console.log("FIREBASE_SERVICE_ACCOUNT_KEY not set. Using Application Default Credentials (ADC).");
         admin.initializeApp();
     }
 }

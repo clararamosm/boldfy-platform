@@ -26,14 +26,16 @@ import { useAuth } from '@/contexts/auth-context';
 // ─── Types ──────────────────────────────────────
 type MissionStatus = 'completa' | 'pendente' | 'aguardando' | 'rejeitada' | 'agendada' | 'expirada';
 
+type FirestoreDate = { toDate?: () => Date } | string | null;
+
 type Mission = {
     id: string;
     name: string;
     description: string;
     points: number;
     status: MissionStatus;
-    startDate?: any;
-    endDate?: any;
+    startDate?: FirestoreDate;
+    endDate?: FirestoreDate;
     type: 'timed' | 'fixed' | 'trail_content' | 'trail_trigger';
     completionMode?: 'auto' | 'proof';
     submissionFeedback?: string;
@@ -42,9 +44,11 @@ type Mission = {
     assignedTo?: string;
 };
 
-const toDate = (d: any): Date | null => {
+const toDate = (d: FirestoreDate | undefined): Date | null => {
     if (!d) return null;
-    return d.toDate ? d.toDate() : new Date(d);
+    if (typeof d === 'object' && d !== null && 'toDate' in d && typeof d.toDate === 'function') return d.toDate();
+    if (typeof d === 'string') return new Date(d);
+    return null;
 };
 
 // ─── Weekly Mission Card (full card with border) ──────
@@ -59,7 +63,7 @@ const WeeklyMissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
     const t = useT();
     const { fmtDate } = useFormat();
 
-    const formatDate = (d: any) => {
+    const formatDate = (d: FirestoreDate | undefined) => {
         const date = toDate(d);
         return date ? fmtDate(date, 'dd/MM/yyyy') : '';
     };

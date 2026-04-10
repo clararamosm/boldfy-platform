@@ -21,7 +21,7 @@ type Company = {
     status: 'Ativa' | 'Inativa' | 'Trial';
     licenses: number;
     adminProfile: { email: string };
-    createdAt?: any;
+    createdAt?: { toDate?: () => Date } | string | null;
     activeSeats?: number;
 };
 
@@ -88,8 +88,8 @@ export default function MasterDashboardPage() {
 
                 // Recent companies (sorted desc by createdAt, top 5)
                 const sorted = [...allCompanies].sort((a, b) => {
-                    const da = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
-                    const db2 = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+                    const da = a.createdAt && typeof a.createdAt === 'object' && a.createdAt !== null && 'toDate' in a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : new Date(a.createdAt as string || 0);
+                    const db2 = b.createdAt && typeof b.createdAt === 'object' && b.createdAt !== null && 'toDate' in b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : new Date(b.createdAt as string || 0);
                     return db2.getTime() - da.getTime();
                 });
 

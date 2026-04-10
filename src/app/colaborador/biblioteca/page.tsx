@@ -26,7 +26,7 @@ type Asset = {
     name: string;
     type: string;
     category: 'Posts' | 'Materiais Ricos' | 'Assets de Marca';
-    uploadDate: any;
+    uploadDate: { toDate?: () => Date } | string | null;
     fileUrl: string;
 };
 
@@ -37,7 +37,7 @@ type GeneratedContent = {
     format: string;
     length: string;
     starred: boolean;
-    createdAt: any;
+    createdAt: { toDate?: () => Date } | string | null;
 };
 
 // ─── Section selector ────────────────────────────────────────────
@@ -72,7 +72,7 @@ const AssetCard = ({ asset }: { asset: Asset }) => {
             <CardContent className="p-4 space-y-1">
                 <CardTitle className="text-base font-semibold">{asset.name}</CardTitle>
                 <p className="text-sm text-muted-foreground">{asset.type}</p>
-                <p className="text-xs text-muted-foreground">{interpolate(t.colabLibrary.addedOn, { date: asset.uploadDate?.toDate().toLocaleDateString(locale === 'en' ? 'en-US' : 'pt-BR') || 'N/A' })}</p>
+                <p className="text-xs text-muted-foreground">{interpolate(t.colabLibrary.addedOn, { date: asset.uploadDate && typeof asset.uploadDate === 'object' && asset.uploadDate !== null && 'toDate' in asset.uploadDate && typeof asset.uploadDate.toDate === 'function' ? asset.uploadDate.toDate().toLocaleDateString(locale === 'en' ? 'en-US' : 'pt-BR') : asset.uploadDate ? new Date(asset.uploadDate as string).toLocaleDateString(locale === 'en' ? 'en-US' : 'pt-BR') : 'N/A' })}</p>
             </CardContent>
             <CardFooter>
                 <Button className="w-full" variant="secondary" asChild>
@@ -117,7 +117,7 @@ const GeneratedContentCard = ({
         setIsToggling(false);
     };
 
-    const createdDate = item.createdAt?.toDate ? item.createdAt.toDate() : new Date();
+    const createdDate = item.createdAt && typeof item.createdAt === 'object' && item.createdAt !== null && 'toDate' in item.createdAt && typeof item.createdAt.toDate === 'function' ? item.createdAt.toDate() : item.createdAt ? new Date(item.createdAt as string) : new Date();
     const daysAgo = Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24));
 
     return (

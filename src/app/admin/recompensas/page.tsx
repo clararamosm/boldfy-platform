@@ -36,7 +36,7 @@ type Rescue = {
     userId: string;
     userName: string;
     rewardName: string;
-    date: any;
+    date: { toDate?: () => Date } | string | null;
     points: number;
     status: 'Pendente' | 'Pago';
 }
@@ -370,7 +370,7 @@ export default function AdminRecompensasPage() {
                           <TableCell className="font-medium">{rescue.userName}</TableCell>
                           <TableCell>{rescue.rewardName}</TableCell>
                           <TableCell>{rescue.points?.toLocaleString() || '—'}</TableCell>
-                          <TableCell>{rescue.date?.toDate ? rescue.date.toDate().toLocaleDateString() : 'N/A'}</TableCell>
+                          <TableCell>{rescue.date && typeof rescue.date === 'object' && rescue.date !== null && 'toDate' in rescue.date && typeof rescue.date.toDate === 'function' ? rescue.date.toDate().toLocaleDateString() : rescue.date ? new Date(rescue.date as string).toLocaleDateString() : 'N/A'}</TableCell>
                           <TableCell>
                             <Badge variant={rescue.status === 'Pendente' ? 'destructive' : 'default'} className={rescue.status === 'Pago' ? "bg-green-600 hover:bg-green-700" : ""}>{rescue.status === 'Pendente' ? t.adminRewards.statusPending : t.adminRewards.paid}</Badge>
                           </TableCell>

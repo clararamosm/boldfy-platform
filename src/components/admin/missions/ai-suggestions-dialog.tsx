@@ -22,7 +22,7 @@ type Props = {
   suggestions: AISuggestion[];
   onToggle: (index: number) => void;
   onUpdateDate: (index: number, field: 'startDate' | 'endDate', date: Date | undefined) => void;
-  onUpdateField: (index: number, field: string, value: any) => void;
+  onUpdateField: (index: number, field: string, value: string | number | boolean) => void;
   onSave: () => void;
 };
 

@@ -80,9 +80,9 @@ export function MissionTable({
           </TableRow>
         ) : missions.map((mission) => {
           const derivedStatus = deriveMissionStatus(mission, new Date());
-          const formatDate = (d: any) => {
+          const formatDate = (d: { toDate?: () => Date } | string | null | undefined) => {
             if (!d) return '';
-            const date = d.toDate ? d.toDate() : new Date(d);
+            const date = typeof d === 'object' && d !== null && 'toDate' in d && typeof d.toDate === 'function' ? d.toDate() : new Date(d as string);
             return fmtDate(date, 'dd/MM/yyyy');
           };
 

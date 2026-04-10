@@ -32,7 +32,7 @@ type Reward = {
 type Rescue = {
     id: string;
     rewardName: string;
-    date: any;
+    date: { toDate?: () => Date } | string | null;
     status: 'Pendente' | 'Pago';
 };
 
@@ -40,7 +40,7 @@ type HistoryItem = {
     id: string;
     icon: React.ReactNode;
     description: string;
-    date: any;
+    date: { toDate?: () => Date } | string | null;
     points: number;
     type: 'gain' | 'spend';
     source?: 'missao' | 'trilha' | 'resgate';
@@ -96,7 +96,7 @@ const PointHistoryItem = ({ icon, description, date, points, type }: HistoryItem
             {icon}
             <div>
                 <p className="font-medium">{description}</p>
-                <p className="text-sm text-muted-foreground">{date?.toDate().toLocaleDateString()}</p>
+                <p className="text-sm text-muted-foreground">{date && typeof date === 'object' && date !== null && 'toDate' in date && typeof date.toDate === 'function' ? date.toDate().toLocaleDateString() : date ? new Date(date as string).toLocaleDateString() : 'N/A'}</p>
             </div>
         </div>
         <Badge variant="secondary" className={`${type === 'gain' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} whitespace-nowrap shrink-0`}>
@@ -353,7 +353,7 @@ export default function InfluencerRecompensasPage() {
                                         <div key={rescue.id} className="flex justify-between items-center p-3 rounded-lg hover:bg-muted/50">
                                             <div>
                                                 <p className="font-medium">{rescue.rewardName}</p>
-                                                <p className="text-sm text-muted-foreground">{rescue.date?.toLocaleDateString()}</p>
+                                                <p className="text-sm text-muted-foreground">{rescue.date && typeof rescue.date === 'object' && rescue.date !== null && 'toDate' in rescue.date && typeof rescue.date.toDate === 'function' ? rescue.date.toDate().toLocaleDateString() : rescue.date ? new Date(rescue.date as string).toLocaleDateString() : 'N/A'}</p>
                                             </div>
                                             <Badge variant={rescue.status === 'Pendente' ? 'destructive' : 'default'} className={rescue.status === 'Pago' ? "bg-green-600 hover:bg-green-700" : ""}>{rescue.status}</Badge>
                                         </div>

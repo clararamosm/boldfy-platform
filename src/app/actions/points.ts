@@ -26,7 +26,7 @@ export async function getCompanyRanking(idToken: string, userId: string): Promis
       return { ranking: [], monthlyPrizeName: null, error: 'Usuário não encontrado.' };
     }
 
-    const companyId = userDoc.data()!.companyId;
+    const companyId = userDoc.data()?.companyId;
     if (!companyId) {
       return { ranking: [], monthlyPrizeName: null, error: 'Empresa não associada ao usuário.' };
     }
@@ -52,7 +52,7 @@ export async function getCompanyRanking(idToken: string, userId: string): Promis
     const companyDoc = await adminDb.collection('companies').doc(companyId).get();
 
     if (companyDoc.exists) {
-      const monthlyPrizeId = companyDoc.data()!.monthlyPrize;
+      const monthlyPrizeId = companyDoc.data()?.monthlyPrize;
       if (monthlyPrizeId) {
         const rewardDoc = await adminDb
           .collection('companies')
@@ -62,7 +62,7 @@ export async function getCompanyRanking(idToken: string, userId: string): Promis
           .get();
 
         if (rewardDoc.exists) {
-          monthlyPrizeName = rewardDoc.data()!.name || null;
+          monthlyPrizeName = rewardDoc.data()?.name || null;
         }
       }
     }

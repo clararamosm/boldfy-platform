@@ -26,10 +26,10 @@ export function MissionForm({ mission, isSubmitting, formRef, isFixed = false }:
   const t = useT();
   const { fmtDate, locale } = useFormat();
   const [startDate, setStartDate] = useState<Date | undefined>(
-    mission?.startDate?.toDate ? mission.startDate.toDate() : mission?.startDate ? new Date(mission.startDate) : undefined
+    mission?.startDate && typeof mission.startDate === 'object' && mission.startDate !== null && 'toDate' in mission.startDate && typeof mission.startDate.toDate === 'function' ? mission.startDate.toDate() : mission?.startDate ? new Date(mission.startDate as string) : undefined
   );
   const [endDate, setEndDate] = useState<Date | undefined>(
-    mission?.endDate?.toDate ? mission.endDate.toDate() : mission?.endDate ? new Date(mission.endDate) : undefined
+    mission?.endDate && typeof mission.endDate === 'object' && mission.endDate !== null && 'toDate' in mission.endDate && typeof mission.endDate.toDate === 'function' ? mission.endDate.toDate() : mission?.endDate ? new Date(mission.endDate as string) : undefined
   );
   const [completionMode, setCompletionMode] = useState<string>(mission?.completionMode || 'proof');
 

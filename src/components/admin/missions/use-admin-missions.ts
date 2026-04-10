@@ -14,6 +14,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCompanyData } from '@/hooks/use-company-data';
 
 // ─── Types ────────────────────────────────────
+type FirestoreDate = { toDate?: () => Date } | string | null;
+
 export type Mission = {
   id: string;
   name: string;
@@ -21,9 +23,9 @@ export type Mission = {
   points: number;
   type: 'fixed' | 'timed';
   completionMode?: 'auto' | 'proof';
-  startDate?: any;
-  endDate?: any;
-  createdAt?: any;
+  startDate?: FirestoreDate;
+  endDate?: FirestoreDate;
+  createdAt?: FirestoreDate;
   pendingSubmissions?: number;
 };
 
@@ -36,7 +38,7 @@ export type Submission = {
   proofUrl: string;
   proofFileName: string;
   status: string;
-  submittedAt: any;
+  submittedAt: FirestoreDate;
 };
 
 export type DerivedStatus = 'ativa' | 'agendada' | 'encerrada';
@@ -56,8 +58,8 @@ export type AISuggestion = {
 export const deriveMissionStatus = (mission: Mission, now: Date): DerivedStatus => {
   if (mission.type === 'fixed') return 'ativa';
   if (!mission.startDate || !mission.endDate) return 'ativa';
-  const start = mission.startDate?.toDate ? mission.startDate.toDate() : new Date(mission.startDate);
-  const end = mission.endDate?.toDate ? mission.endDate.toDate() : new Date(mission.endDate);
+  const start = typeof mission.startDate === 'object' && mission.startDate !== null && 'toDate' in mission.startDate && typeof mission.startDate.toDate === 'function' ? mission.startDate.toDate() : new Date(mission.startDate as string);
+  const end = typeof mission.endDate === 'object' && mission.endDate !== null && 'toDate' in mission.endDate && typeof mission.endDate.toDate === 'function' ? mission.endDate.toDate() : new Date(mission.endDate as string);
   if (now < start) return 'agendada';
   if (now > end) return 'encerrada';
   return 'ativa';
@@ -152,7 +154,7 @@ export function useAdminMissions() {
     setIsSubmitting(true);
     const formData = new FormData(formRef.current);
 
-    const missionData: any = {
+    const missionData: Record<string, unknown> = {
       name: formData.get('name'),
       description: formData.get('description'),
       points: Number(formData.get('points')),
@@ -223,7 +225,7 @@ export function useAdminMissions() {
       if (!res.ok) throw new Error('Erro na geração de missões.');
 
       const data = await res.json();
-      setAiSuggestions((data.missions || []).map((m: any) => ({
+      setAiSuggestions((data.missions || []).map((m: { name: string; description: string; points: number }) => ({
         ...m,
         selected: false,
         type: 'timed' as const,
@@ -247,7 +249,7 @@ export function useAdminMissions() {
     setAiSuggestions(prev => prev.map((s, i) => i === index ? { ...s, [field]: date } : s));
   };
 
-  const updateSuggestionField = (index: number, field: string, value: any) => {
+  const updateSuggestionField = (index: number, field: string, value: string | number | boolean) => {
     setAiSuggestions(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
   };
 
@@ -266,7 +268,7 @@ export function useAdminMissions() {
     setIsSubmitting(true);
     try {
       for (const s of selected) {
-        const missionDoc: any = {
+        const missionDoc: Record<string, unknown> = {
           name: s.name,
           description: s.description,
           points: s.points,

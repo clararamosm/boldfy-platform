@@ -29,7 +29,7 @@ type Collaborator = {
   email: string;
   points: number;
   status: 'Ativo' | 'Inativo' | 'Pendente';
-  createdAt: any;
+  createdAt: { toDate?: () => Date } | string | null;
   avatarUrl?: string;
   linkedinStatus: 'connected' | 'expiring' | 'expired' | 'not_connected';
 };
@@ -349,7 +349,7 @@ export default function AdminColaboradoresPage() {
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell>{user.createdAt?.toLocaleDateString() || 'N/A'}</TableCell>
+                      <TableCell>{user.createdAt && typeof user.createdAt === 'object' && user.createdAt !== null && 'toDate' in user.createdAt && typeof user.createdAt.toDate === 'function' ? user.createdAt.toDate().toLocaleDateString() : user.createdAt ? new Date(user.createdAt as string).toLocaleDateString() : 'N/A'}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

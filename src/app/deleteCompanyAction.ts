@@ -55,10 +55,12 @@ export async function deleteCompany(
         if (adminAuth) {
           await adminAuth.deleteUser(userDoc.id);
         }
-      } catch (authError: any) {
+      } catch (authError: unknown) {
         // User might not exist in Auth, continue with Firestore deletion
-        if (authError?.code !== 'auth/user-not-found') {
-          console.warn(`Warning: Could not delete Auth user ${userDoc.id}:`, authError?.message);
+        const errCode = (authError as { code?: string })?.code;
+        const errMsg = authError instanceof Error ? authError.message : String(authError);
+        if (errCode !== 'auth/user-not-found') {
+          console.warn(`Warning: Could not delete Auth user ${userDoc.id}:`, errMsg);
         }
       }
       // Delete from Firestore

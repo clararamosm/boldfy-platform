@@ -98,7 +98,10 @@ export async function completeMissionSelf(
       return { error: 'Missão não encontrada.' };
     }
 
-    const missionData = missionDoc.data()!;
+    const missionData = missionDoc.data();
+    if (!missionData) {
+      return { error: 'Dados da missão inválidos.' };
+    }
     if (missionData.completionMode !== 'auto') {
       return { error: 'Esta missão requer comprovação.' };
     }
@@ -188,7 +191,10 @@ export async function reviewMissionProof(
       return { error: 'Submissão não encontrada.' };
     }
 
-    const subData = subDoc.data()!;
+    const subData = subDoc.data();
+    if (!subData) {
+      return { error: 'Dados da submissão inválidos.' };
+    }
     if (subData.status !== 'pending') {
       return { error: 'Esta submissão já foi avaliada.' };
     }
@@ -201,7 +207,7 @@ export async function reviewMissionProof(
       .get();
 
     if (action === 'approve') {
-      const missionPoints = missionDoc.exists ? missionDoc.data()!.points || 0 : 0;
+      const missionPoints = missionDoc.exists ? (missionDoc.data()?.points || 0) : 0;
       const batch = adminDb.batch();
 
       batch.update(subRef, {
@@ -221,7 +227,7 @@ export async function reviewMissionProof(
         .collection('pointsHistory')
         .doc();
       batch.set(historyRef, {
-        description: `Missão concluída: ${missionDoc.exists ? missionDoc.data()!.name : 'Missão'}`,
+        description: `Missão concluída: ${missionDoc.exists ? (missionDoc.data()?.name || 'Missão') : 'Missão'}`,
         date: FieldValue.serverTimestamp(),
         points: missionPoints,
         type: 'gain',

@@ -110,7 +110,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
   // Verificar que quem chama e master
   const idToken = formData.get('idToken') as string;
   if (!idToken) return { error: 'Token de autenticacao ausente.' };
-  try { await requireMaster(idToken); } catch (e: any) { return { error: e.message }; }
+  try { await requireMaster(idToken); } catch (e: unknown) { return { error: e instanceof Error ? e.message : 'Erro de autenticação.' }; }
 
   const validatedData = InviteAdminSchema.safeParse({
     companyName: formData.get('companyName'),
@@ -177,7 +177,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
-    if ((error as any)?.code === 'auth/email-already-exists') {
+    if ((error as { code?: string })?.code === 'auth/email-already-exists') {
       return { error: `Um usuário com o e-mail ${adminEmail} já existe.` };
     }
     console.error("Error in inviteAdmin:", errorMessage);
@@ -207,7 +207,7 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
   const idToken = formData.get('idToken') as string;
   const formCompanyId = formData.get('companyId') as string;
   if (!idToken) return { error: 'Token de autenticacao ausente.' };
-  try { await requireAdmin(idToken, formCompanyId); } catch (e: any) { return { error: e.message }; }
+  try { await requireAdmin(idToken, formCompanyId); } catch (e: unknown) { return { error: e instanceof Error ? e.message : 'Erro de autenticação.' }; }
 
   const validatedData = InviteCollaboratorSchema.safeParse({
     name: formData.get('name'),
@@ -247,8 +247,8 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
         displayName: name,
         password: crypto.randomBytes(16).toString('base64url') + 'A1!',
       });
-    } catch (authError: any) {
-      if (authError?.code === 'auth/email-already-exists') {
+    } catch (authError: unknown) {
+      if ((authError as { code?: string })?.code === 'auth/email-already-exists') {
         return { error: `Um usuário com o e-mail ${email} já existe.` };
       }
       throw authError;
@@ -296,12 +296,15 @@ export async function deleteCollaborator(idToken: string, userId: string): Promi
     // Verificar que quem chama e admin da mesma empresa do colaborador
     const targetDoc = await adminDb.collection('users').doc(userId).get();
     if (!targetDoc.exists) return { error: 'Colaborador nao encontrado.' };
-    await requireAdmin(idToken, targetDoc.data()!.companyId);
+    const targetData = targetDoc.data();
+    if (!targetData?.companyId) return { error: 'Colaborador sem empresa associada.' };
+    await requireAdmin(idToken, targetData.companyId);
     try {
       await adminAuth.deleteUser(userId);
-    } catch (authError: any) {
-      if (authError?.code !== 'auth/user-not-found') {
-        console.error(`Error deleting Auth user ${userId}:`, authError?.message);
+    } catch (authError: unknown) {
+      const authErr = authError as { code?: string; message?: string };
+      if (authErr?.code !== 'auth/user-not-found') {
+        console.error(`Error deleting Auth user ${userId}:`, authErr?.message);
       }
     }
 
