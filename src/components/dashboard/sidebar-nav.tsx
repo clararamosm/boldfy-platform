@@ -12,6 +12,7 @@ interface SidebarNavProps {
     title: string;
     icon: LucideIcon;
     badge?: string;
+    badgeVariant?: 'default' | 'danger';
     disabled?: boolean;
   }[];
 }
@@ -63,7 +64,8 @@ export function SidebarNav({ items }: SidebarNavProps) {
                   {item.title}
                   {item.badge && (
                     <span className={cn(
-                      "text-[10px] font-semibold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full leading-none inline-block",
+                      "text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none inline-block",
+                      item.badgeVariant === 'danger' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600',
                       bouncingItem === item.href && "badge-bounce"
                     )}>
                       {item.badge}
@@ -84,7 +86,10 @@ export function SidebarNav({ items }: SidebarNavProps) {
                   <span className="flex items-center gap-2">
                     {item.title}
                     {item.badge && (
-                      <span className="text-[10px] font-semibold bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full leading-none">
+                      <span className={cn(
+                        "text-[10px] font-semibold px-1.5 py-0.5 rounded-full leading-none",
+                        item.badgeVariant === 'danger' ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-600'
+                      )}>
                         {item.badge}
                       </span>
                     )}

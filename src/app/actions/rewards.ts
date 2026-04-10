@@ -109,10 +109,16 @@ export async function redeemReward(
       });
     }
 
-    const newPoints = currentPoints - reward.points;
-    batch.update(adminDb.collection('users').doc(userId), {
-      points: Math.max(0, newPoints),
-    });
+    const userUpdateData: Record<string, unknown> = {
+      points: Math.max(0, currentPoints - reward.points),
+    };
+
+    // If this is an AI credits reward, add bonus credits to the user
+    if (reward.type === 'ai_credits' && typeof reward.creditsAmount === 'number' && reward.creditsAmount > 0) {
+      userUpdateData['aiCredits.bonusCredits'] = FieldValue.increment(reward.creditsAmount);
+    }
+
+    batch.update(adminDb.collection('users').doc(userId), userUpdateData);
 
     await batch.commit();
 

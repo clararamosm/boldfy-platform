@@ -15,7 +15,7 @@ service cloud.firestore {
 
     // Fields that only server actions can modify (never client)
     function isNotChangingProtectedFields() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'companyName', 'points']);
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'companyName', 'points', 'aiCredits']);
     }
 
     // Prevent excessively large documents (max 20 fields at root level)

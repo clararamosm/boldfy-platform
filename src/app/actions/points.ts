@@ -34,6 +34,8 @@ export async function getCompanyRanking(idToken: string, userId: string): Promis
     const usersSnap = await adminDb
       .collection('users')
       .where('companyId', '==', companyId)
+      .orderBy('points', 'desc')
+      .limit(10)
       .get();
 
     const ranking: RankedUser[] = usersSnap.docs
@@ -45,8 +47,7 @@ export async function getCompanyRanking(idToken: string, userId: string): Promis
           points: data.points || 0,
           avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture || data.avatarUrl || undefined,
         };
-      })
-      .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+      });
 
     let monthlyPrizeName: string | null = null;
     const companyDoc = await adminDb.collection('companies').doc(companyId).get();

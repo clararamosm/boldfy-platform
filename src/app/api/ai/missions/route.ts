@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { ai } from "@/ai/genkit";
 import { auth as adminAuth, db as adminDb } from "@/lib/firebase-admin";
+import { checkRateLimit } from "@/lib/rate-limit";
+
+const MissionsSchema = z.object({
+  brandContext: z.record(z.unknown()).optional(),
+  companyName: z.string().min(1).max(200).optional(),
+  locale: z.enum(["en", "pt-BR"]).default("pt-BR"),
+});
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,6 +23,15 @@ export async function POST(req: NextRequest) {
       uid = decoded.uid;
     } catch {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
+    }
+
+    // Rate limiting: 5 requests per minute for mission generation
+    const rateCheck = checkRateLimit(`ai-missions:${uid}`, 5, 60_000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Try again later.", retryAfterMs: rateCheck.retryAfterMs },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rateCheck.retryAfterMs / 1000)) } }
+      );
     }
 
     // Verify user is admin or master (only they can generate missions)
@@ -33,9 +50,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User has no associated company" }, { status: 403 });
     }
 
-    const { brandContext, companyName, locale } = await req.json();
+    // Validate input
+    const rawBody = await req.json();
+    const parsed = MissionsSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid input" },
+        { status: 400 }
+      );
+    }
+    const { brandContext, companyName, locale } = parsed.data;
 
-    const bc = brandContext || {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bc = (brandContext || {}) as Record<string, any>;
     const isEN = locale === 'en';
 
     const langDirective = isEN
@@ -119,9 +146,9 @@ Retorne APENAS um JSON valido, sem markdown, sem explicacao, neste formato:
 
     // Parse the JSON from the AI response
     const cleanText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleanText);
+    const aiResult = JSON.parse(cleanText);
 
-    return NextResponse.json(parsed);
+    return NextResponse.json(aiResult);
   } catch (error) {
     console.error("Error generating missions:", error);
     return NextResponse.json(

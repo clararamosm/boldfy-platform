@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { ai } from "@/ai/genkit";
 import { auth as adminAuth, db as adminDb } from "@/lib/firebase-admin";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { FieldValue } from "firebase-admin/firestore";
+
+const GenerateSchema = z.object({
+  content: z.string().min(1, "Content is required").max(5000, "Content too long"),
+  companyProfile: z.record(z.unknown()).optional(),
+  personalBranding: z.record(z.unknown()).optional(),
+  format: z.enum(["linkedin", "text-heavy", "hybrid"]).default("linkedin"),
+  length: z.enum(["short", "medium", "long"]).default("medium"),
+  locale: z.enum(["en", "pt-BR"]).default("pt-BR"),
+});
+
+// Default AI credits for new users
+const DEFAULT_MONTHLY_CREDITS = 40;
+
+/** Get next renewal date (1st of next month at 00:00 UTC) */
+function getNextRenewalDate(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,8 +38,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired token" }, { status: 401 });
     }
 
+    // Rate limiting: 10 requests per minute per user
+    const rateCheck = checkRateLimit(`ai-generate:${uid}`, 10, 60_000);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many requests. Try again later.", retryAfterMs: rateCheck.retryAfterMs },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(rateCheck.retryAfterMs / 1000)) } }
+      );
+    }
+
     // Verify user exists and has a valid role
-    const userDoc = await adminDb.collection('users').doc(uid).get();
+    const userRef = adminDb.collection('users').doc(uid);
+    const userDoc = await userRef.get();
     if (!userDoc.exists) {
       return NextResponse.json({ error: "User not found" }, { status: 403 });
     }
@@ -33,14 +64,76 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User has no associated company" }, { status: 403 });
     }
 
+    // Validate input with Zod
     const body = await req.json();
-    const { content, companyProfile, personalBranding, format, length, locale } = body;
+    const parsed = GenerateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid input" },
+        { status: 400 }
+      );
+    }
+    const { content, companyProfile, personalBranding, format, length, locale } = parsed.data;
     const isEN = locale === 'en';
 
-    if (!content) {
+    // ── AI Credits Check + Lazy Renewal ──
+    let aiCredits = userData?.aiCredits as {
+      remaining: number;
+      bonusCredits: number;
+      monthlyLimit: number;
+      renewsAt: { toMillis?: () => number; _seconds?: number } | null;
+      totalUsed: number;
+    } | undefined;
+
+    // Initialize credits if user has none yet
+    if (!aiCredits) {
+      aiCredits = {
+        remaining: DEFAULT_MONTHLY_CREDITS,
+        bonusCredits: 0,
+        monthlyLimit: DEFAULT_MONTHLY_CREDITS,
+        renewsAt: null,
+        totalUsed: 0,
+      };
+      await userRef.update({
+        aiCredits: {
+          remaining: DEFAULT_MONTHLY_CREDITS,
+          bonusCredits: 0,
+          monthlyLimit: DEFAULT_MONTHLY_CREDITS,
+          renewsAt: getNextRenewalDate(),
+          totalUsed: 0,
+        },
+      });
+    }
+
+    // Lazy renewal: check if renewsAt has passed
+    const renewsAtMs = aiCredits.renewsAt?.toMillis?.()
+      ?? (aiCredits.renewsAt as { _seconds?: number })?._seconds
+        ? (aiCredits.renewsAt as { _seconds: number })._seconds * 1000
+        : null;
+
+    if (renewsAtMs && Date.now() >= renewsAtMs) {
+      // Reset monthly credits, keep bonusCredits
+      aiCredits.remaining = aiCredits.monthlyLimit || DEFAULT_MONTHLY_CREDITS;
+      const nextRenewal = getNextRenewalDate();
+      await userRef.update({
+        'aiCredits.remaining': aiCredits.remaining,
+        'aiCredits.renewsAt': nextRenewal,
+      });
+    }
+
+    // Check if user has credits (remaining + bonusCredits)
+    const totalAvailable = (aiCredits.remaining || 0) + (aiCredits.bonusCredits || 0);
+    if (totalAvailable <= 0) {
+      const renewsAt = renewsAtMs || getNextRenewalDate().getTime();
+      const daysUntilRenewal = Math.ceil((renewsAt - Date.now()) / (1000 * 60 * 60 * 24));
       return NextResponse.json(
-        { error: "Content is required" },
-        { status: 400 }
+        {
+          error: "credits_exhausted",
+          message: `Seus créditos de IA acabaram. Eles renovam em ${daysUntilRenewal} dia${daysUntilRenewal !== 1 ? 's' : ''}.`,
+          renewsAt,
+          daysUntilRenewal,
+        },
+        { status: 403 }
       );
     }
 
@@ -223,7 +316,26 @@ Tamanho: ${lengthGuide[length] || lengthGuide.medium}
       );
     }
 
-    return NextResponse.json({ alignedContent: text });
+    // ── Consume 1 AI credit ──
+    // First consume from monthly remaining, then from bonusCredits
+    const updateData: Record<string, unknown> = {
+      'aiCredits.totalUsed': FieldValue.increment(1),
+    };
+    if ((aiCredits.remaining || 0) > 0) {
+      updateData['aiCredits.remaining'] = FieldValue.increment(-1);
+    } else {
+      updateData['aiCredits.bonusCredits'] = FieldValue.increment(-1);
+    }
+    await userRef.update(updateData);
+
+    const newRemaining = (aiCredits.remaining || 0) > 0
+      ? (aiCredits.remaining - 1) + (aiCredits.bonusCredits || 0)
+      : (aiCredits.bonusCredits || 0) - 1;
+
+    return NextResponse.json({
+      alignedContent: text,
+      creditsRemaining: Math.max(0, newRemaining),
+    });
   } catch (error) {
     console.error("AI Generate error:", error);
     return NextResponse.json(

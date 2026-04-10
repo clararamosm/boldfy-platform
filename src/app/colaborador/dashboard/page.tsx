@@ -470,7 +470,7 @@ export default function ColaboradorDashboardPage() {
                 ) : null}
 
                 {/* Content Grid — Missions, Trails + Ranking sidebar */}
-                <div className="grid lg:grid-cols-[1fr_1fr_280px] md:grid-cols-2 gap-6">
+                <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-6">
                     {/* Active Missions */}
                     <Card>
                         <CardHeader className="pb-3">
@@ -570,7 +570,7 @@ export default function ColaboradorDashboardPage() {
 
                                     {/* Full list */}
                                     <div className="space-y-1.5">
-                                        {ranking.slice(0, 8).map((user, idx) => (
+                                        {ranking.slice(0, 10).map((user, idx) => (
                                             <div
                                                 key={user.id}
                                                 className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md ${user.isCurrentUser ? 'bg-primary/5' : ''} ${user.points === 0 ? 'opacity-40' : ''}`}

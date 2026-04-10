@@ -145,6 +145,19 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     });
     const companyId = companyRef.id;
 
+    // Seed default AI credits reward for the new company
+    await adminDb.collection('companies').doc(companyId).collection('rewards').add({
+      name: '10 Creditos de IA',
+      points: 150,
+      type: 'ai_credits',
+      creditsAmount: 10,
+      stock: 'Ilimitado',
+      status: 'Disponível',
+      imageUrl: null,
+      isDefault: true,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
     const userRecord = await adminAuth.createUser({
       email: adminEmail,
       displayName: adminName,
