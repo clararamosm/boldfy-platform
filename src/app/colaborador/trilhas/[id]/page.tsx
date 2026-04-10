@@ -1,482 +1,25 @@
 'use client';
 
-import DOMPurify from 'dompurify';
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { db, auth } from '@/lib/firebase';
-import {
-  collection, doc, getDocs, getDoc, setDoc, updateDoc,
-  query, orderBy, Timestamp, where, addDoc
-} from 'firebase/firestore';
-import { onAuthStateChanged, User } from 'firebase/auth';
 import { useParams, useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import {
-  Play, BookOpen, HelpCircle, Wrench, Target,
-  ArrowLeft, ArrowRight, Loader2, CheckCircle2,
-  Trophy, X, Eye, Rocket, Clock, Star, AlertCircle,
-  ChevronLeft, ChevronRight, Menu, Lock, SkipForward, Zap
-} from 'lucide-react';
-import type {
-  Trilha, Modulo, ModuloModo, ProgressoTrilha, QuestaoDesafio
-} from '@/types/trilhas';
-import { recalculatePoints } from '@/app/actions';
-import { getAuthToken } from '@/lib/auth-client';
 import { useT } from '@/lib/i18n/context';
-import { interpolate } from '@/lib/i18n';
-
-const MODO_ICONS: Record<ModuloModo, any> = {
-  aula: Play,
-  leitura: BookOpen,
-  desafio: HelpCircle,
-  faca_voce_mesmo: Wrench,
-  missao_conteudo: Target,
-};
-
-const DESAFIO_FAIXA_MIN = 0.6;
-const DESAFIO_FAIXA_BONUS = 0.8;
+import { useTrailPlayer } from '@/components/trilhas/player/use-trail-player';
+import { TrailIntroScreen } from '@/components/trilhas/player/trail-intro-screen';
+import { TrailConclusionScreen } from '@/components/trilhas/player/trail-conclusion-screen';
+import { TrailTopBar } from '@/components/trilhas/player/trail-top-bar';
+import { ModuleRenderer } from '@/components/trilhas/player/module-renderer';
+import { TrailBottomBar } from '@/components/trilhas/player/trail-bottom-bar';
 
 export default function TrilhaFullscreenPage() {
   const { id } = useParams();
   const router = useRouter();
-  const t = useT();
-  const tp = t.trailPlayer;
-  const MODO_LABELS: Record<ModuloModo, string> = {
-    aula: tp.modoAula,
-    leitura: tp.modoLeitura,
-    desafio: tp.modoDesafio,
-    faca_voce_mesmo: tp.modoPratica,
-    missao_conteudo: tp.modoMissao,
-  };
-  const [user, setUser] = useState<User | null>(null);
+  const tp = useT().trailPlayer;
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsubscribe();
-  }, []);
-  const [companyId, setCompanyId] = useState<string | null>(null);
-  const [trail, setTrail] = useState<Trilha | null>(null);
-  const [progress, setProgress] = useState<ProgressoTrilha | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeModuleIndex, setActiveModuleIndex] = useState<number | null>(null);
-  const [showIntro, setShowIntro] = useState(true);
-  const [showConclusion, setShowConclusion] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [reviewMode, setReviewMode] = useState(false);
+  const player = useTrailPlayer(id as string);
 
-  // Desafio state
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
-  const [answeredQuestions, setAnsweredQuestions] = useState<Set<number>>(new Set());
-  const [quizSubmitted, setQuizSubmitted] = useState(false);
-  const [quizScore, setQuizScore] = useState<{correct: number; total: number; percent: number; points: number} | null>(null);
-  const [alreadyAttempted, setAlreadyAttempted] = useState(false);
-
-  // Video state
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoProgress, setVideoProgress] = useState(0);
-  const [videoCompleted, setVideoCompleted] = useState(false);
-
-  // Load user company
-  useEffect(() => {
-    if (!user) return;
-    const loadUser = async () => {
-      const snap = await getDoc(doc(db, 'users', user.uid));
-      if (snap.exists()) setCompanyId(snap.data().companyId);
-    };
-    loadUser();
-  }, [user]);
-
-  // Load trail and progress
-  useEffect(() => {
-    if (!user || !companyId || !id) return;
-    const load = async () => {
-      setLoading(true);
-      try {
-        let trailData: Trilha | null = null;
-
-        // 1. Try activated global trail: look up sessionId from activatedGlobalTrails
-        const actDoc = await getDoc(doc(db, `companies/${companyId}/activatedGlobalTrails`, id as string));
-        if (actDoc.exists()) {
-          const sessionId = actDoc.data().sessionId;
-          if (sessionId) {
-            const globalSnap = await getDoc(doc(db, `globalSessions/${sessionId}/trails`, id as string));
-            if (globalSnap.exists()) {
-              trailData = { id: globalSnap.id, ...globalSnap.data() } as Trilha;
-            }
-          }
-        }
-
-        // 2. Try company custom trail (search through company sessions)
-        if (!trailData) {
-          const sessSnap = await getDocs(collection(db, `companies/${companyId}/sessions`));
-          for (const sessDoc of sessSnap.docs) {
-            const tDoc = await getDoc(doc(db, `companies/${companyId}/sessions/${sessDoc.id}/trails`, id as string));
-            if (tDoc.exists()) {
-              trailData = { id: tDoc.id, ...tDoc.data() } as Trilha;
-              break;
-            }
-          }
-        }
-
-        if (!trailData) {
-          const customSnap = await getDoc(doc(db, 'companies', companyId, 'trails', id as string));
-          if (customSnap.exists()) {
-            trailData = { id: customSnap.id, ...customSnap.data() } as Trilha;
-          }
-        }
-
-        if (!trailData) {
-          setLoading(false);
-          return;
-        }
-
-        // Sort modules by ordem
-        if (trailData.modulos) {
-          trailData.modulos.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-        }
-        setTrail(trailData);
-
-        // Load progress
-        const progSnap = await getDoc(
-          doc(db, 'users', user.uid, 'trailProgress', id as string)
-        );
-        if (progSnap.exists()) {
-          const p = progSnap.data() as ProgressoTrilha;
-          setProgress(p);
-          if (p.concluida) {
-            setShowConclusion(true);
-            setShowIntro(false);
-          }
-        } else {
-          // Create initial progress
-          const initial: ProgressoTrilha = {
-            modulosCompletos: [],
-            pontuacaoFixadaPorModulo: {},
-            primeirasTentativasDesafio: {},
-            concluida: false,
-            percentual: 0,
-            pontosGanhos: 0,
-            iniciadaEm: Timestamp.now(),
-          };
-          await setDoc(
-            doc(db, 'users', user.uid, 'trailProgress', id as string),
-            initial
-          );
-          setProgress(initial);
-        }
-      } catch (err) {
-        console.error('Error loading trail:', err);
-      }
-      setLoading(false);
-    };
-    load();
-  }, [user, companyId, id]);
-
-  // Computed values
-  const sortedModules = useMemo(() => {
-    return (trail?.modulos || []).map((m: Modulo) => ({
-      ...m,
-      id: m.id as string,
-      tipo: (m.modo || 'leitura') as ModuloModo,
-      conteudo: {
-        texto: m.conteudoHtml,
-        videoUrl: m.videoUrl,
-        materialPdfUrl: m.materialPdfUrl,
-        pontuacaoBase: m.pontuacaoBase,
-        pontuacaoBonus: m.pontuacaoBonus,
-        questoes: m.questoes,
-        instrucao: m.instrucaoCard,
-        exemplos: m.missaoGatilho?.exemplos,
-      },
-    }));
-  }, [trail]);
-  const completedCount = useMemo(() => progress?.modulosCompletos?.length || 0, [progress]);
-  const totalModules = sortedModules.length;
-  const progressPercent = totalModules > 0 ? Math.round((completedCount / totalModules) * 100) : 0;
-  const currentModule = activeModuleIndex !== null ? sortedModules[activeModuleIndex] : null;
-
-  const isModuleCompleted = useCallback((moduleId: string) => {
-    return progress?.modulosCompletos?.includes(moduleId) || false;
-  }, [progress]);
-
-  const canAccessModule = useCallback((index: number) => {
-    if (reviewMode) return true;
-    if (index === 0) return true;
-    const prevModule = sortedModules[index - 1];
-    if (!prevModule) return true;
-    return isModuleCompleted(prevModule.id);
-  }, [sortedModules, isModuleCompleted, reviewMode]);
-
-  // Save progress to Firestore
-  const saveProgress = useCallback(async (updatedProgress: ProgressoTrilha) => {
-    if (!user || !companyId || !id) return;
-    setSaving(true);
-    try {
-      await setDoc(
-        doc(db, 'users', user.uid, 'trailProgress', id as string),
-        updatedProgress,
-        { merge: true }
-      );
-      setProgress(updatedProgress);
-    } catch (err) {
-      console.error('Error saving progress:', err);
-    }
-    setSaving(false);
-  }, [user, companyId, id]);
-
-  // Complete a module
-  const completeModule = useCallback(async (moduleId: string, points: number) => {
-    if (!progress || !trail) return;
-    const alreadyDone = progress.modulosCompletos?.includes(moduleId);
-    if (alreadyDone) return;
-
-    const newCompleted = [...(progress.modulosCompletos || []), moduleId];
-    const newPointsMap = { ...progress.pontuacaoFixadaPorModulo, [moduleId]: points };
-    const totalPoints = Object.values(newPointsMap).reduce((a, b) => a + b, 0);
-    const newPercent = Math.round((newCompleted.length / sortedModules.length) * 100);
-
-    // Check if all modules are done (all modules are mandatory)
-    const allModulesDone = sortedModules.length > 0 && sortedModules.every(m => newCompleted.includes(m.id));
-
-    const updatedProgress: ProgressoTrilha = {
-      ...progress,
-      modulosCompletos: newCompleted,
-      pontuacaoFixadaPorModulo: newPointsMap,
-      pontosGanhos: totalPoints,
-      percentual: newPercent,
-    };
-
-    if (allModulesDone && !progress.concluida) {
-      updatedProgress.concluida = true;
-      updatedProgress.concluidaEm = Timestamp.now();
-      updatedProgress.pontosGanhos = totalPoints + (trail.pontuacaoBonus || 0);
-
-      // Register trail completion in pointsHistory
-      try {
-        await addDoc(collection(db, 'users', user!.uid, 'pointsHistory'), {
-          description: interpolate(tp.trailCompletedHistory, { title: trail.titulo }),
-          date: Timestamp.now(),
-          points: updatedProgress.pontosGanhos,
-          type: 'gain',
-          source: 'trilha',
-        });
-      } catch (err) {
-        console.error('Error adding trail to pointsHistory:', err);
-      }
-
-      // Create trigger mission if exists
-      if (trail.missaoGatilho) {
-        try {
-          const triggerNow = Timestamp.now();
-          const triggerDeadlineDays = trail.missaoGatilho.prazoDias || 14;
-          const triggerEndDate = new Date();
-          triggerEndDate.setDate(triggerEndDate.getDate() + triggerDeadlineDays);
-
-          await addDoc(collection(db, 'companies', companyId!, 'missions'), {
-            name: trail.missaoGatilho.titulo,
-            description: trail.missaoGatilho.descricao,
-            points: trail.missaoGatilho.pontos || 0,
-            type: 'trail_trigger',
-            status: 'active',
-            tag: 'Missao de Trilha',
-            trailId: id,
-            assignedTo: user!.uid,
-            requiresProof: trail.missaoGatilho.requerComprovante || false,
-            completionMode: trail.missaoGatilho.requerComprovante ? 'proof' : 'auto',
-            deadlineDays: triggerDeadlineDays,
-            startDate: triggerNow,
-            endDate: Timestamp.fromDate(triggerEndDate),
-            createdAt: triggerNow,
-          });
-        } catch (err) {
-          console.error('Error creating trigger mission:', err);
-        }
-      }
-    }
-
-    await saveProgress(updatedProgress);
-
-    // Recalculate user total points server-side
-    if (user) {
-      getAuthToken().then(token =>
-        recalculatePoints(token, user.uid)
-      ).catch(err =>
-        console.error('Error recalculating points:', err)
-      );
-    }
-
-    // Auto-advance or show conclusion
-    if (allModulesDone && updatedProgress.concluida) {
-      setShowConclusion(true);
-    }
-  }, [progress, trail, sortedModules, companyId, id, user, saveProgress]);
-
-  // Desafio logic
-  const handleAnswerSelect = (questionIndex: number, optionIndex: number) => {
-    if (answeredQuestions.has(questionIndex)) return;
-    setSelectedAnswers(prev => ({ ...prev, [questionIndex]: optionIndex }));
-  };
-
-  const handleConfirmAnswer = () => {
-    if (!currentModule || currentModule.tipo !== 'desafio') return;
-    const questions = currentModule.conteudo?.questoes || [];
-    const q = questions[currentQuestionIndex];
-    if (!q) return;
-    setAnsweredQuestions(prev => new Set(prev).add(currentQuestionIndex));
-  };
-
-  const handleNextQuestion = () => {
-    if (!currentModule) return;
-    const questions = currentModule.conteudo?.questoes || [];
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-    }
-  };
-
-  const handleSubmitDesafio = async () => {
-    if (!currentModule || !progress) return;
-    const questions = currentModule.conteudo?.questoes || [];
-    const total = questions.length;
-    let correct = 0;
-    questions.forEach((q: QuestaoDesafio, i: number) => {
-      if (selectedAnswers[i] === q.respostaCorreta) correct++;
-    });
-    const percent = total > 0 ? correct / total : 0;
-
-    let points = 0;
-    const basePoints = currentModule.conteudo?.pontuacaoBase || 0;
-    const bonusPoints = currentModule.conteudo?.pontuacaoBonus || 0;
-    if (percent >= DESAFIO_FAIXA_BONUS) {
-      points = basePoints + bonusPoints;
-    } else if (percent >= DESAFIO_FAIXA_MIN) {
-      points = basePoints;
-    }
-
-    setQuizScore({ correct, total, percent: Math.round(percent * 100), points });
-    setQuizSubmitted(true);
-
-    // Save first attempt
-    const newAttempts = {
-      ...progress.primeirasTentativasDesafio,
-      [currentModule.id]: { percentual: Math.round(percent * 100), pontos: points }
-    };
-    const updatedProgress = { ...progress, primeirasTentativasDesafio: newAttempts };
-    setProgress(updatedProgress);
-
-    await completeModule(currentModule.id, points);
-  };
-
-  // Unlock mission (missao_conteudo)
-  const handleUnlockMission = async () => {
-    if (!currentModule || !user || !companyId) return;
-    setSaving(true);
-    try {
-      const now = Timestamp.now();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 14);
-
-      const missionPoints = currentModule.missaoGatilho?.pontosRecompensa
-        || currentModule.conteudo?.pontuacaoBase
-        || 0;
-
-      await addDoc(collection(db, 'companies', companyId, 'missions'), {
-        name: currentModule.titulo || 'Missao de Trilha',
-        description: currentModule.conteudo?.instrucao || '',
-        points: missionPoints,
-        type: 'trail_content',
-        status: 'active',
-        tag: 'Missao de Trilha',
-        trailId: id,
-        moduleId: currentModule.id,
-        assignedTo: user.uid,
-        completionMode: 'proof',
-        startDate: now,
-        endDate: Timestamp.fromDate(endDate),
-        deadlineDays: 14,
-        createdAt: now,
-      });
-      await completeModule(currentModule.id, 0);
-    } catch (err) {
-      console.error('Error creating mission:', err);
-    }
-    setSaving(false);
-  };
-
-  // Navigation
-  const startTrail = () => {
-    setShowIntro(false);
-    if (progress && progress.modulosCompletos?.length > 0) {
-      const lastCompleted = progress.modulosCompletos[progress.modulosCompletos.length - 1];
-      const lastIndex = sortedModules.findIndex(m => m.id === lastCompleted);
-      const nextIndex = lastIndex + 1 < sortedModules.length ? lastIndex + 1 : lastIndex;
-      setActiveModuleIndex(nextIndex);
-    } else {
-      setActiveModuleIndex(0);
-    }
-    resetModuleState();
-  };
-
-  const goToModule = (index: number) => {
-    if (!canAccessModule(index)) return;
-    setActiveModuleIndex(index);
-    resetModuleState();
-    setSidebarOpen(false);
-  };
-
-  const goNext = () => {
-    if (activeModuleIndex === null) return;
-    const next = activeModuleIndex + 1;
-    if (next < sortedModules.length && canAccessModule(next)) {
-      setActiveModuleIndex(next);
-      resetModuleState();
-    } else if (reviewMode && next >= sortedModules.length) {
-      setReviewMode(false);
-      setShowConclusion(true);
-    }
-  };
-
-  const goPrev = () => {
-    if (activeModuleIndex === null || activeModuleIndex === 0) return;
-    setActiveModuleIndex(activeModuleIndex - 1);
-    resetModuleState();
-  };
-
-  const resetModuleState = () => {
-    setCurrentQuestionIndex(0);
-    setSelectedAnswers({});
-    setAnsweredQuestions(new Set());
-    setQuizSubmitted(false);
-    setQuizScore(null);
-    setAlreadyAttempted(false);
-    setVideoProgress(0);
-    setVideoCompleted(false);
-  };
-
-  // Check if desafio already attempted
-  useEffect(() => {
-    if (!currentModule || !progress) return;
-    if (currentModule.tipo === 'desafio' && progress.primeirasTentativasDesafio?.[currentModule.id]) {
-      setAlreadyAttempted(true);
-      const attempt = progress.primeirasTentativasDesafio[currentModule.id];
-      setQuizScore({ correct: 0, total: 0, percent: attempt.percentual || attempt.percentualAcerto || 0, points: attempt.pontos || attempt.pontosGanhos || 0 });
-    }
-  }, [currentModule, progress]);
-
-  // Video progress tracking
-  const handleVideoTimeUpdate = () => {
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    const percent = video.duration > 0 ? (video.currentTime / video.duration) * 100 : 0;
-    setVideoProgress(percent);
-    if (percent >= 80) setVideoCompleted(true);
-  };
-
-  // RENDER
-  if (loading) {
+  // Loading
+  if (player.loading) {
     return (
       <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
         <div className="text-center space-y-4">
@@ -487,7 +30,8 @@ export default function TrilhaFullscreenPage() {
     );
   }
 
-  if (!trail) {
+  // Not found
+  if (!player.trail) {
     return (
       <div className="fixed inset-0 bg-background flex items-center justify-center z-50">
         <div className="text-center space-y-4">
@@ -501,582 +45,92 @@ export default function TrilhaFullscreenPage() {
     );
   }
 
-  // INTRO SCREEN
-  if (showIntro && !showConclusion) {
-    const hasStarted = (progress?.modulosCompletos?.length || 0) > 0;
+  // Intro screen
+  if (player.showIntro && !player.showConclusion) {
     return (
-      <div className="fixed inset-0 bg-background z-50 overflow-auto">
-        <div className="max-w-2xl mx-auto px-4 py-12">
-          <Button variant="ghost" onClick={() => router.push('/colaborador/trilhas')} className="mb-8">
-            <ArrowLeft className="mr-2 h-4 w-4" /> {tp.backToTrails}
-          </Button>
-
-          <Card>
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <BookOpen className="h-8 w-8 text-primary" />
-              </div>
-              <CardTitle className="text-2xl">{trail.titulo}</CardTitle>
-              {trail.descricao && (
-                <CardDescription className="text-base mt-2">{trail.descricao}</CardDescription>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center gap-1 text-2xl font-bold text-primary">
-                    <Zap className="h-5 w-5 text-yellow-500" />
-                    {trail.pontuacaoTotal || 0}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{tp.pointsAvailable}</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center gap-1 text-2xl font-bold">
-                    <BookOpen className="h-5 w-5" />
-                    {sortedModules.length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{tp.modulesLabel}</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-center gap-1 text-2xl font-bold">
-                    <Clock className="h-5 w-5" />
-                    {trail.tempoEstimadoMin || '?'}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{tp.minutesLabel}</p>
-                </div>
-              </div>
-
-              {hasStarted && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>{tp.progress}</span>
-                    <span>{interpolate(tp.modulesCount, { done: completedCount, total: totalModules })}</span>
-                  </div>
-                  <Progress value={progressPercent} className="h-2" />
-                </div>
-              )}
-
-              {trail.pontuacaoBonus > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
-                  <p className="text-sm text-amber-800">
-                    <Trophy className="inline h-4 w-4 mr-1" />
-                    {interpolate(tp.completionBonus, { points: trail.pontuacaoBonus })}
-                  </p>
-                </div>
-              )}
-
-              <Button className="w-full" size="lg" onClick={startTrail}>
-                {hasStarted ? (
-                  <><ArrowRight className="mr-2 h-5 w-5" /> {tp.continueTrail}</>
-                ) : (
-                  <><Rocket className="mr-2 h-5 w-5" /> {tp.startTrail}</>
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <TrailIntroScreen
+        trail={player.trail}
+        sortedModulesCount={player.sortedModules.length}
+        completedCount={player.completedCount}
+        totalModules={player.totalModules}
+        progressPercent={player.progressPercent}
+        onStart={player.startTrail}
+        onBack={() => router.push('/colaborador/trilhas')}
+      />
     );
   }
 
-  // CONCLUSION SCREEN
-  if (showConclusion && trail) {
-    const modulePoints = progress?.pontosGanhos ? progress.pontosGanhos - (trail.pontuacaoBonus || 0) : 0;
+  // Conclusion screen
+  if (player.showConclusion && player.trail) {
     return (
-      <div className="fixed inset-0 bg-background z-50 overflow-auto">
-        <div className="max-w-2xl mx-auto px-4 py-12">
-          <Card className="border-green-200 bg-green-50/50">
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4">
-                <Trophy className="h-10 w-10 text-green-600" />
-              </div>
-              <CardTitle className="text-2xl text-green-800">{tp.trailCompleted}</CardTitle>
-              <CardDescription className="text-green-700 text-base">
-                {interpolate(tp.congratulations, { title: trail.titulo })}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="bg-white rounded-lg p-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">{tp.modulePoints}</span>
-                  <span className="font-semibold">{modulePoints > 0 ? modulePoints : 0}</span>
-                </div>
-                {trail.pontuacaoBonus > 0 && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">{tp.completionBonusLabel}</span>
-                    <span className="font-semibold text-amber-600">+{trail.pontuacaoBonus}</span>
-                  </div>
-                )}
-                <hr />
-                <div className="flex justify-between items-center text-lg">
-                  <span className="font-bold">{tp.total}</span>
-                  <span className="font-bold text-primary">{interpolate(tp.pointsValue, { points: progress?.pontosGanhos || 0 })}</span>
-                </div>
-              </div>
-
-              {trail.missaoGatilho && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-                  <Rocket className="h-6 w-6 text-blue-600 mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-blue-800">{tp.newMissionCreated}</p>
-                  <Button
-                    variant="outline"
-                    className="mt-2 border-blue-300 text-blue-700"
-                    onClick={() => router.push('/colaborador/missoes')}
-                  >
-                    {tp.viewMissions}
-                  </Button>
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => router.push('/colaborador/trilhas')}
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" /> {tp.backToTrails}
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={() => {
-                    setReviewMode(true);
-                    setShowConclusion(false);
-                    setShowIntro(false);
-                    setActiveModuleIndex(0);
-                    resetModuleState();
-                  }}
-                >
-                  <BookOpen className="mr-2 h-4 w-4" /> {tp.reviewTrail}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <TrailConclusionScreen
+        trail={player.trail}
+        progress={player.progress}
+        onBack={() => router.push('/colaborador/trilhas')}
+        onReview={player.enterReviewMode}
+        onGoToMissions={() => router.push('/colaborador/missoes')}
+      />
     );
   }
 
-  // FULLSCREEN MODULE VIEW
-  if (!currentModule) return null;
-  const ModoIcon = MODO_ICONS[currentModule.tipo] || BookOpen;
-  const moduleCompleted = isModuleCompleted(currentModule.id);
+  // Module view
+  if (!player.currentModule) return null;
+  const moduleCompleted = player.isModuleCompleted(player.currentModule.id);
 
   return (
     <div className="fixed inset-0 bg-background z-50 flex flex-col">
-      {/* Top bar */}
-      <div className="h-14 border-b bg-card flex items-center justify-between px-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => setSidebarOpen(!sidebarOpen)}>
-            <Menu className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => { setReviewMode(false); router.push('/colaborador/trilhas'); }}>
-            <X className="h-5 w-5" />
-          </Button>
-          <span className="text-sm font-medium hidden sm:inline">{trail.titulo}</span>
-          {reviewMode && (
-            <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-xs">
-              {tp.reviewMode}
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex-1 max-w-md mx-4">
-          <Progress value={progressPercent} className="h-2" />
-        </div>
-
-        <div className="flex items-center gap-2 text-sm">
-          <Badge variant="outline">
-            <ModoIcon className="h-3 w-3 mr-1" />
-            {MODO_LABELS[currentModule.tipo]}
-          </Badge>
-          {currentModule.tipo !== 'faca_voce_mesmo' && currentModule.tipo !== 'missao_conteudo' && (
-            <Badge variant="secondary">
-              <Star className="h-3 w-3 mr-1" />
-              {currentModule.tipo === 'desafio'
-                ? (currentModule.conteudo?.pontuacaoBase || 0) + ' ' + tp.points
-                : (currentModule.pontuacaoBase || 0) + ' ' + tp.points}
-            </Badge>
-          )}
-          {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-        </div>
-      </div>
+      <TrailTopBar
+        trailTitle={player.trail.titulo}
+        currentModule={player.currentModule}
+        progressPercent={player.progressPercent}
+        reviewMode={player.reviewMode}
+        sidebarOpen={player.sidebarOpen}
+        saving={player.saving}
+        sortedModules={player.sortedModules}
+        activeModuleIndex={player.activeModuleIndex}
+        isModuleCompleted={player.isModuleCompleted}
+        canAccessModule={player.canAccessModule}
+        onToggleSidebar={() => player.setSidebarOpen(!player.sidebarOpen)}
+        onClose={() => { router.push('/colaborador/trilhas'); }}
+        onGoToModule={player.goToModule}
+      />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        {sidebarOpen && (
-          <div className="w-72 border-r bg-card overflow-y-auto shrink-0">
-            <div className="p-4 space-y-1">
-              <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">{tp.modulesLabel}</p>
-              {sortedModules.map((mod, idx) => {
-                const Icon = MODO_ICONS[mod.tipo] || BookOpen;
-                const completed = isModuleCompleted(mod.id);
-                const active = idx === activeModuleIndex;
-                const locked = !canAccessModule(idx);
-                return (
-                  <button
-                    key={mod.id}
-                    onClick={() => goToModule(idx)}
-                    disabled={locked}
-                    className={`flex items-center gap-3 w-full text-left p-2.5 rounded-lg text-sm transition-colors ${
-                      active ? 'bg-primary/10 text-primary font-medium' :
-                      completed ? 'text-green-700 hover:bg-green-50' :
-                      locked ? 'text-muted-foreground/50 cursor-not-allowed' :
-                      'hover:bg-muted'
-                    }`}
-                  >
-                    <div className={`flex h-7 w-7 items-center justify-center rounded-full shrink-0 ${
-                      completed ? 'bg-green-100 text-green-700' :
-                      active ? 'bg-primary/20 text-primary' :
-                      locked ? 'bg-muted text-muted-foreground/50' :
-                      'bg-muted'
-                    }`}>
-                      {completed ? <CheckCircle2 className="h-4 w-4" /> :
-                       locked ? <Lock className="h-3 w-3" /> :
-                       <Icon className="h-3.5 w-3.5" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="truncate">{mod.titulo}</p>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        {!mod.obrigatorio && (
-                          <span className="text-xs text-muted-foreground">{tp.optional}</span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Main content area */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-3xl mx-auto p-6 pb-32">
-
-            {/* MODULE: AULA (video) */}
-            {currentModule.tipo === 'aula' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
-                  {moduleCompleted && (
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                  {currentModule.conteudo?.videoUrl ? (
-                    currentModule.conteudo.videoUrl.includes('youtube') || currentModule.conteudo.videoUrl.includes('youtu.be') || currentModule.conteudo.videoUrl.includes('vimeo') ? (
-                      <iframe
-                        src={currentModule.conteudo.videoUrl}
-                        className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    ) : (
-                      <video
-                        ref={videoRef}
-                        src={currentModule.conteudo.videoUrl}
-                        controls
-                        className="w-full h-full"
-                        onTimeUpdate={handleVideoTimeUpdate}
-                      />
-                    )
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-white/50">
-                      <Play className="h-16 w-16" />
-                    </div>
-                  )}
-                </div>
-
-                {!moduleCompleted && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>{tp.videoProgress}</span>
-                      <span>{Math.round(videoProgress)}%</span>
-                    </div>
-                    <Progress value={videoProgress} className="h-2" />
-                    <p className="text-xs text-muted-foreground">{tp.videoMinWatch}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* MODULE: LEITURA */}
-            {currentModule.tipo === 'leitura' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
-                  {moduleCompleted && (
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
-                    </Badge>
-                  )}
-                </div>
-                <div
-                  className="prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentModule.conteudo?.texto || `<p>${tp.contentUnavailable}</p>`) }}
-                />
-              </div>
-            )}
-
-            {/* MODULE: DESAFIO */}
-            {currentModule.tipo === 'desafio' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
-                  {moduleCompleted && (
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
-                    </Badge>
-                  )}
-                </div>
-
-                {alreadyAttempted && !quizSubmitted ? (
-                  <Card className="border-amber-200 bg-amber-50">
-                    <CardContent className="p-6 text-center space-y-3">
-                      <AlertCircle className="h-8 w-8 text-amber-600 mx-auto" />
-                      <p className="font-semibold text-amber-800">{tp.scoreAlreadyFixed}</p>
-                      <p className="text-sm text-amber-700">
-                        {tp.alreadyAttemptedMsg}
-                        {quizScore && <strong> {quizScore.percent}% = {quizScore.points} {tp.points}</strong>}
-                      </p>
-                      <p className="text-xs text-amber-600">{tp.alreadyAttemptedNote}</p>
-                    </CardContent>
-                  </Card>
-                ) : quizSubmitted && quizScore ? (
-                  <Card className="border-green-200 bg-green-50">
-                    <CardContent className="p-6 text-center space-y-4">
-                      <Trophy className="h-10 w-10 text-green-600 mx-auto" />
-                      <p className="text-xl font-bold text-green-800">{tp.challengeResult}</p>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <p className="text-2xl font-bold">{quizScore.correct}/{quizScore.total}</p>
-                          <p className="text-xs text-muted-foreground">{tp.correctAnswers}</p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold">{quizScore.percent}%</p>
-                          <p className="text-xs text-muted-foreground">{tp.percentage}</p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-primary">{quizScore.points}</p>
-                          <p className="text-xs text-muted-foreground">{tp.pointsLabel}</p>
-                        </div>
-                      </div>
-                      {quizScore.percent < 60 && (
-                        <p className="text-sm text-red-600">{tp.belowMinimum}</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <>
-                    {/* Question by question */}
-                    {(() => {
-                      const questions = currentModule.conteudo?.questoes || [];
-                      const q = questions[currentQuestionIndex];
-                      if (!q) return <p>{tp.noQuestions}</p>;
-                      const isAnswered = answeredQuestions.has(currentQuestionIndex);
-                      const selectedIdx = selectedAnswers[currentQuestionIndex];
-                      const isCorrect = selectedIdx === q.respostaCorreta;
-
-                      return (
-                        <div className="space-y-4">
-                          <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>{interpolate(tp.questionOf, { current: currentQuestionIndex + 1, total: questions.length })}</span>
-                            <Progress value={((currentQuestionIndex + 1) / questions.length) * 100} className="w-24 h-2" />
-                          </div>
-
-                          <Card>
-                            <CardContent className="p-6">
-                              <p className="text-lg font-semibold mb-4">{q.enunciado}</p>
-                              <div className="space-y-2">
-                                {q.opcoes?.map((opt: string, oi: number) => {
-                                  let style = 'border-border hover:bg-muted cursor-pointer';
-                                  if (isAnswered) {
-                                    if (oi === q.respostaCorreta) style = 'border-green-500 bg-green-50';
-                                    else if (oi === selectedIdx && oi !== q.respostaCorreta) style = 'border-red-500 bg-red-50';
-                                    else style = 'border-border opacity-50';
-                                  } else if (selectedIdx === oi) {
-                                    style = 'border-primary bg-primary/5';
-                                  }
-                                  return (
-                                    <button
-                                      key={oi}
-                                      onClick={() => handleAnswerSelect(currentQuestionIndex, oi)}
-                                      disabled={isAnswered}
-                                      className={`w-full text-left p-3 rounded-lg border-2 transition-colors ${style}`}
-                                    >
-                                      <span className="text-sm">{opt}</span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-
-                              {isAnswered && (
-                                <div className={`mt-4 p-3 rounded-lg ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                                  <p className={`text-sm font-semibold ${isCorrect ? 'text-green-800' : 'text-red-800'}`}>
-                                    {isCorrect ? tp.correct : tp.incorrect}
-                                  </p>
-                                  {q.explicacao && (
-                                    <p className="text-sm text-muted-foreground mt-1">{q.explicacao}</p>
-                                  )}
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
-
-                          <div className="flex justify-between">
-                            {!isAnswered ? (
-                              <Button
-                                onClick={handleConfirmAnswer}
-                                disabled={selectedIdx === undefined}
-                              >
-                                {tp.confirmAnswer}
-                              </Button>
-                            ) : currentQuestionIndex < questions.length - 1 ? (
-                              <Button onClick={handleNextQuestion}>
-                                {tp.nextQuestion} <ChevronRight className="ml-2 h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button onClick={handleSubmitDesafio}>
-                                <Trophy className="mr-2 h-4 w-4" /> {tp.viewResult}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* MODULE: FACA VOCE MESMO */}
-            {currentModule.tipo === 'faca_voce_mesmo' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
-                  {moduleCompleted && (
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
-                    </Badge>
-                  )}
-                </div>
-                <Card className="border-amber-200">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-3">
-                      <Wrench className="h-6 w-6 text-amber-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-amber-800 mb-2">{tp.practice}</p>
-                        <p className="text-sm whitespace-pre-wrap">{currentModule.conteudo?.instrucao || tp.followInstructions}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <p className="text-xs text-muted-foreground text-center">
-                  {tp.noPointsModule}
-                </p>
-              </div>
-            )}
-
-            {/* MODULE: MISSAO CONTEUDO */}
-            {currentModule.tipo === 'missao_conteudo' && (
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
-                  {moduleCompleted && (
-                    <Badge className="bg-green-100 text-green-800">
-                      <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.missionUnlocked}
-                    </Badge>
-                  )}
-                </div>
-                <Card className="border-blue-200">
-                  <CardContent className="p-6 space-y-4">
-                    <div className="flex items-start gap-3">
-                      <Target className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold text-blue-800 mb-2">{tp.contentMission}</p>
-                        <p className="text-sm whitespace-pre-wrap">{currentModule.conteudo?.instrucao || ''}</p>
-                      </div>
-                    </div>
-                    {currentModule.conteudo?.exemplos && (
-                      <div className="bg-blue-50 rounded-lg p-4">
-                        <p className="text-xs font-semibold text-blue-700 uppercase mb-2">{tp.examples}</p>
-                        <p className="text-sm whitespace-pre-wrap">{currentModule.conteudo.exemplos}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-                <p className="text-xs text-muted-foreground text-center">
-                  {tp.noPointsMission}
-                </p>
-              </div>
-            )}
-
+            <ModuleRenderer
+              currentModule={player.currentModule}
+              moduleCompleted={moduleCompleted}
+              videoRef={player.videoRef}
+              videoProgress={player.videoProgress}
+              onVideoTimeUpdate={player.handleVideoTimeUpdate}
+              currentQuestionIndex={player.currentQuestionIndex}
+              selectedAnswers={player.selectedAnswers}
+              answeredQuestions={player.answeredQuestions}
+              quizSubmitted={player.quizSubmitted}
+              quizScore={player.quizScore}
+              alreadyAttempted={player.alreadyAttempted}
+              onAnswerSelect={player.handleAnswerSelect}
+              onConfirmAnswer={player.handleConfirmAnswer}
+              onNextQuestion={player.handleNextQuestion}
+              onSubmitDesafio={player.handleSubmitDesafio}
+            />
           </div>
 
-          {/* Bottom action bar */}
-          <div className="fixed bottom-0 left-0 right-0 bg-card border-t p-4 z-10">
-            <div className="max-w-3xl mx-auto flex items-center justify-between">
-              <Button variant="outline" size="sm" onClick={goPrev} disabled={activeModuleIndex === 0}>
-                <ChevronLeft className="mr-1 h-4 w-4" /> {tp.previous}
-              </Button>
-
-              <div className="flex items-center gap-2">
-                {!moduleCompleted && !quizSubmitted && (
-                  <>
-                    {/* Action button per mode */}
-                    {currentModule.tipo === 'aula' && (
-                      <Button
-                        onClick={() => completeModule(currentModule.id, currentModule.pontuacaoBase || 0)}
-                        disabled={!videoCompleted && !(currentModule.conteudo?.videoUrl?.includes('youtube') || currentModule.conteudo?.videoUrl?.includes('vimeo'))}
-                      >
-                        <CheckCircle2 className="mr-2 h-4 w-4" /> {tp.moduleCompleted}
-                      </Button>
-                    )}
-                    {currentModule.tipo === 'leitura' && (
-                      <Button onClick={() => completeModule(currentModule.id, currentModule.pontuacaoBase || 0)}>
-                        <CheckCircle2 className="mr-2 h-4 w-4" /> {tp.readingCompleted}
-                      </Button>
-                    )}
-                    {currentModule.tipo === 'faca_voce_mesmo' && (
-                      <Button onClick={() => completeModule(currentModule.id, 0)}>
-                        <Eye className="mr-2 h-4 w-4" /> {tp.viewed}
-                      </Button>
-                    )}
-                    {currentModule.tipo === 'missao_conteudo' && (
-                      <Button onClick={handleUnlockMission} disabled={saving}>
-                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
-                        {tp.unlockMission}
-                      </Button>
-                    )}
-                    {/* Skip button for optional modules */}
-                    {!currentModule.obrigatorio && currentModule.tipo !== 'desafio' && (
-                      <Button variant="ghost" size="sm" onClick={goNext}>
-                        <SkipForward className="mr-1 h-4 w-4" /> {tp.skip}
-                      </Button>
-                    )}
-                  </>
-                )}
-
-                {moduleCompleted && (
-                  <Badge variant="outline" className="text-green-700 border-green-300">
-                    <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
-                  </Badge>
-                )}
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goNext}
-                disabled={activeModuleIndex === null || activeModuleIndex >= sortedModules.length - 1}
-              >
-                {tp.next} <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          <TrailBottomBar
+            currentModule={player.currentModule}
+            moduleCompleted={moduleCompleted}
+            quizSubmitted={player.quizSubmitted}
+            saving={player.saving}
+            videoCompleted={player.videoCompleted}
+            activeModuleIndex={player.activeModuleIndex}
+            totalModules={player.totalModules}
+            onPrev={player.goPrev}
+            onNext={player.goNext}
+            onCompleteModule={player.completeModule}
+            onUnlockMission={player.handleUnlockMission}
+          />
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@
 
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle, Upload, Clock, Zap, CalendarDays, Loader2, History, XCircle, AlertCircle, HourglassIcon, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,16 @@ const toDate = (d: any): Date | null => {
     return d.toDate ? d.toDate() : new Date(d);
 };
 
+// ---- Status visual config ----
+const STATUS_STYLES: Record<MissionStatus, { border: string; badgeClass: string; badgeIcon: React.ReactNode; badgeText?: string }> = {
+    pendente: { border: 'border-l-primary', badgeClass: '', badgeIcon: null },
+    aguardando: { border: 'border-l-amber-400', badgeClass: 'bg-amber-100 text-amber-700 border-amber-200', badgeIcon: <HourglassIcon className="h-3 w-3" /> },
+    rejeitada: { border: 'border-l-red-400', badgeClass: 'bg-red-100 text-red-700 border-red-200', badgeIcon: <XCircle className="h-3 w-3" /> },
+    agendada: { border: 'border-l-blue-400', badgeClass: 'bg-blue-100 text-blue-700 border-blue-200', badgeIcon: <Clock className="h-3 w-3" /> },
+    completa: { border: 'border-l-green-400', badgeClass: 'bg-green-100 text-green-700 border-green-200', badgeIcon: <CheckCircle className="h-3 w-3" /> },
+    expirada: { border: 'border-l-gray-300', badgeClass: 'bg-gray-100 text-gray-500 border-gray-200', badgeIcon: <Clock className="h-3 w-3" /> },
+};
+
 // ---- Sub-components ----
 const MissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: { mission: Mission, onSubmitProof: (missionId: string, file: File) => Promise<void>, onAutoComplete: (missionId: string) => Promise<void>, isSubmitting: boolean }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -64,34 +74,36 @@ const MissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: {
         setDialogOpen(false);
     };
 
-    const statusConfig: Record<MissionStatus, { icon: React.ReactNode; text: string; color: string; badge?: string; badgeClass?: string; button: React.ReactNode }> = {
-        completa: {
-            icon: <CheckCircle className="h-4 w-4 mr-2" />,
-            text: t.colabMissions.completed,
-            color: "text-green-600",
-            badge: t.colabMissions.completed,
-            badgeClass: "bg-green-100 text-green-700",
-            button: <Button disabled variant="secondary"><CheckCircle className="mr-2 h-4 w-4" />{t.colabMissions.completedButton}</Button>
-        },
-        aguardando: {
-            icon: <HourglassIcon className="h-4 w-4 mr-2" />,
-            text: t.colabMissions.waitingApproval,
-            color: "text-yellow-600",
-            badge: t.colabMissions.waiting,
-            badgeClass: "bg-yellow-100 text-yellow-700",
-            button: <Button disabled variant="outline"><HourglassIcon className="mr-2 h-4 w-4" />{t.colabMissions.waitingApproval}</Button>
-        },
-        rejeitada: {
-            icon: <XCircle className="h-4 w-4 mr-2" />,
-            text: mission.submissionFeedback ? t.colabMissions.rejectionReason.replace('{feedback}', mission.submissionFeedback) : t.colabMissions.rejected,
-            color: "text-red-600",
-            badge: t.colabMissions.rejected,
-            badgeClass: "bg-red-100 text-red-700",
-            button: (
+    const style = STATUS_STYLES[mission.status];
+    const isHistory = mission.status === 'completa' || mission.status === 'expirada';
+
+    const statusBadgeText: Record<MissionStatus, string> = {
+        pendente: '',
+        aguardando: t.colabMissions.waiting,
+        rejeitada: t.colabMissions.rejected,
+        agendada: t.colabMissions.scheduled,
+        completa: t.colabMissions.completed,
+        expirada: t.colabMissions.expired,
+    };
+
+    // Action button (compact)
+    const renderAction = () => {
+        if (isHistory) return null;
+
+        if (mission.status === 'agendada') return null;
+
+        if (mission.status === 'aguardando') return null;
+
+        if (mission.status === 'rejeitada') {
+            return (
                 <ActionDialog
                     title={t.colabMissions.resubmitProof}
                     description={t.colabMissions.resubmitDescription.replace('{name}', mission.name)}
-                    trigger={<Button variant="destructive"><Upload className="mr-2 h-4 w-4" /> {t.colabMissions.resubmitProof}</Button>}
+                    trigger={
+                        <Button size="sm" variant="destructive" className="h-8 text-xs">
+                            <Upload className="mr-1.5 h-3.5 w-3.5" /> {t.colabMissions.resubmitProof}
+                        </Button>
+                    }
                     actionText={selectedFile ? t.colabMissions.submitProof : t.colabMissions.selectFile}
                     onAction={handleSubmit}
                     showCancel
@@ -109,117 +121,120 @@ const MissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: {
                         )}
                     </div>
                 </ActionDialog>
-            )
-        },
-        pendente: {
-            icon: null,
-            text: mission.completionMode === 'auto' ? "" : "",
-            color: "",
-            button: mission.completionMode === 'auto' ? (
-                <Button onClick={() => onAutoComplete(mission.id)} disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+            );
+        }
+
+        // pendente
+        if (mission.completionMode === 'auto') {
+            return (
+                <Button size="sm" className="h-8 text-xs" onClick={() => onAutoComplete(mission.id)} disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="mr-1.5 h-3.5 w-3.5" />}
                     {t.colabMissions.conclude}
                 </Button>
-            ) : (
-                <ActionDialog
-                    title={t.colabMissions.submitProofTitle}
-                    description={t.colabMissions.submitProofDescription.replace('{name}', mission.name)}
-                    trigger={<Button><Upload className="mr-2 h-4 w-4" /> {t.colabMissions.submitProof}</Button>}
-                    actionText={selectedFile ? t.colabMissions.submitProof : t.colabMissions.selectFile}
-                    onAction={handleSubmit}
-                    showCancel
-                    open={dialogOpen}
-                    onOpenChange={setDialogOpen}
-                >
-                    <div className="space-y-2">
-                        <Label htmlFor={`file-${mission.id}`} className="sr-only">{t.colabMissions.fileLabel}</Label>
-                        <Input id={`file-${mission.id}`} type="file" accept="image/*,video/*,.pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} disabled={isSubmitting} />
-                        <p className="text-xs text-muted-foreground">{t.colabMissions.fileHelp}</p>
-                    </div>
-                </ActionDialog>
-            )
-        },
-        agendada: {
-            icon: <Clock className="h-4 w-4 mr-2" />,
-            text: t.colabMissions.scheduled,
-            color: "text-blue-600",
-            badge: t.colabMissions.scheduled,
-            badgeClass: "bg-blue-100 text-blue-700",
-            button: <Button disabled variant="outline">{t.colabMissions.scheduledButton}</Button>
-        },
-        expirada: {
-            icon: <Clock className="h-4 w-4 mr-2" />,
-            text: t.colabMissions.expired,
-            color: "text-muted-foreground",
-            badge: t.colabMissions.expired,
-            badgeClass: "bg-gray-100 text-gray-600",
-            button: <Button disabled variant="outline">{t.colabMissions.expired}</Button>
-        },
+            );
+        }
+
+        return (
+            <ActionDialog
+                title={t.colabMissions.submitProofTitle}
+                description={t.colabMissions.submitProofDescription.replace('{name}', mission.name)}
+                trigger={
+                    <Button size="sm" className="h-8 text-xs">
+                        <Upload className="mr-1.5 h-3.5 w-3.5" /> {t.colabMissions.submitProof}
+                    </Button>
+                }
+                actionText={selectedFile ? t.colabMissions.submitProof : t.colabMissions.selectFile}
+                onAction={handleSubmit}
+                showCancel
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+            >
+                <div className="space-y-2">
+                    <Label htmlFor={`file-${mission.id}`} className="sr-only">{t.colabMissions.fileLabel}</Label>
+                    <Input id={`file-${mission.id}`} type="file" accept="image/*,video/*,.pdf" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} disabled={isSubmitting} />
+                    <p className="text-xs text-muted-foreground">{t.colabMissions.fileHelp}</p>
+                </div>
+            </ActionDialog>
+        );
     };
 
-    const cfg = statusConfig[mission.status];
-    const isHistory = mission.status === 'completa' || mission.status === 'expirada';
-
     return (
-        <Card className={isHistory ? 'opacity-80' : ''}>
-            <CardHeader>
-                <div className="flex justify-between items-start gap-4">
-                    <CardTitle className="font-headline text-lg">{mission.name}</CardTitle>
-                    <div className="flex items-center gap-2 shrink-0">
-                        {cfg.badge && (
-                            <Badge variant="secondary" className={cfg.badgeClass}>
-                                {cfg.badge}
+        <Card className={`border-l-4 ${style.border} ${isHistory ? 'opacity-60' : ''} transition-all hover:shadow-sm`}>
+            <div className="p-4 space-y-2.5">
+                {/* Row 1: Title + Points */}
+                <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-headline text-sm font-semibold leading-tight line-clamp-1">{mission.name}</h3>
+                    <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0 text-xs h-6">
+                        <Zap className="h-3 w-3 mr-1" /> {mission.points} pts
+                    </Badge>
+                </div>
+
+                {/* Row 2: Description (compact) */}
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{mission.description}</p>
+
+                {/* Row 3: Tags + Date + Action */}
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        {/* Status badge */}
+                        {statusBadgeText[mission.status] && (
+                            <Badge variant="outline" className={`text-[11px] h-5 px-2 gap-1 ${style.badgeClass}`}>
+                                {style.badgeIcon}
+                                {statusBadgeText[mission.status]}
                             </Badge>
                         )}
-                        <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap">
-                            <Zap className="h-3 w-3 mr-1"/> {mission.points}
-                        </Badge>
+
+                        {/* Type tag */}
+                        {(mission.type === 'trail_content' || mission.type === 'trail_trigger') && (
+                            <Badge variant="outline" className="text-[11px] h-5 px-2 gap-1 bg-purple-50 text-purple-700 border-purple-200">
+                                <Target className="h-3 w-3" />
+                                Trilha
+                            </Badge>
+                        )}
+
+                        {/* Date */}
+                        {mission.startDate && mission.endDate && (
+                            <span className="text-[11px] text-muted-foreground flex items-center gap-1 shrink-0">
+                                <CalendarDays className="h-3 w-3" />
+                                {formatDate(mission.startDate)} — {formatDate(mission.endDate)}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Action button */}
+                    <div className="shrink-0">
+                        {renderAction()}
                     </div>
                 </div>
-                <CardDescription>{mission.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {mission.startDate && mission.endDate && (
-                    <div className="text-xs text-muted-foreground flex items-center">
-                        <CalendarDays className="h-3 w-3 mr-1.5" />
-                        <span>{t.colabMissions.period} {formatDate(mission.startDate)} — {formatDate(mission.endDate)}</span>
+
+                {/* Rejection feedback (if applicable) */}
+                {mission.status === 'rejeitada' && mission.submissionFeedback && (
+                    <div className="bg-red-50 border border-red-200 rounded-md px-3 py-1.5 mt-1">
+                        <p className="text-[11px] text-red-700 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3 shrink-0" />
+                            <span className="line-clamp-1">{mission.submissionFeedback}</span>
+                        </p>
                     </div>
                 )}
-            </CardContent>
-            <CardFooter className="flex justify-between items-center">
-                {cfg.text ? (
-                    <div className={`text-sm ${cfg.color} flex items-center font-medium`}>
-                        {cfg.icon}
-                        <span className="line-clamp-1">{cfg.text}</span>
-                    </div>
-                ) : (
-                    <span/>
-                )}
-                {cfg.button}
-            </CardFooter>
+            </div>
         </Card>
     );
 };
 
 const MissionsPageSkeleton = () => (
-    <div className="space-y-4">
-        {[...Array(2)].map((_, i) => (
-            <Card key={i}>
-                <CardHeader>
-                    <div className="flex justify-between items-start gap-4">
-                        <div className="space-y-2">
-                            <Skeleton className="h-6 w-56" />
-                            <Skeleton className="h-4 w-72" />
-                        </div>
-                        <Skeleton className="h-5 w-16" />
+    <div className="grid gap-3 sm:grid-cols-2">
+        {[...Array(4)].map((_, i) => (
+            <Card key={i} className="border-l-4 border-l-muted">
+                <div className="p-4 space-y-2.5">
+                    <div className="flex justify-between items-start gap-3">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-6 w-16 rounded-full" />
                     </div>
-                </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-4 w-48" />
-                </CardContent>
-                <CardFooter className="flex justify-end items-center">
-                    <Skeleton className="h-10 w-44" />
-                </CardFooter>
+                    <Skeleton className="h-3 w-full" />
+                    <div className="flex items-center gap-2">
+                        <Skeleton className="h-5 w-20 rounded-full" />
+                        <Skeleton className="h-5 w-24 rounded-full" />
+                    </div>
+                </div>
             </Card>
         ))}
     </div>
@@ -453,7 +468,7 @@ export default function ColaboradorMissoesPage() {
             return <p className="text-center text-muted-foreground py-8">{t.colabMissions.noMissions}</p>;
         }
         return (
-            <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
                 {missionList.map(mission => (
                     <MissionCard key={mission.id} mission={mission} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} />
                 ))}
@@ -526,7 +541,7 @@ export default function ColaboradorMissoesPage() {
                                 <p className="text-sm text-muted-foreground mt-1">{t.colabMissions.noHistoryDescription}</p>
                             </div>
                         ) : (
-                            <div className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-2">
                                 {historyMissions.map(mission => (
                                     <MissionCard key={mission.id} mission={mission} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} />
                                 ))}
