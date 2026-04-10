@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { Header } from "@/components/dashboard/header";
@@ -25,6 +25,7 @@ import {
   Edit3,
   Linkedin,
   ImageIcon,
+  Zap,
 } from 'lucide-react';
 import {
   format,
@@ -39,50 +40,76 @@ import {
   subMonths,
   isToday,
   parseISO,
+  isWithinInterval,
+  isBefore,
+  isAfter,
 } from 'date-fns';
 import { useT, useLocale } from '@/lib/i18n/context';
 import { getDateLocale } from '@/lib/i18n/date-utils';
 import type { Dictionary } from '@/lib/i18n/dictionaries/pt-BR';
 
-function getStatusConfig(t: Dictionary) {
+// ─── Types ──────
+type CalendarMission = {
+  id: string;
+  name: string;
+  description: string;
+  points: number;
+  startDate: Date | null;
+  endDate: Date | null;
+  calendarStatus: 'active' | 'scheduled';
+  type: string;
+};
+
+type CalendarItem =
+  | { kind: 'post'; data: ScheduledPost }
+  | { kind: 'mission'; data: CalendarMission };
+
+// ─── Config ──────
+function getPostStatusConfig(t: Dictionary) {
   return {
     published: {
-      label: t.colabCalendar.statusPublished,
-      color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-      cardBorder: 'border-l-4 border-l-purple-500',
-      calendarDot: 'bg-purple-500',
+      tag: t.colabCalendar.tagPostPublished,
+      color: 'bg-[#0A66C2]/10 text-[#0A66C2] dark:bg-[#0A66C2]/20',
+      cardBorder: 'border-l-4 border-l-[#0A66C2]',
+      calendarColor: 'bg-[#0A66C2]/15 text-[#0A66C2]',
       icon: CheckCircle2,
     },
     scheduled: {
-      label: t.colabCalendar.statusScheduled,
-      color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-      cardBorder: 'border-l-4 border-l-blue-500',
-      calendarDot: 'bg-blue-500',
+      tag: t.colabCalendar.tagPostScheduled,
+      color: 'bg-[#0A66C2]/10 text-[#0A66C2] dark:bg-[#0A66C2]/20',
+      cardBorder: 'border-l-4 border-l-[#0A66C2]/60',
+      calendarColor: 'bg-[#0A66C2]/10 text-[#0A66C2]',
       icon: Clock,
     },
     in_progress: {
-      label: t.colabCalendar.filterInProgress,
+      tag: t.colabCalendar.tagPostInProgress,
       color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
       cardBorder: 'border-l-4 border-l-yellow-500',
-      calendarDot: 'bg-yellow-500',
+      calendarColor: 'bg-yellow-100 text-yellow-700',
       icon: Edit3,
     },
     draft: {
-      label: t.colabCalendar.statusIdea,
+      tag: t.colabCalendar.tagPostIdea,
       color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
       cardBorder: 'border-l-4 border-l-gray-400',
-      calendarDot: 'bg-gray-400',
+      calendarColor: 'bg-gray-100 text-gray-600',
       icon: Edit3,
     },
     failed: {
-      label: t.colabCalendar.statusFailed,
+      tag: t.colabCalendar.tagPostFailed,
       color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
       cardBorder: 'border-l-4 border-l-red-500',
-      calendarDot: 'bg-red-500',
+      calendarColor: 'bg-red-100 text-red-700',
       icon: AlertCircle,
     },
   };
 }
+
+// ─── Helpers ──────
+const toDate = (d: any): Date | null => {
+  if (!d) return null;
+  return d.toDate ? d.toDate() : new Date(d);
+};
 
 function CalendarSkeleton() {
   return (
@@ -103,66 +130,187 @@ function CalendarSkeleton() {
   );
 }
 
-type StatusFilter = 'all' | 'published' | 'scheduled' | 'in_progress' | 'draft' | 'failed';
+type StatusFilter = 'all' | 'missions' | 'published' | 'scheduled' | 'in_progress' | 'draft' | 'failed';
 
 export default function CalendarioPage() {
   const t = useT();
   const locale = useLocale();
   const dateFnsLocale = getDateLocale(locale);
-  const statusConfig = useMemo(() => getStatusConfig(t), [t]);
+  const postStatusConfig = useMemo(() => getPostStatusConfig(t), [t]);
   const { user: authUser } = useAuth();
   const userId = authUser?.uid || null;
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [missions, setMissions] = useState<CalendarMission[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const { toast } = useToast();
   const router = useRouter();
 
-  // Fetch posts
-  const fetchPosts = useCallback(async () => {
-    if (!userId) return;
+  // ─── Fetch posts + missions ──────
+  const fetchData = useCallback(async (uid: string) => {
     setIsLoading(true);
-    const token = await getAuthToken();
-    const result = await getScheduledPosts(token, userId);
-    if (result.posts) {
-      setPosts(result.posts);
-    } else if (result.error) {
-      toast({ variant: 'destructive', title: t.common.error, description: result.error });
+    try {
+      const [postsResult, userDocSnap] = await Promise.all([
+        getAuthToken().then(token => getScheduledPosts(token, uid)),
+        getDoc(doc(db, 'users', uid)),
+      ]);
+
+      // Posts
+      if (postsResult.posts) {
+        setPosts(postsResult.posts);
+      } else if (postsResult.error) {
+        toast({ variant: 'destructive', title: t.common.error, description: postsResult.error });
+      }
+
+      // Missions
+      if (userDocSnap.exists()) {
+        const companyId = userDocSnap.data()?.companyId;
+        if (companyId) {
+          const [missionsSnap, subsSnap] = await Promise.all([
+            getDocs(collection(db, 'companies', companyId, 'missions')),
+            getDocs(collection(db, 'companies', companyId, 'missionSubmissions')),
+          ]);
+
+          // Build user submissions map
+          const userSubs: Record<string, string> = {};
+          subsSnap.docs.forEach(d => {
+            const data = d.data();
+            if (data.userId === uid) {
+              const existing = userSubs[data.missionId];
+              if (!existing || data.status === 'approved') {
+                userSubs[data.missionId] = data.status;
+              }
+            }
+          });
+
+          const now = new Date();
+          const calMissions: CalendarMission[] = [];
+
+          missionsSnap.docs.forEach(docSnap => {
+            const data = docSnap.data();
+            // Skip trail missions assigned to other users
+            const isTrailMission = data.type === 'trail_content' || data.type === 'trail_trigger';
+            if (isTrailMission && data.assignedTo && data.assignedTo !== uid) return;
+
+            const start = toDate(data.startDate);
+            const end = toDate(data.endDate);
+
+            // Only show missions that have dates (timed missions)
+            if (!start && !end) return;
+
+            // Skip completed/expired
+            const sub = userSubs[docSnap.id];
+            if (sub === 'approved') return;
+            if (end && isBefore(end, now) && sub !== 'approved') return; // expired
+
+            const isScheduled = start && isAfter(start, now);
+
+            calMissions.push({
+              id: docSnap.id,
+              name: data.name || 'Sem título',
+              description: data.description || '',
+              points: data.points || 0,
+              startDate: start,
+              endDate: end,
+              calendarStatus: isScheduled ? 'scheduled' : 'active',
+              type: data.type || 'timed',
+            });
+          });
+
+          setMissions(calMissions);
+        }
+      }
+    } catch (err) {
+      console.error('Calendar fetch error:', err);
+      toast({ variant: 'destructive', title: t.common.error, description: t.colabCalendar.loadError });
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [userId, toast]);
+  }, [toast, t]);
 
   useEffect(() => {
-    if (userId) fetchPosts();
-  }, [userId, fetchPosts]);
+    if (userId) fetchData(userId);
+  }, [userId, fetchData]);
 
-  // Status counts
+  // ─── Status counts ──────
   const statusCounts = useMemo(() => {
-    const counts = { all: posts.length, published: 0, scheduled: 0, in_progress: 0, draft: 0, failed: 0 };
+    const counts = { all: posts.length + missions.length, missions: missions.length, published: 0, scheduled: 0, in_progress: 0, draft: 0, failed: 0 };
     posts.forEach(post => {
       if (post.status in counts) counts[post.status as keyof typeof counts]++;
     });
     return counts;
-  }, [posts]);
+  }, [posts, missions]);
 
-  // Filtered posts by selected status
-  const filteredPosts = useMemo(() => {
-    if (statusFilter === 'all') return posts;
-    return posts.filter(p => p.status === statusFilter);
-  }, [posts, statusFilter]);
+  // ─── Unified calendar items grouped by day ──────
+  const itemsByDay = useMemo(() => {
+    const map = new Map<string, CalendarItem[]>();
 
-  // Upcoming posts (next scheduled, not yet published)
-  const upcomingPosts = useMemo(() => {
+    const addItem = (key: string, item: CalendarItem) => {
+      const existing = map.get(key) || [];
+      existing.push(item);
+      map.set(key, existing);
+    };
+
+    // Posts: filter by status if needed
+    const filteredPosts = statusFilter === 'all' ? posts
+      : statusFilter === 'missions' ? []
+      : posts.filter(p => p.status === statusFilter);
+
+    filteredPosts.forEach(post => {
+      const dayKey = format(parseISO(post.scheduledFor), 'yyyy-MM-dd');
+      addItem(dayKey, { kind: 'post', data: post });
+    });
+
+    // Missions: show on each day within their date range
+    const showMissions = statusFilter === 'all' || statusFilter === 'missions';
+    if (showMissions) {
+      missions.forEach(mission => {
+        const start = mission.startDate || mission.endDate;
+        const end = mission.endDate || mission.startDate;
+        if (!start || !end) return;
+
+        const days = eachDayOfInterval({ start, end });
+        days.forEach(day => {
+          const dayKey = format(day, 'yyyy-MM-dd');
+          addItem(dayKey, { kind: 'mission', data: mission });
+        });
+      });
+    }
+
+    return map;
+  }, [posts, missions, statusFilter]);
+
+  // ─── Selected day items ──────
+  const selectedDayItems = useMemo(() => {
+    if (!selectedDay) return [];
+    const key = format(selectedDay, 'yyyy-MM-dd');
+    return itemsByDay.get(key) || [];
+  }, [selectedDay, itemsByDay]);
+
+  // ─── Upcoming (sidebar default) ──────
+  const upcomingItems = useMemo(() => {
     const now = new Date();
-    return posts
+    const upcoming: CalendarItem[] = [];
+
+    // Upcoming posts
+    posts
       .filter(p => p.status === 'scheduled' && parseISO(p.scheduledFor) > now)
       .sort((a, b) => parseISO(a.scheduledFor).getTime() - parseISO(b.scheduledFor).getTime())
-      .slice(0, 5);
-  }, [posts]);
+      .slice(0, 3)
+      .forEach(p => upcoming.push({ kind: 'post', data: p }));
 
-  // Calendar days
+    // Active missions
+    missions
+      .filter(m => m.calendarStatus === 'active')
+      .slice(0, 3)
+      .forEach(m => upcoming.push({ kind: 'mission', data: m }));
+
+    return upcoming;
+  }, [posts, missions]);
+
+  // ─── Calendar days ──────
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(currentMonth);
@@ -171,25 +319,7 @@ export default function CalendarioPage() {
     return eachDayOfInterval({ start: calStart, end: calEnd });
   }, [currentMonth]);
 
-  // Posts grouped by day (respects filter)
-  const postsByDay = useMemo(() => {
-    const map = new Map<string, ScheduledPost[]>();
-    filteredPosts.forEach(post => {
-      const dayKey = format(parseISO(post.scheduledFor), 'yyyy-MM-dd');
-      const existing = map.get(dayKey) || [];
-      existing.push(post);
-      map.set(dayKey, existing);
-    });
-    return map;
-  }, [filteredPosts]);
-
-  // Selected day posts
-  const selectedDayPosts = useMemo(() => {
-    if (!selectedDay) return [];
-    const key = format(selectedDay, 'yyyy-MM-dd');
-    return postsByDay.get(key) || [];
-  }, [selectedDay, postsByDay]);
-
+  // ─── Handlers ──────
   const handleDeletePost = async (postId: string) => {
     if (!userId) return;
     const token = await getAuthToken();
@@ -204,9 +334,7 @@ export default function CalendarioPage() {
 
   const handleNewPost = (date?: Date) => {
     const params = new URLSearchParams();
-    if (date) {
-      params.set('date', date.toISOString());
-    }
+    if (date) params.set('date', date.toISOString());
     router.push(`/colaborador/calendario/novo?${params.toString()}`);
   };
 
@@ -223,9 +351,144 @@ export default function CalendarioPage() {
     );
   }
 
+  // ─── Render helpers ──────
+  const getCalendarCellLabel = (item: CalendarItem): string => {
+    if (item.kind === 'post') {
+      return `${format(parseISO(item.data.scheduledFor), 'HH:mm')} · ${item.data.caption.slice(0, 18)}`;
+    }
+    return item.data.name.slice(0, 22);
+  };
+
+  const getCalendarCellColor = (item: CalendarItem): string => {
+    if (item.kind === 'post') {
+      const config = postStatusConfig[item.data.status];
+      return config?.calendarColor || 'bg-gray-100 text-gray-600';
+    }
+    // Mission: active = solid purple, scheduled = lighter purple
+    return item.data.calendarStatus === 'active'
+      ? 'bg-primary/15 text-primary'
+      : 'bg-primary/8 text-primary/60';
+  };
+
+  const renderSidebarCard = (item: CalendarItem, idx: number) => {
+    if (item.kind === 'post') {
+      const post = item.data;
+      const config = postStatusConfig[post.status] || postStatusConfig.draft;
+      const StatusIcon = config.icon;
+
+      return (
+        <Card key={`post-${post.id}`} className={`overflow-hidden ${config.cardBorder}`}>
+          <CardContent className="p-4 space-y-3">
+            {/* Tag + Status + time */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="secondary" className={`${config.color} text-[10px] gap-1 h-5`}>
+                  <StatusIcon className="h-3 w-3" />
+                  {config.tag}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {format(parseISO(post.scheduledFor), 'HH:mm')}
+                </span>
+              </div>
+              <div className="flex gap-1">
+                {post.status !== 'published' && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => router.push(`/colaborador/calendario/novo?edit=${post.id}`)}
+                  >
+                    <Edit3 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => handleDeletePost(post.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Caption preview */}
+            <p className="text-sm line-clamp-4 whitespace-pre-line">{post.caption}</p>
+
+            {/* Media indicator */}
+            {post.mediaUrl && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ImageIcon className="h-3.5 w-3.5" />
+                {t.colabCalendar.mediaAttached}
+              </div>
+            )}
+
+            {/* LinkedIn link */}
+            {post.linkedinPostUrl && (
+              <a
+                href={post.linkedinPostUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-[#0A66C2] hover:underline font-medium"
+              >
+                <Linkedin className="h-3.5 w-3.5" />
+                {t.colabCalendar.viewOnLinkedin} ↗
+              </a>
+            )}
+
+            {/* Published date */}
+            {post.status === 'published' && post.publishedAt && (
+              <p className="text-[11px] text-muted-foreground">
+                {t.colabCalendar.statusPublished} {format(parseISO(post.publishedAt), "d MMM, HH:mm", { locale: dateFnsLocale })}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Mission card
+    const mission = item.data;
+    const isActive = mission.calendarStatus === 'active';
+    const borderClass = isActive
+      ? 'border-l-4 border-l-primary'
+      : 'border-l-4 border-l-primary/40';
+    const tagColor = isActive
+      ? 'bg-primary/10 text-primary'
+      : 'bg-primary/5 text-primary/60';
+    const tagLabel = isActive ? t.colabCalendar.tagMissionActive : t.colabCalendar.tagMissionScheduled;
+
+    return (
+      <Card key={`mission-${mission.id}`} className={`overflow-hidden ${borderClass}`}>
+        <CardContent className="p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <Badge variant="secondary" className={`${tagColor} text-[10px] gap-1 h-5`}>
+              <Zap className="h-3 w-3" />
+              {tagLabel}
+            </Badge>
+            <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] h-5 px-1.5">
+              {mission.points} pts
+            </Badge>
+          </div>
+          <h4 className="text-sm font-medium">{mission.name}</h4>
+          {mission.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2">{mission.description}</p>
+          )}
+          {(mission.startDate || mission.endDate) && (
+            <p className="text-[11px] text-muted-foreground">
+              {mission.startDate && format(mission.startDate, "d MMM", { locale: dateFnsLocale })}
+              {mission.startDate && mission.endDate && ' — '}
+              {mission.endDate && format(mission.endDate, "d MMM", { locale: dateFnsLocale })}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <>
-      <Header title="Calendário" />
+      <Header title={t.colabCalendar.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
           {/* CALENDAR */}
@@ -253,8 +516,9 @@ export default function CalendarioPage() {
             <div className="flex flex-wrap items-center gap-2">
               {([
                 { key: 'all' as StatusFilter, label: t.colabCalendar.filterAll, color: 'bg-muted text-foreground' },
-                { key: 'published' as StatusFilter, label: t.colabCalendar.filterPublished, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-                { key: 'scheduled' as StatusFilter, label: t.colabCalendar.filterScheduled, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+                { key: 'missions' as StatusFilter, label: t.colabCalendar.filterMissions, color: 'bg-primary/10 text-primary' },
+                { key: 'published' as StatusFilter, label: t.colabCalendar.filterPublished, color: 'bg-[#0A66C2]/10 text-[#0A66C2]' },
+                { key: 'scheduled' as StatusFilter, label: t.colabCalendar.filterScheduled, color: 'bg-[#0A66C2]/10 text-[#0A66C2]' },
                 { key: 'in_progress' as StatusFilter, label: t.colabCalendar.filterInProgress, color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
                 { key: 'draft' as StatusFilter, label: t.colabCalendar.filterIdeas, color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
                 { key: 'failed' as StatusFilter, label: t.colabCalendar.filterFailed, color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
@@ -294,7 +558,15 @@ export default function CalendarioPage() {
               <div className="grid grid-cols-7">
                 {calendarDays.map((day, idx) => {
                   const dayKey = format(day, 'yyyy-MM-dd');
-                  const dayPosts = postsByDay.get(dayKey) || [];
+                  const dayItems = itemsByDay.get(dayKey) || [];
+                  // Deduplicate missions (same mission appears on multiple days)
+                  const seen = new Set<string>();
+                  const uniqueItems = dayItems.filter(item => {
+                    const key = item.kind === 'post' ? `p-${item.data.id}` : `m-${item.data.id}`;
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                  });
                   const inMonth = isSameMonth(day, currentMonth);
                   const today = isToday(day);
                   const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
@@ -321,22 +593,21 @@ export default function CalendarioPage() {
                         {format(day, 'd')}
                       </span>
 
-                      {/* Post indicators */}
+                      {/* Item indicators */}
                       <div className="mt-1 space-y-0.5">
-                        {dayPosts.slice(0, 2).map(post => {
-                          const config = statusConfig[post.status];
-                          return (
-                            <div
-                              key={post.id}
-                              className={`text-[10px] px-1 py-0.5 rounded truncate ${config.color}`}
-                            >
-                              {format(parseISO(post.scheduledFor), 'HH:mm')} · {post.caption.slice(0, 20)}...
-                            </div>
-                          );
-                        })}
-                        {dayPosts.length > 2 && (
+                        {uniqueItems.slice(0, 2).map(item => (
+                          <div
+                            key={item.kind === 'post' ? `p-${item.data.id}` : `m-${item.data.id}`}
+                            className={`text-[10px] px-1 py-0.5 rounded truncate ${getCalendarCellColor(item)}`}
+                          >
+                            {item.kind === 'mission' && <Zap className="h-2.5 w-2.5 inline mr-0.5 -mt-px" />}
+                            {item.kind === 'post' && <Linkedin className="h-2.5 w-2.5 inline mr-0.5 -mt-px" />}
+                            {getCalendarCellLabel(item)}
+                          </div>
+                        ))}
+                        {uniqueItems.length > 2 && (
                           <div className="text-[10px] text-muted-foreground px-1">
-                            +{dayPosts.length - 2}
+                            +{uniqueItems.length - 2}
                           </div>
                         )}
                       </div>
@@ -364,81 +635,18 @@ export default function CalendarioPage() {
             </div>
 
             {selectedDay ? (
-              selectedDayPosts.length > 0 ? (
+              selectedDayItems.length > 0 ? (
                 <div className="space-y-3">
-                  {selectedDayPosts.map(post => {
-                    const config = statusConfig[post.status] || statusConfig.draft;
-                    const StatusIcon = config.icon;
-                    return (
-                      <Card key={post.id} className={`overflow-hidden ${config.cardBorder}`}>
-                        <CardContent className="p-4 space-y-3">
-                          {/* Status + time */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className={`${config.color} text-xs gap-1`}>
-                                <StatusIcon className="h-3 w-3" />
-                                {config.label}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {format(parseISO(post.scheduledFor), 'HH:mm')}
-                              </span>
-                            </div>
-                            <div className="flex gap-1">
-                              {post.status !== 'published' && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => router.push(`/colaborador/calendario/novo?edit=${post.id}`)}
-                                >
-                                  <Edit3 className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDeletePost(post.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Caption preview */}
-                          <p className="text-sm line-clamp-4 whitespace-pre-line">{post.caption}</p>
-
-                          {/* Media indicator */}
-                          {post.mediaUrl && (
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <ImageIcon className="h-3.5 w-3.5" />
-                              {t.colabCalendar.mediaAttached}
-                            </div>
-                          )}
-
-                          {/* LinkedIn link for published posts */}
-                          {post.linkedinPostUrl && (
-                            <a
-                              href={post.linkedinPostUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-xs text-[#0A66C2] hover:underline font-medium"
-                            >
-                              <Linkedin className="h-3.5 w-3.5" />
-                              {t.colabCalendar.viewOnLinkedin} ↗
-                            </a>
-                          )}
-
-                          {/* Published date */}
-                          {post.status === 'published' && post.publishedAt && (
-                            <p className="text-[11px] text-muted-foreground">
-                              {t.colabCalendar.statusPublished} {format(parseISO(post.publishedAt), "d MMM, HH:mm", { locale: dateFnsLocale })}
-                            </p>
-                          )}
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                  {/* Deduplicate for sidebar too */}
+                  {(() => {
+                    const seen = new Set<string>();
+                    return selectedDayItems.filter(item => {
+                      const key = item.kind === 'post' ? `p-${item.data.id}` : `m-${item.data.id}`;
+                      if (seen.has(key)) return false;
+                      seen.add(key);
+                      return true;
+                    }).map((item, idx) => renderSidebarCard(item, idx));
+                  })()}
                 </div>
               ) : (
                 <Card className="border-dashed">
@@ -460,29 +668,10 @@ export default function CalendarioPage() {
               )
             ) : (
               <div className="space-y-3">
-                {upcomingPosts.length > 0 ? (
+                {upcomingItems.length > 0 ? (
                   <>
                     <p className="text-xs text-muted-foreground">{t.colabCalendar.nextScheduled}</p>
-                    {upcomingPosts.map(post => {
-                      const config = statusConfig[post.status] || statusConfig.draft;
-                      const StatusIcon = config.icon;
-                      return (
-                        <Card key={post.id} className={`overflow-hidden ${config.cardBorder}`}>
-                          <CardContent className="p-3 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Badge variant="secondary" className={`${config.color} text-xs gap-1`}>
-                                <StatusIcon className="h-3 w-3" />
-                                {config.label}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {format(parseISO(post.scheduledFor), "d MMM, HH:mm", { locale: dateFnsLocale })}
-                              </span>
-                            </div>
-                            <p className="text-sm line-clamp-2 whitespace-pre-line">{post.caption}</p>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                    {upcomingItems.map((item, idx) => renderSidebarCard(item, idx))}
                   </>
                 ) : (
                   <Card className="border-dashed">

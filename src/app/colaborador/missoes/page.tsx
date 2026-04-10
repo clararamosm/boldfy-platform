@@ -4,7 +4,7 @@
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, Upload, Clock, CalendarDays, Loader2, History, XCircle, AlertCircle, HourglassIcon, Target, ChevronDown, ChevronRight, Trophy } from "lucide-react";
+import { CheckCircle, Upload, Clock, CalendarDays, Loader2, History, XCircle, AlertCircle, HourglassIcon, Target, ChevronDown, ChevronRight, Trophy, BookOpen } from "lucide-react";
 import { CoinIcon } from "@/components/coin-icon";
 import { Badge } from "@/components/ui/badge";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
@@ -305,7 +305,7 @@ const ToggleSection = ({ title, icon, missions, emptyText, onSubmitProof, onAuto
 
 // ─── Skeleton ──────
 const PageSkeleton = () => (
-    <div className="grid gap-6 lg:grid-cols-[1fr,340px]">
+    <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-3">
             {[...Array(3)].map((_, i) => (
                 <Card key={i}><div className="p-4 space-y-2.5">
@@ -504,8 +504,8 @@ export default function ColaboradorMissoesPage() {
                     <PageSkeleton />
                 ) : (
                     <>
-                        {/* 2-column layout */}
-                        <div className="grid gap-6 lg:grid-cols-[1fr,340px]">
+                        {/* 2-column layout — equal weight */}
+                        <div className="grid gap-6 lg:grid-cols-2">
                             {/* LEFT COLUMN — Weekly missions */}
                             <div className="space-y-4">
                                 <h2 className="text-base font-semibold flex items-center gap-2">
@@ -559,7 +559,7 @@ export default function ColaboradorMissoesPage() {
 
                                 <ToggleSection
                                     title={t.colabMissions.tabTrail}
-                                    icon={<Target className="h-4 w-4" />}
+                                    icon={<BookOpen className="h-4 w-4" />}
                                     missions={allTrailForDisplay}
                                     emptyText={t.colabMissions.noMissions}
                                     onSubmitProof={handleSubmitProof}

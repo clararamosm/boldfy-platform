@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, BarChart3, Zap, Newspaper, CalendarDays, UserSearch } from "lucide-react";
+import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, Zap, Newspaper, CalendarDays, UserSearch } from "lucide-react";
 import { usePathname } from 'next/navigation';
 import { Header } from './header';
 import { useUnreadFeed } from '@/hooks/use-unread-feed';
@@ -17,7 +17,6 @@ export function ColaboradorSidebarNav() {
             { title: t.nav.dashboard, href: "/colaborador/dashboard", icon: LayoutDashboard },
             { title: t.nav.trails, href: "/colaborador/trilhas", icon: BookOpen },
             { title: t.nav.missions, href: "/colaborador/missoes", icon: Zap },
-            { title: t.nav.rankings, href: "/colaborador/rankings", icon: BarChart3 },
             { title: t.nav.rewards, href: "/colaborador/recompensas", icon: Gift },
             { title: t.nav.library, href: "/colaborador/biblioteca", icon: Library },
             { title: t.nav.contentAssistant, href: "/colaborador/assistente", icon: Sparkles },
@@ -43,7 +42,6 @@ export function ColaboradorHeader() {
         '/colaborador/dashboard': t.nav.dashboard,
         '/colaborador/trilhas': t.nav.trails,
         '/colaborador/missoes': t.nav.missions,
-        '/colaborador/rankings': t.nav.rankings,
         '/colaborador/recompensas': t.nav.rewards,
         '/colaborador/biblioteca': t.nav.library,
         '/colaborador/assistente': t.nav.contentAssistant,
