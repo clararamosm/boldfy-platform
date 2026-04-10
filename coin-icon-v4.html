@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boldfy Coin v4 — fy SVG da marca</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f8f8fa; color: #1a1a2e; padding: 40px 24px; }
+  h1 { text-align: center; font-size: 24px; margin-bottom: 6px; color: #7C3AED; }
+  .subtitle { text-align: center; color: #666; margin-bottom: 40px; font-size: 13px; }
+  .section { margin-bottom: 48px; }
+  .section h2 { font-size: 17px; margin-bottom: 4px; color: #333; }
+  .section p { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .row { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; }
+  .coin-demo { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .coin-demo > span { font-size: 11px; color: #999; font-weight: 500; }
+  .bg-white { background: white; padding: 24px 32px; border-radius: 12px; border: 1px solid #e5e5ea; }
+  .bg-dark { background: #1a1a2e; padding: 24px 32px; border-radius: 12px; }
+  .bg-dark .coin-demo > span { color: #aaa; }
+  .divider { height: 1px; background: #e5e5ea; margin: 48px 0; }
+  .note { font-size: 12px; color: #aaa; margin-top: 8px; font-style: italic; }
+
+  /* ════════════════════════════════════════════
+     BASE COIN — Flat 3D
+     ════════════════════════════════════════════ */
+  .coin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #FFD700;
+    box-shadow: 0 3px 0 #B8960B, 0 4px 8px rgba(0,0,0,0.15);
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden;
+  }
+  .coin::after {
+    content: '';
+    position: absolute;
+    inset: 11%;
+    border-radius: 50%;
+    border: 1.5px solid rgba(139,101,8,0.18);
+    pointer-events: none;
+  }
+  .coin::before {
+    content: '';
+    position: absolute;
+    top: 6%;
+    left: 12%;
+    width: 34%;
+    height: 24%;
+    background: radial-gradient(ellipse, rgba(255,255,255,0.55) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .coin.sz-xs  { width: 16px; height: 16px; box-shadow: 0 1px 0 #B8960B, 0 1px 3px rgba(0,0,0,0.1); }
+  .coin.sz-sm  { width: 20px; height: 20px; box-shadow: 0 2px 0 #B8960B, 0 2px 4px rgba(0,0,0,0.12); }
+  .coin.sz-md  { width: 28px; height: 28px; box-shadow: 0 2px 0 #B8960B, 0 3px 6px rgba(0,0,0,0.12); }
+  .coin.sz-lg  { width: 40px; height: 40px; }
+  .coin.sz-xl  { width: 56px; height: 56px; }
+  .coin.sz-2xl { width: 80px; height: 80px; }
+  .coin.sz-3xl { width: 120px; height: 120px; box-shadow: 0 5px 0 #B8960B, 0 6px 14px rgba(0,0,0,0.18); }
+
+  /* ════════════════════════════════════════════
+     FY SVG da marca dentro da moeda
+     ════════════════════════════════════════════ */
+  .coin svg.fy-brand {
+    width: 55%;
+    height: 55%;
+    position: relative;
+    z-index: 1;
+  }
+  .coin svg.fy-brand path { fill: #7B5800; }
+
+  /* ════════════════════════════════════════════
+     ANIMATIONS
+     ════════════════════════════════════════════ */
+  .coin.anim-spin:hover {
+    animation: quickSpin 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  @keyframes quickSpin {
+    0%   { transform: perspective(300px) rotateY(0deg) scale(1); }
+    40%  { transform: perspective(300px) rotateY(200deg) scale(1.08); }
+    100% { transform: perspective(300px) rotateY(360deg) scale(1); }
+  }
+
+  .coin-container { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+  .coin.anim-burst:hover {
+    animation: burstSpin 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes burstSpin {
+    0%   { transform: perspective(400px) rotateY(0deg) scale(1); }
+    30%  { transform: perspective(400px) rotateY(180deg) scale(1.12); }
+    60%  { transform: perspective(400px) rotateY(360deg) scale(1.05); }
+    100% { transform: perspective(400px) rotateY(360deg) scale(1); }
+  }
+
+  .coin-container .particle {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: #FFD700; box-shadow: 0 1px 0 #B8960B; opacity: 0; pointer-events: none;
+  }
+  .coin-container .particle.p-lg { width: 14px; height: 14px; }
+  /* Mini fy SVG inside particles */
+  .coin-container .particle svg { width: 60%; height: 60%; }
+  .coin-container .particle svg path { fill: #7B5800; }
+
+  .coin-container:hover .particle { animation: burst 0.8s ease-out forwards; }
+  .coin-container:hover .particle:nth-child(2) { animation-delay: 0.02s; --dx: -35px; --dy: -40px; --rot: -120deg; }
+  .coin-container:hover .particle:nth-child(3) { animation-delay: 0.05s; --dx: 40px; --dy: -30px; --rot: 200deg; }
+  .coin-container:hover .particle:nth-child(4) { animation-delay: 0.03s; --dx: -40px; --dy: 15px; --rot: -200deg; }
+  .coin-container:hover .particle:nth-child(5) { animation-delay: 0.06s; --dx: 35px; --dy: 25px; --rot: 160deg; }
+  .coin-container:hover .particle:nth-child(6) { animation-delay: 0.04s; --dx: 0px; --dy: -48px; --rot: 90deg; }
+  .coin-container:hover .particle:nth-child(7) { animation-delay: 0.07s; --dx: -25px; --dy: 35px; --rot: -90deg; }
+  .coin-container:hover .particle:nth-child(8) { animation-delay: 0.01s; --dx: 28px; --dy: -45px; --rot: 260deg; }
+  @keyframes burst {
+    0%   { opacity: 1; transform: translate(0,0) rotate(0deg) scale(0.4); }
+    40%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--dx, 30px), var(--dy, -30px)) rotate(var(--rot, 180deg)) scale(0.2); }
+  }
+
+  .coin-container .sparkle {
+    position: absolute; width: 4px; height: 4px; border-radius: 50%; opacity: 0; pointer-events: none;
+  }
+  .sparkle.gold { background: #FFD700; }
+  .sparkle.purple { background: #bd58e7; }
+  .sparkle.white { background: #fff; box-shadow: 0 0 3px rgba(255,215,0,0.5); }
+  .coin-container:hover .sparkle { animation: sparkleBurst 0.7s ease-out forwards; }
+  .coin-container:hover .sparkle:nth-child(9) { --dx: 50px; --dy: -20px; animation-delay: 0.1s; }
+  .coin-container:hover .sparkle:nth-child(10) { --dx: -48px; --dy: -25px; animation-delay: 0.06s; }
+  .coin-container:hover .sparkle:nth-child(11) { --dx: 20px; --dy: 45px; animation-delay: 0.12s; }
+  .coin-container:hover .sparkle:nth-child(12) { --dx: -30px; --dy: -50px; animation-delay: 0.08s; }
+  .coin-container:hover .sparkle:nth-child(13) { --dx: 45px; --dy: 30px; animation-delay: 0.04s; }
+  @keyframes sparkleBurst {
+    0%   { opacity: 1; transform: translate(0,0) scale(1.5); }
+    50%  { opacity: 0.8; }
+    100% { opacity: 0; transform: translate(var(--dx, 30px), var(--dy, -30px)) scale(0); }
+  }
+
+  /* ════════════════════════════════════════════
+     VARIANTS
+     ════════════════════════════════════════════ */
+  .coin.gray {
+    background: #d1d5db;
+    box-shadow: 0 2px 0 #9ca3af, 0 2px 4px rgba(0,0,0,0.08);
+  }
+  .coin.gray::after { border-color: rgba(107,114,128,0.15); }
+  .coin.gray::before { background: radial-gradient(ellipse, rgba(255,255,255,0.3) 0%, transparent 70%); }
+  .coin.gray svg.fy-brand path { fill: #6b7280; }
+
+  .coin.green {
+    background: linear-gradient(145deg, #4ade80, #22c55e);
+    box-shadow: 0 2px 0 #16a34a, 0 2px 4px rgba(22,163,74,0.2);
+  }
+  .coin.green::after { border-color: rgba(255,255,255,0.2); }
+  .coin.green::before { background: radial-gradient(ellipse, rgba(255,255,255,0.4) 0%, transparent 70%); }
+  .coin.green svg.fy-brand path { fill: #fff; }
+
+  /* ════════════════════════════════════════════
+     CONTEXT MOCKUP STYLES
+     ════════════════════════════════════════════ */
+  .stat-card { display: inline-flex; flex-direction: column; gap: 4px; padding: 16px 20px; background: white; border: 1px solid #e5e5ea; border-radius: 12px; min-width: 155px; }
+  .stat-card .top { display: flex; justify-content: space-between; align-items: center; }
+  .stat-card .label { font-size: 13px; color: #888; }
+  .stat-card .value { font-size: 24px; font-weight: 700; color: #1a1a2e; }
+  .stat-card .delta { font-size: 11px; color: #22c55e; }
+  .mission-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: white; border: 1px solid #e5e5ea; border-radius: 10px; max-width: 440px; }
+  .mission-row .info { flex: 1; }
+  .mission-row .info .name { font-size: 14px; font-weight: 600; }
+  .mission-row .info .desc { font-size: 12px; color: #888; }
+  .mission-row .points-badge { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 700; color: #7B5800; }
+  .mockup { margin-top: 40px; }
+  .mockup h2 { font-size: 17px; margin-bottom: 4px; }
+  .mockup p { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .compare-label { font-size: 14px; font-weight: 600; color: #7C3AED; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #f0ecff; display: inline-block; }
+  .ranking-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: white; border: 1px solid #e5e5ea; border-radius: 10px; max-width: 380px; }
+  .ranking-row .rank { font-size: 16px; font-weight: 700; color: #7C3AED; width: 28px; text-align: center; }
+  .ranking-row .avatar { width: 32px; height: 32px; border-radius: 50%; background: #e5e5ea; }
+  .ranking-row .rinfo { flex: 1; }
+  .ranking-row .rinfo .rname { font-size: 14px; font-weight: 600; }
+  .ranking-row .rinfo .rpts { font-size: 12px; color: #888; display: flex; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Boldfy Coin v4 — fy SVG da marca</h1>
+<p class="subtitle">Usando o path real do "fy" extraído do ícone oficial. Hover para animar.</p>
+
+<!-- ═══════════════════════════════════════════════
+     TODOS OS TAMANHOS
+     ═══════════════════════════════════════════════ -->
+<div class="section">
+  <div class="compare-label">Todos os tamanhos — fundo claro</div>
+  <p>O "fy" oficial da Boldfy dentro da moeda Flat 3D.</p>
+  <div class="bg-white">
+    <div class="row">
+      <div class="coin-demo">
+        <div class="coin sz-xs anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+        <span>16px</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-sm anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+        <span>20px</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-md anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+        <span>28px</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-lg anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+        <span>40px</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin-container">
+          <div class="coin sz-xl anim-burst"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+          <div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div>
+          <div class="sparkle gold"></div><div class="sparkle purple"></div><div class="sparkle white"></div><div class="sparkle gold"></div><div class="sparkle purple"></div>
+        </div>
+        <span>56px</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin-container">
+          <div class="coin sz-2xl anim-burst"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+          <div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div>
+          <div class="sparkle gold"></div><div class="sparkle purple"></div><div class="sparkle white"></div><div class="sparkle gold"></div><div class="sparkle purple"></div>
+        </div>
+        <span>80px</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin-container">
+          <div class="coin sz-3xl anim-burst"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+          <div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div>
+          <div class="sparkle gold"></div><div class="sparkle purple"></div><div class="sparkle white"></div><div class="sparkle gold"></div><div class="sparkle purple"></div>
+        </div>
+        <span>120px</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FUNDO ESCURO -->
+<div class="section">
+  <div class="compare-label">Fundo escuro</div>
+  <div class="bg-dark">
+    <div class="row">
+      <div class="coin-demo"><div class="coin sz-sm anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div><span>20px</span></div>
+      <div class="coin-demo"><div class="coin sz-md anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div><span>28px</span></div>
+      <div class="coin-demo"><div class="coin sz-lg anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div><span>40px</span></div>
+      <div class="coin-demo">
+        <div class="coin-container">
+          <div class="coin sz-xl anim-burst"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+          <div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div><div class="particle p-lg"></div><div class="particle"></div>
+          <div class="sparkle gold"></div><div class="sparkle purple"></div><div class="sparkle white"></div><div class="sparkle gold"></div><div class="sparkle purple"></div>
+        </div>
+        <span>56px</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VARIANTES -->
+<div class="section">
+  <div class="compare-label">Variantes — Cinza (pendente) / Verde (concluído) / Dourado (pontos)</div>
+  <div class="bg-white">
+    <div class="row">
+      <div class="coin-demo"><div class="coin sz-md gray"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div><span>Pendente</span></div>
+      <div class="coin-demo"><div class="coin sz-md green anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div><span>Concluído</span></div>
+      <div class="coin-demo"><div class="coin sz-md anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div><span>Pontos</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════
+     CONTEXTOS DE USO
+     ═══════════════════════════════════════════════ -->
+<div class="mockup">
+  <h2>Contexto: Stat Card</h2>
+  <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+    <div class="stat-card">
+      <div class="top"><span class="label">Meus Pontos</span><div class="coin sz-sm anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div></div>
+      <span class="value">2.450</span><span class="delta">+320 este mês</span>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <h2>Contexto: Badge de missão</h2>
+  <div style="display: flex; flex-direction: column; gap: 10px;">
+    <div class="mission-row">
+      <div style="width: 36px; height: 36px; background: #f5f0ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+      <div class="info"><div class="name">Compartilhe um post</div><div class="desc">Missão semanal</div></div>
+      <div class="points-badge"><div class="coin sz-xs anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div> 150</div>
+    </div>
+    <div class="mission-row">
+      <div style="width: 36px; height: 36px; background: #f5f0ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+      <div class="info"><div class="name">Complete seu perfil</div><div class="desc">Missão única</div></div>
+      <div class="points-badge"><div class="coin sz-xs anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div> 500</div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <h2>Contexto: Ranking</h2>
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <div class="ranking-row">
+      <span class="rank">1</span>
+      <div class="avatar" style="background: #dbeafe;"></div>
+      <div class="rinfo"><div class="rname">Maria Silva</div><div class="rpts"><div class="coin sz-xs anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div> 4.280 pts</div></div>
+    </div>
+    <div class="ranking-row">
+      <span class="rank">2</span>
+      <div class="avatar" style="background: #fef3c7;"></div>
+      <div class="rinfo"><div class="rname">João Santos</div><div class="rpts"><div class="coin sz-xs anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div> 3.910 pts</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup">
+  <h2>Contexto: Progresso de trilha</h2>
+  <div class="bg-white" style="max-width: 400px;">
+    <p style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">Trilha: Onboarding</p>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <div class="coin sz-sm green anim-spin"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+      <div style="flex: 1; height: 6px; background: #e5e5ea; border-radius: 3px; overflow: hidden;">
+        <div style="width: 66%; height: 100%; background: linear-gradient(90deg, #22c55e, #4ade80); border-radius: 3px;"></div>
+      </div>
+      <div class="coin sz-sm gray"><svg class="fy-brand" viewBox="25 25 67 67"><path d="M81.43,42.37l-7.79,21.75c-.25.69-1.23.71-1.5.02l-8.61-21.8c-.12-.31-.42-.51-.74-.51h-22.6c-.44,0-.8-.36-.8-.8v-1.33c0-1.91.49-3.39,1.48-4.43.98-1.04,2.3-1.56,3.94-1.56,1.04,0,2.05.16,3.03.49.73.24,1.42.56,2.06.96.37.23.85.12,1.08-.24.68-1.03,1.36-2.05,2.06-3.06.71-1.03,1.41-2.07,2.1-3.12.23-.35.15-.83-.19-1.09-1.59-1.23-3.34-2.11-5.23-2.64-2.13-.6-4.24-.9-6.31-.9-2.62,0-5.14.56-7.55,1.68-2.41,1.12-4.37,2.83-5.9,5.13-1.53,2.3-2.3,5.28-2.3,8.94v39.63c0,.44.36.8.8.8h10.13c.44,0,.8-.36.8-.8v-27.6c0-.44.36-.8.8-.8h13.46c.31,0,.6.18.73.46l12.92,28.02c.09.19.1.41.02.61l-1.03,2.81c-.71,1.91-1.5,3.27-2.38,4.06-.82.75-1.82,1.14-2.98,1.18-3.35-.09-6.09-2.65-6.45-5.93-.05-.41-.38-.73-.8-.73h-7.81c-.46,0-.82.39-.8.85.44,8.46,7.47,15.21,16.04,15.21,2.68,0,5.34-.47,7.15-1.48,1.8-1.01,3.29-2.38,4.47-4.1,1.18-1.72,2.2-3.62,3.08-5.7.87-2.08,1.75-4.18,2.62-6.31l15.29-37.11c.22-.53-.17-1.1-.74-1.1h-10.79c-.34,0-.64.21-.75.53Z"/></svg></div>
+    </div>
+    <p style="font-size: 12px; color: #888; margin-top: 6px;">2 de 3 etapas concluídas</p>
+  </div>
+</div>
+
+<div class="divider"></div>
+<p class="note" style="text-align: center;">
+  v4 — Usando o path SVG real do "fy" extraído do ícone oficial da Boldfy.<br>
+  viewBox recortado para centralizar apenas a tipografia (sem o fundo roxo arredondado).
+</p>
+
+</body>
+</html>

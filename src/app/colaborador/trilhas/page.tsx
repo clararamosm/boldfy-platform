@@ -275,7 +275,7 @@ export default function ColaboradorTrilhasPage() {
                           {totalModulos} {totalModulos !== 1 ? t.colabTrails.modules : t.colabTrails.module}
                         </Badge>
                         <Badge variant="secondary" className="text-xs">
-                          <CoinIcon className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} {t.common.points}
+                          <CoinIcon size="xs" className="mr-1" />{trail.pontuacaoTotal || 0} {t.common.points}
                         </Badge>
                         {trail.tempoEstimadoMin > 0 && (
                           <Badge variant="outline" className="text-xs">

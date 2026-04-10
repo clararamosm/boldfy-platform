@@ -145,7 +145,7 @@ const WeeklyMissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
                 <div className="flex items-start justify-between gap-3">
                     <h3 className="font-headline text-sm font-semibold leading-tight line-clamp-1">{mission.name}</h3>
                     <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0 text-xs h-6">
-                        <CoinIcon className="h-3 w-3 mr-1" /> {mission.points} pts
+                        <CoinIcon size="sm" className="mr-1" /> {mission.points} pts
                     </Badge>
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{mission.description}</p>
@@ -251,7 +251,7 @@ const CompactMissionRow = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
                     {mission.name}
                 </span>
                 <Badge variant="secondary" className="bg-primary/10 text-primary text-[11px] h-5 px-1.5 shrink-0">
-                    <CoinIcon className="h-2.5 w-2.5 mr-0.5" /> {mission.points}
+                    <CoinIcon size="xs" className="mr-0.5" /> {mission.points}
                 </Badge>
                 <div className="shrink-0 ml-1">{renderCompactAction()}</div>
             </button>
@@ -332,7 +332,7 @@ export default function ColaboradorMissoesPage() {
     const [missions, setMissions] = useState<Mission[]>([]);
     const [historyMissions, setHistoryMissions] = useState<Mission[]>([]);
     const [trailMissions, setTrailMissions] = useState<Mission[]>([]);
-    const [stats, setStats] = useState({ weeklyPoints: 0, fixedProgress: 0, fixedCompleted: 0, fixedTotal: 0 });
+    const [stats, setStats] = useState({ totalMissionPoints: 0, fixedProgress: 0, fixedCompleted: 0, fixedTotal: 0 });
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
@@ -415,7 +415,8 @@ export default function ColaboradorMissoesPage() {
             setMissions(active);
             setHistoryMissions(history);
             setTrailMissions(trailActive);
-            setStats({ weeklyPoints: 0, fixedCompleted: completedFixed, fixedTotal: totalFixed, fixedProgress: totalFixed > 0 ? (completedFixed / totalFixed) * 100 : 0 });
+            const totalMissionPoints = history.filter(m => m.status === 'completa').reduce((sum, m) => sum + m.points, 0);
+            setStats({ totalMissionPoints, fixedCompleted: completedFixed, fixedTotal: totalFixed, fixedProgress: totalFixed > 0 ? (completedFixed / totalFixed) * 100 : 0 });
         } catch (error) {
             console.error("Error fetching missions: ", error);
             toast({ variant: 'destructive', title: t.colabMissions.toastFetchError, description: (error as Error).message });
@@ -487,9 +488,9 @@ export default function ColaboradorMissoesPage() {
                     <CardContent className="grid gap-4 md:grid-cols-2 p-4">
                         <div className="p-2">
                             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <CoinIcon className="h-4 w-4" /> {t.colabMissions.weeklyPoints}
+                                <CoinIcon size="lg" /> {t.colabMissions.weeklyPoints}
                             </div>
-                            <div className="text-3xl font-bold">{stats.weeklyPoints}</div>
+                            <div className="text-3xl font-bold">{stats.totalMissionPoints.toLocaleString()}</div>
                         </div>
                         <div className="p-2">
                             <div className="flex items-center justify-between gap-2 text-sm font-medium text-muted-foreground mb-2">

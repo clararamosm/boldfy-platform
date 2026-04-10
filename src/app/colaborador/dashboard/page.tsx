@@ -314,7 +314,7 @@ export default function ColaboradorDashboardPage() {
                     <Card>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                                <CoinIcon className="h-4 w-4 text-primary" />
+                                <CoinIcon size="lg" />
                                 <span className="text-xs font-medium">{t.colabDashboard.points}</span>
                             </div>
                             <p className="text-2xl font-bold">{data.points}</p>
@@ -584,7 +584,7 @@ export default function ColaboradorDashboardPage() {
                                                     {user.isCurrentUser ? (t.colabRankings?.you || 'Você') : user.name}
                                                 </span>
                                                 <Badge variant="secondary" className="bg-primary/10 text-primary text-[10px] h-5 px-1.5 shrink-0">
-                                                    <CoinIcon className="h-2.5 w-2.5 mr-0.5" />
+                                                    <CoinIcon size="xs" className="mr-0.5" />
                                                     {user.points.toLocaleString()}
                                                 </Badge>
                                             </div>

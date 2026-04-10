@@ -482,7 +482,7 @@ export default function AdminDashboardPage() {
             <CardContent className="pt-6 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-muted-foreground">{t.adminDashboard.pointsDistributed}</span>
-                <CoinIcon className="h-4 w-4 text-amber-500" />
+                <CoinIcon size="sm" />
               </div>
               <div className="text-3xl font-bold">{data.totalPointsDistributed.toLocaleString()}</div>
               <ComparisonBadge current={data.totalPointsDistributed} previous={data.prevPointsDistributed} />
@@ -534,7 +534,7 @@ export default function AdminDashboardPage() {
                         </p>
                       </div>
                       <Badge variant="secondary" className="bg-primary/10 text-primary shrink-0 text-xs">
-                        <CoinIcon className="h-3 w-3 mr-0.5" /> {collab.points.toLocaleString()}
+                        <CoinIcon size="xs" className="mr-0.5" /> {collab.points.toLocaleString()}
                       </Badge>
                     </div>
                   ))}

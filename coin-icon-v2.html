@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boldfy Coin v2 — Flat 3D + Animações</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f8f8fa; color: #1a1a2e; padding: 40px 24px; }
+  h1 { text-align: center; font-size: 26px; margin-bottom: 6px; color: #7C3AED; }
+  .subtitle { text-align: center; color: #666; margin-bottom: 40px; font-size: 13px; }
+  .section { margin-bottom: 48px; }
+  .section h2 { font-size: 17px; margin-bottom: 4px; color: #333; }
+  .section p { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .row { display: flex; gap: 32px; align-items: flex-end; flex-wrap: wrap; }
+  .coin-demo { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .coin-demo > span { font-size: 11px; color: #999; font-weight: 500; }
+  .bg-white { background: white; padding: 24px 32px; border-radius: 12px; border: 1px solid #e5e5ea; }
+  .bg-dark { background: #1a1a2e; padding: 24px 32px; border-radius: 12px; }
+  .bg-dark .coin-demo > span { color: #aaa; }
+  .divider { height: 1px; background: #e5e5ea; margin: 48px 0; }
+  .note { font-size: 12px; color: #aaa; margin-top: 8px; font-style: italic; }
+
+  /* ════════════════════════════════════════════════════
+     BASE COIN — Flat 3D (Option D evolved)
+     ════════════════════════════════════════════════════ */
+  .coin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #FFD700;
+    box-shadow: 0 3px 0 #B8960B, 0 4px 8px rgba(0,0,0,0.15);
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+  }
+  /* Inner ring */
+  .coin::after {
+    content: '';
+    position: absolute;
+    inset: 11%;
+    border-radius: 50%;
+    border: 1.5px solid rgba(139,101,8,0.18);
+    pointer-events: none;
+  }
+  /* Highlight gleam */
+  .coin::before {
+    content: '';
+    position: absolute;
+    top: 8%;
+    left: 14%;
+    width: 32%;
+    height: 22%;
+    background: radial-gradient(ellipse, rgba(255,255,255,0.55) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  /* Sizes */
+  .coin.sz-xs  { width: 16px; height: 16px; box-shadow: 0 1px 0 #B8960B, 0 1px 3px rgba(0,0,0,0.1); }
+  .coin.sz-sm  { width: 20px; height: 20px; box-shadow: 0 2px 0 #B8960B, 0 2px 4px rgba(0,0,0,0.12); }
+  .coin.sz-md  { width: 28px; height: 28px; box-shadow: 0 2px 0 #B8960B, 0 3px 6px rgba(0,0,0,0.12); }
+  .coin.sz-lg  { width: 40px; height: 40px; }
+  .coin.sz-xl  { width: 56px; height: 56px; }
+  .coin.sz-2xl { width: 80px; height: 80px; }
+  .coin.sz-3xl { width: 120px; height: 120px; box-shadow: 0 5px 0 #B8960B, 0 6px 14px rgba(0,0,0,0.18); }
+
+  /* B logo SVG inside */
+  .coin svg.b-logo {
+    width: 52%;
+    height: 52%;
+    position: relative;
+    z-index: 1;
+  }
+  .coin svg.b-logo path { fill: #7B5800; }
+
+  /* ════════════════════════════════════════════════════
+     ANIMATION: Small coins — quick spin (rodadinha)
+     ════════════════════════════════════════════════════ */
+  .coin.anim-spin:hover {
+    animation: quickSpin 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  @keyframes quickSpin {
+    0%   { transform: perspective(300px) rotateY(0deg) scale(1); }
+    40%  { transform: perspective(300px) rotateY(200deg) scale(1.08); }
+    100% { transform: perspective(300px) rotateY(360deg) scale(1); }
+  }
+
+  /* ════════════════════════════════════════════════════
+     ANIMATION: Large coins — spin + confetti burst
+     ════════════════════════════════════════════════════ */
+  .coin-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .coin.anim-burst:hover {
+    animation: burstSpin 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes burstSpin {
+    0%   { transform: perspective(400px) rotateY(0deg) scale(1); }
+    30%  { transform: perspective(400px) rotateY(180deg) scale(1.12); }
+    60%  { transform: perspective(400px) rotateY(360deg) scale(1.05); }
+    100% { transform: perspective(400px) rotateY(360deg) scale(1); }
+  }
+
+  /* Mini coin particles */
+  .coin-container .particle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #FFD700;
+    box-shadow: 0 1px 0 #B8960B;
+    opacity: 0;
+    pointer-events: none;
+    font-size: 5px;
+    font-weight: 800;
+    color: #7B5800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .coin-container .particle.p-lg {
+    width: 14px;
+    height: 14px;
+    font-size: 7px;
+  }
+
+  .coin-container:hover .particle { animation: burst 0.8s ease-out forwards; }
+  .coin-container:hover .particle:nth-child(2) { animation-delay: 0.02s; --dx: -35px; --dy: -40px; --rot: -120deg; }
+  .coin-container:hover .particle:nth-child(3) { animation-delay: 0.05s; --dx: 40px; --dy: -30px; --rot: 200deg; }
+  .coin-container:hover .particle:nth-child(4) { animation-delay: 0.03s; --dx: -40px; --dy: 15px; --rot: -200deg; }
+  .coin-container:hover .particle:nth-child(5) { animation-delay: 0.06s; --dx: 35px; --dy: 25px; --rot: 160deg; }
+  .coin-container:hover .particle:nth-child(6) { animation-delay: 0.04s; --dx: 0px; --dy: -48px; --rot: 90deg; }
+  .coin-container:hover .particle:nth-child(7) { animation-delay: 0.07s; --dx: -25px; --dy: 35px; --rot: -90deg; }
+  .coin-container:hover .particle:nth-child(8) { animation-delay: 0.01s; --dx: 28px; --dy: -45px; --rot: 260deg; }
+  .coin-container:hover .particle:nth-child(9) { animation-delay: 0.08s; --dx: -42px; --dy: -10px; --rot: -45deg; }
+
+  @keyframes burst {
+    0%   { opacity: 1; transform: translate(0,0) rotate(0deg) scale(0.4); }
+    40%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(var(--dx, 30px), var(--dy, -30px)) rotate(var(--rot, 180deg)) scale(0.2); }
+  }
+
+  /* Sparkle dots (non-coin confetti) */
+  .coin-container .sparkle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .sparkle.gold { background: #FFD700; }
+  .sparkle.purple { background: #bd58e7; }
+  .sparkle.white { background: #fff; box-shadow: 0 0 3px rgba(255,215,0,0.5); }
+
+  .coin-container:hover .sparkle { animation: sparkleBurst 0.7s ease-out forwards; }
+  .coin-container:hover .sparkle:nth-child(10) { --dx: 50px; --dy: -20px; animation-delay: 0.1s; }
+  .coin-container:hover .sparkle:nth-child(11) { --dx: -48px; --dy: -25px; animation-delay: 0.06s; }
+  .coin-container:hover .sparkle:nth-child(12) { --dx: 20px; --dy: 45px; animation-delay: 0.12s; }
+  .coin-container:hover .sparkle:nth-child(13) { --dx: -30px; --dy: -50px; animation-delay: 0.08s; }
+  .coin-container:hover .sparkle:nth-child(14) { --dx: 45px; --dy: 30px; animation-delay: 0.04s; }
+  .coin-container:hover .sparkle:nth-child(15) { --dx: -50px; --dy: 20px; animation-delay: 0.14s; }
+
+  @keyframes sparkleBurst {
+    0%   { opacity: 1; transform: translate(0,0) scale(1.5); }
+    50%  { opacity: 0.8; }
+    100% { opacity: 0; transform: translate(var(--dx, 30px), var(--dy, -30px)) scale(0); }
+  }
+
+  /* ════════════════════════════════════════════════════
+     VARIANT: Gray (trail pending)
+     ════════════════════════════════════════════════════ */
+  .coin.gray {
+    background: #d1d5db;
+    box-shadow: 0 2px 0 #9ca3af, 0 2px 4px rgba(0,0,0,0.08);
+  }
+  .coin.gray::after { border-color: rgba(107,114,128,0.15); }
+  .coin.gray::before { background: radial-gradient(ellipse, rgba(255,255,255,0.35) 0%, transparent 70%); }
+  .coin.gray svg.b-logo path { fill: #6b7280; }
+
+  /* ════════════════════════════════════════════════════
+     VARIANT: Green (trail completed)
+     ════════════════════════════════════════════════════ */
+  .coin.green {
+    background: linear-gradient(145deg, #4ade80, #22c55e);
+    box-shadow: 0 2px 0 #16a34a, 0 2px 4px rgba(22,163,74,0.2);
+  }
+  .coin.green::after { border-color: rgba(255,255,255,0.2); }
+  .coin.green::before { background: radial-gradient(ellipse, rgba(255,255,255,0.4) 0%, transparent 70%); }
+  .coin.green svg.b-logo path { fill: #fff; }
+
+  /* ════════════════════════════════════════════════════
+     MOCKUP styles
+     ════════════════════════════════════════════════════ */
+  .mockup { margin-top: 48px; }
+  .mockup h2 { font-size: 17px; margin-bottom: 4px; }
+  .mockup p { font-size: 13px; color: #888; margin-bottom: 16px; }
+
+  .stat-card {
+    display: inline-flex; flex-direction: column; gap: 4px;
+    padding: 16px 20px; background: white; border: 1px solid #e5e5ea;
+    border-radius: 12px; min-width: 160px;
+  }
+  .stat-card .top { display: flex; justify-content: space-between; align-items: center; }
+  .stat-card .label { font-size: 13px; color: #888; }
+  .stat-card .value { font-size: 24px; font-weight: 700; color: #1a1a2e; }
+  .stat-card .delta { font-size: 11px; color: #22c55e; }
+
+  .mission-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; background: white; border: 1px solid #e5e5ea;
+    border-radius: 10px; max-width: 440px;
+  }
+  .mission-row .info { flex: 1; }
+  .mission-row .info .name { font-size: 14px; font-weight: 600; }
+  .mission-row .info .desc { font-size: 12px; color: #888; }
+  .mission-row .points-badge { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: 700; color: #7B5800; }
+
+  .trail-step { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+  .trail-step .step-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
+  .trail-step .step-icon.pending { background: #e5e5ea; color: #999; }
+  .trail-step .step-icon.done { background: #22c55e; color: white; }
+  .trail-step .step-info .step-name { font-size: 14px; font-weight: 500; }
+  .trail-step .step-info .step-pts { font-size: 12px; color: #888; display: flex; align-items: center; gap: 5px; margin-top: 2px; }
+
+  .progress-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; }
+  .progress-bar { flex: 1; height: 8px; background: #e5e5ea; border-radius: 4px; overflow: hidden; }
+  .progress-bar .fill { height: 100%; background: linear-gradient(90deg, #7C3AED, #A855F7); border-radius: 4px; }
+  .progress-pts { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+
+  /* Ranking item mockup */
+  .rank-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .rank-pos { width: 22px; font-size: 13px; font-weight: 700; color: #999; text-align: center; }
+  .rank-avatar { width: 28px; height: 28px; border-radius: 50%; background: #e5e5ea; }
+  .rank-name { flex: 1; font-size: 13px; font-weight: 500; }
+  .rank-pts { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: #7B5800; }
+</style>
+</head>
+<body>
+
+<h1>Boldfy Coin v2 — Flat 3D + B da Marca</h1>
+<p class="subtitle">Passe o mouse: pequenas giram, grandes soltam moedinhas. Todas com o B da Boldfy.</p>
+
+<!-- ═══════════════════════════════════════════════════
+     SVG TEMPLATE — Boldfy "b" extracted from logo
+     ═══════════════════════════════════════════════════ -->
+
+<!-- ──────── TAMANHOS + SPIN (pequenos) ──────── -->
+<div class="section">
+  <h2>Tamanhos pequenos — Rodadinha no hover</h2>
+  <p>Para uso inline: stat cards, badges de pontos, listas, rankings</p>
+  <div class="bg-white">
+    <div class="row">
+      <div class="coin-demo">
+        <div class="coin sz-xs anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>16px</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-sm anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>20px</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-md anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>28px</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-lg anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>40px</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────── TAMANHOS GRANDES + BURST ──────── -->
+<div class="section">
+  <h2>Tamanhos grandes — Spin + confetti de moedinhas</h2>
+  <p>Para hero sections, conquistas, celebrações. Hover = moedinhas saem voando!</p>
+  <div class="bg-white">
+    <div class="row" style="gap: 48px;">
+
+      <div class="coin-demo">
+        <div class="coin-container">
+          <div class="coin sz-xl anim-burst">
+            <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+          </div>
+          <!-- Mini coin particles -->
+          <div class="particle">b</div>
+          <div class="particle p-lg">b</div>
+          <div class="particle">b</div>
+          <div class="particle p-lg">b</div>
+          <div class="particle">b</div>
+          <div class="particle p-lg">b</div>
+          <div class="particle">b</div>
+          <div class="particle">b</div>
+          <!-- Sparkle dots -->
+          <div class="sparkle gold"></div>
+          <div class="sparkle purple"></div>
+          <div class="sparkle white"></div>
+          <div class="sparkle gold"></div>
+          <div class="sparkle purple"></div>
+          <div class="sparkle white"></div>
+        </div>
+        <span>56px</span>
+      </div>
+
+      <div class="coin-demo">
+        <div class="coin-container">
+          <div class="coin sz-2xl anim-burst">
+            <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+          </div>
+          <div class="particle">b</div>
+          <div class="particle p-lg">b</div>
+          <div class="particle">b</div>
+          <div class="particle p-lg">b</div>
+          <div class="particle">b</div>
+          <div class="particle p-lg">b</div>
+          <div class="particle">b</div>
+          <div class="particle">b</div>
+          <div class="sparkle gold"></div>
+          <div class="sparkle purple"></div>
+          <div class="sparkle white"></div>
+          <div class="sparkle gold"></div>
+          <div class="sparkle purple"></div>
+          <div class="sparkle white"></div>
+        </div>
+        <span>80px</span>
+      </div>
+
+      <div class="coin-demo">
+        <div class="coin-container">
+          <div class="coin sz-3xl anim-burst">
+            <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+          </div>
+          <div class="particle">b</div>
+          <div class="particle p-lg">b</div>
+          <div class="particle">b</div>
+          <div class="particle p-lg">b</div>
+          <div class="particle">b</div>
+          <div class="particle p-lg">b</div>
+          <div class="particle">b</div>
+          <div class="particle">b</div>
+          <div class="sparkle gold"></div>
+          <div class="sparkle purple"></div>
+          <div class="sparkle white"></div>
+          <div class="sparkle gold"></div>
+          <div class="sparkle purple"></div>
+          <div class="sparkle white"></div>
+        </div>
+        <span>120px</span>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ──────── VARIANTES: CINZA / VERDE ──────── -->
+<div class="section">
+  <h2>Variantes para Trilhas</h2>
+  <p>Cinza = pendente/em progresso &nbsp;|&nbsp; Verde = concluído &nbsp;|&nbsp; Dourada = padrão (pontos)</p>
+  <div class="bg-white">
+    <div class="row">
+      <div class="coin-demo">
+        <div class="coin sz-md gray anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>Cinza (pendente)</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-md green anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>Verde (concluído)</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-md anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>Dourada (pontos)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────── FUNDO ESCURO ──────── -->
+<div class="section">
+  <h2>Em fundo escuro</h2>
+  <div class="bg-dark">
+    <div class="row">
+      <div class="coin-demo">
+        <div class="coin sz-lg anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>Dourada</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-lg gray anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>Cinza</span>
+      </div>
+      <div class="coin-demo">
+        <div class="coin sz-lg green anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        <span>Verde</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- ═══════════════════════════════════════════════════
+     MOCKUPS EM CONTEXTO
+     ═══════════════════════════════════════════════════ -->
+
+<!-- ──────── STAT CARD ──────── -->
+<div class="mockup">
+  <h2>Contexto: Stat Card do Dashboard</h2>
+  <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+    <div class="stat-card">
+      <div class="top">
+        <span class="label">Meus Pontos</span>
+        <div class="coin sz-sm anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+      </div>
+      <span class="value">2.450</span>
+      <span class="delta">+350 este mês</span>
+    </div>
+  </div>
+</div>
+
+<!-- ──────── MISSION ROW ──────── -->
+<div class="mockup">
+  <h2>Contexto: Missão com badge de pontos</h2>
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div class="mission-row">
+      <div style="width: 36px; height: 36px; background: #f5f0ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      </div>
+      <div class="info">
+        <div class="name">Compartilhe um post no LinkedIn</div>
+        <div class="desc">Missão semanal • Até 15/04</div>
+      </div>
+      <div class="points-badge">
+        <div class="coin sz-xs anim-spin">
+          <svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg>
+        </div>
+        150
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────── RANKING ──────── -->
+<div class="mockup">
+  <h2>Contexto: Ranking do Dashboard</h2>
+  <div style="background: white; padding: 16px; border-radius: 12px; border: 1px solid #e5e5ea; max-width: 300px;">
+    <div class="rank-row">
+      <div class="rank-pos" style="color: #FFD700; font-size: 15px;">1</div>
+      <div class="rank-avatar" style="background: #e0d4f5;"></div>
+      <div class="rank-name">Ana Silva</div>
+      <div class="rank-pts">
+        <div class="coin sz-xs anim-spin"><svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg></div>
+        3.200
+      </div>
+    </div>
+    <div class="rank-row">
+      <div class="rank-pos" style="color: #C0C0C0;">2</div>
+      <div class="rank-avatar" style="background: #dbeafe;"></div>
+      <div class="rank-name">Pedro Costa</div>
+      <div class="rank-pts">
+        <div class="coin sz-xs anim-spin"><svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg></div>
+        2.850
+      </div>
+    </div>
+    <div class="rank-row">
+      <div class="rank-pos" style="color: #CD7F32;">3</div>
+      <div class="rank-avatar" style="background: #fce7f3;"></div>
+      <div class="rank-name">Maria Oliveira</div>
+      <div class="rank-pts">
+        <div class="coin sz-xs anim-spin"><svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg></div>
+        2.400
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────── TRILHA PROGRESSO ──────── -->
+<div class="mockup">
+  <h2>Contexto: Progresso na Trilha</h2>
+  <p>Cinza = pendente, Verde = concluído, Barra de progresso com moedinha dourada</p>
+  <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e5e5ea; max-width: 440px;">
+    <div class="trail-step">
+      <div class="step-icon done">&#10003;</div>
+      <div class="step-info">
+        <div class="step-name">Introdução à Marca Pessoal</div>
+        <div class="step-pts">
+          <div class="coin sz-xs green anim-spin"><svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg></div>
+          <span style="color: #22c55e; font-weight: 600;">+50 conquistados</span>
+        </div>
+      </div>
+    </div>
+    <div class="trail-step">
+      <div class="step-icon done">&#10003;</div>
+      <div class="step-info">
+        <div class="step-name">Definindo seu Tom de Voz</div>
+        <div class="step-pts">
+          <div class="coin sz-xs green anim-spin"><svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg></div>
+          <span style="color: #22c55e; font-weight: 600;">+75 conquistados</span>
+        </div>
+      </div>
+    </div>
+    <div class="trail-step">
+      <div class="step-icon pending">3</div>
+      <div class="step-info">
+        <div class="step-name">Criando Conteúdo Estratégico</div>
+        <div class="step-pts">
+          <div class="coin sz-xs gray"><svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg></div>
+          <span style="color: #999;">100 pontos</span>
+        </div>
+      </div>
+    </div>
+    <div class="trail-step">
+      <div class="step-icon pending">4</div>
+      <div class="step-info">
+        <div class="step-name">Publicando com Confiança</div>
+        <div class="step-pts">
+          <div class="coin sz-xs gray"><svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg></div>
+          <span style="color: #999;">100 pontos</span>
+        </div>
+      </div>
+    </div>
+    <div class="progress-section">
+      <div class="progress-bar"><div class="fill" style="width: 38%;"></div></div>
+      <div class="progress-pts">
+        <div class="coin sz-xs anim-spin"><svg class="b-logo" viewBox="0 0 80 100"><path d="M0,96V2c0-1,.8-2,2-2h18c1,0,2,.8,2,2v30c0,1.2,1.4,2,2.4,1.2,1.6-1.1,3.5-2.1,5.8-2.9C33.6,29.1,37,28.5,40.4,28.5c6.7,0,12.3,1.6,17,4.9,4.6,3.2,8.2,7.5,10.6,12.9,2.4,5.3,3.7,11.2,3.7,17.6,0,7.6-1.6,14.3-4.8,20.1-3.2,5.8-7.8,10.4-14,13.7-6.1,3.3-13.5,4.9-22.2,4.9-6,0-11.6-.6-17-1.6-4.8-1-8.9-2-12.2-3.1-.6-.2-1-.8-1-1.4ZM21.5,62v20.5c0,.7.4,1.3,1.1,1.5.9.3,1.9.5,2.9.7,1.5.3,3.5.5,6,.5,5.6,0,10-1.8,13.2-5.5,3.2-3.7,4.8-8.5,4.8-14.5,0-2.9-.5-5.7-1.4-8.4-1-2.7-2.4-4.9-4.5-6.7-2-1.7-4.7-2.6-8-2.6-4.8,0-8.3,1.3-10.6,4-2.3,2.6-3.4,6.2-3.4,10.5Z"/></svg></div>
+        125 / 325
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+<p class="note" style="text-align: center;">
+  Base: Opção D (Flat 3D) &nbsp;•&nbsp; Letra: "b" extraído do logo SVG da Boldfy &nbsp;•&nbsp; Animação pequena: rodadinha &nbsp;•&nbsp; Animação grande: spin + confetti de moedinhas + sparkles
+</p>
+
+</body>
+</html>

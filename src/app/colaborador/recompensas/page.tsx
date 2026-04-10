@@ -60,7 +60,7 @@ const RewardCard = ({ reward, onRedeem, disabled, isSubmitting }: { reward: Rewa
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                 <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
-                    <CoinIcon className="h-3 w-3 mr-1"/> {reward.points.toLocaleString()}
+                    <CoinIcon size="xs" className="mr-1"/> {reward.points.toLocaleString()}
                 </Badge>
                 <ActionDialog
                     title={`${t.colabRewards.redeem} ${reward.name}?`}
@@ -100,7 +100,7 @@ const PointHistoryItem = ({ icon, description, date, points, type }: HistoryItem
             </div>
         </div>
         <Badge variant="secondary" className={`${type === 'gain' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} whitespace-nowrap shrink-0`}>
-            <CoinIcon className="h-3 w-3 mr-1"/> {type === 'gain' ? '+' : '-'}{points.toLocaleString()}
+            <CoinIcon size="xs" className="mr-1"/> {type === 'gain' ? '+' : '-'}{points.toLocaleString()}
         </Badge>
     </div>
 );

@@ -542,7 +542,7 @@ const en: Dictionary = {
   // ══════════════════════════════════════════════
   colabMissions: {
     title: 'Missions',
-    weeklyPoints: 'Weekly Mission Points',
+    weeklyPoints: 'Points earned from Missions',
     fixedProgress: 'Fixed Mission Progress',
     tabWeekly: 'Weekly Missions',
     tabFixed: 'Fixed Missions',

@@ -540,7 +540,7 @@ const ptBR = {
   // ══════════════════════════════════════════════
   colabMissions: {
     title: 'Missões',
-    weeklyPoints: 'Pontos de Missões da Semana',
+    weeklyPoints: 'Pontos ganhos com Missões',
     fixedProgress: 'Progresso em Missões Fixas',
     tabWeekly: 'Missões da Semana',
     tabFixed: 'Missões Fixas',
