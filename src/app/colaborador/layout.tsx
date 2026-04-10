@@ -138,7 +138,11 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
             )}
             {/* Block access when company subscription is expired */}
-            {subscription.isBlocked ? (
+            {subscription.loading ? (
+                <div className="flex items-center justify-center min-h-[60vh]">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+            ) : subscription.isBlocked ? (
                 <SubscriptionGate role="colaborador" plan={subscription.plan} />
             ) : (
                 children

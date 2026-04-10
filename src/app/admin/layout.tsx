@@ -151,7 +151,11 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 )}
                 <TrialBanner daysLeft={subscription.daysLeft} plan={subscription.plan} />
                 {/* Block access when subscription is expired — except /admin/configuracoes (billing page) */}
-                {subscription.isBlocked && !isMasterMode && pathname !== '/admin/configuracoes' ? (
+                {subscription.loading ? (
+                    <div className="flex items-center justify-center min-h-[60vh]">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                ) : subscription.isBlocked && !isMasterMode && pathname !== '/admin/configuracoes' ? (
                     <SubscriptionGate role="admin" plan={subscription.plan} />
                 ) : (
                     children
