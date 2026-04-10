@@ -103,7 +103,6 @@ function BillingCard({ companyId }: { companyId: string | undefined }) {
                 },
                 body: JSON.stringify({
                     seats: sub.totalLicenses || 5,
-                    isBeta: true,
                 }),
             });
             const data = await res.json();

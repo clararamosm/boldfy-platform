@@ -31,6 +31,10 @@ env:
   - variable: NOTION_API_KEY
     secret: NOTION_API_KEY
 
+  # --- Session cookie signing (required for login to work) ---
+  - variable: COOKIE_SECRET
+    secret: COOKIE_SECRET
+
   # --- Stripe (payments) ---
   - variable: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
     value: pk_live_51RWi7iAkR3p87HetSpR9E2ccYJRhb0qZFy8NMunwFSTD5V5Tbmo0G3dxttnj6v5yJhjTkH5ZCOEAsJ84tX80McOJ00qSlbtB0v
