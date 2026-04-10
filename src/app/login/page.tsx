@@ -38,6 +38,8 @@ function LoginForm() {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const userRole = userData.role;
+        // Set session cookie BEFORE redirect so middleware allows access
+        document.cookie = `boldfy-session=${userRole}; path=/; max-age=${60 * 60 * 24 * 14}; SameSite=Lax`;
         if (userRole === 'master') { router.push('/master/empresas'); }
         else if (userRole === 'admin') { router.push('/admin/dashboard'); }
         else if (userRole === 'colaborador') { router.push('/colaborador/dashboard'); }

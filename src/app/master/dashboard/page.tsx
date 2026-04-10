@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -12,24 +12,24 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Building2, BookOpen, Globe, LogIn, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
 import { useT } from '@/lib/i18n/context';
 
 
 type Company = {
     id: string;
     companyName: string;
-    status: 'Ativa' | 'Inativa';
+    status: 'Ativa' | 'Inativa' | 'Trial';
     licenses: number;
     adminProfile: { email: string };
     createdAt?: any;
+    activeSeats?: number;
 };
 
 type MasterStats = {
     activeCompanies: number;
     totalCollaborators: number;
     globalTrails: number;
-    avgEngagement: number; // Placeholder
+    activeCollaborators: number;
 };
 
 const StatCard = ({ title, value, description, icon: Icon, isLoading }: { title: string, value: string, description: string, icon: React.ElementType, isLoading: boolean }) => (
@@ -60,31 +60,53 @@ export default function MasterDashboardPage() {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                // Fetch companies
-                const companiesQuery = query(collection(db, "companies"), orderBy("createdAt", "desc"), limit(5));
-                const companiesSnap = await getDocs(companiesQuery);
-                const companiesList = companiesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Company[];
-                
+                // Fetch all companies
                 const allCompaniesSnap = await getDocs(collection(db, "companies"));
+                const allCompanies = allCompaniesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Company[];
 
+                // Fetch all collaborators (role=colaborador)
+                const collabQuery = query(collection(db, "users"), where("role", "==", "colaborador"));
+                const collabSnap = await getDocs(collabQuery);
 
-                // Fetch users to calculate total collaborators
-                const usersQuery = collection(db, "users");
-                const usersSnap = await getDocs(usersQuery);
-                const collaboratorsCount = usersSnap.size;
+                // Build per-company seat counts
+                const seatCounts: Record<string, number> = {};
+                collabSnap.docs.forEach(d => {
+                    const cId = d.data().companyId;
+                    if (cId) seatCounts[cId] = (seatCounts[cId] || 0) + 1;
+                });
 
-                const mockStats: MasterStats = {
-                    activeCompanies: allCompaniesSnap.docs.filter(c => c.data().status === 'Ativa').length,
-                    totalCollaborators: collaboratorsCount,
-                    globalTrails: 5, // Placeholder, would be fetched from a 'global-trails' collection
-                    avgEngagement: 78, // Placeholder
-                };
-                
-                setStats(mockStats);
-                setRecentCompanies(companiesList); 
+                // Count active collaborators (status === 'Ativo')
+                const activeCollabCount = collabSnap.docs.filter(d => d.data().status === 'Ativo').length;
+
+                // Fetch global trail count (sum trails across all globalSessions)
+                const sessionsSnap = await getDocs(collection(db, "globalSessions"));
+                let totalGlobalTrails = 0;
+                for (const sess of sessionsSnap.docs) {
+                    const trailsSnap = await getDocs(collection(db, `globalSessions/${sess.id}/trails`));
+                    totalGlobalTrails += trailsSnap.size;
+                }
+
+                // Recent companies (sorted desc by createdAt, top 5)
+                const sorted = [...allCompanies].sort((a, b) => {
+                    const da = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+                    const db2 = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+                    return db2.getTime() - da.getTime();
+                });
+
+                setRecentCompanies(sorted.slice(0, 5).map(c => ({
+                    ...c,
+                    activeSeats: seatCounts[c.id] || 0,
+                })));
+
+                setStats({
+                    activeCompanies: allCompanies.filter(c => c.status === 'Ativa' || c.status === 'Trial').length,
+                    totalCollaborators: collabSnap.size,
+                    globalTrails: totalGlobalTrails,
+                    activeCollaborators: activeCollabCount,
+                });
             } catch (error) {
                 console.error("Error fetching master data:", error);
-                 toast({ variant: 'destructive', title: t.masterDashboard.fetchError });
+                toast({ variant: 'destructive', title: t.masterDashboard.fetchError });
             } finally {
                 setIsLoading(false);
             }
@@ -100,7 +122,7 @@ export default function MasterDashboardPage() {
            <StatCard title={t.masterDashboard.activeCompanies} value={stats?.activeCompanies.toString() || '0'} description={t.masterDashboard.activeCompaniesDescription} icon={Building2} isLoading={isLoading} />
            <StatCard title={t.masterDashboard.totalCollaborators} value={stats?.totalCollaborators.toString() || '0'} description={t.masterDashboard.totalCollaboratorsDescription} icon={Users} isLoading={isLoading} />
            <StatCard title={t.masterDashboard.globalTrails} value={stats?.globalTrails.toString() || '0'} description={t.masterDashboard.globalTrailsDescription} icon={Globe} isLoading={isLoading} />
-           <StatCard title={t.masterDashboard.avgEngagement} value={`${stats?.avgEngagement || 0}%`} description={t.masterDashboard.avgEngagementDescription} icon={BookOpen} isLoading={isLoading} />
+           <StatCard title={t.masterDashboard.avgEngagement} value={stats?.activeCollaborators.toString() || '0'} description={t.masterDashboard.avgEngagementDescription} icon={BookOpen} isLoading={isLoading} />
         </div>
          <Card>
           <CardHeader>
