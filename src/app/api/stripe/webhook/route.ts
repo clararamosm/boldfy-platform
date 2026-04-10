@@ -12,6 +12,18 @@ import type Stripe from 'stripe';
 
 const BETA_MONTHS = 5; // 5 months at beta price, then full price
 
+/** Safely convert a Stripe timestamp (unix seconds, Date, or undefined) to a JS Date */
+function toFirestoreDate(value: unknown): Date {
+  if (value instanceof Date) return value;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    // Stripe timestamps are in seconds; if value < 1e12 it's seconds, otherwise ms
+    return value < 1e12 ? new Date(value * 1000) : new Date(value);
+  }
+  // Fallback: return current date to avoid Firestore crash
+  console.warn('toFirestoreDate received invalid value:', value);
+  return new Date();
+}
+
 export async function POST(req: NextRequest) {
   const stripe = getStripe();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -61,10 +73,9 @@ export async function POST(req: NextRequest) {
         if (session.subscription) {
           const subId = typeof session.subscription === 'string'
             ? session.subscription
-            : session.subscription;
-          const subResponse = await stripe.subscriptions.retrieve(subId as string);
+            : (session.subscription as { id: string })?.id;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const sub = ('data' in subResponse ? subResponse.data : subResponse) as any;
+          const sub = await stripe.subscriptions.retrieve(subId as string) as any;
           const seats = parseInt(sub.metadata.seats || '0', 10);
           const tier = sub.metadata.tier || '';
           const isBeta = sub.metadata.isBeta === 'true';
@@ -82,7 +93,7 @@ export async function POST(req: NextRequest) {
             'subscription.totalLicenses': seats,
             'subscription.tier': tier,
             'subscription.isBeta': isBeta,
-            'subscription.currentPeriodEnd': new Date(sub.current_period_end * 1000),
+            'subscription.currentPeriodEnd': toFirestoreDate(sub.current_period_end),
             'subscription.cancelAtPeriodEnd': sub.cancel_at_period_end || false,
           };
 
@@ -131,7 +142,7 @@ export async function POST(req: NextRequest) {
 
         await adminDb.collection('companies').doc(companyIdUpd).update({
           'subscription.status': statusMap[subUpdated.status] || subUpdated.status,
-          'subscription.currentPeriodEnd': new Date(subUpdated.current_period_end * 1000),
+          'subscription.currentPeriodEnd': toFirestoreDate(subUpdated.current_period_end),
           'subscription.cancelAtPeriodEnd': subUpdated.cancel_at_period_end,
         });
         break;
@@ -162,9 +173,8 @@ export async function POST(req: NextRequest) {
           : invoice.subscription?.id;
 
         if (failedSubId) {
-          const subResponse = await stripe.subscriptions.retrieve(failedSubId);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const failedSub = ('data' in subResponse ? subResponse.data : subResponse) as any;
+          const failedSub = await stripe.subscriptions.retrieve(failedSubId) as any;
           const companyIdFailed = failedSub.metadata?.companyId;
           if (companyIdFailed) {
             await adminDb.collection('companies').doc(companyIdFailed).update({
