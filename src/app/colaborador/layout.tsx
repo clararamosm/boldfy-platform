@@ -1,10 +1,8 @@
 'use client';
 
 import type React from "react";
-import { useState, useEffect } from 'react';
 import { signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { SidebarHeader, SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
 import Logo from "@/components/logo";
 import { ColaboradorSidebarNav } from "@/components/dashboard/colaborador-sidebar-nav";
@@ -15,61 +13,26 @@ import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { LogOut, User as UserIcon, Loader2, AlertTriangle, Linkedin, HelpCircle } from "lucide-react";
-import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { AuthProvider } from "@/contexts/auth-context";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { interpolate } from "@/lib/i18n/interpolate";
-import type { Locale } from "@/lib/i18n/types";
-
-type TokenStatus = 'valid' | 'expiring_soon' | 'expired' | 'not_connected';
-
-function getTokenStatus(rawData: Record<string, unknown>): { status: TokenStatus; daysLeft: number } {
-    const connection = rawData?.linkedinConnection as { tokenExpiresAt?: number } | undefined;
-    if (!connection?.tokenExpiresAt) return { status: 'not_connected', daysLeft: 0 };
-    const now = Date.now();
-    const msLeft = connection.tokenExpiresAt - now;
-    const daysLeft = Math.floor(msLeft / (1000 * 60 * 60 * 24));
-    if (msLeft <= 0) return { status: 'expired', daysLeft: 0 };
-    if (daysLeft <= 7) return { status: 'expiring_soon', daysLeft };
-    return { status: 'valid', daysLeft };
-}
+import { useAuthGuard } from "@/hooks/use-auth-guard";
 
 function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
-    const { user, loading } = useAuth();
+    const { user, loading, ready, locale, tokenStatus } = useAuthGuard({
+        role: 'colaborador',
+        checkLinkedInToken: true,
+    });
     const router = useRouter();
-    const [tokenStatus, setTokenStatus] = useState<{ status: TokenStatus; daysLeft: number }>({ status: 'not_connected', daysLeft: 0 });
-    const [companyLocale, setCompanyLocale] = useState<Locale>('pt-BR');
-
-    useEffect(() => {
-        if (loading) return;
-        if (!user) {
-            router.push('/login');
-            return;
-        }
-        if (user.role !== 'colaborador') {
-            router.push('/login');
-            return;
-        }
-        if (user.rawData) {
-            setTokenStatus(getTokenStatus(user.rawData));
-        }
-        // Buscar locale da empresa
-        if (user.companyId) {
-            getDoc(doc(db, 'companies', user.companyId)).then((compDoc) => {
-                if (compDoc.exists()) {
-                    setCompanyLocale((compDoc.data().locale as Locale) || 'pt-BR');
-                }
-            });
-        }
-    }, [user, loading, router]);
 
     const handleLogout = async () => {
         await signOut(auth);
         router.push('/login');
     };
 
-    if (loading || !user) {
+    if (loading || !ready || !user) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -143,7 +106,7 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
     );
 
     return (
-        <LocaleProvider locale={companyLocale}>
+        <LocaleProvider locale={locale}>
         <DashboardLayout sidebar={sidebarContent}>
             {tokenStatus.status === 'expired' && (
                 <div className="bg-red-50 border-b border-red-200 px-4 py-2.5 flex items-center justify-between dark:bg-red-950/30 dark:border-red-900">

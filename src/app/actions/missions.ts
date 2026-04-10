@@ -17,7 +17,12 @@ export async function submitMissionProof(
   proofFileName: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    await requireSelf(idToken, userId);
+    const authUser = await requireSelf(idToken, userId);
+
+    // Validate user belongs to the company
+    if (authUser.companyId !== companyId) {
+      return { error: 'Acesso negado: você não pertence a esta empresa.' };
+    }
 
     const missionDoc = await adminDb
       .collection('companies')
@@ -75,7 +80,12 @@ export async function completeMissionSelf(
   userName: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    await requireSelf(idToken, userId);
+    const authUser = await requireSelf(idToken, userId);
+
+    // Validate user belongs to the company
+    if (authUser.companyId !== companyId) {
+      return { error: 'Acesso negado: você não pertence a esta empresa.' };
+    }
 
     const missionDoc = await adminDb
       .collection('companies')

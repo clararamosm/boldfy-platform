@@ -81,8 +81,9 @@ export async function handleAlignContent(
     const idToken = formData.get('idToken') as string;
     if (!idToken) return { error: 'Token de autenticação ausente.', alignedContent: null };
 
+    let authUser;
     try {
-      await requireAuth(idToken);
+      authUser = await requireAuth(idToken);
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Erro de autenticação.', alignedContent: null };
     }
@@ -100,6 +101,11 @@ export async function handleAlignContent(
     }
 
     const { content, companyId, userId, format, length } = validatedData.data;
+
+    // Validate user belongs to the company
+    if (authUser.companyId !== companyId) {
+      return { error: 'Acesso negado: você não pertence a esta empresa.', alignedContent: null };
+    }
 
     const companyProfile = await getCompanyProfile(companyId);
     const personalBranding = await getPersonalBranding(userId);
@@ -165,10 +171,16 @@ export async function generateHooks(input: GenerateHooksInput): Promise<Generate
   try {
     if (!input.idToken) return { error: 'Token de autenticação ausente.' };
 
+    let authUser;
     try {
-      await requireAuth(input.idToken);
+      authUser = await requireAuth(input.idToken);
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Erro de autenticação.' };
+    }
+
+    // Validate user belongs to the company
+    if (authUser.companyId !== input.companyId) {
+      return { error: 'Acesso negado: você não pertence a esta empresa.' };
     }
 
     const companyProfile = await getCompanyProfile(input.companyId);
@@ -269,10 +281,16 @@ export async function generateWithHook(input: GenerateWithHookInput): Promise<Al
   try {
     if (!input.idToken) return { error: 'Token de autenticação ausente.', alignedContent: null };
 
+    let authUser;
     try {
-      await requireAuth(input.idToken);
+      authUser = await requireAuth(input.idToken);
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Erro de autenticação.', alignedContent: null };
+    }
+
+    // Validate user belongs to the company
+    if (authUser.companyId !== input.companyId) {
+      return { error: 'Acesso negado: você não pertence a esta empresa.', alignedContent: null };
     }
 
     const companyProfile = await getCompanyProfile(input.companyId);

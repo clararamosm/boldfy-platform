@@ -18,6 +18,16 @@ service cloud.firestore {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'companyName', 'points']);
     }
 
+    // Prevent excessively large documents (max 20 fields at root level)
+    function isReasonableSize() {
+      return request.resource.data.keys().size() <= 30;
+    }
+
+    // Validate string field is not absurdly long (max 10KB)
+    function isReasonableString(field) {
+      return field is string && field.size() <= 10000;
+    }
+
     // Rules for the 'users' collection
     match /users/{userId} {
       // Only server actions create users (via Admin SDK, which bypasses rules)
@@ -32,12 +42,26 @@ service cloud.firestore {
 
       // A user can update their own profile and personal branding data,
       // but CANNOT change role, companyId, or companyName.
-      allow update: if request.auth.uid == userId && isNotChangingProtectedFields();
+      allow update: if request.auth.uid == userId
+                    && isNotChangingProtectedFields()
+                    && isReasonableSize();
 
       // Rules for user subcollections (trailProgress, etc.)
       match /trailProgress/{trailId} {
-        // User can read and write their own progress
-        allow read, write: if request.auth.uid == userId;
+        // User can read their own progress
+        allow read: if request.auth.uid == userId;
+
+        // User can create initial progress (pontosGanhos must be 0)
+        allow create: if request.auth.uid == userId
+                      && request.resource.data.pontosGanhos == 0
+                      && request.resource.data.concluida == false;
+
+        // User can update progress but cannot set pontosGanhos > 5000 (safety cap)
+        // Full point calculation is done server-side via recalculatePoints
+        allow update: if request.auth.uid == userId
+                      && request.resource.data.pontosGanhos is number
+                      && request.resource.data.pontosGanhos >= 0
+                      && request.resource.data.pontosGanhos <= 5000;
 
         // Admin can read progress of users in their company
         allow read: if hasRole(request.auth.uid, 'admin')
@@ -52,9 +76,17 @@ service cloud.firestore {
         allow read: if request.auth.uid == userId;
       }
 
-      // Points history — created by server actions (Admin SDK)
+      // Points history — trail completions from client, missions from server (Admin SDK)
       match /pointsHistory/{historyId} {
         allow read: if request.auth.uid == userId;
+
+        // Allow client to create trail completion entries (capped at 5000 points)
+        allow create: if request.auth.uid == userId
+                      && request.resource.data.type == 'gain'
+                      && request.resource.data.source == 'trilha'
+                      && request.resource.data.points is number
+                      && request.resource.data.points >= 0
+                      && request.resource.data.points <= 5000;
 
         // Admin can read points history of users in their company
         allow read: if hasRole(request.auth.uid, 'admin')
@@ -96,8 +128,12 @@ service cloud.firestore {
       // Rules for company subcollections (sessions, activatedGlobalTrails, assets, etc.)
       match /{subcollection}/{docId} {
         // Admins of the company and master admins can manage subcollections
-        allow read, write: if request.auth != null
-                         && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
+        allow read: if request.auth != null
+                    && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
+
+        allow write: if request.auth != null
+                     && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') )
+                     && isReasonableSize();
 
         // Colaboradores can only read data from subcollections
         allow read: if request.auth != null
@@ -105,8 +141,12 @@ service cloud.firestore {
 
         // Deep subcollections (e.g., sessions/{id}/trails/{id})
         match /{deepSub}/{deepDocId} {
-          allow read, write: if request.auth != null
-                           && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
+          allow read: if request.auth != null
+                      && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
+
+          allow write: if request.auth != null
+                       && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') )
+                       && isReasonableSize();
 
           allow read: if request.auth != null
                       && hasRole(request.auth.uid, 'colaborador') && getCompanyId(request.auth.uid) == companyId;

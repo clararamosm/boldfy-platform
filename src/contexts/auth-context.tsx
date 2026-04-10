@@ -1,10 +1,18 @@
 // src/contexts/auth-context.tsx
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+
+// Session cookie helpers — used by middleware.ts for server-side route protection
+function setSessionCookie(role: string) {
+  document.cookie = `boldfy-session=${role}; path=/; max-age=${60 * 60 * 24 * 14}; SameSite=Lax`;
+}
+function clearSessionCookie() {
+  document.cookie = 'boldfy-session=; path=/; max-age=0';
+}
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -57,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!fbUser) {
         setUser(null);
         setFirebaseUser(null);
+        clearSessionCookie();
         setLoading(false);
         return;
       }
@@ -67,21 +76,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
         if (userDoc.exists()) {
           const data = userDoc.data();
+          const role = data.role || '';
           setUser({
             uid: fbUser.uid,
             name: data.profile?.name || data.name || '',
             email: data.profile?.email || data.email || fbUser.email || '',
-            role: data.role || '',
+            role,
             companyId: data.companyId,
             profile: data.profile,
             rawData: data,
           });
+          setSessionCookie(role);
         } else {
           setUser(null);
+          clearSessionCookie();
         }
       } catch (err) {
         console.error('AuthProvider: Error fetching user data:', err);
         setUser(null);
+        clearSessionCookie();
       }
 
       setLoading(false);

@@ -1,7 +1,7 @@
 'use client';
 
 import type React from "react";
-import { useEffect } from 'react';
+import { Suspense } from 'react';
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
@@ -13,31 +13,20 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogOut, Loader2 } from "lucide-react";
-import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { AuthProvider } from "@/contexts/auth-context";
 import { LocaleProvider } from "@/lib/i18n/context";
+import { useAuthGuard } from "@/hooks/use-auth-guard";
 
 function MasterLayoutInner({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, ready } = useAuthGuard({ role: 'master' });
   const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-    if (user.role !== 'master') {
-      router.push('/login');
-      return;
-    }
-  }, [user, loading, router]);
 
   const handleLogout = async () => {
     await signOut(auth);
     router.push('/login');
   };
 
-  if (loading || !user) {
+  if (loading || !ready || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -106,7 +95,9 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
 export default function MasterLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <MasterLayoutInner>{children}</MasterLayoutInner>
+      <Suspense fallback={<div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-purple-600" /></div>}>
+        <MasterLayoutInner>{children}</MasterLayoutInner>
+      </Suspense>
     </AuthProvider>
   );
 }

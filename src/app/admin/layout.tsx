@@ -12,14 +12,14 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle } from "lucide-react";
 import { differenceInDays, parseISO } from 'date-fns';
-import { AuthProvider, useAuth } from "@/contexts/auth-context";
+import { AuthProvider } from "@/contexts/auth-context";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
-import type { Locale } from "@/lib/i18n/types";
+import { useAuthGuard } from "@/hooks/use-auth-guard";
 
 type CompanyStatus = 'Ativa' | 'Inativa' | 'Trial';
 
@@ -69,57 +69,8 @@ const TrialNotification = ({ companyId }: { companyId: string | undefined }) => 
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
-    const { user, loading } = useAuth();
-    const [companyId, setCompanyId] = useState<string | undefined>(undefined);
-    const [companyLocale, setCompanyLocale] = useState<Locale>('pt-BR');
+    const { user, companyId, locale, loading, ready, isMasterMode, masterCompanyName } = useAuthGuard({ role: 'admin' });
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const [isMaster, setIsMaster] = useState(false);
-    const [masterCompanyName, setMasterCompanyName] = useState('');
-    const [ready, setReady] = useState(false);
-
-    useEffect(() => {
-        if (loading) return;
-        if (!user) {
-            router.push('/login');
-            return;
-        }
-        if (user.role !== 'admin' && user.role !== 'master') {
-            router.push('/login');
-            return;
-        }
-
-        // Master: usar companyId da URL; Admin: usar do doc
-        if (user.role === 'master') {
-            const urlCompanyId = searchParams.get('companyId');
-            if (urlCompanyId) {
-                setCompanyId(urlCompanyId);
-                setIsMaster(true);
-                // Buscar nome + locale da empresa para o banner
-                getDoc(doc(db, 'companies', urlCompanyId)).then((compDoc) => {
-                    if (compDoc.exists()) {
-                        const data = compDoc.data();
-                        setMasterCompanyName(data.companyName || '');
-                        setCompanyLocale((data.locale as Locale) || 'pt-BR');
-                    }
-                });
-            } else {
-                router.push('/master/empresas');
-                return;
-            }
-        } else {
-            setCompanyId(user.companyId);
-            // Buscar locale da empresa do admin
-            if (user.companyId) {
-                getDoc(doc(db, 'companies', user.companyId)).then((compDoc) => {
-                    if (compDoc.exists()) {
-                        setCompanyLocale((compDoc.data().locale as Locale) || 'pt-BR');
-                    }
-                });
-            }
-        }
-        setReady(true);
-    }, [user, loading, router, searchParams]);
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -200,9 +151,9 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     );
 
     return (
-        <LocaleProvider locale={companyLocale}>
+        <LocaleProvider locale={locale}>
             <DashboardLayout sidebar={sidebarContent}>
-                {isMaster && (
+                {isMasterMode && (
                   <div className="bg-purple-600 text-white px-4 py-2 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4" />

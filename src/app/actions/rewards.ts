@@ -15,7 +15,12 @@ export async function redeemReward(
   userName: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    await requireSelf(idToken, userId);
+    const authUser = await requireSelf(idToken, userId);
+
+    // Validate user belongs to the company they're redeeming from
+    if (authUser.companyId !== companyId) {
+      return { error: 'Acesso negado: você não pertence a esta empresa.' };
+    }
 
     const rewardDoc = await adminDb
       .collection('companies')
