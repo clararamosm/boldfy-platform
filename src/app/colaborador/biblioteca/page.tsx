@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, getDocs, query, doc, getDoc, orderBy, deleteDoc } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Download, Star, ClipboardCopy, Check, Trash2, ChevronLeft, ChevronRight, Sparkles, FolderOpen, ArrowRight } from "lucide-react";
@@ -265,7 +265,7 @@ export default function ColaboradorBibliotecaPage() {
     const [generatedContent, setGeneratedContent] = useState<GeneratedContent[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isLoadingContent, setIsLoadingContent] = useState(true);
-    const [userId, setUserId] = useState<string | null>(null);
+    const { user: authUser } = useAuth();
     const [companyId, setCompanyId] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState<Section>('conteudos');
     const [contentPage, setContentPage] = useState(1);
@@ -321,34 +321,29 @@ export default function ColaboradorBibliotecaPage() {
     }, []);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-            if (user) {
-                setUserId(user.uid);
-                const userDocRef = doc(db, "users", user.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    const cId = userDocSnap.data().companyId;
-                    setCompanyId(cId);
-                    fetchAssets(cId);
-                    fetchGeneratedContent(user.uid);
-                } else {
-                    toast({ variant: 'destructive', title: t.colabLibrary.userError });
-                    setIsLoading(false);
-                    setIsLoadingContent(false);
-                }
+        if (!authUser?.uid) return;
+        const init = async () => {
+            const userDocRef = doc(db, "users", authUser.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+                const cId = userDocSnap.data().companyId;
+                setCompanyId(cId);
+                fetchAssets(cId);
+                fetchGeneratedContent(authUser.uid);
             } else {
+                toast({ variant: 'destructive', title: t.colabLibrary.userError });
                 setIsLoading(false);
                 setIsLoadingContent(false);
             }
-        });
-        return () => unsubscribe();
-    }, [fetchAssets, fetchGeneratedContent, toast]);
+        };
+        init();
+    }, [authUser?.uid, fetchAssets, fetchGeneratedContent, toast]);
 
     // ── Handlers ─────────────────────────────────────────────────
     const handleStarToggle = async (contentId: string, starred: boolean) => {
-        if (!userId) return;
+        if (!authUser?.uid) return;
         const token = await getAuthToken();
-        const result = await toggleStarContent(token, userId, contentId, starred);
+        const result = await toggleStarContent(token, authUser.uid, contentId, starred);
         if (result.success) {
             setGeneratedContent(prev =>
                 prev.map(item => item.id === contentId ? { ...item, starred } : item)
@@ -357,9 +352,9 @@ export default function ColaboradorBibliotecaPage() {
     };
 
     const handleDeleteContent = async (contentId: string) => {
-        if (!userId) return;
+        if (!authUser?.uid) return;
         try {
-            await deleteDoc(doc(db, 'users', userId, 'generatedContent', contentId));
+            await deleteDoc(doc(db, 'users', authUser.uid, 'generatedContent', contentId));
             setGeneratedContent(prev => prev.filter(item => item.id !== contentId));
             toast({ title: t.colabLibrary.contentRemoved });
         } catch {
@@ -409,7 +404,7 @@ export default function ColaboradorBibliotecaPage() {
                     <GeneratedContentCard
                         key={item.id}
                         item={item}
-                        userId={userId!}
+                        userId={authUser!.uid}
                         onStarToggle={handleStarToggle}
                         onDelete={handleDeleteContent}
                         onUseLegenda={handleUseLegenda}

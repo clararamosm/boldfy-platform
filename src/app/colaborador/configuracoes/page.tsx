@@ -14,8 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Linkedin, ExternalLink, Unlink, CheckCircle2, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -79,7 +79,8 @@ function SettingsPageContent() {
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const { user: authUser } = useAuth();
+    const currentUserId = authUser?.uid || null;
     const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
     const [branding, setBranding] = useState<BrandingData>({ voice: '', expertise: '', value: '', position: '', languageStyle: '', contentPillars: '' });
     const [linkedinConnection, setLinkedinConnection] = useState<LinkedInConnectionData>(null);
@@ -131,23 +132,8 @@ function SettingsPageContent() {
     }, [toast]);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
-            if (user) {
-                setCurrentUserId(user.uid);
-                fetchData(user.uid);
-            } else {
-                setCurrentUserId(null);
-                setIsLoading(false);
-                toast({
-                    title: "Usuário não autenticado",
-                    description: "Faça login para acessar as configurações.",
-                    variant: "destructive",
-                });
-            }
-        });
-
-        return () => unsubscribe();
-    }, [fetchData, toast]);
+        if (currentUserId) fetchData(currentUserId);
+    }, [currentUserId, fetchData]);
 
     const searchParams = useSearchParams();
     useEffect(() => {

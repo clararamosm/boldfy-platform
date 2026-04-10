@@ -2,9 +2,9 @@
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
@@ -44,7 +44,8 @@ function EditorContent() {
   const t = useT();
   const locale = useLocale();
   const dateFnsLocale = getDateLocale(locale);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user: authUser } = useAuth();
+  const userId = authUser?.uid || null;
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -80,25 +81,20 @@ function EditorContent() {
     }
   }, [searchParams]);
 
-  // Auth + LinkedIn status
+  // LinkedIn status check
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        router.push('/login');
-        return;
-      }
-      setUserId(firebaseUser.uid);
-      setIsLoading(false);
-      // Check LinkedIn status + profile data for preview
-      const tkn = await firebaseUser.getIdToken();
-      const status = await getLinkedInStatus(tkn, firebaseUser.uid);
+    if (!userId) return;
+    setIsLoading(false);
+    const checkLinkedIn = async () => {
+      const tkn = await getAuthToken();
+      const status = await getLinkedInStatus(tkn, userId);
       setLinkedinConnected(status.connected && !!status.tokenValid);
       if (status.name) setProfileName(status.name);
       if (status.picture) setProfilePicture(status.picture);
       if (status.headline) setProfileHeadline(status.headline);
-    });
-    return () => unsubscribe();
-  }, [router]);
+    };
+    checkLinkedIn();
+  }, [userId]);
 
   // Media file handling
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {

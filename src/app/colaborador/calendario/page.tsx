@@ -2,9 +2,9 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -110,7 +110,8 @@ export default function CalendarioPage() {
   const locale = useLocale();
   const dateFnsLocale = getDateLocale(locale);
   const statusConfig = useMemo(() => getStatusConfig(t), [t]);
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user: authUser } = useAuth();
+  const userId = authUser?.uid || null;
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -118,18 +119,6 @@ export default function CalendarioPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const { toast } = useToast();
   const router = useRouter();
-
-  // Auth
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        router.push('/login');
-        return;
-      }
-      setUserId(firebaseUser.uid);
-    });
-    return () => unsubscribe();
-  }, [router]);
 
   // Fetch posts
   const fetchPosts = useCallback(async () => {

@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import {
   collection, doc, getDocs, getDoc, query, orderBy
 } from 'firebase/firestore';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { useAuth } from '@/contexts/auth-context';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -94,12 +94,7 @@ function ScrollableTrailRow({ children }: { children: React.ReactNode }) {
 }
 
 export default function ColaboradorTrilhasPage() {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsubscribe();
-  }, []);
+  const { user: authUser } = useAuth();
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionsWithTrails, setSessionsWithTrails] = useState<SessionWithTrails[]>([]);
@@ -109,17 +104,17 @@ export default function ColaboradorTrilhasPage() {
 
   // Get company ID
   useEffect(() => {
-    if (!user) return;
+    if (!authUser?.uid) return;
     const fetch = async () => {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userDoc = await getDoc(doc(db, 'users', authUser.uid));
       if (userDoc.exists()) setCompanyId(userDoc.data().companyId || null);
     };
     fetch();
-  }, [user]);
+  }, [authUser?.uid]);
 
   // Load all available trails (global activated + company custom)
   const loadTrails = useCallback(async () => {
-    if (!companyId || !user) return;
+    if (!companyId || !authUser?.uid) return;
     setLoading(true);
     try {
       const allSessions: SessionWithTrails[] = [];
@@ -165,7 +160,7 @@ export default function ColaboradorTrilhasPage() {
       }
 
       // 3. Load user progress for all trails
-      const progressSnap = await getDocs(collection(db, `users/${user.uid}/trailProgress`));
+      const progressSnap = await getDocs(collection(db, `users/${authUser.uid}/trailProgress`));
       const progressMap: Record<string, ProgressoTrilha> = {};
       progressSnap.docs.forEach(d => { progressMap[d.id] = d.data() as ProgressoTrilha; });
 
@@ -191,7 +186,7 @@ export default function ColaboradorTrilhasPage() {
     } finally {
       setLoading(false);
     }
-  }, [companyId, user]);
+  }, [companyId, authUser?.uid]);
 
   useEffect(() => { if (companyId) loadTrails(); }, [companyId, loadTrails]);
 

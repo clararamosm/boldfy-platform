@@ -10,8 +10,7 @@ import { CoinIcon } from "@/components/coin-icon";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import React, { useState, useEffect, useCallback } from 'react';
-import { auth } from "@/lib/firebase";
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { useAuth } from '@/contexts/auth-context';
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getAuthToken } from '@/lib/auth-client';
@@ -74,10 +73,10 @@ const PageSkeleton = () => (
 
 export default function RankingsPage() {
   const t = useT();
+  const { user: authUser } = useAuth();
   const [generalRanking, setGeneralRanking] = useState<UserRanking[]>([]);
   const [monthlyPrizeName, setMonthlyPrizeName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchData = useCallback(async (userId: string) => {
@@ -113,22 +112,10 @@ export default function RankingsPage() {
   }, [toast]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
-      if (user) {
-        setCurrentUserId(user.uid);
-        fetchData(user.uid);
-      } else {
-        setCurrentUserId(null);
-        setIsLoading(false);
-        toast({
-          variant: 'destructive',
-          title: t.colabRankings.authError,
-          description: t.colabRankings.authErrorDescription,
-        });
-      }
-    });
-    return () => unsubscribe();
-  }, [fetchData, toast]);
+    if (authUser?.uid) {
+      fetchData(authUser.uid);
+    }
+  }, [authUser?.uid, fetchData]);
 
   const top3 = generalRanking.slice(0, 3);
 

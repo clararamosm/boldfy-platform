@@ -1,9 +1,9 @@
 // src/app/colaborador/dashboard/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import React, { useState, useEffect, useCallback } from 'react';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import {
     collection, getDocs, getDoc, doc, query, where, orderBy, limit
 } from 'firebase/firestore';
@@ -166,6 +166,7 @@ const LinkedInSkeleton = () => (
 
 // ---- Main Component ----
 export default function ColaboradorDashboardPage() {
+    const { user: authUser } = useAuth();
     const [data, setData] = useState<DashboardData | null>(null);
     const [linkedinMetrics, setLinkedinMetrics] = useState<DashboardMetrics | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -173,106 +174,94 @@ export default function ColaboradorDashboardPage() {
     const { toast } = useToast();
     const t = useT();
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-            if (!user) return;
+    const fetchDashboard = useCallback(async (uid: string) => {
+        try {
+            const userDocRef = doc(db, "users", uid);
+            const userDocSnap = await getDoc(userDocRef);
 
+            if (!userDocSnap.exists()) return;
+
+            const userData = userDocSnap.data();
+            const companyId = userData.companyId;
+            if (!companyId) return;
+
+            const [missionsSnap, trailsSnap, rewardsSnap, progressSnap] = await Promise.all([
+                getDocs(query(
+                    collection(db, "companies", companyId, "missions"),
+                    where("status", "==", "Ativa"),
+                    limit(5)
+                )),
+                getDocs(query(
+                    collection(db, "companies", companyId, "trails"),
+                    where("active", "==", true),
+                    orderBy("order", "asc")
+                )),
+                getDocs(collection(db, "companies", companyId, "rewards")),
+                getDocs(collection(db, "users", uid, "trailProgress"))
+            ]);
+
+            const missions: Mission[] = missionsSnap.docs.map(d => ({
+                id: d.id,
+                title: d.data().title || d.data().name || 'Sem titulo',
+                points: d.data().points || 0,
+                status: d.data().status || ''
+            }));
+
+            const progressMap: Record<string, number[]> = {};
+            progressSnap.docs.forEach(d => {
+                progressMap[d.id] = d.data().completedPhases || [];
+            });
+
+            const trails: Trail[] = trailsSnap.docs.map(d => {
+                const tData = d.data();
+                const totalPhases = (tData.phases || []).length;
+                const completed = progressMap[d.id] || [];
+                const completedCount = completed.length;
+                const progress = totalPhases > 0 ? Math.round((completedCount / totalPhases) * 100) : 0;
+                return { id: d.id, title: tData.title || 'Sem titulo', totalPhases, completedPhases: completedCount, progress };
+            });
+
+            const completedTrails = trails.filter(tr => tr.progress === 100).length;
+
+            setData({
+                userName: userData.profile?.name || userData.name || 'Colaborador',
+                points: userData.points || 0,
+                activeMissions: missions,
+                trails,
+                availableRewards: rewardsSnap.docs.length,
+                completedTrails,
+                totalTrails: trails.length
+            });
+
+            setIsLoading(false);
+
+            // Fetch LinkedIn metrics (non-blocking)
             try {
-                const userDocRef = doc(db, "users", user.uid);
-                const userDocSnap = await getDoc(userDocRef);
-
-                if (!userDocSnap.exists()) return;
-
-                const userData = userDocSnap.data();
-                const companyId = userData.companyId;
-                if (!companyId) return;
-
-                // Fetch dashboard data + LinkedIn metrics in parallel
-                const [missionsSnap, trailsSnap, rewardsSnap, progressSnap] = await Promise.all([
-                    getDocs(query(
-                        collection(db, "companies", companyId, "missions"),
-                        where("status", "==", "Ativa"),
-                        limit(5)
-                    )),
-                    getDocs(query(
-                        collection(db, "companies", companyId, "trails"),
-                        where("active", "==", true),
-                        orderBy("order", "asc")
-                    )),
-                    getDocs(collection(db, "companies", companyId, "rewards")),
-                    getDocs(collection(db, "users", user.uid, "trailProgress"))
-                ]);
-
-                // Process missions
-                const missions: Mission[] = missionsSnap.docs.map(d => ({
-                    id: d.id,
-                    title: d.data().title || d.data().name || 'Sem titulo',
-                    points: d.data().points || 0,
-                    status: d.data().status || ''
-                }));
-
-                // Process trail progress map
-                const progressMap: Record<string, number[]> = {};
-                progressSnap.docs.forEach(d => {
-                    progressMap[d.id] = d.data().completedPhases || [];
-                });
-
-                // Process trails with real progress
-                const trails: Trail[] = trailsSnap.docs.map(d => {
-                    const tData = d.data();
-                    const totalPhases = (tData.phases || []).length;
-                    const completed = progressMap[d.id] || [];
-                    const completedCount = completed.length;
-                    const progress = totalPhases > 0 ? Math.round((completedCount / totalPhases) * 100) : 0;
-                    return {
-                        id: d.id,
-                        title: tData.title || 'Sem titulo',
-                        totalPhases,
-                        completedPhases: completedCount,
-                        progress
-                    };
-                });
-
-                const completedTrails = trails.filter(t => t.progress === 100).length;
-
-                setData({
-                    userName: userData.profile?.name || userData.name || user.displayName || 'Colaborador',
-                    points: userData.points || 0,
-                    activeMissions: missions,
-                    trails,
-                    availableRewards: rewardsSnap.docs.length,
-                    completedTrails,
-                    totalTrails: trails.length
-                });
-
-                setIsLoading(false);
-
-                // Fetch LinkedIn metrics (non-blocking)
-                try {
-                    const token = await getAuthToken();
-                    const metrics = await getLinkedInDashboardMetrics(token, user.uid);
-                    setLinkedinMetrics(metrics);
-                } catch (err) {
-                    console.error('LinkedIn metrics error:', err);
-                    setLinkedinMetrics(null);
-                } finally {
-                    setLinkedinLoading(false);
-                }
-
+                const token = await getAuthToken();
+                const metrics = await getLinkedInDashboardMetrics(token, uid);
+                setLinkedinMetrics(metrics);
             } catch (err) {
-                console.error('Dashboard error:', err);
-                toast({
-                    title: t.colabDashboard.loadingError,
-                    description: t.colabDashboard.loadingErrorDescription,
-                    variant: "destructive"
-                });
-                setIsLoading(false);
+                console.error('LinkedIn metrics error:', err);
+                setLinkedinMetrics(null);
+            } finally {
                 setLinkedinLoading(false);
             }
-        });
 
-        return () => unsubscribe();
+        } catch (err) {
+            console.error('Dashboard error:', err);
+            toast({
+                title: t.colabDashboard.loadingError,
+                description: t.colabDashboard.loadingErrorDescription,
+                variant: "destructive"
+            });
+            setIsLoading(false);
+            setLinkedinLoading(false);
+        }
     }, [toast]);
+
+    useEffect(() => {
+        if (authUser?.uid) fetchDashboard(authUser.uid);
+    }, [authUser?.uid, fetchDashboard]);
 
     if (isLoading) {
         return (

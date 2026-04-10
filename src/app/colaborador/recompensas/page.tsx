@@ -2,8 +2,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { db, auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { db } from '@/lib/firebase';
+import { useAuth } from '@/contexts/auth-context';
 import { collection, doc, getDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { getAuthToken } from '@/lib/auth-client';
 import { redeemReward } from '@/app/actions';
@@ -154,6 +154,7 @@ const PageSkeleton = () => {
 
 export default function InfluencerRecompensasPage() {
     const t = useT();
+    const { user: authUser } = useAuth();
     const { toast } = useToast();
     const [rewards, setRewards] = useState<Reward[]>([]);
     const [rescues, setRescues] = useState<Rescue[]>([]);
@@ -263,20 +264,8 @@ export default function InfluencerRecompensasPage() {
     }, [toast]);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user: User | null) => {
-            if (user) {
-                fetchData(user.uid);
-            } else {
-                setIsLoading(false);
-                toast({
-                    variant: 'destructive',
-                    title: t.common.error,
-                    description: t.colabRewards.toastAuthError,
-                });
-            }
-        });
-        return () => unsubscribe();
-    }, [fetchData, toast]);
+        if (authUser?.uid) fetchData(authUser.uid);
+    }, [authUser?.uid, fetchData]);
 
     const handleRedeem = async (reward: Reward) => {
         if (!userInfo) return;

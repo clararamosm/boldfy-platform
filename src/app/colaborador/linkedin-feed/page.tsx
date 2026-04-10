@@ -1,9 +1,8 @@
 // src/app/colaborador/linkedin-feed/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/contexts/auth-context';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -195,41 +194,36 @@ function EmptyFeed() {
 // ─── Main Component ─────────────────────────────────────────────
 export default function LinkedInFeedPage() {
   const t = useT();
+  const { user: authUser } = useAuth();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-      if (!user) return;
+  const fetchFeed = useCallback(async () => {
+    try {
+      const token = await getAuthToken();
+      const result = await getCompanyFeed(token);
 
-      setCurrentUserId(user.uid);
-
-      try {
-        const token = await getAuthToken();
-        const result = await getCompanyFeed(token);
-
-        if (result.error) {
-          setError(result.error);
-          toast({ variant: 'destructive', title: t.common.error, description: result.error });
-        } else {
-          setPosts(result.posts || []);
-          // Mark feed as read to reset unread badge
-          markFeedAsRead(token).catch(() => {});
-        }
-      } catch (err) {
-        console.error('Feed error:', err);
-        setError(t.linkedinFeed.loadError);
-        toast({ variant: 'destructive', title: t.linkedinFeed.loadError });
-      } finally {
-        setIsLoading(false);
+      if (result.error) {
+        setError(result.error);
+        toast({ variant: 'destructive', title: t.common.error, description: result.error });
+      } else {
+        setPosts(result.posts || []);
+        markFeedAsRead(token).catch(() => {});
       }
-    });
-
-    return () => unsubscribe();
+    } catch (err) {
+      console.error('Feed error:', err);
+      setError(t.linkedinFeed.loadError);
+      toast({ variant: 'destructive', title: t.linkedinFeed.loadError });
+    } finally {
+      setIsLoading(false);
+    }
   }, [toast]);
+
+  useEffect(() => {
+    if (authUser?.uid) fetchFeed();
+  }, [authUser?.uid, fetchFeed]);
 
   // Count unique authors
   const uniqueAuthors = new Set(posts.map(p => p.userId)).size;
@@ -271,7 +265,7 @@ export default function LinkedInFeedPage() {
               <FeedPostCard
                 key={`${post.userId}-${post.id}`}
                 post={post}
-                currentUserId={currentUserId}
+                currentUserId={authUser?.uid || ''}
               />
             ))}
           </div>
