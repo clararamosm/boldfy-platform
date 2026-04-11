@@ -201,19 +201,19 @@ export default function StrategistConfiguracoesPage() {
                     />
                     <p className="text-xs text-muted-foreground">O e-mail não pode ser alterado.</p>
                   </div>
+
+                  {/* Save inside card */}
+                  <div className="flex justify-end pt-2">
+                    <Button onClick={handleSave} disabled={isSaving}>
+                      {isSaving ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</>
+                      ) : (
+                        'Salvar Alterações'
+                      )}
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
-
-              {/* Save */}
-              <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</>
-                  ) : (
-                    'Salvar Alterações'
-                  )}
-                </Button>
-              </div>
 
               {/* Slack Notifications Settings */}
               <SlackSettingsCard />

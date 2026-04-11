@@ -54,23 +54,44 @@ type NotificationState = {
   timeOfDay?: string;
 };
 
-const NOTIF_TYPES: SlackNotificationType[] = [
+type CompanyData = {
+  id: string;
+  name: string;
+  tls: { id: string; name: string }[];
+};
+
+// Ordered: internal first, then client
+const NOTIF_TYPES_ORDERED: SlackNotificationType[] = [
   'resumo_semanal',
+  'feedback_recebido',
   'lembrete_aprovacao',
   'dropin_semanal',
   'post_pronto',
-  'feedback_recebido',
 ];
 
 const DAYS_OF_WEEK = [
   { value: 1, label: 'Segunda' },
-  { value: 2, label: 'Terca' },
+  { value: 2, label: 'Terça' },
   { value: 3, label: 'Quarta' },
   { value: 4, label: 'Quinta' },
   { value: 5, label: 'Sexta' },
 ];
 
-// ---- Component ----
+function createDefaultNotifications(): Record<SlackNotificationType, NotificationState> {
+  const initial: Record<string, NotificationState> = {};
+  for (const type of NOTIF_TYPES_ORDERED) {
+    initial[type] = {
+      enabled: false,
+      channelId: null,
+      channelName: null,
+      template: DEFAULT_TEMPLATES[type],
+      ...(type === 'dropin_semanal' ? { dayOfWeek: 2, timeOfDay: '10:00' } : {}),
+    };
+  }
+  return initial as Record<SlackNotificationType, NotificationState>;
+}
+
+// ---- Main Component ----
 
 export function SlackSettingsCard() {
   const { toast } = useToast();
@@ -78,34 +99,12 @@ export function SlackSettingsCard() {
 
   // Data
   const [channels, setChannels] = useState<Channel[]>([]);
-  const [companies, setCompanies] = useState<{ id: string; name: string; tls: { id: string; name: string }[] }[]>([]);
+  const [companies, setCompanies] = useState<CompanyData[]>([]);
 
-  // Selection
-  const [selectedCompany, setSelectedCompany] = useState<string>('');
-  const [selectedTl, setSelectedTl] = useState<string>('');
-
-  // Loading states
+  // Loading
   const [isLoadingInit, setIsLoadingInit] = useState(true);
-  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [testingType, setTestingType] = useState<string | null>(null);
 
-  // Notification config state
-  const [notifications, setNotifications] = useState<Record<SlackNotificationType, NotificationState>>(() => {
-    const initial: Record<string, NotificationState> = {};
-    for (const type of NOTIF_TYPES) {
-      initial[type] = {
-        enabled: false,
-        channelId: null,
-        channelName: null,
-        template: DEFAULT_TEMPLATES[type],
-        ...(type === 'dropin_semanal' ? { dayOfWeek: 2, timeOfDay: '10:00' } : {}),
-      };
-    }
-    return initial as Record<SlackNotificationType, NotificationState>;
-  });
-
-  // ---- Initial load: channels + sidebar data ----
+  // ---- Initial load ----
   const loadInitialData = useCallback(async () => {
     try {
       setIsLoadingInit(true);
@@ -131,19 +130,111 @@ export function SlackSettingsCard() {
     if (user) loadInitialData();
   }, [user, loadInitialData]);
 
-  // ---- Load config when company+TL changes ----
-  const loadConfig = useCallback(async (companyId: string, tlId: string) => {
+  // ---- Render ----
+
+  if (isLoadingInit) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Notificações Slack</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (companies.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Notificações Slack</CardTitle>
+              <CardDescription className="mt-1">
+                Configure notificações automáticas para canais do Slack por perfil.
+              </CardDescription>
+            </div>
+            <VariablesInfoPopover />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground text-center py-6">
+            Nenhuma empresa encontrada. Verifique suas atribuições.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Notificações Slack</CardTitle>
+            <CardDescription className="mt-1">
+              Configure notificações automáticas para canais do Slack por perfil.
+            </CardDescription>
+          </div>
+          <VariablesInfoPopover />
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {companies.map(company => (
+          <CompanyBlock
+            key={company.id}
+            company={company}
+            channels={channels}
+          />
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---- Company Block ----
+
+function CompanyBlock({
+  company,
+  channels,
+}: {
+  company: CompanyData;
+  channels: Channel[];
+}) {
+  const { toast } = useToast();
+
+  const [selectedTl, setSelectedTl] = useState<string>('');
+  const [isLoadingConfig, setIsLoadingConfig] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [testingType, setTestingType] = useState<string | null>(null);
+
+  const [notifications, setNotifications] = useState<Record<SlackNotificationType, NotificationState>>(
+    createDefaultNotifications
+  );
+
+  // Auto-select first TL if only one
+  useEffect(() => {
+    if (company.tls.length === 1 && !selectedTl) {
+      setSelectedTl(company.tls[0].id);
+    }
+  }, [company.tls, selectedTl]);
+
+  // Load config when TL changes
+  const loadConfig = useCallback(async (tlId: string) => {
     try {
       setIsLoadingConfig(true);
       const token = await getAuthToken();
       if (!token) return;
 
-      const result = await getSlackConfig(token, companyId, tlId);
+      const result = await getSlackConfig(token, company.id, tlId);
 
       if (result.config) {
-        // Populate state from saved config
         const newState: Record<string, NotificationState> = {};
-        for (const type of NOTIF_TYPES) {
+        for (const type of NOTIF_TYPES_ORDERED) {
           const saved = result.config.notifications[type];
           newState[type] = {
             enabled: saved?.enabled ?? false,
@@ -158,39 +249,22 @@ export function SlackSettingsCard() {
         }
         setNotifications(newState as Record<SlackNotificationType, NotificationState>);
       } else {
-        // Reset to defaults
-        const defaults: Record<string, NotificationState> = {};
-        for (const type of NOTIF_TYPES) {
-          defaults[type] = {
-            enabled: false,
-            channelId: null,
-            channelName: null,
-            template: DEFAULT_TEMPLATES[type],
-            ...(type === 'dropin_semanal' ? { dayOfWeek: 2, timeOfDay: '10:00' } : {}),
-          };
-        }
-        setNotifications(defaults as Record<SlackNotificationType, NotificationState>);
+        setNotifications(createDefaultNotifications());
       }
     } catch (error) {
       console.error('Error loading Slack config:', error);
     } finally {
       setIsLoadingConfig(false);
     }
-  }, []);
+  }, [company.id]);
 
   useEffect(() => {
-    if (selectedCompany && selectedTl) {
-      loadConfig(selectedCompany, selectedTl);
+    if (selectedTl) {
+      loadConfig(selectedTl);
     }
-  }, [selectedCompany, selectedTl, loadConfig]);
+  }, [selectedTl, loadConfig]);
 
-  // ---- Handlers ----
-
-  const handleCompanyChange = (companyId: string) => {
-    setSelectedCompany(companyId);
-    setSelectedTl('');
-  };
-
+  // Handlers
   const handleNotifChange = (type: SlackNotificationType, field: string, value: unknown) => {
     setNotifications(prev => ({
       ...prev,
@@ -207,29 +281,28 @@ export function SlackSettingsCard() {
   };
 
   const handleSave = async () => {
-    if (!selectedCompany || !selectedTl) return;
+    if (!selectedTl) return;
     setIsSaving(true);
     try {
       const token = await getAuthToken();
       if (!token) return;
 
-      const company = companies.find(c => c.id === selectedCompany);
-      const tl = company?.tls.find(t => t.id === selectedTl);
+      const tl = company.tls.find(t => t.id === selectedTl);
 
-      const result = await saveSlackConfig(token, selectedCompany, selectedTl, {
-        companyName: company?.name || '',
+      const result = await saveSlackConfig(token, company.id, selectedTl, {
+        companyName: company.name,
         tlName: tl?.name || '',
         notifications: notifications as unknown as Record<SlackNotificationType, Partial<NotificationEntry>>,
       });
 
       if (result.success) {
-        toast({ title: 'Configuracoes Slack salvas!' });
+        toast({ title: 'Configurações Slack salvas!' });
       } else {
         toast({ variant: 'destructive', title: result.error || 'Erro ao salvar.' });
       }
     } catch (error) {
       console.error('Error saving Slack config:', error);
-      toast({ variant: 'destructive', title: 'Erro ao salvar configuracoes.' });
+      toast({ variant: 'destructive', title: 'Erro ao salvar configurações.' });
     } finally {
       setIsSaving(false);
     }
@@ -260,121 +333,73 @@ export function SlackSettingsCard() {
     }
   };
 
-  // ---- Derived ----
-  const selectedCompanyObj = companies.find(c => c.id === selectedCompany);
-  const tls = selectedCompanyObj?.tls || [];
-
-  // ---- Render ----
-
-  if (isLoadingInit) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Notificacoes Slack</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-32 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Hash className="h-5 w-5" />
-              Notificacoes Slack
-            </CardTitle>
-            <CardDescription className="mt-1">
-              Configure notificacoes automaticas para canais do Slack por perfil.
-            </CardDescription>
-          </div>
-          <VariablesInfoPopover />
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Company + TL selectors */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Empresa</Label>
-            <Select value={selectedCompany} onValueChange={handleCompanyChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione a empresa" />
-              </SelectTrigger>
-              <SelectContent>
-                {companies.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Perfil (TL)</Label>
-            <Select value={selectedTl} onValueChange={setSelectedTl} disabled={!selectedCompany}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o perfil" />
-              </SelectTrigger>
-              <SelectContent>
-                {tls.map(tl => (
-                  <SelectItem key={tl.id} value={tl.id}>{tl.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+    <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+      {/* Company header */}
+      <h3 className="font-semibold text-sm">{company.name}</h3>
 
-        {/* Notification config — only show when both selected */}
-        {selectedCompany && selectedTl && (
-          <>
-            {isLoadingConfig ? (
-              <div className="space-y-3">
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {NOTIF_TYPES.map(type => (
-                  <NotificationRow
-                    key={type}
-                    type={type}
-                    state={notifications[type]}
-                    channels={channels}
-                    isTesting={testingType === type}
-                    onChange={(field, value) => handleNotifChange(type, field, value)}
-                    onChannelChange={(channelId) => handleChannelChange(type, channelId)}
-                    onTest={() => handleTest(type)}
-                  />
-                ))}
-              </div>
-            )}
+      {/* TL selector + Channel */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Perfil</Label>
+          <Select value={selectedTl} onValueChange={setSelectedTl}>
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Selecione o perfil" />
+            </SelectTrigger>
+            <SelectContent>
+              {company.tls.map(tl => (
+                <SelectItem key={tl.id} value={tl.id}>{tl.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-            {/* Save button */}
-            <div className="flex justify-end pt-2">
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</>
-                ) : (
-                  'Salvar Configuracoes'
-                )}
-              </Button>
+      {/* Notification cards */}
+      {selectedTl && (
+        <>
+          {isLoadingConfig ? (
+            <div className="space-y-3">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
             </div>
-          </>
-        )}
+          ) : (
+            <div className="space-y-2">
+              {NOTIF_TYPES_ORDERED.map(type => (
+                <NotificationRow
+                  key={type}
+                  type={type}
+                  state={notifications[type]}
+                  channels={channels}
+                  isTesting={testingType === type}
+                  onChange={(field, value) => handleNotifChange(type, field, value)}
+                  onChannelChange={(channelId) => handleChannelChange(type, channelId)}
+                  onTest={() => handleTest(type)}
+                />
+              ))}
+            </div>
+          )}
 
-        {/* Empty state */}
-        {(!selectedCompany || !selectedTl) && (
-          <p className="text-sm text-muted-foreground text-center py-6">
-            Selecione uma empresa e perfil para configurar notificacoes.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+          {/* Save button */}
+          <div className="flex justify-end pt-2">
+            <Button onClick={handleSave} disabled={isSaving} size="sm">
+              {isSaving ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</>
+              ) : (
+                'Salvar Configurações'
+              )}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {!selectedTl && (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          Selecione um perfil para configurar as notificações.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -399,17 +424,23 @@ function NotificationRow({
 }) {
   const meta = NOTIFICATION_META[type];
   const [isOpen, setIsOpen] = useState(false);
+  const isClient = meta.tag === 'cliente';
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg border p-3">
+      <div className="rounded-lg border bg-background p-3">
+        {/* Tag above title */}
+        <div className="mb-1.5">
+          <Badge
+            variant={isClient ? 'outline' : 'secondary'}
+            className="text-[10px] px-1.5 py-0 h-4 font-normal"
+          >
+            {isClient ? 'Cliente' : 'Interna'}
+          </Badge>
+        </div>
+
         {/* Header row */}
         <div className="flex items-center gap-3">
-          {/* Tag badge */}
-          <Badge variant={meta.tag === 'interna' ? 'secondary' : 'outline'} className="text-xs shrink-0">
-            {meta.tag === 'interna' ? '🏢 Interna' : '👤 Cliente'}
-          </Badge>
-
           {/* Name + schedule */}
           <div className="flex-1 min-w-0">
             <span className="text-sm font-medium">{meta.label}</span>
@@ -449,6 +480,13 @@ function NotificationRow({
           </CollapsibleTrigger>
         </div>
 
+        {/* Client notification reminder */}
+        {isClient && state.enabled && (
+          <p className="text-xs text-muted-foreground mt-2 italic">
+            Essa notificação chegará no canal interno. Lembre-se de repassar a mensagem no canal do cliente.
+          </p>
+        )}
+
         {/* Expandable content: template + dropin config */}
         <CollapsibleContent className="mt-3 space-y-3">
           {/* Drop-in specific: day + time */}
@@ -471,7 +509,7 @@ function NotificationRow({
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Horario</Label>
+                <Label className="text-xs">Horário</Label>
                 <Select
                   value={state.timeOfDay || '10:00'}
                   onValueChange={(v) => onChange('timeOfDay', v)}
@@ -536,12 +574,12 @@ function VariablesInfoPopover() {
     <Popover>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm">
-          <Info className="h-4 w-4 mr-1" /> Variaveis
+          <Info className="h-4 w-4 mr-1" /> Variáveis
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[400px] max-h-[400px] overflow-y-auto" align="end">
         <div className="space-y-1">
-          <h4 className="font-semibold text-sm mb-2">Variaveis disponiveis</h4>
+          <h4 className="font-semibold text-sm mb-2">Variáveis disponíveis</h4>
           <p className="text-xs text-muted-foreground mb-3">
             Clique para copiar. Use nos templates de mensagem.
           </p>

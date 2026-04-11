@@ -56,10 +56,12 @@ Semana: {{semana}}
 
 Total do mes: {{total_posts_mes}} | Pendentes: {{total_pendentes}} | Aprovados: {{total_aprovados}}`,
 
-  lembrete_aprovacao: `*Lembrete de Aprovacao — {{perfil}}*
+  lembrete_aprovacao: `*Lembrete de Aprovação — {{perfil}}*
 
-Posts aguardando aprovacao:
-{{lista_pendentes_aprovacao}}`,
+Posts aguardando aprovação:
+{{lista_pendentes_aprovacao}}
+
+_{{estrategista}}, que tal enviar esse lembrete no canal do cliente?_`,
 
   dropin_semanal: `*Drop-in Semanal — {{empresa}} / {{perfil}}*
 {{data_hoje}}
@@ -68,11 +70,15 @@ Posts aguardando aprovacao:
 {{lista_posts_prontos}}
 
 *Posts aprovados:*
-{{lista_posts_aprovados}}`,
+{{lista_posts_aprovados}}
+
+_{{estrategista}}, que tal repassar esse resumo no canal do cliente?_`,
 
   post_pronto: `*Post Pronto para Publicar* — {{empresa}} / {{perfil}}
 
-{{titulo_post}}`,
+{{titulo_post}}
+
+_{{estrategista}}, repasse essa informação no canal do cliente._`,
 
   feedback_recebido: `*Feedback Recebido* — {{empresa}} / {{perfil}}
 
@@ -89,10 +95,10 @@ export const NOTIFICATION_META: Record<SlackNotificationType, {
   schedule: string;
 }> = {
   resumo_semanal: { label: 'Resumo Semanal', tag: 'interna', schedule: 'Sexta 9h' },
-  lembrete_aprovacao: { label: 'Lembrete de Aprovacao', tag: 'cliente', schedule: 'Seg-Sex 9h' },
-  dropin_semanal: { label: 'Drop-in Semanal', tag: 'cliente', schedule: 'Configuravel' },
-  post_pronto: { label: 'Post Pronto para Publicar', tag: 'cliente', schedule: 'Evento' },
   feedback_recebido: { label: 'Feedback Recebido', tag: 'interna', schedule: 'Evento' },
+  lembrete_aprovacao: { label: 'Lembrete de Aprovação', tag: 'cliente', schedule: 'Seg-Sex 9h' },
+  dropin_semanal: { label: 'Drop-in Semanal', tag: 'cliente', schedule: 'Configurável' },
+  post_pronto: { label: 'Post Pronto para Publicar', tag: 'cliente', schedule: 'Evento' },
 };
 
 // ---- Variable Definitions (for info popup) ----
@@ -103,17 +109,17 @@ export const TEMPLATE_VARIABLES = [
   { key: '{{estrategista}}', description: 'Nome do estrategista' },
   { key: '{{data_hoje}}', description: 'Data de hoje (ex: 11 de abril de 2026)' },
   { key: '{{semana}}', description: 'Intervalo da semana atual (ex: 07/abr – 13/abr)' },
-  { key: '{{semana_seguinte}}', description: 'Intervalo da proxima semana' },
-  { key: '{{lista_posts_essa_semana}}', description: 'Posts agendados para esta semana (titulo + link + data)' },
-  { key: '{{lista_posts_semana_seguinte}}', description: 'Posts agendados para a proxima semana' },
+  { key: '{{semana_seguinte}}', description: 'Intervalo da próxima semana' },
+  { key: '{{lista_posts_essa_semana}}', description: 'Posts agendados para esta semana (título + link + data)' },
+  { key: '{{lista_posts_semana_seguinte}}', description: 'Posts agendados para a próxima semana' },
   { key: '{{lista_posts_aprovados}}', description: 'Posts com status aprovado' },
   { key: '{{lista_posts_prontos}}', description: 'Posts prontos para publicar' },
-  { key: '{{lista_pendentes_aprovacao}}', description: 'Posts aguardando aprovacao' },
+  { key: '{{lista_pendentes_aprovacao}}', description: 'Posts aguardando aprovação' },
   { key: '{{lista_posts_postados_semana}}', description: 'Posts publicados esta semana' },
-  { key: '{{total_posts_mes}}', description: 'Total de posts do mes' },
-  { key: '{{total_pendentes}}', description: 'Total pendentes de aprovacao' },
+  { key: '{{total_posts_mes}}', description: 'Total de posts do mês' },
+  { key: '{{total_pendentes}}', description: 'Total pendentes de aprovação' },
   { key: '{{total_aprovados}}', description: 'Total aprovados' },
-  { key: '{{titulo_post}}', description: 'Titulo do post (com link) — apenas em notificacoes de evento' },
-  { key: '{{link_post}}', description: 'Link direto para o post — apenas em notificacoes de evento' },
+  { key: '{{titulo_post}}', description: 'Título do post (com link) — apenas em notificações de evento' },
+  { key: '{{link_post}}', description: 'Link direto para o post — apenas em notificações de evento' },
   { key: '{{feedback_texto}}', description: 'Texto do feedback do TL — apenas em feedback recebido' },
 ];
