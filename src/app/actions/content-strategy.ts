@@ -13,24 +13,21 @@ export type ContentStrategyData = {
     authority: { percentage: number; description: string }; // MoFu
     conversion: { percentage: number; description: string }; // BoFu
   };
-  // Messaging & Positioning
-  messaging: {
-    enemy: string;
-    positioning: string;
-    pointOfView: string;
-  };
-  // Central Narrative
-  narrative: string;
-  // Pain Points
-  pains: Array<{ title: string; description: string }>;
-  // Solutions
-  solutions: Array<{ title: string; description: string }>;
   // Content Pillars
   pillars: Array<{
     name: string;
     subtitle: string;
     series: Array<{ name: string; objective: string; inputs: string }>;
   }>;
+  // Legacy fields (kept for backward compat, moved to BrandContext)
+  messaging?: {
+    enemy: string;
+    positioning: string;
+    pointOfView: string;
+  };
+  narrative?: string;
+  pains?: Array<{ title: string; description: string }>;
+  solutions?: Array<{ title: string; description: string }>;
   // Metadata
   updatedAt?: string;
   updatedBy?: string;
@@ -51,8 +48,8 @@ export type BrandManualData = {
   };
   // Tone of Voice
   toneOfVoice: Array<{ title: string; description: string }>;
-  // Situations
-  situations: Array<{ context: string; description: string }>;
+  // Situations (legacy, removed from UI)
+  situations?: Array<{ context: string; description: string }>;
   // Language & Style
   languageStyle: Array<{ title: string; description: string }>;
   // Do's & Don'ts
@@ -80,9 +77,10 @@ export type BrandManualData = {
 export type BrandContextData = {
   valueProposition?: string;
   tagline?: string;
+  positioning?: string;
   businessKeywords?: string[];
-  solutions?: string[];
-  targetPainPoints?: string[];
+  solutions?: Array<{ title: string; description: string }>;
+  pains?: Array<{ title: string; description: string }>;
   targetAudience?: string;
   approvedTopics?: string[];
   prohibitedPhrases?: string[];

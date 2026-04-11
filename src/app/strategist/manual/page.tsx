@@ -26,7 +26,6 @@ function emptyManual(): BrandManualData {
       secondary: { title: '', description: '' },
     },
     toneOfVoice: [{ title: '', description: '' }],
-    situations: [{ context: '', description: '' }],
     languageStyle: [{ title: '', description: '' }],
     bestPractices: { dos: [''], donts: [''] },
     vocabulary: { keywords: [''], expressions: [''] },
@@ -92,7 +91,6 @@ export default function StrategistManualPage() {
         },
         mindset: data.mindset.filter(m => m.title || m.description),
         toneOfVoice: data.toneOfVoice.filter(t => t.title || t.description),
-        situations: data.situations.filter(s => s.context || s.description),
         languageStyle: data.languageStyle.filter(l => l.title || l.description),
         bestPractices: {
           dos: data.bestPractices.dos.filter(Boolean),
@@ -409,58 +407,7 @@ export default function StrategistManualPage() {
             </CardContent>
           </Card>
 
-          {/* 5. Situações */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Situações</CardTitle>
-              <CardDescription>Como a marca se comporta em contextos diferentes.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {data.situations.map((item, idx) => (
-                <div key={idx} className="flex gap-2 items-start">
-                  <div className="flex-1 grid grid-cols-[1fr_2fr] gap-2">
-                    <Input
-                      placeholder="Contexto"
-                      value={item.context}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        situations: updateItem(prev.situations, idx, { context: e.target.value }),
-                      }))}
-                      disabled={isSaving}
-                    />
-                    <Input
-                      placeholder="Como se comportar"
-                      value={item.description}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        situations: updateItem(prev.situations, idx, { description: e.target.value }),
-                      }))}
-                      disabled={isSaving}
-                    />
-                  </div>
-                  <Button
-                    variant="ghost" size="icon"
-                    onClick={() => setData(prev => ({ ...prev, situations: removeItem(prev.situations, idx) }))}
-                    disabled={isSaving || data.situations.length <= 1}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                variant="outline" size="sm"
-                onClick={() => setData(prev => ({
-                  ...prev,
-                  situations: addItem(prev.situations, { context: '', description: '' }),
-                }))}
-                disabled={isSaving}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Situação
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* 6. Linguagem e Estilo */}
+          {/* 5. Linguagem e Estilo */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Linguagem e Estilo</CardTitle>

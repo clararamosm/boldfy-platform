@@ -28,6 +28,7 @@ export type PipelinePost = {
   etapa: string;
   formato: string;
   leadMagnet: boolean;
+  contentPillar?: string;
   mediaUrl?: string;
   mediaType?: string;
   tlFeedback?: string;
@@ -66,6 +67,7 @@ export async function createPipelinePost(
     etapa?: string;
     formato?: string;
     leadMagnet?: boolean;
+    contentPillar?: string;
   }
 ): Promise<ActionResult> {
   try {
@@ -81,6 +83,7 @@ export async function createPipelinePost(
       etapa: data.etapa || '',
       formato: data.formato || '',
       leadMagnet: data.leadMagnet || false,
+      contentPillar: data.contentPillar || '',
       mediaUrl: null,
       mediaType: null,
       tlFeedback: null,
@@ -118,6 +121,7 @@ export async function updatePipelinePost(
     etapa: string;
     formato: string;
     leadMagnet: boolean;
+    contentPillar: string;
     mediaUrl: string | null;
     mediaType: string | null;
   }>

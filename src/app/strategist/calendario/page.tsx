@@ -136,7 +136,7 @@ function CalendarSkeleton() {
           <Skeleton key={`h-${i}`} className="h-8" />
         ))}
         {[...Array(35)].map((_, i) => (
-          <Skeleton key={`d-${i}`} className="h-28" />
+          <Skeleton key={`d-${i}`} className="h-36" />
         ))}
       </div>
     </div>
@@ -417,7 +417,7 @@ export default function StrategistCalendarioPage() {
                   <div
                     key={idx}
                     className={`
-                      min-h-[120px] p-1.5 border-b border-r text-left
+                      min-h-[140px] p-1.5 border-b border-r text-left
                       ${!inMonth ? 'bg-muted/10' : ''}
                     `}
                   >
@@ -431,9 +431,9 @@ export default function StrategistCalendarioPage() {
                       {format(day, 'd')}
                     </span>
 
-                    {/* Post mini-cards */}
-                    <div className="mt-1 space-y-0.5">
-                      {dayPosts.slice(0, 4).map(post => {
+                    {/* Post cards — Notion-style with tags */}
+                    <div className="mt-1 space-y-1">
+                      {dayPosts.slice(0, 3).map(post => {
                         const cfg = pipelineStatusConfig[post.status] || pipelineStatusConfig.backlog;
                         const time = post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : '';
                         const showTime = time && time !== '00:00';
@@ -447,22 +447,58 @@ export default function StrategistCalendarioPage() {
                               e.stopPropagation();
                               handlePostClick(post);
                             }}
-                            className={`
-                              w-full text-left rounded px-1.5 py-0.5 transition-all
-                              hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer
-                              ${cfg.calendarBg}
-                            `}
+                            className="w-full text-left rounded-md border bg-card p-1.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-1"
                             title={`${post.title || 'Sem título'} — ${firstName} · ${post.companyName} — ${cfg.label}`}
                           >
-                            <div className="flex items-center gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cfg.dotColor}`} />
-                              <span className={`text-[10px] font-medium truncate ${cfg.calendarText}`}>
+                            {/* Title row with status dot */}
+                            <div className="flex items-start gap-1">
+                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 mt-[5px] ${cfg.dotColor}`} />
+                              <span className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
                                 {post.title || 'Sem título'}
                               </span>
                             </div>
+
+                            {/* Tags row */}
+                            <div className="flex flex-wrap gap-0.5 pl-2.5">
+                              {/* Status tag */}
+                              <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.color}`}>
+                                {cfg.label}
+                              </span>
+                              {/* Editorial */}
+                              {post.editorial && (
+                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                                  {post.editorial}
+                                </span>
+                              )}
+                              {/* Etapa */}
+                              {post.etapa && (
+                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                  {post.etapa}
+                                </span>
+                              )}
+                              {/* Formato */}
+                              {post.formato && (
+                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                  {post.formato}
+                                </span>
+                              )}
+                              {/* Content Pillar */}
+                              {post.contentPillar && (
+                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                                  {post.contentPillar}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Meta row: time + TL name + company */}
                             <div className="flex items-center gap-1 text-[9px] text-muted-foreground pl-2.5">
-                              {showTime && <span>{time}</span>}
-                              {showTime && <span>·</span>}
+                              {showTime && (
+                                <>
+                                  <Clock className="h-2.5 w-2.5" />
+                                  <span>{time}</span>
+                                  <span>·</span>
+                                </>
+                              )}
                               <span className="truncate">{firstName}</span>
                               <span>·</span>
                               <span className="truncate">{post.companyName}</span>
@@ -470,9 +506,9 @@ export default function StrategistCalendarioPage() {
                           </button>
                         );
                       })}
-                      {dayPosts.length > 4 && (
+                      {dayPosts.length > 3 && (
                         <div className="text-[10px] text-muted-foreground px-1 font-medium">
-                          +{dayPosts.length - 4} mais
+                          +{dayPosts.length - 3} mais
                         </div>
                       )}
                     </div>

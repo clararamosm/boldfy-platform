@@ -24,10 +24,6 @@ function emptyStrategy(): ContentStrategyData {
       authority: { percentage: 40, description: '' },
       conversion: { percentage: 20, description: '' },
     },
-    messaging: { enemy: '', positioning: '', pointOfView: '' },
-    narrative: '',
-    pains: [{ title: '', description: '' }],
-    solutions: [{ title: '', description: '' }],
     pillars: [{
       name: '',
       subtitle: '',
@@ -87,8 +83,6 @@ export default function StrategistEstrategiaPage() {
       // Clean empty items
       const clean: ContentStrategyData = {
         ...data,
-        pains: data.pains.filter(p => p.title || p.description),
-        solutions: data.solutions.filter(s => s.title || s.description),
         pillars: data.pillars
           .filter(p => p.name || p.subtitle || p.series.some(s => s.name))
           .map(p => ({
@@ -283,175 +277,7 @@ export default function StrategistEstrategiaPage() {
             </CardContent>
           </Card>
 
-          {/* 2. Mensagens e Posicionamento */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Mensagens e Posicionamento</CardTitle>
-              <CardDescription>Inimigo, posicionamento e ponto de vista únicos.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Inimigo</Label>
-                <Textarea
-                  placeholder="Contra o que essa marca se posiciona? O inimigo comum..."
-                  value={data.messaging.enemy}
-                  onChange={(e) => setData(prev => ({
-                    ...prev,
-                    messaging: { ...prev.messaging, enemy: e.target.value },
-                  }))}
-                  rows={2}
-                  disabled={isSaving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Posicionamento</Label>
-                <Textarea
-                  placeholder="Como a marca se posiciona no mercado..."
-                  value={data.messaging.positioning}
-                  onChange={(e) => setData(prev => ({
-                    ...prev,
-                    messaging: { ...prev.messaging, positioning: e.target.value },
-                  }))}
-                  rows={2}
-                  disabled={isSaving}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Ponto de Vista</Label>
-                <Textarea
-                  placeholder="A perspectiva única que diferencia dos demais..."
-                  value={data.messaging.pointOfView}
-                  onChange={(e) => setData(prev => ({
-                    ...prev,
-                    messaging: { ...prev.messaging, pointOfView: e.target.value },
-                  }))}
-                  rows={2}
-                  disabled={isSaving}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 3. Narrativa Central */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Narrativa Central</CardTitle>
-              <CardDescription>A história que conecta toda a comunicação.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="A narrativa macro que guia todo o conteúdo..."
-                value={data.narrative}
-                onChange={(e) => setData(prev => ({ ...prev, narrative: e.target.value }))}
-                rows={4}
-                disabled={isSaving}
-              />
-            </CardContent>
-          </Card>
-
-          {/* 4. Dores */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Dores</CardTitle>
-              <CardDescription>Os problemas e dores que o conteúdo aborda.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {data.pains.map((pain, idx) => (
-                <div key={idx} className="flex gap-2 items-start">
-                  <div className="flex-1 grid grid-cols-[1fr_2fr] gap-2">
-                    <Input
-                      placeholder="Dor"
-                      value={pain.title}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        pains: updateItem(prev.pains, idx, { title: e.target.value }),
-                      }))}
-                      disabled={isSaving}
-                    />
-                    <Input
-                      placeholder="Descrição"
-                      value={pain.description}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        pains: updateItem(prev.pains, idx, { description: e.target.value }),
-                      }))}
-                      disabled={isSaving}
-                    />
-                  </div>
-                  <Button
-                    variant="ghost" size="icon"
-                    onClick={() => setData(prev => ({ ...prev, pains: removeItem(prev.pains, idx) }))}
-                    disabled={isSaving || data.pains.length <= 1}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                variant="outline" size="sm"
-                onClick={() => setData(prev => ({
-                  ...prev,
-                  pains: [...prev.pains, { title: '', description: '' }],
-                }))}
-                disabled={isSaving}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Dor
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* 5. Soluções */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Soluções</CardTitle>
-              <CardDescription>As soluções e resultados que o conteúdo promove.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {data.solutions.map((sol, idx) => (
-                <div key={idx} className="flex gap-2 items-start">
-                  <div className="flex-1 grid grid-cols-[1fr_2fr] gap-2">
-                    <Input
-                      placeholder="Solução"
-                      value={sol.title}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        solutions: updateItem(prev.solutions, idx, { title: e.target.value }),
-                      }))}
-                      disabled={isSaving}
-                    />
-                    <Input
-                      placeholder="Descrição"
-                      value={sol.description}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        solutions: updateItem(prev.solutions, idx, { description: e.target.value }),
-                      }))}
-                      disabled={isSaving}
-                    />
-                  </div>
-                  <Button
-                    variant="ghost" size="icon"
-                    onClick={() => setData(prev => ({ ...prev, solutions: removeItem(prev.solutions, idx) }))}
-                    disabled={isSaving || data.solutions.length <= 1}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                variant="outline" size="sm"
-                onClick={() => setData(prev => ({
-                  ...prev,
-                  solutions: [...prev.solutions, { title: '', description: '' }],
-                }))}
-                disabled={isSaving}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Solução
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* 6. Pilares de Conteúdo */}
+          {/* 2. Pilares de Conteúdo */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Pilares de Conteúdo</CardTitle>
