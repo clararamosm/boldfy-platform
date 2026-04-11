@@ -147,10 +147,10 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
 
     // Seed default AI credits reward for the new company
     await adminDb.collection('companies').doc(companyId).collection('rewards').add({
-      name: '10 Creditos de IA',
-      points: 150,
+      name: '5 Creditos de IA',
+      points: 200,
       type: 'ai_credits',
-      creditsAmount: 10,
+      creditsAmount: 5,
       stock: 'Ilimitado',
       status: 'Disponível',
       imageUrl: null,
@@ -273,7 +273,7 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
       companyId: companyId,
       companyName: companyName,
       points: 0,
-      status: 'Ativo',
+      status: 'Pendente',
       profile: { name, email },
       createdAt: FieldValue.serverTimestamp(),
     });

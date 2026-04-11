@@ -210,7 +210,7 @@ export default function ColaboradorTrilhasPage() {
           <p className="text-xs text-muted-foreground">{t.colabTrails.totalTrails}</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6 text-center">
-          <Clock className="w-6 h-6 mx-auto mb-2 text-yellow-500" />
+          <Clock className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
           <p className="text-2xl font-bold">{stats.emProgresso}</p>
           <p className="text-xs text-muted-foreground">{t.colabTrails.inProgress}</p>
         </CardContent></Card>
@@ -220,7 +220,7 @@ export default function ColaboradorTrilhasPage() {
           <p className="text-xs text-muted-foreground">{t.colabTrails.completed}</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6 text-center">
-          <Star className="w-6 h-6 mx-auto mb-2 text-amber-500" />
+          <CoinIcon className="w-6 h-6 mx-auto mb-2" />
           <p className="text-2xl font-bold">{stats.pontos}</p>
           <p className="text-xs text-muted-foreground">{t.colabTrails.pointsEarned}</p>
         </CardContent></Card>

@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
 // Session cookie helpers — calls server API to set signed HttpOnly cookie
@@ -94,6 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (safeData.linkedinConnection) {
             const { accessToken, refreshToken, ...safeConnection } = safeData.linkedinConnection as Record<string, unknown>;
             safeData.linkedinConnection = safeConnection;
+          }
+
+          // Auto-activate collaborators on first login
+          if (role === 'colaborador' && data.status === 'Pendente') {
+            updateDoc(doc(db, 'users', fbUser.uid), { status: 'Ativo' }).catch(err =>
+              console.error('Failed to activate collaborator:', err),
+            );
           }
 
           setUser({

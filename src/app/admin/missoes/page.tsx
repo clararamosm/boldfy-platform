@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ActionDialog } from '@/components/dashboard/action-dialog';
-import { PlusCircle, ChevronDown, Sparkles, CheckCircle2, Clock, History, FileCheck } from 'lucide-react';
+import { PlusCircle, ChevronDown, Sparkles, LayoutList, History, FileCheck, Pin, Clock } from 'lucide-react';
 
 import { useAdminMissions } from '@/components/admin/missions/use-admin-missions';
 import { MissionForm } from '@/components/admin/missions/mission-form';
@@ -17,6 +17,8 @@ import { ReviewSubmissionsSheet } from '@/components/admin/missions/review-submi
 
 export default function AdminMissoesPage() {
   const m = useAdminMissions();
+
+  const totalActive = m.fixedMissions.length + m.activeTimedMissions.length + m.scheduledTimedMissions.length;
 
   return (
     <>
@@ -75,18 +77,13 @@ export default function AdminMissoesPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="ativas">
+        {/* Tabs — 2 tabs: Missões + Histórico */}
+        <Tabs defaultValue="missoes">
           <TabsList>
-            <TabsTrigger value="ativas" className="flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Ativas
-              {m.activeMissions.length > 0 && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">{m.activeMissions.length}</Badge>}
-            </TabsTrigger>
-            <TabsTrigger value="agendadas" className="flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" />
-              Agendadas
-              {m.scheduledMissions.length > 0 && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">{m.scheduledMissions.length}</Badge>}
+            <TabsTrigger value="missoes" className="flex items-center gap-1.5">
+              <LayoutList className="h-3.5 w-3.5" />
+              Missões
+              {totalActive > 0 && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">{totalActive}</Badge>}
             </TabsTrigger>
             <TabsTrigger value="historico" className="flex items-center gap-1.5">
               <History className="h-3.5 w-3.5" />
@@ -95,26 +92,59 @@ export default function AdminMissoesPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="ativas">
+          <TabsContent value="missoes" className="space-y-6">
+            {/* Box: Missões Fixas */}
             <Card>
               <CardHeader>
-                <CardTitle>Missões Ativas</CardTitle>
-                <CardDescription>Missões disponíveis para os colaboradores agora.</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Pin className="h-4 w-4" />
+                  Missões Fixas
+                </CardTitle>
+                <CardDescription>Missões permanentes, sempre disponíveis para os colaboradores.</CardDescription>
               </CardHeader>
               <CardContent>
-                <MissionTable missions={m.activeMissions} isLoading={m.isLoading} status="ativa" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={8} />
+                <MissionTable missions={m.fixedMissions} isLoading={m.isLoading} status="ativa" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={8} />
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="agendadas">
+            {/* Box: Missões Temporárias */}
             <Card>
               <CardHeader>
-                <CardTitle>Missões Agendadas</CardTitle>
-                <CardDescription>Missões que serão ativadas automaticamente na data de início.</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Missões Temporárias
+                </CardTitle>
+                <CardDescription>Missões com período definido de início e fim.</CardDescription>
               </CardHeader>
-              <CardContent>
-                <MissionTable missions={m.scheduledMissions} isLoading={m.isLoading} status="agendada" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={7} />
+              <CardContent className="space-y-6">
+                {/* Seção: Ativas */}
+                {m.activeTimedMissions.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                      <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">Ativas</Badge>
+                      <span className="text-xs">{m.activeTimedMissions.length} missão(ões)</span>
+                    </h4>
+                    <MissionTable missions={m.activeTimedMissions} isLoading={m.isLoading} status="ativa" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={8} />
+                  </div>
+                )}
+
+                {/* Seção: Agendadas */}
+                {m.scheduledTimedMissions.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">Agendadas</Badge>
+                      <span className="text-xs">{m.scheduledTimedMissions.length} missão(ões)</span>
+                    </h4>
+                    <MissionTable missions={m.scheduledTimedMissions} isLoading={m.isLoading} status="agendada" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={7} />
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {m.activeTimedMissions.length === 0 && m.scheduledTimedMissions.length === 0 && !m.isLoading && (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    Nenhuma missão temporária. Crie uma missão com período para começar.
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

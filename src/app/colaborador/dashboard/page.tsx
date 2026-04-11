@@ -536,17 +536,8 @@ export default function ColaboradorDashboardPage() {
                                 </p>
                             ) : (
                                 <div className="space-y-3">
-                                    {/* Mini podium — top 3 as avatars */}
+                                    {/* Top 3 — linear order: 1º, 2º, 3º */}
                                     <div className="flex items-end justify-center gap-3 pb-3 border-b">
-                                        {ranking.length >= 2 && (
-                                            <div className="flex flex-col items-center gap-1">
-                                                <Avatar className="h-10 w-10 border-2 border-muted">
-                                                    <AvatarImage src={ranking[1].avatarUrl} />
-                                                    <AvatarFallback className="text-xs">{ranking[1].name?.substring(0, 2).toUpperCase()}</AvatarFallback>
-                                                </Avatar>
-                                                <span className="text-[10px] font-bold text-muted-foreground">2º</span>
-                                            </div>
-                                        )}
                                         {ranking.length >= 1 && (
                                             <div className="flex flex-col items-center gap-1 -mt-2">
                                                 <Crown className="h-4 w-4 text-yellow-500" />
@@ -555,6 +546,15 @@ export default function ColaboradorDashboardPage() {
                                                     <AvatarFallback className="text-xs font-bold">{ranking[0].name?.substring(0, 2).toUpperCase()}</AvatarFallback>
                                                 </Avatar>
                                                 <span className="text-[10px] font-bold text-primary">1º</span>
+                                            </div>
+                                        )}
+                                        {ranking.length >= 2 && (
+                                            <div className="flex flex-col items-center gap-1">
+                                                <Avatar className="h-10 w-10 border-2 border-muted">
+                                                    <AvatarImage src={ranking[1].avatarUrl} />
+                                                    <AvatarFallback className="text-xs">{ranking[1].name?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                                                </Avatar>
+                                                <span className="text-[10px] font-bold text-muted-foreground">2º</span>
                                             </div>
                                         )}
                                         {ranking.length >= 3 && (

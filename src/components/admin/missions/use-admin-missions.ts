@@ -146,6 +146,11 @@ export function useAdminMissions() {
   const activeMissions = allMissions.filter(m => deriveMissionStatus(m, now) === 'ativa');
   const scheduledMissions = allMissions.filter(m => deriveMissionStatus(m, now) === 'agendada');
   const pastMissions = allMissions.filter(m => deriveMissionStatus(m, now) === 'encerrada');
+
+  // Separated by type for the new 2-tab layout
+  const fixedMissions = allMissions.filter(m => m.type === 'fixed');
+  const activeTimedMissions = allMissions.filter(m => m.type === 'timed' && deriveMissionStatus(m, now) === 'ativa');
+  const scheduledTimedMissions = allMissions.filter(m => m.type === 'timed' && deriveMissionStatus(m, now) === 'agendada');
   const totalPending = allMissions.reduce((sum, m) => sum + (m.pendingSubmissions || 0), 0);
 
   // ─── CRUD ───────────────────────────────────
@@ -321,6 +326,7 @@ export function useAdminMissions() {
   return {
     // Data
     allMissions, activeMissions, scheduledMissions, pastMissions,
+    fixedMissions, activeTimedMissions, scheduledTimedMissions,
     isLoading, isSubmitting, companyId, totalPending,
 
     // Dialogs

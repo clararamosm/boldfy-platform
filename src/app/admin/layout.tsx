@@ -79,12 +79,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 <AdminSidebarNav />
             </SidebarContent>
             <SidebarFooter>
-                <div className="flex items-center justify-center px-2 group-data-[state=collapsed]:justify-center">
-                    <FeedbackDialog pagina="Sidebar" />
-                </div>
-                <DropdownMenu>
+                <div className="flex items-center w-full gap-1 px-1">
+                    <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="w-full justify-start gap-2 px-2 py-3 h-auto">
+                        <Button variant="ghost" className="flex-1 justify-start gap-2 px-2 py-3 h-auto min-w-0">
                             <Avatar className="h-9 w-9 shrink-0">
                                 {user.profile?.avatarUrl && (
                                     <AvatarImage src={user.profile.avatarUrl} alt={user.name || ''} />
@@ -99,6 +97,9 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                             </div>
                         </Button>
                     </DropdownMenuTrigger>
+                    <div className="shrink-0 group-data-[state=collapsed]:hidden">
+                        <FeedbackDialog pagina="Sidebar" />
+                    </div>
                     <DropdownMenuContent align="end" side="top" className="min-w-56 max-w-72">
                         <DropdownMenuLabel>
                             <div className="flex flex-col gap-0.5">
@@ -128,6 +129,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
+                </div>
             </SidebarFooter>
         </>
     );

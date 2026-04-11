@@ -31,6 +31,13 @@ type Company = {
     locale?: 'pt-BR' | 'en';
     adminProfile: { email: string; name: string; };
     createdAt: { toDate?: () => Date } | string | null;
+    subscription?: {
+        plan?: string;
+        status?: string;
+        trialEnd?: { toDate?: () => Date } | string | null;
+    };
+    /** True when the admin has never logged in (no password set yet) */
+    adminPending?: boolean;
 };
 
 function CompanyFormContent() {
@@ -99,10 +106,9 @@ export default function MasterEmpresasPage() {
         try {
             const companiesQuery = collection(db, "companies");
             const querySnapshot = await getDocs(query(companiesQuery, orderBy("createdAt", "desc")));
-            const companiesList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Company));
-            setCompanies(companiesList);
+            const companiesList = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Company));
 
-            // Fetch seat counts for each company
+            // Fetch seat counts + detect admin pending for each company
             const counts: Record<string, number> = {};
             for (const comp of companiesList) {
                 const usersQuery = query(
@@ -111,7 +117,22 @@ export default function MasterEmpresasPage() {
                 );
                 const usersSnap = await getDocs(usersQuery);
                 counts[comp.id] = usersSnap.size;
+
+                // Check if admin user has ever logged in (via lastLoginAt metadata)
+                const adminEmail = comp.adminProfile?.email;
+                if (adminEmail) {
+                    const adminQuery = query(
+                        collection(db, "users"),
+                        where("companyId", "==", comp.id),
+                        where("role", "==", "admin")
+                    );
+                    const adminSnap = await getDocs(adminQuery);
+                    if (adminSnap.empty) {
+                        comp.adminPending = true;
+                    }
+                }
             }
+            setCompanies(companiesList);
             setSeatCounts(counts);
         } catch (error) {
             console.error("Error fetching companies:", error);
@@ -163,16 +184,45 @@ export default function MasterEmpresasPage() {
         </Button>
     );
 
-    const getStatusBadge = (status: Company['status']) => {
-        switch (status) {
+    const getStatusBadge = (company: Company) => {
+        const plan = company.subscription?.plan;
+        const trialEnd = company.subscription?.trialEnd;
+
+        // Admin never logged in
+        if (company.adminPending) {
+            return <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">Pendente</Badge>;
+        }
+
+        // Show trial with days remaining
+        if (plan === 'trial') {
+            let daysLeft = 0;
+            if (trialEnd) {
+                const end = typeof trialEnd === 'object' && trialEnd !== null && 'toDate' in trialEnd && typeof trialEnd.toDate === 'function'
+                    ? trialEnd.toDate()
+                    : new Date(trialEnd as string);
+                daysLeft = Math.max(0, Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+            }
+            return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Trial ({daysLeft}d)</Badge>;
+        }
+
+        // Paid / Beta
+        if (plan === 'paid' || plan === 'beta') {
+            return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Pagante</Badge>;
+        }
+
+        // Canceled
+        if (plan === 'canceled') {
+            return <Badge variant="destructive">Cancelado</Badge>;
+        }
+
+        // Fallback to legacy status field
+        switch (company.status) {
             case 'Ativa':
                 return <Badge variant="default">Ativa</Badge>;
             case 'Inativa':
                 return <Badge variant="destructive">Inativa</Badge>;
-            case 'Trial':
-                return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Trial</Badge>;
             default:
-                return <Badge variant="outline">{status}</Badge>;
+                return <Badge variant="outline">{company.status}</Badge>;
         }
     };
 
@@ -278,7 +328,7 @@ export default function MasterEmpresasPage() {
                             companies.map(company => (
                                 <TableRow key={company.id} className={(company.status !== 'Ativa' && company.status !== 'Trial') ? 'text-muted-foreground' : ''}>
                                     <TableCell className="font-medium">{company.companyName}</TableCell>
-                                    <TableCell>{getStatusBadge(company.status)}</TableCell>
+                                    <TableCell>{getStatusBadge(company)}</TableCell>
                                     <TableCell>{seatCounts[company.id] || 0} / {company.licenses}</TableCell>
                                     <TableCell>{company.adminProfile?.email}</TableCell>
                                     <TableCell>

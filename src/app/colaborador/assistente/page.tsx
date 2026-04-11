@@ -9,11 +9,22 @@ import { AiAssistantForm } from "@/components/ai-assistant-form";
 import { HotTopicsBox } from "@/components/hot-topics-box";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Sparkles, Clock, ShoppingCart } from 'lucide-react';
+import { Sparkles, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import { useAiCredits } from '@/hooks/use-ai-credits';
+
+function AiCreditsTag() {
+  const { totalAvailable, monthlyLimit, loading } = useAiCredits();
+  if (loading) return null;
+  const isExhausted = totalAvailable <= 0;
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${isExhausted ? 'bg-red-100 text-red-700' : 'bg-purple-100 text-purple-700'}`}>
+      <Sparkles className="h-3 w-3" />
+      {totalAvailable}/{monthlyLimit} créditos · renovação mensal
+    </span>
+  );
+}
 
 const AssistantPageSkeleton = () => (
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -54,70 +65,6 @@ const AssistantPageSkeleton = () => (
   </div>
 );
 
-function AiCreditsBar() {
-  const { totalAvailable, monthlyLimit, bonusCredits, daysUntilRenewal, loading } = useAiCredits();
-
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="py-4">
-          <Skeleton className="h-4 w-48" />
-          <Skeleton className="h-2 w-full mt-2" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const isExhausted = totalAvailable <= 0;
-  const percentage = monthlyLimit > 0 ? Math.min(100, (totalAvailable / monthlyLimit) * 100) : 0;
-
-  return (
-    <Card className={isExhausted ? 'border-red-200 bg-red-50/50' : 'border-purple-200 bg-purple-50/30'}>
-      <CardContent className="py-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className={`h-4 w-4 ${isExhausted ? 'text-red-500' : 'text-purple-600'}`} />
-            <span className="text-sm font-medium">
-              {isExhausted ? 'Seus creditos de IA acabaram' : 'Creditos de IA'}
-            </span>
-          </div>
-          <span className={`text-sm font-bold ${isExhausted ? 'text-red-600' : 'text-purple-700'}`}>
-            {totalAvailable}/{monthlyLimit}
-          </span>
-        </div>
-
-        <Progress
-          value={percentage}
-          className={`h-2 ${isExhausted ? '[&>div]:bg-red-500' : '[&>div]:bg-purple-600'}`}
-        />
-
-        <div className="flex items-center justify-between mt-2">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            <span>
-              {daysUntilRenewal !== null
-                ? `Renovam em ${daysUntilRenewal} dia${daysUntilRenewal !== 1 ? 's' : ''}`
-                : 'Renovacao mensal'
-              }
-            </span>
-            {bonusCredits > 0 && (
-              <span className="ml-2 text-purple-600">+{bonusCredits} bonus</span>
-            )}
-          </div>
-          {isExhausted && (
-            <Button asChild size="sm" variant="outline" className="h-7 text-xs border-red-200 text-red-600 hover:bg-red-50">
-              <Link href="/colaborador/recompensas">
-                <ShoppingCart className="h-3 w-3 mr-1" />
-                Comprar mais creditos
-              </Link>
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function AiAssistantPage() {
   const t = useT();
   const { user, loading } = useAuth();
@@ -139,10 +86,10 @@ export default function AiAssistantPage() {
 
   return (
     <>
-      <Header title={t.ai.pageTitle} />
+      <Header title={t.ai.pageTitle}>
+        {!loading && user && <AiCreditsTag />}
+      </Header>
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-4">
-        {/* AI Credits Bar */}
-        {!loading && user && <AiCreditsBar />}
 
         {/* Hot Topics Box */}
         {!loading && user && !isBlocked && (
