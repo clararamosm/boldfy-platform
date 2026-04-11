@@ -9,13 +9,15 @@ import type { NextRequest } from 'next/server';
 import { verifySessionValue } from '@/lib/session';
 
 // Routes that require authentication
-const PROTECTED_PREFIXES = ['/admin', '/colaborador', '/master'];
+const PROTECTED_PREFIXES = ['/admin', '/colaborador', '/master', '/thoughtleader', '/strategist'];
 
 // Role-to-route mapping
 const ROLE_ROUTES: Record<string, string> = {
   master: '/master',
   admin: '/admin',
   colaborador: '/colaborador',
+  thoughtleader: '/thoughtleader',
+  strategist: '/strategist',
 };
 
 export async function middleware(request: NextRequest) {
@@ -44,8 +46,13 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Master can access /admin routes (with ?companyId=)
-  if (pathname.startsWith('/admin') && (role === 'admin' || role === 'master')) {
+  // Master and Strategist can access /admin routes (with ?companyId=)
+  if (pathname.startsWith('/admin') && (role === 'admin' || role === 'master' || role === 'strategist')) {
+    return NextResponse.next();
+  }
+
+  // Strategist can access /thoughtleader routes (with ?userId= to view TL accounts)
+  if (pathname.startsWith('/thoughtleader') && (role === 'thoughtleader' || role === 'strategist')) {
     return NextResponse.next();
   }
 
@@ -61,5 +68,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/colaborador/:path*', '/master/:path*'],
+  matcher: ['/admin/:path*', '/colaborador/:path*', '/master/:path*', '/thoughtleader/:path*', '/strategist/:path*'],
 };

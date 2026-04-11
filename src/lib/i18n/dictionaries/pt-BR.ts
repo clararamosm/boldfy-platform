@@ -101,6 +101,12 @@ const ptBR = {
     support: 'Suporte',
     signOut: 'Sair',
     comingSoon: 'Em breve',
+    backlog: 'Backlog',
+    strategy: 'Estratégia',
+    brandManual: 'Manual de Marca',
+    strategists: 'Estrategistas',
+    thoughtLeaders: 'Thought Leaders',
+    contentPipeline: 'Pipeline de Conteúdo',
   },
 
   // ══════════════════════════════════════════════
@@ -110,6 +116,8 @@ const ptBR = {
     admin: 'Admin',
     collaborator: 'Colaborador',
     master: 'Master',
+    thoughtLeader: 'Thought Leader',
+    strategist: 'Estrategista',
   },
 
   // ══════════════════════════════════════════════
@@ -499,6 +507,8 @@ const ptBR = {
     upgrade: 'Fazer Upgrade',
     masterMode: 'Modo Master — Visualizando: {company}',
     backToMaster: 'Voltar ao Painel Master',
+    strategistMode: 'Modo Estrategista — Visualizando: {company}',
+    backToStrategist: 'Voltar ao Painel Estrategista',
   },
 
   // ══════════════════════════════════════════════
@@ -1298,6 +1308,181 @@ const ptBR = {
     send: 'Enviar',
     scheduledFor: 'Agendado para',
     nowLabel: 'Agora',
+  },
+
+  // ══════════════════════════════════════════════
+  // THOUGHT LEADER
+  // ══════════════════════════════════════════════
+  thoughtLeader: {
+    dashboardTitle: 'Dashboard',
+    greeting: 'Olá, {name}!',
+    subtitle: 'Acompanhe a performance do seu conteúdo',
+    postsPublished: 'Posts Publicados',
+    postsScheduled: 'Posts Agendados',
+    pendingApproval: 'Aguardando Aprovação',
+    impressionsTotal: 'Impressões Totais',
+    backlogTitle: 'Backlog de Conteúdo',
+    backlogDescription: 'Revise e aprove os conteúdos produzidos para o seu perfil.',
+    strategyTitle: 'Estratégia de Conteúdo',
+    strategyDescription: 'Veja a estratégia definida para o seu perfil. Gerenciada pelo seu estrategista.',
+    manualTitle: 'Manual de Marca',
+    manualDescription: 'Veja o manual de marca pessoal definido para o seu perfil.',
+    calendarTitle: 'Calendário',
+    calendarDescription: 'Visualize os posts agendados e publicados.',
+    noStrategy: 'Nenhuma estratégia definida ainda. Seu estrategista está trabalhando nisso.',
+    noManual: 'Nenhum manual de marca definido ainda. Seu estrategista está trabalhando nisso.',
+  },
+
+  // ══════════════════════════════════════════════
+  // STRATEGIST
+  // ══════════════════════════════════════════════
+  strategist: {
+    companiesTitle: 'Empresas',
+    companiesDescription: 'Empresas atribuídas à sua conta.',
+    viewCompany: 'Visualizar Empresa',
+    thoughtLeadersTitle: 'Thought Leaders',
+    thoughtLeadersDescription: 'Gerencie os Thought Leaders desta empresa.',
+    viewTL: 'Visualizar TL',
+    pipelineTitle: 'Pipeline de Conteúdo',
+    pipelineDescription: 'Gerencie a produção de conteúdo dos Thought Leaders.',
+    calendarTitle: 'Calendário',
+    strategyTitle: 'Estratégia de Conteúdo',
+    strategyDescription: 'Defina a estratégia de conteúdo para este perfil.',
+    manualTitle: 'Manual de Marca',
+    manualDescription: 'Defina o manual de marca pessoal deste perfil.',
+    noCompanies: 'Nenhuma empresa atribuída. Contate o Master para ser vinculado.',
+    noTLs: 'Nenhum Thought Leader nesta empresa.',
+    assignedCompanies: 'Empresas Atribuídas',
+  },
+
+  // ══════════════════════════════════════════════
+  // CONTENT PIPELINE
+  // ══════════════════════════════════════════════
+  contentPipeline: {
+    title: 'Pipeline de Conteúdo',
+    newPost: 'Novo Post',
+    status: {
+      backlog: 'Backlog',
+      aprovarIdeia: 'Aprovar Ideia',
+      emProducao: 'Em Produção',
+      aprovarPost: 'Aprovar Post',
+      postAprovado: 'Post Aprovado',
+      prontoPraPostar: 'Pronto pra Postar',
+      postado: 'Postado',
+    },
+    format: {
+      video: 'Vídeo',
+      texto: 'Texto',
+      gif: 'GIF',
+      onePager: 'One Pager',
+      carrossel: 'Carrossel',
+      foto: 'Foto',
+      quote: 'Quote',
+      meme: 'Meme',
+      print: 'Print',
+    },
+    editorial: {
+      visaoMercado: 'Visão de Mercado',
+      bastidores: 'Bastidores',
+      decisoes: 'Decisões',
+    },
+    stage: {
+      visibilidade: 'Visibilidade',
+      autoridade: 'Autoridade',
+      conversao: 'Conversão',
+    },
+    postTitle: 'Título do Post',
+    postDate: 'Data',
+    postFormat: 'Formato',
+    postEditorial: 'Editorial',
+    postStage: 'Etapa',
+    postCaption: 'Legenda',
+    postDesignNotes: 'Notas de Design',
+    approveIdea: 'Aprovar Ideia',
+    rejectIdea: 'Rejeitar Ideia',
+    approvePost: 'Aprovar Post',
+    rejectPost: 'Rejeitar Post',
+    requestChanges: 'Solicitar Alterações',
+    moveToProduction: 'Mover para Produção',
+    markReady: 'Marcar como Pronto',
+    publish: 'Publicar',
+    rejectionReason: 'Motivo da rejeição',
+    changeNotes: 'Notas de alteração',
+    noPostsInStatus: 'Nenhum post neste status.',
+    allStatuses: 'Todos os Status',
+    filterByStatus: 'Filtrar por status',
+    toastStatusUpdated: 'Status atualizado com sucesso!',
+    toastStatusError: 'Erro ao atualizar status.',
+    toastPostCreated: 'Post criado com sucesso!',
+    toastPostCreateError: 'Erro ao criar post.',
+    toastPostUpdated: 'Post atualizado com sucesso!',
+    toastPostUpdateError: 'Erro ao atualizar post.',
+  },
+
+  // ══════════════════════════════════════════════
+  // THOUGHT LEADER LAYOUT
+  // ══════════════════════════════════════════════
+  tlLayout: {
+    tokenExpired: 'Seu token do LinkedIn expirou. Reconecte para continuar publicando.',
+    tokenExpiring: 'Seu token do LinkedIn expira em {days} dia(s). Reconecte para evitar interrupções.',
+    reconnect: 'Reconectar',
+  },
+
+  // ══════════════════════════════════════════════
+  // ADMIN: THOUGHT LEADERS SECTION
+  // ══════════════════════════════════════════════
+  adminTL: {
+    title: 'Thought Leaders',
+    totalTLs: 'Total de Thought Leaders',
+    activeTLs: 'Thought Leaders Ativos',
+    availableTLLicenses: 'Licenças TL Disponíveis',
+    invite: 'Convidar Thought Leader',
+    inviteTitle: 'Convidar Novo Thought Leader',
+    inviteDescription: 'Envie um convite para um novo Thought Leader. Ele receberá um e-mail para criar sua senha.',
+    inviteName: 'Nome do Thought Leader',
+    inviteNamePlaceholder: 'Ex: Carlos Lima',
+    inviteEmail: 'E-mail do Thought Leader',
+    inviteEmailPlaceholder: 'nome@empresa.com.br',
+    sendInvite: 'Enviar Convite',
+    tableThoughtLeader: 'Thought Leader',
+    tableStatus: 'Status',
+    tableLinkedin: 'LinkedIn',
+    tableJoinDate: 'Data de Adesão',
+    empty: 'Nenhum Thought Leader encontrado. Convide o primeiro!',
+    toastInviteSent: 'Convite enviado!',
+    toastInviteDescription: 'O Thought Leader receberá um e-mail para definir sua senha.',
+    toastInviteError: 'Erro ao convidar',
+    statusPending: 'Pendente',
+  },
+
+  // ══════════════════════════════════════════════
+  // MASTER: STRATEGISTS
+  // ══════════════════════════════════════════════
+  masterStrategists: {
+    title: 'Estrategistas',
+    cardTitle: 'Gerenciamento de Estrategistas',
+    cardDescription: 'Gerencie os estrategistas da Boldfy e suas atribuições de empresas.',
+    addStrategist: 'Adicionar Estrategista',
+    addTitle: 'Adicionar Novo Estrategista',
+    addDescription: 'Envie um convite para um novo estrategista da equipe Boldfy.',
+    name: 'Nome',
+    namePlaceholder: 'Ex: Ana Costa',
+    email: 'E-mail',
+    emailPlaceholder: 'ana@boldfy.com',
+    createAndInvite: 'Criar e Convidar',
+    tableStrategist: 'Estrategista',
+    tableEmail: 'Email',
+    tableCompanies: 'Empresas',
+    tableStatus: 'Status',
+    empty: 'Nenhum estrategista encontrado.',
+    assignCompanies: 'Atribuir Empresas',
+    assignTitle: 'Atribuir Empresas ao Estrategista',
+    assignDescription: 'Selecione as empresas que este estrategista irá gerenciar.',
+    toastCreated: 'Estrategista criado com sucesso!',
+    toastCreateError: 'Erro ao criar estrategista.',
+    toastAssigned: 'Empresas atribuídas com sucesso!',
+    toastAssignError: 'Erro ao atribuir empresas.',
+    toastFetchError: 'Erro ao buscar estrategistas.',
   },
 
 } as const;

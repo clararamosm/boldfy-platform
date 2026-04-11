@@ -103,6 +103,12 @@ const en: Dictionary = {
     support: 'Support',
     signOut: 'Sign Out',
     comingSoon: 'Coming soon',
+    backlog: 'Backlog',
+    strategy: 'Strategy',
+    brandManual: 'Brand Manual',
+    strategists: 'Strategists',
+    thoughtLeaders: 'Thought Leaders',
+    contentPipeline: 'Content Pipeline',
   },
 
   // ══════════════════════════════════════════════
@@ -112,6 +118,8 @@ const en: Dictionary = {
     admin: 'Admin',
     collaborator: 'Collaborator',
     master: 'Master',
+    thoughtLeader: 'Thought Leader',
+    strategist: 'Strategist',
   },
 
   // ══════════════════════════════════════════════
@@ -501,6 +509,8 @@ const en: Dictionary = {
     upgrade: 'Upgrade',
     masterMode: 'Master Mode — Viewing: {company}',
     backToMaster: 'Back to Master Panel',
+    strategistMode: 'Strategist Mode — Viewing: {company}',
+    backToStrategist: 'Back to Strategist Panel',
   },
 
   // ══════════════════════════════════════════════
@@ -1298,6 +1308,181 @@ const en: Dictionary = {
     send: 'Send',
     scheduledFor: 'Scheduled for',
     nowLabel: 'Now',
+  },
+
+  // ══════════════════════════════════════════════
+  // THOUGHT LEADER
+  // ══════════════════════════════════════════════
+  thoughtLeader: {
+    dashboardTitle: 'Dashboard',
+    greeting: 'Hello, {name}!',
+    subtitle: 'Track your content performance',
+    postsPublished: 'Posts Published',
+    postsScheduled: 'Posts Scheduled',
+    pendingApproval: 'Pending Approval',
+    impressionsTotal: 'Total Impressions',
+    backlogTitle: 'Content Backlog',
+    backlogDescription: 'Review and approve content produced for your profile.',
+    strategyTitle: 'Content Strategy',
+    strategyDescription: 'View the strategy defined for your profile. Managed by your strategist.',
+    manualTitle: 'Brand Manual',
+    manualDescription: 'View the personal brand manual defined for your profile.',
+    calendarTitle: 'Calendar',
+    calendarDescription: 'View scheduled and published posts.',
+    noStrategy: 'No strategy defined yet. Your strategist is working on it.',
+    noManual: 'No brand manual defined yet. Your strategist is working on it.',
+  },
+
+  // ══════════════════════════════════════════════
+  // STRATEGIST
+  // ══════════════════════════════════════════════
+  strategist: {
+    companiesTitle: 'Companies',
+    companiesDescription: 'Companies assigned to your account.',
+    viewCompany: 'View Company',
+    thoughtLeadersTitle: 'Thought Leaders',
+    thoughtLeadersDescription: 'Manage the Thought Leaders of this company.',
+    viewTL: 'View TL',
+    pipelineTitle: 'Content Pipeline',
+    pipelineDescription: 'Manage content production for Thought Leaders.',
+    calendarTitle: 'Calendar',
+    strategyTitle: 'Content Strategy',
+    strategyDescription: 'Define the content strategy for this profile.',
+    manualTitle: 'Brand Manual',
+    manualDescription: 'Define the personal brand manual for this profile.',
+    noCompanies: 'No companies assigned. Contact Master to be linked.',
+    noTLs: 'No Thought Leaders in this company.',
+    assignedCompanies: 'Assigned Companies',
+  },
+
+  // ══════════════════════════════════════════════
+  // CONTENT PIPELINE
+  // ══════════════════════════════════════════════
+  contentPipeline: {
+    title: 'Content Pipeline',
+    newPost: 'New Post',
+    status: {
+      backlog: 'Backlog',
+      aprovarIdeia: 'Approve Idea',
+      emProducao: 'In Production',
+      aprovarPost: 'Approve Post',
+      postAprovado: 'Post Approved',
+      prontoPraPostar: 'Ready to Post',
+      postado: 'Posted',
+    },
+    format: {
+      video: 'Video',
+      texto: 'Text',
+      gif: 'GIF',
+      onePager: 'One Pager',
+      carrossel: 'Carousel',
+      foto: 'Photo',
+      quote: 'Quote',
+      meme: 'Meme',
+      print: 'Print',
+    },
+    editorial: {
+      visaoMercado: 'Market Vision',
+      bastidores: 'Behind the Scenes',
+      decisoes: 'Decisions',
+    },
+    stage: {
+      visibilidade: 'Visibility',
+      autoridade: 'Authority',
+      conversao: 'Conversion',
+    },
+    postTitle: 'Post Title',
+    postDate: 'Date',
+    postFormat: 'Format',
+    postEditorial: 'Editorial',
+    postStage: 'Stage',
+    postCaption: 'Caption',
+    postDesignNotes: 'Design Notes',
+    approveIdea: 'Approve Idea',
+    rejectIdea: 'Reject Idea',
+    approvePost: 'Approve Post',
+    rejectPost: 'Reject Post',
+    requestChanges: 'Request Changes',
+    moveToProduction: 'Move to Production',
+    markReady: 'Mark as Ready',
+    publish: 'Publish',
+    rejectionReason: 'Rejection reason',
+    changeNotes: 'Change notes',
+    noPostsInStatus: 'No posts in this status.',
+    allStatuses: 'All Statuses',
+    filterByStatus: 'Filter by status',
+    toastStatusUpdated: 'Status updated successfully!',
+    toastStatusError: 'Error updating status.',
+    toastPostCreated: 'Post created successfully!',
+    toastPostCreateError: 'Error creating post.',
+    toastPostUpdated: 'Post updated successfully!',
+    toastPostUpdateError: 'Error updating post.',
+  },
+
+  // ══════════════════════════════════════════════
+  // THOUGHT LEADER LAYOUT
+  // ══════════════════════════════════════════════
+  tlLayout: {
+    tokenExpired: 'Your LinkedIn token has expired. Reconnect to continue publishing.',
+    tokenExpiring: 'Your LinkedIn token expires in {days} day(s). Reconnect to avoid interruptions.',
+    reconnect: 'Reconnect',
+  },
+
+  // ══════════════════════════════════════════════
+  // ADMIN: THOUGHT LEADERS SECTION
+  // ══════════════════════════════════════════════
+  adminTL: {
+    title: 'Thought Leaders',
+    totalTLs: 'Total Thought Leaders',
+    activeTLs: 'Active Thought Leaders',
+    availableTLLicenses: 'Available TL Licenses',
+    invite: 'Invite Thought Leader',
+    inviteTitle: 'Invite New Thought Leader',
+    inviteDescription: 'Send an invitation to a new Thought Leader. They will receive an email to set their password.',
+    inviteName: 'Thought Leader Name',
+    inviteNamePlaceholder: 'Ex: Carlos Lima',
+    inviteEmail: 'Thought Leader Email',
+    inviteEmailPlaceholder: 'name@company.com',
+    sendInvite: 'Send Invite',
+    tableThoughtLeader: 'Thought Leader',
+    tableStatus: 'Status',
+    tableLinkedin: 'LinkedIn',
+    tableJoinDate: 'Join Date',
+    empty: 'No Thought Leaders found. Invite the first one!',
+    toastInviteSent: 'Invite sent!',
+    toastInviteDescription: 'The Thought Leader will receive an email to set their password.',
+    toastInviteError: 'Error inviting',
+    statusPending: 'Pending',
+  },
+
+  // ══════════════════════════════════════════════
+  // MASTER: STRATEGISTS
+  // ══════════════════════════════════════════════
+  masterStrategists: {
+    title: 'Strategists',
+    cardTitle: 'Strategist Management',
+    cardDescription: 'Manage Boldfy strategists and their company assignments.',
+    addStrategist: 'Add Strategist',
+    addTitle: 'Add New Strategist',
+    addDescription: 'Send an invitation to a new Boldfy team strategist.',
+    name: 'Name',
+    namePlaceholder: 'Ex: Ana Costa',
+    email: 'Email',
+    emailPlaceholder: 'ana@boldfy.com',
+    createAndInvite: 'Create & Invite',
+    tableStrategist: 'Strategist',
+    tableEmail: 'Email',
+    tableCompanies: 'Companies',
+    tableStatus: 'Status',
+    empty: 'No strategists found.',
+    assignCompanies: 'Assign Companies',
+    assignTitle: 'Assign Companies to Strategist',
+    assignDescription: 'Select the companies this strategist will manage.',
+    toastCreated: 'Strategist created successfully!',
+    toastCreateError: 'Error creating strategist.',
+    toastAssigned: 'Companies assigned successfully!',
+    toastAssignError: 'Error assigning companies.',
+    toastFetchError: 'Error fetching strategists.',
   },
 
 } as const;

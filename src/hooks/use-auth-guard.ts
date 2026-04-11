@@ -20,8 +20,8 @@ type TokenInfo = {
 
 type UseAuthGuardOptions = {
   /** The required role for this route */
-  role: 'master' | 'admin' | 'colaborador';
-  /** If true, check LinkedIn token status (colaborador only) */
+  role: 'master' | 'admin' | 'colaborador' | 'thoughtleader' | 'strategist';
+  /** If true, check LinkedIn token status (colaborador / thoughtleader) */
   checkLinkedInToken?: boolean;
 };
 
@@ -40,7 +40,9 @@ type UseAuthGuardReturn = {
   tokenStatus: TokenInfo;
   /** Whether a master is viewing as admin */
   isMasterMode: boolean;
-  /** Company name when in master mode */
+  /** Whether a strategist is viewing as admin */
+  isStrategistMode: boolean;
+  /** Company name when in master/strategist mode */
   masterCompanyName: string;
 };
 
@@ -67,6 +69,7 @@ export function useAuthGuard(options: UseAuthGuardOptions): UseAuthGuardReturn {
   const [ready, setReady] = useState(false);
   const [tokenStatus, setTokenStatus] = useState<TokenInfo>({ status: 'not_connected', daysLeft: 0 });
   const [isMasterMode, setIsMasterMode] = useState(false);
+  const [isStrategistMode, setIsStrategistMode] = useState(false);
   const [masterCompanyName, setMasterCompanyName] = useState('');
 
   useEffect(() => {
@@ -82,7 +85,7 @@ export function useAuthGuard(options: UseAuthGuardOptions): UseAuthGuardReturn {
       router.push('/login');
       return;
     }
-    if (role === 'admin' && user.role !== 'admin' && user.role !== 'master') {
+    if (role === 'admin' && user.role !== 'admin' && user.role !== 'master' && user.role !== 'strategist') {
       router.push('/login');
       return;
     }
@@ -90,14 +93,23 @@ export function useAuthGuard(options: UseAuthGuardOptions): UseAuthGuardReturn {
       router.push('/login');
       return;
     }
+    if (role === 'thoughtleader' && user.role !== 'thoughtleader' && user.role !== 'strategist') {
+      router.push('/login');
+      return;
+    }
+    if (role === 'strategist' && user.role !== 'strategist') {
+      router.push('/login');
+      return;
+    }
 
     // Determine companyId
-    if (role === 'admin' && user.role === 'master') {
-      // Master viewing admin panel — companyId from URL
+    if (role === 'admin' && (user.role === 'master' || user.role === 'strategist')) {
+      // Master or Strategist viewing admin panel — companyId from URL
       const urlCompanyId = searchParams.get('companyId');
       if (urlCompanyId) {
         setCompanyId(urlCompanyId);
-        setIsMasterMode(true);
+        if (user.role === 'master') setIsMasterMode(true);
+        if (user.role === 'strategist') setIsStrategistMode(true);
         // Fetch company name + locale
         getDoc(doc(db, 'companies', urlCompanyId)).then((compDoc) => {
           if (compDoc.exists()) {
@@ -107,15 +119,22 @@ export function useAuthGuard(options: UseAuthGuardOptions): UseAuthGuardReturn {
           }
         });
       } else {
-        router.push('/master/empresas');
+        // Redirect back to their home
+        if (user.role === 'master') router.push('/master/empresas');
+        else router.push('/strategist/empresas');
         return;
       }
-    } else if (role === 'master') {
-      // Master in master panel — no companyId needed
+    } else if (role === 'master' || role === 'strategist') {
+      // Master/Strategist in their own panel — no companyId needed
+      setCompanyId(undefined);
+      setLocale('pt-BR');
+    } else if (role === 'thoughtleader' && user.role === 'strategist') {
+      // Strategist viewing TL account — companyId from the TL user being viewed
+      // The strategist layout will handle fetching TL-specific data
       setCompanyId(undefined);
       setLocale('pt-BR');
     } else {
-      // Admin or Colaborador — companyId from user doc
+      // Admin, Colaborador, or Thought Leader — companyId from user doc
       setCompanyId(user.companyId);
       if (user.companyId) {
         getDoc(doc(db, 'companies', user.companyId)).then((compDoc) => {
@@ -126,7 +145,7 @@ export function useAuthGuard(options: UseAuthGuardOptions): UseAuthGuardReturn {
       }
     }
 
-    // LinkedIn token check (colaborador only)
+    // LinkedIn token check (colaborador and thoughtleader)
     if (checkLinkedInToken && user.rawData) {
       setTokenStatus(getTokenStatus(user.rawData));
     }
@@ -142,6 +161,7 @@ export function useAuthGuard(options: UseAuthGuardOptions): UseAuthGuardReturn {
     loading: authLoading,
     tokenStatus,
     isMasterMode,
+    isStrategistMode,
     masterCompanyName,
   };
 }

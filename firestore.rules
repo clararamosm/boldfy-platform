@@ -13,6 +13,12 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(userId)).data.companyId;
     }
 
+    // Check if a strategist is assigned to a specific company
+    function isStrategistForCompany(userId, companyId) {
+      return hasRole(userId, 'strategist')
+             && companyId in get(/databases/$(database)/documents/users/$(userId)).data.assignedCompanies;
+    }
+
     // Fields that only server actions can modify (never client)
     function isNotChangingProtectedFields() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'companyName', 'points', 'aiCredits']);
@@ -35,9 +41,11 @@ service cloud.firestore {
 
       // A user can read their own document.
       // An admin can read documents of users in their own company.
+      // A strategist can read users of companies they are assigned to.
       // A master admin can read any user document.
       allow read: if request.auth.uid == userId
                   || (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == resource.data.companyId)
+                  || isStrategistForCompany(request.auth.uid, resource.data.companyId)
                   || hasRole(request.auth.uid, 'master');
 
       // A user can update their own profile and personal branding data,
@@ -71,6 +79,9 @@ service cloud.firestore {
         allow read: if hasRole(request.auth.uid, 'admin')
                     && getCompanyId(request.auth.uid) == getCompanyId(userId);
 
+        // Strategist can read progress of users in assigned companies
+        allow read: if isStrategistForCompany(request.auth.uid, getCompanyId(userId));
+
         // Master can read any progress
         allow read: if hasRole(request.auth.uid, 'master');
       }
@@ -99,6 +110,9 @@ service cloud.firestore {
         allow read: if hasRole(request.auth.uid, 'admin')
                     && getCompanyId(request.auth.uid) == getCompanyId(userId);
 
+        // Strategist can read points history of users in assigned companies
+        allow read: if isStrategistForCompany(request.auth.uid, getCompanyId(userId));
+
         // Master can read any points history
         allow read: if hasRole(request.auth.uid, 'master');
       }
@@ -110,8 +124,25 @@ service cloud.firestore {
 
       // Scheduled posts for LinkedIn — user can only access their own posts
       // All writes go through server actions (Admin SDK), but allow client reads
+      // Strategist can read scheduled posts of users in assigned companies
       match /scheduledPosts/{postId} {
         allow read: if request.auth.uid == userId;
+        allow read: if isStrategistForCompany(request.auth.uid, getCompanyId(userId));
+        allow read: if hasRole(request.auth.uid, 'master');
+      }
+
+      // Content pipeline — posts produced for Thought Leaders
+      // TL can read all and update status (approve/reject)
+      // Strategist can read/write for TLs in assigned companies
+      match /contentPipeline/{postId} {
+        allow read: if request.auth.uid == userId;
+        allow update: if request.auth.uid == userId
+                      && isNotChangingProtectedFields()
+                      && isReasonableSize();
+        allow read, write: if isStrategistForCompany(request.auth.uid, getCompanyId(userId));
+        allow read, write: if hasRole(request.auth.uid, 'master');
+        allow read: if hasRole(request.auth.uid, 'admin')
+                    && getCompanyId(request.auth.uid) == getCompanyId(userId);
       }
     }
 
@@ -120,10 +151,13 @@ service cloud.firestore {
       // Only server actions create companies (via Admin SDK)
       allow create: if false;
 
-      // Admins and colaboradores can read their own company's data.
+      // Admins, colaboradores, and thought leaders can read their own company's data.
+      // Strategists can read companies they are assigned to.
       // Master admins can read any company's data.
       allow read: if request.auth != null
-                  && (getCompanyId(request.auth.uid) == companyId || hasRole(request.auth.uid, 'master'));
+                  && (getCompanyId(request.auth.uid) == companyId
+                      || isStrategistForCompany(request.auth.uid, companyId)
+                      || hasRole(request.auth.uid, 'master'));
 
       // BILLING SECURITY: subscription and Stripe fields can ONLY be written by
       // server-side code (Admin SDK / webhooks). Client writes are blocked.
@@ -133,10 +167,12 @@ service cloud.firestore {
           .hasAny(['subscription', 'stripeCustomerId']);
       }
 
-      // Only admins of the company or master admins can update company data.
+      // Only admins of the company, strategists, or master admins can update company data.
       // Billing-related fields are protected from client-side writes.
       allow update: if request.auth != null
-                   && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') )
+                   && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId)
+                        || isStrategistForCompany(request.auth.uid, companyId)
+                        || hasRole(request.auth.uid, 'master') )
                    && isNotChangingBillingFields();
 
       // Only server actions can delete companies (via Admin SDK)
@@ -144,12 +180,16 @@ service cloud.firestore {
 
       // Rules for company subcollections (sessions, activatedGlobalTrails, assets, etc.)
       match /{subcollection}/{docId} {
-        // Admins of the company and master admins can manage all subcollections
+        // Admins of the company, strategists assigned, and master admins can manage all subcollections
         allow read: if request.auth != null
-                    && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
+                    && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId)
+                         || isStrategistForCompany(request.auth.uid, companyId)
+                         || hasRole(request.auth.uid, 'master') );
 
         allow write: if request.auth != null
-                     && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') )
+                     && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId)
+                          || isStrategistForCompany(request.auth.uid, companyId)
+                          || hasRole(request.auth.uid, 'master') )
                      && isReasonableSize();
 
         // Colaboradores can only read specific subcollections they need
@@ -158,13 +198,23 @@ service cloud.firestore {
                     && getCompanyId(request.auth.uid) == companyId
                     && subcollection in ['missions', 'missionSubmissions', 'trails', 'rewards', 'rescues', 'assets', 'library', 'activatedGlobalTrails'];
 
+        // Thought Leaders can read content strategy and brand manual of their company
+        allow read: if request.auth != null
+                    && hasRole(request.auth.uid, 'thoughtleader')
+                    && getCompanyId(request.auth.uid) == companyId
+                    && subcollection in ['contentStrategy', 'brandManual'];
+
         // Deep subcollections (e.g., sessions/{id}/trails/{id})
         match /{deepSub}/{deepDocId} {
           allow read: if request.auth != null
-                      && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') );
+                      && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId)
+                           || isStrategistForCompany(request.auth.uid, companyId)
+                           || hasRole(request.auth.uid, 'master') );
 
           allow write: if request.auth != null
-                       && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId) || hasRole(request.auth.uid, 'master') )
+                       && ( (hasRole(request.auth.uid, 'admin') && getCompanyId(request.auth.uid) == companyId)
+                            || isStrategistForCompany(request.auth.uid, companyId)
+                            || hasRole(request.auth.uid, 'master') )
                        && isReasonableSize();
 
           // Colaboradores: only read deep subs of allowed parent subcollections

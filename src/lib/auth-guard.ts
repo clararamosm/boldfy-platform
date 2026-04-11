@@ -84,3 +84,85 @@ export async function requireMaster(idToken: string): Promise<AuthUser> {
 
   return user;
 }
+
+/**
+ * Verifica autenticacao + garante que o usuario tem role de strategist.
+ */
+export async function requireStrategist(idToken: string): Promise<AuthUser> {
+  const user = await requireAuth(idToken);
+
+  if (user.role !== 'strategist') {
+    throw new Error('Acesso negado: permissao de estrategista necessaria.');
+  }
+
+  return user;
+}
+
+/**
+ * Verifica autenticacao + garante que o usuario tem role de admin ou strategist
+ * para a empresa especifica.
+ * Strategists precisam ter a empresa em suas assignedCompanies.
+ */
+export async function requireAdminOrStrategist(idToken: string, companyId: string): Promise<AuthUser> {
+  const user = await requireAuth(idToken);
+
+  if (user.role === 'master') {
+    // Master tem acesso total
+    return user;
+  }
+
+  if (user.role === 'admin') {
+    if (user.companyId !== companyId) {
+      throw new Error('Acesso negado: voce nao tem permissao nesta empresa.');
+    }
+    return user;
+  }
+
+  if (user.role === 'strategist') {
+    // Verifica se o strategist esta atribuido a esta empresa
+    const userDoc = await adminDb.collection('users').doc(user.uid).get();
+    const assignedCompanies = userDoc.data()?.assignedCompanies as string[] | undefined;
+    if (!assignedCompanies?.includes(companyId)) {
+      throw new Error('Acesso negado: voce nao esta atribuido a esta empresa.');
+    }
+    return user;
+  }
+
+  throw new Error('Acesso negado: permissao de admin ou estrategista necessaria.');
+}
+
+/**
+ * Verifica que o strategist tem acesso ao Thought Leader especifico.
+ * O TL deve pertencer a uma empresa atribuida ao strategist.
+ */
+export async function requireStrategistForTL(idToken: string, tlUserId: string): Promise<AuthUser> {
+  const user = await requireAuth(idToken);
+
+  if (user.role === 'master') {
+    return user;
+  }
+
+  if (user.role !== 'strategist') {
+    throw new Error('Acesso negado: permissao de estrategista necessaria.');
+  }
+
+  // Buscar o TL para saber a empresa
+  const tlDoc = await adminDb.collection('users').doc(tlUserId).get();
+  if (!tlDoc.exists) {
+    throw new Error('Thought Leader nao encontrado.');
+  }
+
+  const tlCompanyId = tlDoc.data()?.companyId;
+  if (!tlCompanyId) {
+    throw new Error('Thought Leader sem empresa vinculada.');
+  }
+
+  // Verificar se o strategist esta atribuido a empresa do TL
+  const strategistDoc = await adminDb.collection('users').doc(user.uid).get();
+  const assignedCompanies = strategistDoc.data()?.assignedCompanies as string[] | undefined;
+  if (!assignedCompanies?.includes(tlCompanyId)) {
+    throw new Error('Acesso negado: voce nao esta atribuido a empresa deste Thought Leader.');
+  }
+
+  return user;
+}

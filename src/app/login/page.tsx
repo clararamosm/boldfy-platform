@@ -54,6 +54,8 @@ function LoginForm() {
         if (userRole === 'master') { router.push('/master/empresas'); }
         else if (userRole === 'admin') { router.push('/admin/dashboard'); }
         else if (userRole === 'colaborador') { router.push('/colaborador/dashboard'); }
+        else if (userRole === 'thoughtleader') { router.push('/thoughtleader/dashboard'); }
+        else if (userRole === 'strategist') { router.push('/strategist/empresas'); }
         else { setError(t.auth.errors.profileNotRecognized); setLoading(false); return; }
       } else {
         setError(t.auth.errors.profileNotRecognized);

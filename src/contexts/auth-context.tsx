@@ -32,7 +32,7 @@ export type AuthUser = {
   uid: string;
   name: string;
   email: string;
-  role: 'admin' | 'colaborador' | 'master' | string;
+  role: 'admin' | 'colaborador' | 'master' | 'thoughtleader' | 'strategist' | string;
   companyId?: string;
   profile?: {
     name?: string;
@@ -96,8 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             safeData.linkedinConnection = safeConnection;
           }
 
-          // Auto-activate collaborators on first login
-          if (role === 'colaborador' && data.status === 'Pendente') {
+          // Auto-activate collaborators and thought leaders on first login
+          if ((role === 'colaborador' || role === 'thoughtleader') && data.status === 'Pendente') {
             updateDoc(doc(db, 'users', fbUser.uid), { status: 'Ativo' }).catch(err =>
               console.error('Failed to activate collaborator:', err),
             );
