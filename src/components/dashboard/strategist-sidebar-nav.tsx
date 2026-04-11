@@ -186,9 +186,9 @@ export function StrategistSidebarNav() {
                                                                 <SidebarMenuSubButton
                                                                     asChild
                                                                     size="sm"
-                                                                    isActive={isActive('/strategist/calendario', company.id, tl.id)}
+                                                                    isActive={isActive('/strategist/calendario-perfil', company.id, tl.id)}
                                                                 >
-                                                                    <Link href={`/strategist/calendario?companyId=${company.id}&tlId=${tl.id}`}>
+                                                                    <Link href={`/strategist/calendario-perfil?companyId=${company.id}&tlId=${tl.id}&tlName=${encodeURIComponent(tl.name)}`}>
                                                                         <CalendarDays className="h-3 w-3" />
                                                                         <span>Calendário</span>
                                                                     </Link>

@@ -15,7 +15,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   Loader2, Plus, FileText, Calendar as CalIcon, Users, Clock, Tag,
   Layers, LayoutGrid, SquareCheck, Upload, X, Image as ImageIcon, File,
-  User,
+  User, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
@@ -83,6 +83,26 @@ export default function StrategistPipelinePage() {
     leadMagnet: false,
   });
   const [formLoading, setFormLoading] = useState(false);
+
+  // Kanban scroll
+  const kanbanRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = kanbanRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  const scrollKanban = (direction: 'left' | 'right') => {
+    const el = kanbanRef.current;
+    if (!el) return;
+    const amount = 300;
+    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
+    setTimeout(checkScroll, 350);
+  };
 
   // Media upload
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -239,6 +259,13 @@ export default function StrategistPipelinePage() {
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
+
+  // Check scroll arrows after posts load
+  useEffect(() => {
+    if (!isPostsLoading) {
+      setTimeout(checkScroll, 100);
+    }
+  }, [isPostsLoading, checkScroll]);
 
   // ─── Posts grouped by status (for kanban) ──────
   const postsByStatus = useMemo(() => {
@@ -505,7 +532,33 @@ export default function StrategistPipelinePage() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: 'calc(100vh - 200px)' }}>
+          <div className="relative">
+            {/* Scroll arrows */}
+            {canScrollLeft && (
+              <button
+                type="button"
+                onClick={() => scrollKanban('left')}
+                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-background/90 border shadow-md flex items-center justify-center hover:bg-accent transition-colors"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+            )}
+            {canScrollRight && (
+              <button
+                type="button"
+                onClick={() => scrollKanban('right')}
+                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-background/90 border shadow-md flex items-center justify-center hover:bg-accent transition-colors"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            )}
+
+          <div
+            ref={kanbanRef}
+            onScroll={checkScroll}
+            className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
+            style={{ height: 'calc(100vh - 180px)' }}
+          >
             {KANBAN_STATUSES.map(status => {
               const cfg = STATUS_CONFIG[status];
               const columnPosts = postsByStatus[status] || [];
@@ -609,6 +662,7 @@ export default function StrategistPipelinePage() {
                 </div>
               );
             })}
+          </div>
           </div>
         )}
 
