@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, PlusCircle, Loader2, Building2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Loader2, Building2, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
-import { inviteStrategist, assignCompaniesToStrategist } from '@/app/actions';
+import { inviteStrategist, deleteStrategist, assignCompaniesToStrategist } from '@/app/actions';
 
 type Strategist = {
   id: string;
@@ -66,6 +66,11 @@ export default function MasterEstrategistasPage() {
   const [assigningStrategist, setAssigningStrategist] = useState<Strategist | null>(null);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
+
+  // Delete confirmation dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingStrategist, setDeletingStrategist] = useState<Strategist | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [inviteState, formAction] = useActionState(inviteStrategist, { error: undefined, success: undefined });
 
@@ -165,6 +170,29 @@ export default function MasterEstrategistasPage() {
       toast({ variant: 'destructive', title: 'Erro ao atribuir empresas', description: error instanceof Error ? error.message : '' });
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  const handleOpenDelete = (strategist: Strategist) => {
+    setDeletingStrategist(strategist);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingStrategist) return;
+    setIsDeleting(true);
+    try {
+      const token = await getAuthToken();
+      const result = await deleteStrategist(token, deletingStrategist.id);
+      if (result.error) throw new Error(result.error);
+      toast({ title: 'Estrategista removido com sucesso!' });
+      setDeleteDialogOpen(false);
+      setDeletingStrategist(null);
+      fetchData();
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro ao remover estrategista', description: error instanceof Error ? error.message : '' });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -273,6 +301,13 @@ export default function MasterEstrategistasPage() {
                               <Building2 className="mr-2 h-4 w-4" />
                               Atribuir Empresas
                             </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDelete(strategist)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir Estrategista
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -312,6 +347,29 @@ export default function MasterEstrategistasPage() {
           <div className="flex justify-end pt-4">
             <Button onClick={handleSaveAssign} disabled={isAssigning}>
               {isAssigning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</> : 'Salvar Atribuições'}
+            </Button>
+          </div>
+        </ActionDialog>
+
+        {/* Delete Confirmation Dialog */}
+        <ActionDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          title="Excluir Estrategista"
+          description={`Tem certeza que deseja excluir ${deletingStrategist?.name || 'este estrategista'}? Esta ação é irreversível e removerá o estrategista de todas as empresas atribuídas.`}
+          showCancel={false}
+        >
+          <div className="py-2">
+            <p className="text-sm text-muted-foreground">
+              O estrategista será removido permanentemente da plataforma e desvinculado de todas as empresas.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={isDeleting}>
+              {isDeleting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Excluindo...</> : 'Excluir Permanentemente'}
             </Button>
           </div>
         </ActionDialog>

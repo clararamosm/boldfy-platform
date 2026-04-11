@@ -465,10 +465,22 @@ export async function assignCompaniesToStrategist(
     // Add strategist to newly assigned companies
     for (const companyId of companyIds) {
       const compRef = adminDb.collection('companies').doc(companyId);
-      batch.update(compRef, {
-        strategistIds: FieldValue.arrayUnion(strategistId),
-        strategistId: null, // migrate away from singular field
-      });
+      // Migrate legacy singular field if present
+      const compSnap = await compRef.get();
+      const compData = compSnap.data();
+      const legacySingular = compData?.strategistId;
+      if (legacySingular && !compData?.strategistIds?.includes(legacySingular)) {
+        // Ensure the old strategist is also in the array before adding the new one
+        batch.update(compRef, {
+          strategistIds: FieldValue.arrayUnion(legacySingular, strategistId),
+          strategistId: null, // migrate away from singular field
+        });
+      } else {
+        batch.update(compRef, {
+          strategistIds: FieldValue.arrayUnion(strategistId),
+          strategistId: null, // clean legacy field
+        });
+      }
     }
 
     await batch.commit();
@@ -477,6 +489,80 @@ export async function assignCompaniesToStrategist(
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
     console.error('Error in assignCompaniesToStrategist:', errorMessage);
     return { error: `Erro ao atribuir empresas: ${errorMessage}` };
+  }
+}
+
+// ---- Delete Strategist Action (by Master) ----
+
+export async function deleteStrategist(idToken: string, strategistId: string): Promise<{ success?: boolean; error?: string }> {
+  if (!adminAuth) {
+    return { error: "O serviço de autenticação não está disponível." };
+  }
+  try {
+    await requireMaster(idToken);
+  } catch (e: unknown) {
+    return { error: e instanceof Error ? e.message : 'Erro de autenticação.' };
+  }
+
+  try {
+    // Verify user exists and is actually a strategist
+    const targetDoc = await adminDb.collection('users').doc(strategistId).get();
+    if (!targetDoc.exists) return { error: 'Estrategista não encontrado.' };
+    const targetData = targetDoc.data();
+    if (targetData?.role !== 'strategist') return { error: 'Este usuário não é um estrategista.' };
+
+    // Remove strategist from all companies' strategistIds arrays
+    const assignedCompanies: string[] = targetData?.assignedCompanies || [];
+    if (assignedCompanies.length > 0) {
+      const batch = adminDb.batch();
+      for (const companyId of assignedCompanies) {
+        const compRef = adminDb.collection('companies').doc(companyId);
+        batch.update(compRef, {
+          strategistIds: FieldValue.arrayRemove(strategistId),
+        });
+      }
+      await batch.commit();
+    }
+
+    // Also clean up any companies referencing this strategist via legacy singular field
+    const legacyCompanies = await adminDb.collection('companies')
+      .where('strategistId', '==', strategistId).get();
+    if (!legacyCompanies.empty) {
+      const batch2 = adminDb.batch();
+      for (const d of legacyCompanies.docs) {
+        batch2.update(d.ref, { strategistId: null });
+      }
+      await batch2.commit();
+    }
+
+    // Delete from Firebase Auth
+    try {
+      await adminAuth.deleteUser(strategistId);
+    } catch (authError: unknown) {
+      const authErr = authError as { code?: string; message?: string };
+      if (authErr?.code !== 'auth/user-not-found') {
+        console.error(`Error deleting Auth user ${strategistId}:`, authErr?.message);
+      }
+    }
+
+    // Delete subcollections
+    const userRef = adminDb.collection('users').doc(strategistId);
+    const subcollections = await userRef.listCollections();
+    for (const subcol of subcollections) {
+      const docs = await subcol.listDocuments();
+      for (const d of docs) {
+        await d.delete();
+      }
+    }
+
+    // Delete user document
+    await userRef.delete();
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in deleteStrategist:', errorMessage);
+    return { error: `Erro ao remover estrategista: ${errorMessage}` };
   }
 }
 
