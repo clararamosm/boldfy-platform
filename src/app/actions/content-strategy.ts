@@ -77,6 +77,17 @@ export type BrandManualData = {
   updatedBy?: string;
 };
 
+export type BrandContextData = {
+  valueProposition?: string;
+  tagline?: string;
+  businessKeywords?: string[];
+  solutions?: string[];
+  targetPainPoints?: string[];
+  targetAudience?: string;
+  approvedTopics?: string[];
+  prohibitedPhrases?: string[];
+};
+
 // ---- Helper: doc paths ----
 
 function getStrategyPath(companyId: string, tlUserId: string) {
@@ -233,6 +244,81 @@ export async function getBrandManual(
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
     console.error('Error in getBrandManual:', msg);
+    return { error: msg };
+  }
+}
+
+// ---- Get Company Brand Context (Strategist, Admin, Master) ----
+
+export async function getCompanyBrandContext(
+  idToken: string,
+  companyId: string
+): Promise<{ data?: BrandContextData | null; error?: string }> {
+  try {
+    const user = await requireAuth(idToken);
+
+    // Access check
+    if (user.role === 'master') {
+      // OK
+    } else if (user.role === 'admin' && user.companyId === companyId) {
+      // Admin of this company
+    } else if (user.role === 'strategist') {
+      // Check strategist is assigned to this company
+      const userDoc = await adminDb.collection('users').doc(user.uid).get();
+      const assigned: string[] = userDoc.data()?.assignedCompanies || [];
+      if (!assigned.includes(companyId)) {
+        return { error: 'Acesso negado.' };
+      }
+    } else {
+      return { error: 'Acesso negado.' };
+    }
+
+    const compDoc = await adminDb.collection('companies').doc(companyId).get();
+    if (!compDoc.exists) return { error: 'Empresa nao encontrada.' };
+
+    const brandContext = compDoc.data()?.brandContext || compDoc.data()?.branding || null;
+    return { data: brandContext as BrandContextData | null };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in getCompanyBrandContext:', msg);
+    return { error: msg };
+  }
+}
+
+// ---- Save Company Brand Context (Strategist, Admin, Master) ----
+
+export async function saveCompanyBrandContext(
+  idToken: string,
+  companyId: string,
+  data: BrandContextData
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const user = await requireAuth(idToken);
+
+    // Access check
+    if (user.role === 'master') {
+      // OK
+    } else if (user.role === 'admin' && user.companyId === companyId) {
+      // Admin of this company
+    } else if (user.role === 'strategist') {
+      const userDoc = await adminDb.collection('users').doc(user.uid).get();
+      const assigned: string[] = userDoc.data()?.assignedCompanies || [];
+      if (!assigned.includes(companyId)) {
+        return { error: 'Acesso negado.' };
+      }
+    } else {
+      return { error: 'Acesso negado.' };
+    }
+
+    await adminDb.collection('companies').doc(companyId).set(
+      { brandContext: data },
+      { merge: true }
+    );
+
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in saveCompanyBrandContext:', msg);
     return { error: msg };
   }
 }

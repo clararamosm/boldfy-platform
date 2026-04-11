@@ -19,7 +19,16 @@ import {
     SidebarMenuSkeleton,
 } from '@/components/ui/sidebar';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { LayoutDashboard, CalendarDays, ClipboardList, User, ChevronRight, Building2 } from 'lucide-react';
+import {
+    LayoutDashboard,
+    CalendarDays,
+    ClipboardList,
+    User,
+    ChevronRight,
+    Building2,
+    BookOpen,
+    FileText,
+} from 'lucide-react';
 
 export function StrategistSidebarNav() {
     const { user } = useAuth();
@@ -53,6 +62,13 @@ export function StrategistSidebarNav() {
         fetchData();
     }, [user?.uid]);
 
+    const isActive = (path: string, companyId?: string, tlId?: string) => {
+        if (pathname !== path) return false;
+        if (companyId && currentCompanyId !== companyId) return false;
+        if (tlId && currentTlId !== tlId) return false;
+        return true;
+    };
+
     return (
         <>
             {/* Static top items */}
@@ -75,7 +91,7 @@ export function StrategistSidebarNav() {
                         <SidebarMenuItem>
                             <SidebarMenuButton
                                 asChild
-                                isActive={pathname === '/strategist/calendario'}
+                                isActive={pathname === '/strategist/calendario' && !currentCompanyId}
                                 tooltip="Calendário"
                             >
                                 <Link href="/strategist/calendario">
@@ -113,22 +129,37 @@ export function StrategistSidebarNav() {
                 </SidebarGroup>
             ) : (
                 companies.map(company => (
-                    <Collapsible key={company.id} defaultOpen className="group/collapsible">
+                    <Collapsible key={company.id} defaultOpen className="group/company">
                         <SidebarGroup className="py-0">
                             <SidebarGroupLabel asChild>
                                 <CollapsibleTrigger className="flex w-full items-center gap-1 cursor-pointer">
                                     <Building2 className="h-3.5 w-3.5 shrink-0 opacity-60" />
                                     <span className="truncate">{company.name}</span>
-                                    <ChevronRight className="ml-auto h-3 w-3 shrink-0 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                                    <ChevronRight className="ml-auto h-3 w-3 shrink-0 transition-transform group-data-[state=open]/company:rotate-90" />
                                 </CollapsibleTrigger>
                             </SidebarGroupLabel>
                             <CollapsibleContent>
                                 <SidebarGroupContent>
                                     <SidebarMenu>
+                                        {/* Brand Context */}
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
                                                 asChild
-                                                isActive={pathname === '/strategist/pipeline' && currentCompanyId === company.id && !currentTlId}
+                                                isActive={isActive('/strategist/brand-context', company.id)}
+                                                size="sm"
+                                            >
+                                                <Link href={`/strategist/brand-context?companyId=${company.id}`}>
+                                                    <Building2 />
+                                                    <span>Brand Context</span>
+                                                </Link>
+                                            </SidebarMenuButton>
+                                        </SidebarMenuItem>
+
+                                        {/* Pipeline */}
+                                        <SidebarMenuItem>
+                                            <SidebarMenuButton
+                                                asChild
+                                                isActive={isActive('/strategist/pipeline', company.id) && !currentTlId}
                                                 size="sm"
                                             >
                                                 <Link href={`/strategist/pipeline?companyId=${company.id}`}>
@@ -136,25 +167,62 @@ export function StrategistSidebarNav() {
                                                     <span>Pipeline</span>
                                                 </Link>
                                             </SidebarMenuButton>
-                                            {company.tls.length > 0 && (
-                                                <SidebarMenuSub>
-                                                    {company.tls.map(tl => (
-                                                        <SidebarMenuSubItem key={tl.id}>
-                                                            <SidebarMenuSubButton
-                                                                asChild
-                                                                size="sm"
-                                                                isActive={pathname === '/strategist/pipeline' && currentTlId === tl.id}
-                                                            >
-                                                                <Link href={`/strategist/pipeline?companyId=${company.id}&tlId=${tl.id}`}>
-                                                                    <User className="h-3 w-3" />
-                                                                    <span>{tl.name.split(' ')[0]}</span>
-                                                                </Link>
-                                                            </SidebarMenuSubButton>
-                                                        </SidebarMenuSubItem>
-                                                    ))}
-                                                </SidebarMenuSub>
-                                            )}
                                         </SidebarMenuItem>
+
+                                        {/* TL Profiles */}
+                                        {company.tls.map(tl => (
+                                            <SidebarMenuItem key={tl.id}>
+                                                <Collapsible className="group/tl w-full">
+                                                    <SidebarMenuButton asChild size="sm">
+                                                        <CollapsibleTrigger className="flex w-full items-center gap-2 cursor-pointer">
+                                                            <User className="h-3.5 w-3.5 shrink-0" />
+                                                            <span className="truncate">{tl.name.split(' ')[0]}</span>
+                                                            <ChevronRight className="ml-auto h-3 w-3 shrink-0 transition-transform group-data-[state=open]/tl:rotate-90" />
+                                                        </CollapsibleTrigger>
+                                                    </SidebarMenuButton>
+                                                    <CollapsibleContent>
+                                                        <SidebarMenuSub>
+                                                            <SidebarMenuSubItem>
+                                                                <SidebarMenuSubButton
+                                                                    asChild
+                                                                    size="sm"
+                                                                    isActive={isActive('/strategist/calendario', company.id, tl.id)}
+                                                                >
+                                                                    <Link href={`/strategist/calendario?companyId=${company.id}&tlId=${tl.id}`}>
+                                                                        <CalendarDays className="h-3 w-3" />
+                                                                        <span>Calendário</span>
+                                                                    </Link>
+                                                                </SidebarMenuSubButton>
+                                                            </SidebarMenuSubItem>
+                                                            <SidebarMenuSubItem>
+                                                                <SidebarMenuSubButton
+                                                                    asChild
+                                                                    size="sm"
+                                                                    isActive={isActive('/strategist/manual', company.id, tl.id)}
+                                                                >
+                                                                    <Link href={`/strategist/manual?companyId=${company.id}&tlId=${tl.id}`}>
+                                                                        <BookOpen className="h-3 w-3" />
+                                                                        <span>Manual de Marca</span>
+                                                                    </Link>
+                                                                </SidebarMenuSubButton>
+                                                            </SidebarMenuSubItem>
+                                                            <SidebarMenuSubItem>
+                                                                <SidebarMenuSubButton
+                                                                    asChild
+                                                                    size="sm"
+                                                                    isActive={isActive('/strategist/estrategia', company.id, tl.id)}
+                                                                >
+                                                                    <Link href={`/strategist/estrategia?companyId=${company.id}&tlId=${tl.id}`}>
+                                                                        <FileText className="h-3 w-3" />
+                                                                        <span>Estratégia</span>
+                                                                    </Link>
+                                                                </SidebarMenuSubButton>
+                                                            </SidebarMenuSubItem>
+                                                        </SidebarMenuSub>
+                                                    </CollapsibleContent>
+                                                </Collapsible>
+                                            </SidebarMenuItem>
+                                        ))}
                                     </SidebarMenu>
                                 </SidebarGroupContent>
                             </CollapsibleContent>

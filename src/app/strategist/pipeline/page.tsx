@@ -47,6 +47,7 @@ export default function StrategistPipelinePage() {
     title: '',
     caption: '',
     scheduledFor: '',
+    scheduledTime: '10:00',
     status: 'backlog' as PipelineStatus,
     editorial: '',
     etapa: '',
@@ -160,6 +161,7 @@ export default function StrategistPipelinePage() {
       title: '',
       caption: '',
       scheduledFor: '',
+      scheduledTime: '10:00',
       status: 'backlog',
       editorial: '',
       etapa: '',
@@ -172,10 +174,23 @@ export default function StrategistPipelinePage() {
   // Open edit dialog
   const openEditDialog = (post: PipelinePost) => {
     setEditingPost(post);
+    // Decompose ISO date into date + time
+    let dateStr = post.scheduledFor || '';
+    let timeStr = '10:00';
+    if (dateStr && dateStr.includes('T')) {
+      const d = new Date(dateStr);
+      dateStr = d.toISOString().substring(0, 10);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      timeStr = `${hh}:${mm}`;
+    } else if (dateStr && dateStr.length === 10) {
+      // Already just a date (yyyy-MM-dd), keep default time
+    }
     setFormData({
       title: post.title,
       caption: post.caption,
-      scheduledFor: post.scheduledFor || '',
+      scheduledFor: dateStr.substring(0, 10),
+      scheduledTime: timeStr,
       status: post.status,
       editorial: post.editorial,
       etapa: post.etapa,
@@ -191,12 +206,19 @@ export default function StrategistPipelinePage() {
     setFormLoading(true);
     try {
       const token = await getAuthToken();
+      // Compose date + time into ISO string
+      let scheduledFor: string | null = null;
+      if (formData.scheduledFor) {
+        const time = formData.scheduledTime || '10:00';
+        scheduledFor = new Date(`${formData.scheduledFor}T${time}:00`).toISOString();
+      }
+
       if (editingPost) {
         const { updatePipelinePost } = await import('@/app/actions/content-pipeline');
         await updatePipelinePost(token, selectedTL, editingPost.id, {
           title: formData.title,
           caption: formData.caption,
-          scheduledFor: formData.scheduledFor || null,
+          scheduledFor,
           status: formData.status,
           editorial: formData.editorial,
           etapa: formData.etapa,
@@ -208,7 +230,7 @@ export default function StrategistPipelinePage() {
         await createPipelinePost(token, selectedTL, {
           title: formData.title,
           caption: formData.caption,
-          scheduledFor: formData.scheduledFor || null,
+          scheduledFor,
           status: formData.status,
           editorial: formData.editorial,
           etapa: formData.etapa,
@@ -365,6 +387,12 @@ export default function StrategistPipelinePage() {
                       <span className="flex items-center gap-1">
                         <CalIcon className="h-3 w-3" />
                         {new Date(post.scheduledFor).toLocaleDateString()}
+                        {(() => {
+                          const d = new Date(post.scheduledFor);
+                          const hh = String(d.getHours()).padStart(2, '0');
+                          const mm = String(d.getMinutes()).padStart(2, '0');
+                          return `${hh}:${mm}` !== '00:00' ? ` ${hh}:${mm}` : '';
+                        })()}
                       </span>
                     )}
                   </CardDescription>
@@ -416,13 +444,21 @@ export default function StrategistPipelinePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="grid gap-2">
                   <Label>{t.contentPipeline.postDate}</Label>
                   <Input
                     type="date"
                     value={formData.scheduledFor}
                     onChange={(e) => setFormData(p => ({ ...p, scheduledFor: e.target.value }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Horário</Label>
+                  <Input
+                    type="time"
+                    value={formData.scheduledTime}
+                    onChange={(e) => setFormData(p => ({ ...p, scheduledTime: e.target.value }))}
                   />
                 </div>
                 <div className="grid gap-2">
