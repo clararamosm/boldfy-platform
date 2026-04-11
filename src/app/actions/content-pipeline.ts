@@ -408,3 +408,71 @@ export async function markPipelinePostPublished(
     return { error: msg };
   }
 }
+
+// ---- Calendar-oriented: Get ALL pipeline posts for a Strategist ----
+
+export type CalendarPipelinePost = PipelinePost & {
+  tlUserId: string;
+  tlName: string;
+  companyName: string;
+  companyId: string;
+};
+
+export async function getAllPipelinePostsForStrategist(
+  idToken: string
+): Promise<{ posts?: CalendarPipelinePost[]; error?: string }> {
+  try {
+    const user = await requireAuth(idToken);
+    if (user.role !== 'strategist' && user.role !== 'master') {
+      return { error: 'Acesso negado.' };
+    }
+
+    // Get assigned companies
+    const userDoc = await adminDb.collection('users').doc(user.uid).get();
+    const assignedCompanies = (userDoc.data()?.assignedCompanies as string[]) || [];
+
+    if (assignedCompanies.length === 0) return { posts: [] };
+
+    const allPosts: CalendarPipelinePost[] = [];
+
+    for (const companyId of assignedCompanies) {
+      // Get company name
+      const compDoc = await adminDb.collection('companies').doc(companyId).get();
+      const companyName = compDoc.data()?.companyName || '';
+
+      // Get TLs in this company
+      const tlSnap = await adminDb.collection('users')
+        .where('companyId', '==', companyId)
+        .where('role', '==', 'thoughtleader')
+        .get();
+
+      for (const tlDoc of tlSnap.docs) {
+        const tlData = tlDoc.data();
+        const tlName = tlData.profile?.name || tlData.name || '';
+
+        // Get pipeline posts for this TL
+        const postsSnap = await adminDb
+          .collection(getPipelinePath(tlDoc.id))
+          .orderBy('createdAt', 'desc')
+          .get();
+
+        for (const postDoc of postsSnap.docs) {
+          allPosts.push({
+            id: postDoc.id,
+            ...(postDoc.data() as Omit<PipelinePost, 'id'>),
+            tlUserId: tlDoc.id,
+            tlName,
+            companyName,
+            companyId,
+          });
+        }
+      }
+    }
+
+    return { posts: allPosts };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in getAllPipelinePostsForStrategist:', msg);
+    return { error: msg };
+  }
+}

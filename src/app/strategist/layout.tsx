@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { LogOut, Loader2, Settings } from "lucide-react";
 import { AuthProvider } from "@/contexts/auth-context";
 import { LocaleProvider } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
@@ -44,9 +45,6 @@ function StrategistLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <div className="p-2 group-data-[state=collapsed]:hidden">
-          <p className="text-xs font-semibold uppercase text-sidebar-foreground/70">Estrategista</p>
-        </div>
         <StrategistSidebarNav />
       </SidebarContent>
       <SidebarFooter className="p-2 mt-auto">
@@ -80,6 +78,13 @@ function StrategistLayoutInner({ children }: { children: React.ReactNode }) {
                   </p>
                 </div>
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/strategist/configuracoes">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Configurações
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />

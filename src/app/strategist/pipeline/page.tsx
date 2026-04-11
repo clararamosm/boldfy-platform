@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
@@ -21,12 +22,17 @@ import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipelin
 type TLSummary = {
   id: string;
   name: string;
+  companyId: string;
   companyName: string;
 };
 
 export default function StrategistPipelinePage() {
   const { user } = useAuth();
   const t = useT();
+  const searchParams = useSearchParams();
+  const urlCompanyId = searchParams.get('companyId');
+  const urlTlId = searchParams.get('tlId');
+  const appliedUrlParams = useRef(false);
   const [thoughtLeaders, setThoughtLeaders] = useState<TLSummary[]>([]);
   const [selectedTL, setSelectedTL] = useState<string | null>(null);
   const [posts, setPosts] = useState<PipelinePost[]>([]);
@@ -90,13 +96,26 @@ export default function StrategistPipelinePage() {
             allTLs.push({
               id: tlDoc.id,
               name: data.name || data.profile?.name || '',
+              companyId,
               companyName,
             });
           }
         }
 
         setThoughtLeaders(allTLs);
-        if (allTLs.length > 0) {
+
+        // Pre-select TL from URL params (sidebar navigation)
+        if (!appliedUrlParams.current) {
+          if (urlTlId && allTLs.some(tl => tl.id === urlTlId)) {
+            setSelectedTL(urlTlId);
+          } else if (urlCompanyId) {
+            const firstMatch = allTLs.find(tl => tl.companyId === urlCompanyId);
+            setSelectedTL(firstMatch ? firstMatch.id : allTLs[0]?.id || null);
+          } else if (allTLs.length > 0) {
+            setSelectedTL(allTLs[0].id);
+          }
+          appliedUrlParams.current = true;
+        } else if (allTLs.length > 0 && !selectedTL) {
           setSelectedTL(allTLs[0].id);
         }
       } catch (error) {

@@ -16,7 +16,7 @@ service cloud.firestore {
     // Check if a strategist is assigned to a specific company
     function isStrategistForCompany(userId, companyId) {
       return hasRole(userId, 'strategist')
-             && companyId in get(/databases/$(database)/documents/users/$(userId)).data.assignedCompanies;
+             && get(/databases/$(database)/documents/users/$(userId)).data.assignedCompanies.hasAny([companyId]);
     }
 
     // Fields that only server actions can modify (never client)
