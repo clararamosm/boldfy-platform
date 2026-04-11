@@ -431,13 +431,14 @@ export default function StrategistCalendarioPage() {
                       {format(day, 'd')}
                     </span>
 
-                    {/* Post cards — Notion-style with tags */}
+                    {/* Post cards — context-aware: profile vs general */}
                     <div className="mt-1 space-y-1">
                       {dayPosts.slice(0, 3).map(post => {
                         const cfg = pipelineStatusConfig[post.status] || pipelineStatusConfig.backlog;
                         const time = post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : '';
                         const showTime = time && time !== '00:00';
                         const firstName = post.tlName.split(' ')[0];
+                        const isProfileView = tlFilter !== 'all';
 
                         return (
                           <button
@@ -460,29 +461,23 @@ export default function StrategistCalendarioPage() {
 
                             {/* Tags row */}
                             <div className="flex flex-wrap gap-0.5 pl-2.5">
-                              {/* Status tag */}
+                              {/* Status tag — always shown */}
                               <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.color}`}>
                                 {cfg.label}
                               </span>
-                              {/* Editorial */}
-                              {post.editorial && (
-                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                                  {post.editorial}
-                                </span>
-                              )}
-                              {/* Etapa */}
-                              {post.etapa && (
-                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                  {post.etapa}
-                                </span>
-                              )}
-                              {/* Formato */}
+                              {/* Formato — always shown */}
                               {post.formato && (
                                 <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                                   {post.formato}
                                 </span>
                               )}
-                              {/* Content Pillar */}
+                              {/* Etapa — always shown */}
+                              {post.etapa && (
+                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                  {post.etapa}
+                                </span>
+                              )}
+                              {/* Pilar — always shown */}
                               {post.contentPillar && (
                                 <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
                                   {post.contentPillar}
@@ -490,18 +485,23 @@ export default function StrategistCalendarioPage() {
                               )}
                             </div>
 
-                            {/* Meta row: time + TL name + company */}
+                            {/* Meta row: differs between profile view and general view */}
                             <div className="flex items-center gap-1 text-[9px] text-muted-foreground pl-2.5">
                               {showTime && (
                                 <>
                                   <Clock className="h-2.5 w-2.5" />
                                   <span>{time}</span>
-                                  <span>·</span>
                                 </>
                               )}
-                              <span className="truncate">{firstName}</span>
-                              <span>·</span>
-                              <span className="truncate">{post.companyName}</span>
+                              {/* General view: show profile + company */}
+                              {!isProfileView && (
+                                <>
+                                  {showTime && <span>·</span>}
+                                  <span className="truncate">{firstName}</span>
+                                  <span>·</span>
+                                  <span className="truncate">{post.companyName}</span>
+                                </>
+                              )}
                             </div>
                           </button>
                         );

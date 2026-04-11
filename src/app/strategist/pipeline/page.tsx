@@ -1,19 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Header } from "@/components/dashboard/header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, Plus, FileText, Calendar as CalIcon, Pencil, Users, Clock, Tag, Layers, LayoutGrid, SquareCheck, Bookmark } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  Loader2, Plus, FileText, Calendar as CalIcon, Users, Clock, Tag,
+  Layers, LayoutGrid, SquareCheck, Upload, X, Image as ImageIcon, File,
+  User,
+} from "lucide-react";
 import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
 import { getAuthToken } from '@/lib/auth-client';
@@ -26,6 +29,26 @@ type TLSummary = {
   companyName: string;
 };
 
+// ─── Status display config ──────
+const STATUS_CONFIG: Record<PipelineStatus, { label: string; color: string; headerBg: string }> = {
+  backlog:            { label: 'Backlog',          color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',             headerBg: 'border-gray-300 dark:border-gray-600' },
+  aprovar_ideia:      { label: 'Aprovar Ideia',    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',      headerBg: 'border-amber-400 dark:border-amber-500' },
+  em_producao:        { label: 'Em Produção',      color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',          headerBg: 'border-blue-400 dark:border-blue-500' },
+  aprovar_post:       { label: 'Aprovar Post',     color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',  headerBg: 'border-orange-400 dark:border-orange-500' },
+  post_aprovado:      { label: 'Aprovado',         color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', headerBg: 'border-emerald-400 dark:border-emerald-500' },
+  pronto_pra_postar:  { label: 'Pronto',           color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',      headerBg: 'border-green-500 dark:border-green-500' },
+  postado:            { label: 'Postado',          color: 'bg-[#0A66C2]/10 text-[#0A66C2]',                                           headerBg: 'border-[#0A66C2]' },
+  ajuste:             { label: 'Ajuste',           color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',              headerBg: 'border-red-400 dark:border-red-500' },
+  arquivado:          { label: 'Arquivado',        color: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500',             headerBg: 'border-gray-300 dark:border-gray-500' },
+};
+
+const KANBAN_STATUSES: PipelineStatus[] = [
+  'backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post',
+  'post_aprovado', 'pronto_pra_postar', 'postado', 'ajuste', 'arquivado',
+];
+
+const ALL_STATUSES: PipelineStatus[] = [...KANBAN_STATUSES];
+
 export default function StrategistPipelinePage() {
   const { user } = useAuth();
   const t = useT();
@@ -33,12 +56,13 @@ export default function StrategistPipelinePage() {
   const urlCompanyId = searchParams.get('companyId');
   const urlTlId = searchParams.get('tlId');
   const appliedUrlParams = useRef(false);
+
   const [thoughtLeaders, setThoughtLeaders] = useState<TLSummary[]>([]);
-  const [selectedTL, setSelectedTL] = useState<string | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [tlFilter, setTlFilter] = useState<string>('all');
   const [posts, setPosts] = useState<PipelinePost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPostsLoading, setIsPostsLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<PipelineStatus | 'all'>('all');
 
   // Dynamic content pillars from TL's strategy
   const [contentPillars, setContentPillars] = useState<string[]>([]);
@@ -46,13 +70,13 @@ export default function StrategistPipelinePage() {
   // Create/Edit dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<PipelinePost | null>(null);
+  const [dialogTlId, setDialogTlId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     caption: '',
     scheduledFor: '',
     scheduledTime: '10:00',
     status: 'backlog' as PipelineStatus,
-    editorial: '',
     etapa: '',
     formato: '',
     contentPillar: '',
@@ -60,7 +84,13 @@ export default function StrategistPipelinePage() {
   });
   const [formLoading, setFormLoading] = useState(false);
 
-  // Fetch TLs
+  // Media upload
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ─── Fetch TLs ──────
   useEffect(() => {
     if (!user?.uid) return;
 
@@ -109,17 +139,15 @@ export default function StrategistPipelinePage() {
         setThoughtLeaders(allTLs);
 
         if (!appliedUrlParams.current) {
-          if (urlTlId && allTLs.some(tl => tl.id === urlTlId)) {
-            setSelectedTL(urlTlId);
-          } else if (urlCompanyId) {
-            const firstMatch = allTLs.find(tl => tl.companyId === urlCompanyId);
-            setSelectedTL(firstMatch ? firstMatch.id : allTLs[0]?.id || null);
+          if (urlCompanyId) {
+            setSelectedCompany(urlCompanyId);
+            if (urlTlId && allTLs.some(tl => tl.id === urlTlId)) {
+              setTlFilter(urlTlId);
+            }
           } else if (allTLs.length > 0) {
-            setSelectedTL(allTLs[0].id);
+            setSelectedCompany(allTLs[0].companyId);
           }
           appliedUrlParams.current = true;
-        } else if (allTLs.length > 0 && !selectedTL) {
-          setSelectedTL(allTLs[0].id);
         }
       } catch (error) {
         console.error('Error fetching TLs:', error);
@@ -131,9 +159,30 @@ export default function StrategistPipelinePage() {
     fetchTLs();
   }, [user?.uid]);
 
-  // Fetch content pillars from TL's strategy
+  // ─── Derived: unique companies ──────
+  const companies = useMemo(() => {
+    const map = new Map<string, string>();
+    thoughtLeaders.forEach(tl => {
+      if (!map.has(tl.companyId)) map.set(tl.companyId, tl.companyName);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [thoughtLeaders]);
+
+  // ─── Derived: TLs for selected company ──────
+  const companyTLs = useMemo(() => {
+    if (!selectedCompany) return [];
+    return thoughtLeaders.filter(tl => tl.companyId === selectedCompany);
+  }, [thoughtLeaders, selectedCompany]);
+
+  // ─── The effective TL IDs to fetch posts for ──────
+  const activeTlIds = useMemo(() => {
+    if (tlFilter !== 'all') return [tlFilter];
+    return companyTLs.map(tl => tl.id);
+  }, [tlFilter, companyTLs]);
+
+  // ─── Fetch content pillars (uses first active TL) ──────
   useEffect(() => {
-    if (!selectedTL) {
+    if (activeTlIds.length === 0) {
       setContentPillars([]);
       return;
     }
@@ -142,11 +191,9 @@ export default function StrategistPipelinePage() {
       try {
         const token = await getAuthToken();
         const { getContentStrategy } = await import('@/app/actions/content-strategy');
-        const result = await getContentStrategy(token, selectedTL);
+        const result = await getContentStrategy(token, activeTlIds[0]);
         if (result.data?.pillars) {
-          const names = result.data.pillars
-            .map(p => p.name)
-            .filter(Boolean);
+          const names = result.data.pillars.map(p => p.name).filter(Boolean);
           setContentPillars(names);
         } else {
           setContentPillars([]);
@@ -157,54 +204,133 @@ export default function StrategistPipelinePage() {
     };
 
     fetchPillars();
-  }, [selectedTL]);
+  }, [activeTlIds]);
 
-  // Fetch posts for selected TL
+  // ─── Fetch posts for active TLs ──────
   const fetchPosts = useCallback(async () => {
-    if (!selectedTL) return;
+    if (activeTlIds.length === 0) {
+      setPosts([]);
+      return;
+    }
     setIsPostsLoading(true);
     try {
       const token = await getAuthToken();
       const { getPipelinePosts } = await import('@/app/actions/content-pipeline');
-      const filter = statusFilter === 'all' ? null : statusFilter;
-      const result = await getPipelinePosts(token, selectedTL, filter);
-      if (result.posts) {
-        setPosts(result.posts);
+
+      const allPosts: PipelinePost[] = [];
+      for (const tlId of activeTlIds) {
+        const result = await getPipelinePosts(token, tlId, null);
+        if (result.posts) {
+          // Tag each post with its TL id for display
+          result.posts.forEach(p => {
+            (p as PipelinePost & { _tlId?: string })._tlId = tlId;
+          });
+          allPosts.push(...result.posts);
+        }
       }
+      setPosts(allPosts);
     } catch (error) {
       console.error('Error fetching posts:', error);
     } finally {
       setIsPostsLoading(false);
     }
-  }, [selectedTL, statusFilter]);
+  }, [activeTlIds]);
 
   useEffect(() => {
-    if (selectedTL) {
-      fetchPosts();
-    }
-  }, [selectedTL, fetchPosts]);
+    fetchPosts();
+  }, [fetchPosts]);
 
-  // Open create dialog
-  const openCreateDialog = () => {
+  // ─── Posts grouped by status (for kanban) ──────
+  const postsByStatus = useMemo(() => {
+    const map: Record<string, PipelinePost[]> = {};
+    KANBAN_STATUSES.forEach(s => { map[s] = []; });
+    posts.forEach(post => {
+      if (map[post.status]) {
+        map[post.status].push(post);
+      } else {
+        map[post.status] = [post];
+      }
+    });
+    return map;
+  }, [posts]);
+
+  // ─── Get TL name from id ──────
+  const getTlName = (post: PipelinePost) => {
+    const tlId = (post as PipelinePost & { _tlId?: string })._tlId;
+    const tl = thoughtLeaders.find(t => t.id === tlId);
+    return tl ? tl.name.split(' ')[0] : '';
+  };
+
+  // ─── Media handling ──────
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      return;
+    }
+
+    setMediaFile(file);
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setMediaPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setMediaPreview(null);
+    }
+  };
+
+  const clearMedia = () => {
+    setMediaFile(null);
+    setMediaPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const uploadMedia = async (tlId: string, postId: string): Promise<{ url: string; type: string } | null> => {
+    if (!mediaFile) return null;
+    setIsUploading(true);
+    try {
+      const ext = mediaFile.name.split('.').pop() || 'file';
+      const path = `pipeline/${tlId}/${postId}/media.${ext}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, mediaFile);
+      const url = await getDownloadURL(storageRef);
+      const type = mediaFile.type.startsWith('image/') ? 'image' : 'pdf';
+      return { url, type };
+    } catch (error) {
+      console.error('Upload error:', error);
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // ─── Dialog handlers ──────
+  const openCreateDialog = (forStatus: PipelineStatus = 'backlog') => {
     setEditingPost(null);
+    // Use the first active TL or the filter value
+    const targetTl = tlFilter !== 'all' ? tlFilter : companyTLs[0]?.id || null;
+    setDialogTlId(targetTl);
     setFormData({
       title: '',
       caption: '',
       scheduledFor: '',
       scheduledTime: '10:00',
-      status: 'backlog',
-      editorial: '',
+      status: forStatus,
       etapa: '',
       formato: '',
       contentPillar: '',
       leadMagnet: false,
     });
+    clearMedia();
     setDialogOpen(true);
   };
 
-  // Open edit dialog
   const openEditDialog = (post: PipelinePost) => {
     setEditingPost(post);
+    const tlId = (post as PipelinePost & { _tlId?: string })._tlId || activeTlIds[0];
+    setDialogTlId(tlId);
     let dateStr = post.scheduledFor || '';
     let timeStr = '10:00';
     if (dateStr && dateStr.includes('T')) {
@@ -220,18 +346,21 @@ export default function StrategistPipelinePage() {
       scheduledFor: dateStr.substring(0, 10),
       scheduledTime: timeStr,
       status: post.status,
-      editorial: post.editorial,
       etapa: post.etapa,
       formato: post.formato,
       contentPillar: post.contentPillar || '',
       leadMagnet: post.leadMagnet,
     });
+    clearMedia();
+    // Show existing media
+    if (post.mediaUrl) {
+      setMediaPreview(post.mediaType === 'image' ? post.mediaUrl : null);
+    }
     setDialogOpen(true);
   };
 
-  // Submit create or edit
   const handleSubmit = async () => {
-    if (!selectedTL || !formData.title.trim()) return;
+    if (!dialogTlId || !formData.title.trim()) return;
     setFormLoading(true);
     try {
       const token = await getAuthToken();
@@ -241,12 +370,12 @@ export default function StrategistPipelinePage() {
         scheduledFor = new Date(`${formData.scheduledFor}T${time}:00`).toISOString();
       }
 
-      const postPayload = {
+      const postPayload: Record<string, unknown> = {
         title: formData.title,
         caption: formData.caption,
         scheduledFor,
         status: formData.status,
-        editorial: formData.editorial,
+        editorial: '',
         etapa: formData.etapa,
         formato: formData.formato,
         contentPillar: formData.contentPillar,
@@ -254,11 +383,27 @@ export default function StrategistPipelinePage() {
       };
 
       if (editingPost) {
+        // Upload media if new file selected
+        if (mediaFile) {
+          const media = await uploadMedia(dialogTlId, editingPost.id);
+          if (media) {
+            postPayload.mediaUrl = media.url;
+            postPayload.mediaType = media.type;
+          }
+        }
         const { updatePipelinePost } = await import('@/app/actions/content-pipeline');
-        await updatePipelinePost(token, selectedTL, editingPost.id, postPayload);
+        await updatePipelinePost(token, dialogTlId, editingPost.id, postPayload as Parameters<typeof updatePipelinePost>[3]);
       } else {
         const { createPipelinePost } = await import('@/app/actions/content-pipeline');
-        await createPipelinePost(token, selectedTL, postPayload);
+        const result = await createPipelinePost(token, dialogTlId, postPayload as Parameters<typeof createPipelinePost>[2]);
+        // Upload media for new post
+        if (mediaFile && result.postId) {
+          const media = await uploadMedia(dialogTlId, result.postId);
+          if (media) {
+            const { updatePipelinePost: update } = await import('@/app/actions/content-pipeline');
+            await update(token, dialogTlId, result.postId, { mediaUrl: media.url, mediaType: media.type });
+          }
+        }
       }
       setDialogOpen(false);
       fetchPosts();
@@ -284,31 +429,7 @@ export default function StrategistPipelinePage() {
     return map[status] || status;
   };
 
-  const getStatusColor = (status: PipelineStatus) => {
-    const map: Record<PipelineStatus, string> = {
-      backlog: 'bg-gray-100 text-gray-600',
-      aprovar_ideia: 'bg-amber-100 text-amber-700',
-      em_producao: 'bg-blue-100 text-blue-700',
-      aprovar_post: 'bg-orange-100 text-orange-700',
-      post_aprovado: 'bg-emerald-100 text-emerald-700',
-      pronto_pra_postar: 'bg-green-100 text-green-700',
-      postado: 'bg-[#0A66C2]/10 text-[#0A66C2]',
-      ajuste: 'bg-red-100 text-red-700',
-      arquivado: 'bg-gray-100 text-gray-500',
-    };
-    return map[status] || 'bg-gray-100 text-gray-600';
-  };
-
-  const allStatuses: PipelineStatus[] = [
-    'backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post',
-    'post_aprovado', 'pronto_pra_postar', 'postado', 'ajuste', 'arquivado',
-  ];
-
-  const filterStatuses: { value: PipelineStatus | 'all'; label: string }[] = [
-    { value: 'all', label: t.contentPipeline.allStatuses },
-    ...allStatuses.map(s => ({ value: s, label: getStatusLabel(s) })),
-  ];
-
+  // ─── Loading state ──────
   if (isLoading) {
     return (
       <>
@@ -342,122 +463,156 @@ export default function StrategistPipelinePage() {
     <>
       <Header title={t.contentPipeline.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
-        {/* TL selector + filter + create */}
+        {/* Top bar: Company + TL filter + new post */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <Select value={selectedTL || ''} onValueChange={setSelectedTL}>
-            <SelectTrigger className="w-[250px]">
-              <SelectValue placeholder="Selecionar Thought Leader" />
-            </SelectTrigger>
-            <SelectContent>
-              {thoughtLeaders.map(tl => (
-                <SelectItem key={tl.id} value={tl.id}>
-                  {tl.name} ({tl.companyName})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Company selector */}
+          {companies.length > 1 && (
+            <Select value={selectedCompany || ''} onValueChange={(v) => { setSelectedCompany(v); setTlFilter('all'); }}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as PipelineStatus | 'all')}>
+          {/* TL / profile filter */}
+          <Select value={tlFilter} onValueChange={setTlFilter}>
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder={t.contentPipeline.filterByStatus} />
+              <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder="Perfil" />
             </SelectTrigger>
             <SelectContent>
-              {filterStatuses.map(s => (
-                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+              <SelectItem value="all">Todos os Perfis</SelectItem>
+              {companyTLs.map(tl => (
+                <SelectItem key={tl.id} value={tl.id}>{tl.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Button onClick={openCreateDialog} disabled={!selectedTL}>
+          <Button onClick={() => openCreateDialog('backlog')} disabled={companyTLs.length === 0} size="sm">
             <Plus className="h-4 w-4 mr-1" />
             {t.contentPipeline.newPost}
           </Button>
         </div>
 
-        {/* Posts list */}
+        {/* Kanban board */}
         {isPostsLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : posts.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">{t.contentPipeline.noPostsInStatus}</p>
-            </CardContent>
-          </Card>
         ) : (
-          <div className="grid gap-3">
-            {posts.map(post => (
-              <Card key={post.id} className="cursor-pointer hover:border-primary/30 transition-colors" onClick={() => openEditDialog(post)}>
-                <CardHeader className="pb-2 pt-4 px-4">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium">{post.title}</CardTitle>
-                    <div className="flex items-center gap-1.5">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(post.status)}`}>
-                        {getStatusLabel(post.status)}
+          <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: 'calc(100vh - 200px)' }}>
+            {KANBAN_STATUSES.map(status => {
+              const cfg = STATUS_CONFIG[status];
+              const columnPosts = postsByStatus[status] || [];
+              const showColumn = columnPosts.length > 0 || ['backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post', 'post_aprovado', 'pronto_pra_postar'].includes(status);
+
+              if (!showColumn) return null;
+
+              return (
+                <div
+                  key={status}
+                  className="flex-shrink-0 w-[280px] flex flex-col"
+                >
+                  {/* Column header */}
+                  <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-t-2 bg-muted/30 ${cfg.headerBg}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{getStatusLabel(status)}</span>
+                      <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                        {columnPosts.length}
                       </span>
-                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => openCreateDialog(status)}
+                      className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+                      title="Adicionar post"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                    {post.editorial && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                        {post.editorial}
-                      </span>
-                    )}
-                    {post.etapa && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                        {post.etapa}
-                      </span>
-                    )}
-                    {post.formato && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                        {post.formato}
-                      </span>
-                    )}
-                    {post.contentPillar && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                        {post.contentPillar}
-                      </span>
-                    )}
-                    {post.leadMagnet && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                        Lead Magnet
-                      </span>
-                    )}
-                    {post.scheduledFor && (
-                      <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                        <CalIcon className="h-3 w-3" />
-                        {new Date(post.scheduledFor).toLocaleDateString()}
-                        {(() => {
-                          const d = new Date(post.scheduledFor);
-                          const hh = String(d.getHours()).padStart(2, '0');
-                          const mm = String(d.getMinutes()).padStart(2, '0');
-                          return `${hh}:${mm}` !== '00:00' ? ` ${hh}:${mm}` : '';
-                        })()}
-                      </span>
-                    )}
+
+                  {/* Column cards */}
+                  <div className="flex-1 bg-muted/10 rounded-b-lg p-1.5 space-y-1.5 overflow-y-auto">
+                    {columnPosts.map(post => {
+                      const tlName = getTlName(post);
+                      const showDate = post.scheduledFor;
+                      let dateStr = '';
+                      let timeStr = '';
+                      if (showDate) {
+                        const d = new Date(post.scheduledFor!);
+                        dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+                        const hh = String(d.getHours()).padStart(2, '0');
+                        const mm = String(d.getMinutes()).padStart(2, '0');
+                        if (`${hh}:${mm}` !== '00:00') timeStr = `${hh}:${mm}`;
+                      }
+
+                      return (
+                        <button
+                          key={post.id}
+                          type="button"
+                          onClick={() => openEditDialog(post)}
+                          className="w-full text-left rounded-lg border bg-card p-2.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-1.5"
+                        >
+                          {/* Title */}
+                          <p className="text-sm font-medium leading-tight line-clamp-2">{post.title || 'Sem título'}</p>
+
+                          {/* Tags row */}
+                          <div className="flex flex-wrap gap-1">
+                            {post.formato && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                {post.formato}
+                              </span>
+                            )}
+                            {post.etapa && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                                {post.etapa}
+                              </span>
+                            )}
+                            {post.contentPillar && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                                {post.contentPillar}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Meta row: date, time, profile */}
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            {showDate && (
+                              <>
+                                <CalIcon className="h-3 w-3" />
+                                <span>{dateStr}</span>
+                                {timeStr && (
+                                  <>
+                                    <Clock className="h-3 w-3 ml-0.5" />
+                                    <span>{timeStr}</span>
+                                  </>
+                                )}
+                              </>
+                            )}
+                            {tlFilter === 'all' && tlName && (
+                              <>
+                                {showDate && <span className="mx-0.5">·</span>}
+                                <User className="h-3 w-3" />
+                                <span className="truncate">{tlName}</span>
+                              </>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                </CardHeader>
-                {(post.caption || post.tlFeedback) && (
-                  <CardContent className="pt-0 px-4 pb-3">
-                    {post.caption && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">{post.caption}</p>
-                    )}
-                    {post.tlFeedback && (
-                      <div className="mt-1 p-1.5 bg-destructive/10 rounded text-xs text-destructive">
-                        <strong>Feedback TL:</strong> {post.tlFeedback}
-                      </div>
-                    )}
-                  </CardContent>
-                )}
-              </Card>
-            ))}
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Create/Edit Dialog — Notion-style wide layout */}
+        {/* Create/Edit Dialog — Notion-style editor */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
             {/* Title */}
@@ -482,12 +637,31 @@ export default function StrategistPipelinePage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {allStatuses.map(s => (
+                    {ALL_STATUSES.map(s => (
                       <SelectItem key={s} value={s}>{getStatusLabel(s)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Perfil (TL) — only when filter is "all" */}
+              {tlFilter === 'all' && companyTLs.length > 1 && (
+                <div className="flex items-center gap-3 min-h-[32px]">
+                  <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
+                    <User className="h-4 w-4" /> Perfil
+                  </div>
+                  <Select value={dialogTlId || ''} onValueChange={setDialogTlId}>
+                    <SelectTrigger className="h-8 w-auto min-w-[140px] border-0 bg-muted/50 hover:bg-muted">
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companyTLs.map(tl => (
+                        <SelectItem key={tl.id} value={tl.id}>{tl.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Etapa */}
               <div className="flex items-center gap-3 min-h-[32px]">
@@ -529,23 +703,6 @@ export default function StrategistPipelinePage() {
                 </Select>
               </div>
 
-              {/* Editorial */}
-              <div className="flex items-center gap-3 min-h-[32px]">
-                <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
-                  <Bookmark className="h-4 w-4" /> Editorial
-                </div>
-                <Select value={formData.editorial} onValueChange={(v) => setFormData(p => ({ ...p, editorial: v }))}>
-                  <SelectTrigger className="h-8 w-auto min-w-[140px] border-0 bg-muted/50 hover:bg-muted">
-                    <SelectValue placeholder="—" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Visão de Mercado">{t.contentPipeline.editorial.visaoMercado}</SelectItem>
-                    <SelectItem value="Bastidores">{t.contentPipeline.editorial.bastidores}</SelectItem>
-                    <SelectItem value="Decisões">{t.contentPipeline.editorial.decisoes}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               {/* Content Pillar — dynamic */}
               <div className="flex items-center gap-3 min-h-[32px]">
                 <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
@@ -566,7 +723,7 @@ export default function StrategistPipelinePage() {
                   <Input
                     value={formData.contentPillar}
                     onChange={(e) => setFormData(p => ({ ...p, contentPillar: e.target.value }))}
-                    placeholder="Nenhum pilar definido — digite manualmente"
+                    placeholder="Nenhum pilar definido"
                     className="h-8 border-0 bg-muted/50 text-sm"
                   />
                 )}
@@ -608,18 +765,75 @@ export default function StrategistPipelinePage() {
               </div>
             </div>
 
-            {/* Content area — like Notion body */}
+            {/* Content area */}
             <div className="px-6 py-4">
               <Textarea
                 value={formData.caption}
                 onChange={(e) => setFormData(p => ({ ...p, caption: e.target.value }))}
                 placeholder="Escreva o conteúdo do post aqui..."
-                rows={12}
+                rows={10}
                 className="border-0 p-0 focus-visible:ring-0 resize-none text-sm leading-relaxed placeholder:text-muted-foreground/40"
               />
             </div>
 
-            {/* TL Feedback (read-only, only show when editing) */}
+            {/* Media upload area */}
+            <div className="px-6 pb-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {/* Existing media or preview */}
+              {(mediaPreview || (editingPost?.mediaUrl && editingPost?.mediaType === 'image' && !mediaFile)) ? (
+                <div className="relative rounded-lg overflow-hidden border bg-muted/20 mb-2">
+                  <img
+                    src={mediaPreview || editingPost?.mediaUrl || ''}
+                    alt="Mídia"
+                    className="max-h-[200px] w-full object-contain"
+                  />
+                  <button
+                    type="button"
+                    onClick={clearMedia}
+                    className="absolute top-2 right-2 h-6 w-6 rounded-full bg-background/80 flex items-center justify-center hover:bg-background transition-colors"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (editingPost?.mediaUrl && editingPost?.mediaType === 'pdf' && !mediaFile) ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/20 mb-2">
+                  <File className="h-5 w-5 text-red-500" />
+                  <span className="text-sm text-muted-foreground">PDF anexado</span>
+                  <a href={editingPost.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline ml-auto">
+                    Ver PDF
+                  </a>
+                </div>
+              ) : mediaFile && !mediaPreview ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/20 mb-2">
+                  <File className="h-5 w-5 text-red-500" />
+                  <span className="text-sm truncate">{mediaFile.name}</span>
+                  <button type="button" onClick={clearMedia} className="ml-auto text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : null}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-1.5"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                {editingPost?.mediaUrl || mediaFile ? 'Trocar mídia' : 'Adicionar mídia'}
+                <span className="text-[10px] text-muted-foreground">(PNG, JPG, PDF)</span>
+              </Button>
+            </div>
+
+            {/* TL Feedback (read-only) */}
             {editingPost?.tlFeedback && (
               <div className="mx-6 mb-4 p-3 bg-destructive/10 rounded-lg text-sm text-destructive">
                 <strong>Feedback do TL:</strong> {editingPost.tlFeedback}
@@ -629,8 +843,8 @@ export default function StrategistPipelinePage() {
             {/* Footer */}
             <div className="px-6 py-3 border-t flex items-center justify-end gap-2 bg-muted/20">
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-              <Button size="sm" onClick={handleSubmit} disabled={formLoading || !formData.title.trim()}>
-                {formLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              <Button size="sm" onClick={handleSubmit} disabled={formLoading || isUploading || !formData.title.trim()}>
+                {(formLoading || isUploading) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
                 {editingPost ? 'Salvar' : 'Criar Post'}
               </Button>
             </div>
