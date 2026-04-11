@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -52,12 +52,11 @@ const ALL_STATUSES: PipelineStatus[] = [...KANBAN_STATUSES];
 export default function StrategistPipelinePage() {
   const { user } = useAuth();
   const t = useT();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const urlCompanyId = searchParams.get('companyId');
   const urlTlId = searchParams.get('tlId');
-  const urlPostId = searchParams.get('postId');
   const appliedUrlParams = useRef(false);
-  const deepLinkApplied = useRef(false);
 
   const [thoughtLeaders, setThoughtLeaders] = useState<TLSummary[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -69,9 +68,8 @@ export default function StrategistPipelinePage() {
   // Dynamic content pillars from TL's strategy
   const [contentPillars, setContentPillars] = useState<string[]>([]);
 
-  // Create/Edit dialog
+  // Create dialog
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingPost, setEditingPost] = useState<PipelinePost | null>(null);
   const [dialogTlId, setDialogTlId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -269,15 +267,16 @@ export default function StrategistPipelinePage() {
     }
   }, [isPostsLoading, checkScroll]);
 
-  // Deep link: auto-open post dialog when postId is in URL
+  // Deep link: redirect to dedicated post page
   useEffect(() => {
-    if (!urlPostId || isPostsLoading || posts.length === 0 || deepLinkApplied.current) return;
+    const urlPostId = searchParams.get('postId');
+    if (!urlPostId || isPostsLoading || posts.length === 0) return;
     const targetPost = posts.find(p => p.id === urlPostId);
     if (targetPost) {
-      openEditDialog(targetPost);
-      deepLinkApplied.current = true;
+      const postTlId = (targetPost as PipelinePost & { _tlId?: string })._tlId || activeTlIds[0];
+      router.replace(`/post/${selectedCompany}/${postTlId}/${targetPost.id}`);
     }
-  }, [urlPostId, isPostsLoading, posts]);
+  }, [searchParams, isPostsLoading, posts]);
 
   // ─── Posts grouped by status (for kanban) ──────
   const postsByStatus = useMemo(() => {
@@ -347,7 +346,6 @@ export default function StrategistPipelinePage() {
 
   // ─── Dialog handlers ──────
   const openCreateDialog = (forStatus: PipelineStatus = 'backlog') => {
-    setEditingPost(null);
     // Use the first active TL or the filter value
     const targetTl = tlFilter !== 'all' ? tlFilter : companyTLs[0]?.id || null;
     setDialogTlId(targetTl);
@@ -366,37 +364,6 @@ export default function StrategistPipelinePage() {
     setDialogOpen(true);
   };
 
-  const openEditDialog = (post: PipelinePost) => {
-    setEditingPost(post);
-    const tlId = (post as PipelinePost & { _tlId?: string })._tlId || activeTlIds[0];
-    setDialogTlId(tlId);
-    let dateStr = post.scheduledFor || '';
-    let timeStr = '10:00';
-    if (dateStr && dateStr.includes('T')) {
-      const d = new Date(dateStr);
-      dateStr = d.toISOString().substring(0, 10);
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      timeStr = `${hh}:${mm}`;
-    }
-    setFormData({
-      title: post.title,
-      caption: post.caption,
-      scheduledFor: dateStr.substring(0, 10),
-      scheduledTime: timeStr,
-      status: post.status,
-      etapa: post.etapa,
-      formato: post.formato,
-      contentPillar: post.contentPillar || '',
-      leadMagnet: post.leadMagnet,
-    });
-    clearMedia();
-    // Show existing media
-    if (post.mediaUrl) {
-      setMediaPreview(post.mediaType === 'image' ? post.mediaUrl : null);
-    }
-    setDialogOpen(true);
-  };
 
   const handleSubmit = async () => {
     if (!dialogTlId || !formData.title.trim()) return;
@@ -421,33 +388,27 @@ export default function StrategistPipelinePage() {
         leadMagnet: formData.leadMagnet,
       };
 
-      if (editingPost) {
-        // Upload media if new file selected
-        if (mediaFile) {
-          const media = await uploadMedia(dialogTlId, editingPost.id);
-          if (media) {
-            postPayload.mediaUrl = media.url;
-            postPayload.mediaType = media.type;
-          }
-        }
-        const { updatePipelinePost } = await import('@/app/actions/content-pipeline');
-        await updatePipelinePost(token, dialogTlId, editingPost.id, postPayload as Parameters<typeof updatePipelinePost>[3]);
-      } else {
-        const { createPipelinePost } = await import('@/app/actions/content-pipeline');
-        const result = await createPipelinePost(token, dialogTlId, postPayload as Parameters<typeof createPipelinePost>[2]);
+      const { createPipelinePost } = await import('@/app/actions/content-pipeline');
+      const result = await createPipelinePost(token, dialogTlId, postPayload as Parameters<typeof createPipelinePost>[2]);
+
+      if (result.postId) {
         // Upload media for new post
-        if (mediaFile && result.postId) {
+        if (mediaFile) {
           const media = await uploadMedia(dialogTlId, result.postId);
           if (media) {
             const { updatePipelinePost: update } = await import('@/app/actions/content-pipeline');
             await update(token, dialogTlId, result.postId, { mediaUrl: media.url, mediaType: media.type });
           }
         }
+        // Redirect to the dedicated post page
+        setDialogOpen(false);
+        router.push(`/post/${selectedCompany}/${dialogTlId}/${result.postId}`);
+      } else {
+        setDialogOpen(false);
+        fetchPosts();
       }
-      setDialogOpen(false);
-      fetchPosts();
     } catch (error) {
-      console.error('Error saving post:', error);
+      console.error('Error creating post:', error);
     } finally {
       setFormLoading(false);
     }
@@ -620,7 +581,10 @@ export default function StrategistPipelinePage() {
                         <button
                           key={post.id}
                           type="button"
-                          onClick={() => openEditDialog(post)}
+                          onClick={() => {
+                            const postTlId = (post as PipelinePost & { _tlId?: string })._tlId || activeTlIds[0];
+                            router.push(`/post/${selectedCompany}/${postTlId}/${post.id}`);
+                          }}
                           className="w-full text-left rounded-lg border bg-card p-2.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-1.5"
                         >
                           {/* Title */}
@@ -678,9 +642,9 @@ export default function StrategistPipelinePage() {
           </div>
         )}
 
-        {/* Create/Edit Dialog — Notion-style editor */}
+        {/* Create Dialog — simplified, redirects to /post page after creation */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto p-0">
             {/* Title */}
             <div className="px-6 pt-6 pb-2">
               <Input
@@ -691,25 +655,8 @@ export default function StrategistPipelinePage() {
               />
             </div>
 
-            {/* Properties — Notion-style rows */}
+            {/* Properties */}
             <div className="px-6 py-3 border-y space-y-2">
-              {/* Status */}
-              <div className="flex items-center gap-3 min-h-[32px]">
-                <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
-                  <SquareCheck className="h-4 w-4" /> Status
-                </div>
-                <Select value={formData.status} onValueChange={(v) => setFormData(p => ({ ...p, status: v as PipelineStatus }))}>
-                  <SelectTrigger className="h-8 w-auto min-w-[140px] border-0 bg-muted/50 hover:bg-muted">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ALL_STATUSES.map(s => (
-                      <SelectItem key={s} value={s}>{getStatusLabel(s)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
               {/* Perfil (TL) — only when filter is "all" */}
               {tlFilter === 'all' && companyTLs.length > 1 && (
                 <div className="flex items-center gap-3 min-h-[32px]">
@@ -729,189 +676,30 @@ export default function StrategistPipelinePage() {
                 </div>
               )}
 
-              {/* Etapa */}
+              {/* Status */}
               <div className="flex items-center gap-3 min-h-[32px]">
                 <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
-                  <Layers className="h-4 w-4" /> Etapa
+                  <SquareCheck className="h-4 w-4" /> Status
                 </div>
-                <Select value={formData.etapa} onValueChange={(v) => setFormData(p => ({ ...p, etapa: v }))}>
+                <Select value={formData.status} onValueChange={(v) => setFormData(p => ({ ...p, status: v as PipelineStatus }))}>
                   <SelectTrigger className="h-8 w-auto min-w-[140px] border-0 bg-muted/50 hover:bg-muted">
-                    <SelectValue placeholder="—" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Visibilidade">{t.contentPipeline.stage.visibilidade}</SelectItem>
-                    <SelectItem value="Autoridade">{t.contentPipeline.stage.autoridade}</SelectItem>
-                    <SelectItem value="Conversão">{t.contentPipeline.stage.conversao}</SelectItem>
+                    {ALL_STATUSES.map(s => (
+                      <SelectItem key={s} value={s}>{getStatusLabel(s)}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Formato */}
-              <div className="flex items-center gap-3 min-h-[32px]">
-                <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
-                  <LayoutGrid className="h-4 w-4" /> Formato
-                </div>
-                <Select value={formData.formato} onValueChange={(v) => setFormData(p => ({ ...p, formato: v }))}>
-                  <SelectTrigger className="h-8 w-auto min-w-[140px] border-0 bg-muted/50 hover:bg-muted">
-                    <SelectValue placeholder="—" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Vídeo">{t.contentPipeline.format.video}</SelectItem>
-                    <SelectItem value="Texto">{t.contentPipeline.format.texto}</SelectItem>
-                    <SelectItem value="GIF">{t.contentPipeline.format.gif}</SelectItem>
-                    <SelectItem value="One Pager">{t.contentPipeline.format.onePager}</SelectItem>
-                    <SelectItem value="Carrossel">{t.contentPipeline.format.carrossel}</SelectItem>
-                    <SelectItem value="Foto">{t.contentPipeline.format.foto}</SelectItem>
-                    <SelectItem value="Quote">{t.contentPipeline.format.quote}</SelectItem>
-                    <SelectItem value="Meme">{t.contentPipeline.format.meme}</SelectItem>
-                    <SelectItem value="Print">{t.contentPipeline.format.print}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Content Pillar — dynamic */}
-              <div className="flex items-center gap-3 min-h-[32px]">
-                <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
-                  <Tag className="h-4 w-4" /> Pilar
-                </div>
-                {contentPillars.length > 0 ? (
-                  <Select value={formData.contentPillar} onValueChange={(v) => setFormData(p => ({ ...p, contentPillar: v }))}>
-                    <SelectTrigger className="h-8 w-auto min-w-[140px] border-0 bg-muted/50 hover:bg-muted">
-                      <SelectValue placeholder="—" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contentPillars.map(p => (
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input
-                    value={formData.contentPillar}
-                    onChange={(e) => setFormData(p => ({ ...p, contentPillar: e.target.value }))}
-                    placeholder="Nenhum pilar definido"
-                    className="h-8 border-0 bg-muted/50 text-sm"
-                  />
-                )}
-              </div>
-
-              {/* Date + Time */}
-              <div className="flex items-center gap-3 min-h-[32px]">
-                <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
-                  <CalIcon className="h-4 w-4" /> Data
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="date"
-                    value={formData.scheduledFor}
-                    onChange={(e) => setFormData(p => ({ ...p, scheduledFor: e.target.value }))}
-                    className="h-8 w-auto border-0 bg-muted/50"
-                  />
-                  <Input
-                    type="time"
-                    value={formData.scheduledTime}
-                    onChange={(e) => setFormData(p => ({ ...p, scheduledTime: e.target.value }))}
-                    className="h-8 w-[100px] border-0 bg-muted/50"
-                  />
-                </div>
-              </div>
-
-              {/* Lead Magnet */}
-              <div className="flex items-center gap-3 min-h-[32px]">
-                <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
-                  <SquareCheck className="h-4 w-4" /> Lead Magnet
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setFormData(p => ({ ...p, leadMagnet: !p.leadMagnet }))}
-                  className={`h-5 w-5 rounded border flex items-center justify-center transition-colors ${formData.leadMagnet ? 'bg-primary border-primary text-primary-foreground' : 'bg-muted/50 border-muted-foreground/30'}`}
-                >
-                  {formData.leadMagnet && <span className="text-[10px]">✓</span>}
-                </button>
-              </div>
             </div>
-
-            {/* Content area */}
-            <div className="px-6 py-4">
-              <Textarea
-                value={formData.caption}
-                onChange={(e) => setFormData(p => ({ ...p, caption: e.target.value }))}
-                placeholder="Escreva o conteúdo do post aqui..."
-                rows={10}
-                className="border-0 p-0 focus-visible:ring-0 resize-none text-sm leading-relaxed placeholder:text-muted-foreground/40"
-              />
-            </div>
-
-            {/* Media upload area */}
-            <div className="px-6 pb-4">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-
-              {/* Existing media or preview */}
-              {(mediaPreview || (editingPost?.mediaUrl && editingPost?.mediaType === 'image' && !mediaFile)) ? (
-                <div className="relative rounded-lg overflow-hidden border bg-muted/20 mb-2">
-                  <img
-                    src={mediaPreview || editingPost?.mediaUrl || ''}
-                    alt="Mídia"
-                    className="max-h-[200px] w-full object-contain"
-                  />
-                  <button
-                    type="button"
-                    onClick={clearMedia}
-                    className="absolute top-2 right-2 h-6 w-6 rounded-full bg-background/80 flex items-center justify-center hover:bg-background transition-colors"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ) : (editingPost?.mediaUrl && editingPost?.mediaType === 'pdf' && !mediaFile) ? (
-                <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/20 mb-2">
-                  <File className="h-5 w-5 text-red-500" />
-                  <span className="text-sm text-muted-foreground">PDF anexado</span>
-                  <a href={editingPost.mediaUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline ml-auto">
-                    Ver PDF
-                  </a>
-                </div>
-              ) : mediaFile && !mediaPreview ? (
-                <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/20 mb-2">
-                  <File className="h-5 w-5 text-red-500" />
-                  <span className="text-sm truncate">{mediaFile.name}</span>
-                  <button type="button" onClick={clearMedia} className="ml-auto text-muted-foreground hover:text-foreground">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : null}
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                className="gap-1.5"
-              >
-                <Upload className="h-3.5 w-3.5" />
-                {editingPost?.mediaUrl || mediaFile ? 'Trocar mídia' : 'Adicionar mídia'}
-                <span className="text-[10px] text-muted-foreground">(PNG, JPG, PDF)</span>
-              </Button>
-            </div>
-
-            {/* TL Feedback (read-only) */}
-            {editingPost?.tlFeedback && (
-              <div className="mx-6 mb-4 p-3 bg-destructive/10 rounded-lg text-sm text-destructive">
-                <strong>Feedback do TL:</strong> {editingPost.tlFeedback}
-              </div>
-            )}
 
             {/* Footer */}
             <div className="px-6 py-3 border-t flex items-center justify-end gap-2 bg-muted/20">
               <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-              <Button size="sm" onClick={handleSubmit} disabled={formLoading || isUploading || !formData.title.trim()}>
-                {(formLoading || isUploading) && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                {editingPost ? 'Salvar' : 'Criar Post'}
+              <Button size="sm" onClick={handleSubmit} disabled={formLoading || !formData.title.trim()}>
+                {formLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                Criar Post
               </Button>
             </div>
           </DialogContent>

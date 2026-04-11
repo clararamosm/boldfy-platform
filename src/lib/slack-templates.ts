@@ -66,7 +66,7 @@ function getBaseUrl(): string {
 
 function formatPostLink(post: { id: string; title: string; scheduledFor?: string | null }, companyId: string, tlId: string): string {
   const baseUrl = getBaseUrl();
-  const url = `${baseUrl}/strategist/pipeline?companyId=${companyId}&tlId=${tlId}&postId=${post.id}`;
+  const url = `${baseUrl}/post/${companyId}/${tlId}/${post.id}`;
   const date = post.scheduledFor ? ` — ${formatDateShort(post.scheduledFor)}` : '';
   // Slack mrkdwn link format: <URL|Label>
   return `• <${url}|${post.title}>${date}`;
@@ -166,7 +166,7 @@ export async function renderTemplate(
 
   // Event-based single post variables
   if (context.post) {
-    const postUrl = `${baseUrl}/strategist/pipeline?companyId=${context.companyId}&tlId=${context.tlId}&postId=${context.post.id}`;
+    const postUrl = `${baseUrl}/post/${context.companyId}/${context.tlId}/${context.post.id}`;
     simpleVars['{{titulo_post}}'] = `<${postUrl}|${context.post.title}>`;
     simpleVars['{{link_post}}'] = postUrl;
   } else {

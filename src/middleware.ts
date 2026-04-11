@@ -9,7 +9,7 @@ import type { NextRequest } from 'next/server';
 import { verifySessionValue } from '@/lib/session';
 
 // Routes that require authentication
-const PROTECTED_PREFIXES = ['/admin', '/colaborador', '/master', '/thoughtleader', '/strategist'];
+const PROTECTED_PREFIXES = ['/admin', '/colaborador', '/master', '/thoughtleader', '/strategist', '/post'];
 
 // Role-to-route mapping
 const ROLE_ROUTES: Record<string, string> = {
@@ -46,6 +46,11 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
+  // /post route — accessible by strategist, thoughtleader, and master
+  if (pathname.startsWith('/post') && (role === 'strategist' || role === 'thoughtleader' || role === 'master' || role === 'colaborador')) {
+    return NextResponse.next();
+  }
+
   // Master and Strategist can access /admin routes (with ?companyId=)
   if (pathname.startsWith('/admin') && (role === 'admin' || role === 'master' || role === 'strategist')) {
     return NextResponse.next();
@@ -68,5 +73,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/colaborador/:path*', '/master/:path*', '/thoughtleader/:path*', '/strategist/:path*'],
+  matcher: ['/admin/:path*', '/colaborador/:path*', '/master/:path*', '/thoughtleader/:path*', '/strategist/:path*', '/post/:path*'],
 };

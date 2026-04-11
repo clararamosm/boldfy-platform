@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, CheckCircle2, XCircle, FileText, Calendar as CalIcon } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, FileText, Calendar as CalIcon, ExternalLink } from "lucide-react";
 import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
 import { getAuthToken } from '@/lib/auth-client';
@@ -17,6 +18,7 @@ import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipelin
 export default function ThoughtLeaderBacklogPage() {
   const { user } = useAuth();
   const t = useT();
+  const router = useRouter();
   const [posts, setPosts] = useState<PipelinePost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<PipelineStatus | 'all'>('all');
@@ -188,10 +190,21 @@ export default function ThoughtLeaderBacklogPage() {
               <Card key={post.id}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{post.title}</CardTitle>
-                    <Badge variant={getStatusBadgeVariant(post.status)}>
-                      {getStatusLabel(post.status)}
-                    </Badge>
+                    <CardTitle className="text-base flex-1">{post.title}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1 text-xs"
+                        onClick={() => router.push(`/post/${user?.companyId}/${targetUserId}/${post.id}`)}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        Ver
+                      </Button>
+                      <Badge variant={getStatusBadgeVariant(post.status)}>
+                        {getStatusLabel(post.status)}
+                      </Badge>
+                    </div>
                   </div>
                   <CardDescription className="flex items-center gap-3 text-xs">
                     {post.editorial && <span>{post.editorial}</span>}

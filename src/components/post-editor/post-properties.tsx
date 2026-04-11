@@ -1,0 +1,183 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { getAuthToken } from '@/lib/auth-client';
+import { getContentStrategy } from '@/app/actions/content-strategy';
+import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
+
+type Props = {
+  post: PipelinePost;
+  canEdit: boolean;
+  tlId: string;
+  onPropertyChange: (field: string, value: unknown) => void;
+};
+
+const STATUS_OPTIONS: { value: PipelineStatus; label: string; color: string }[] = [
+  { value: 'backlog', label: 'Backlog', color: 'bg-gray-100 text-gray-700' },
+  { value: 'aprovar_ideia', label: 'Aprovar Ideia', color: 'bg-purple-100 text-purple-700' },
+  { value: 'em_producao', label: 'Em Produção', color: 'bg-blue-100 text-blue-700' },
+  { value: 'aprovar_post', label: 'Aprovar Post', color: 'bg-yellow-100 text-yellow-700' },
+  { value: 'post_aprovado', label: 'Post Aprovado', color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'pronto_pra_postar', label: 'Pronto pra Postar', color: 'bg-green-100 text-green-700' },
+  { value: 'postado', label: 'Postado', color: 'bg-green-200 text-green-800' },
+  { value: 'ajuste', label: 'Ajuste', color: 'bg-red-100 text-red-700' },
+  { value: 'arquivado', label: 'Arquivado', color: 'bg-gray-200 text-gray-600' },
+];
+
+const ETAPA_OPTIONS = ['Visibilidade', 'Autoridade', 'Conversão'];
+
+const FORMATO_OPTIONS = ['Vídeo', 'Texto', 'GIF', 'One Pager', 'Carrossel', 'Foto', 'Quote', 'Meme', 'Print'];
+
+export function PostProperties({ post, canEdit, tlId, onPropertyChange }: Props) {
+  const [contentPillars, setContentPillars] = useState<string[]>([]);
+
+  // Load content pillars from strategy
+  useEffect(() => {
+    async function loadPillars() {
+      try {
+        const token = await getAuthToken();
+        const result = await getContentStrategy(token, tlId);
+        if (result.data?.pillars) {
+          setContentPillars(result.data.pillars.map((p: { name: string }) => p.name));
+        }
+      } catch {
+        // Silent — pillar select just won't have options
+      }
+    }
+    loadPillars();
+  }, [tlId]);
+
+  const statusInfo = STATUS_OPTIONS.find(s => s.value === post.status) || STATUS_OPTIONS[0];
+
+  // Read-only view for TL
+  if (!canEdit) {
+    return (
+      <div className="flex flex-wrap gap-2 py-3 border-y">
+        <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+        {post.etapa && <Badge variant="outline">{post.etapa}</Badge>}
+        {post.formato && <Badge variant="outline">{post.formato}</Badge>}
+        {post.contentPillar && <Badge variant="outline">{post.contentPillar}</Badge>}
+        {post.scheduledFor && (
+          <Badge variant="outline">
+            {new Date(post.scheduledFor).toLocaleDateString('pt-BR')}
+          </Badge>
+        )}
+        {post.leadMagnet && <Badge variant="outline">Lead Magnet</Badge>}
+      </div>
+    );
+  }
+
+  // Editable view for strategist
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-4 border-y">
+      {/* Status */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Status</Label>
+        <Select value={post.status} onValueChange={(v) => onPropertyChange('status', v)}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Etapa */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Etapa</Label>
+        <Select value={post.etapa || ''} onValueChange={(v) => onPropertyChange('etapa', v)}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="Selecione" />
+          </SelectTrigger>
+          <SelectContent>
+            {ETAPA_OPTIONS.map(opt => (
+              <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Formato */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Formato</Label>
+        <Select value={post.formato || ''} onValueChange={(v) => onPropertyChange('formato', v)}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="Selecione" />
+          </SelectTrigger>
+          <SelectContent>
+            {FORMATO_OPTIONS.map(opt => (
+              <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Pilar */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Pilar</Label>
+        {contentPillars.length > 0 ? (
+          <Select value={post.contentPillar || ''} onValueChange={(v) => onPropertyChange('contentPillar', v)}>
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {contentPillars.map(p => (
+                <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : (
+          <Input
+            value={post.contentPillar || ''}
+            onChange={(e) => onPropertyChange('contentPillar', e.target.value)}
+            placeholder="Pilar de conteúdo"
+            className="h-8 text-xs"
+          />
+        )}
+      </div>
+
+      {/* Data */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Data</Label>
+        <Input
+          type="date"
+          value={post.scheduledFor ? post.scheduledFor.split('T')[0] : ''}
+          onChange={(e) => {
+            const dateVal = e.target.value;
+            if (dateVal) {
+              // Preserve existing time if any
+              const existingTime = post.scheduledFor?.includes('T')
+                ? post.scheduledFor.split('T')[1]
+                : '00:00:00.000Z';
+              onPropertyChange('scheduledFor', `${dateVal}T${existingTime}`);
+            } else {
+              onPropertyChange('scheduledFor', null);
+            }
+          }}
+          className="h-8 text-xs"
+        />
+      </div>
+
+      {/* Lead Magnet */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Lead Magnet</Label>
+        <div className="flex items-center h-8">
+          <Switch
+            checked={post.leadMagnet}
+            onCheckedChange={(v) => onPropertyChange('leadMagnet', v)}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

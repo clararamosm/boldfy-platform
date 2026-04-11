@@ -286,9 +286,9 @@ export default function StrategistCalendarioPage() {
     return eachDayOfInterval({ start: calStart, end: calEnd });
   }, [currentMonth]);
 
-  // ─── Navigate to pipeline editor (deep link) ──────
+  // ─── Navigate to dedicated post page ──────
   const handlePostClick = (post: CalendarPipelinePost) => {
-    router.push(`/strategist/pipeline?companyId=${post.companyId}&tlId=${post.tlUserId}&postId=${post.id}`);
+    router.push(`/post/${post.companyId}/${post.tlUserId}/${post.id}`);
   };
 
   if (isLoading) {
