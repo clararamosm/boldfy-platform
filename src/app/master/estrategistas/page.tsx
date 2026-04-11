@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,8 +77,7 @@ export default function MasterEstrategistasPage() {
       // Fetch strategists
       const strategistsQuery = query(
         collection(db, 'users'),
-        where('role', '==', 'strategist'),
-        orderBy('createdAt', 'desc')
+        where('role', '==', 'strategist')
       );
       const strategistsSnap = await getDocs(strategistsQuery);
       const strategistsList = strategistsSnap.docs.map(d => {
@@ -91,14 +90,16 @@ export default function MasterEstrategistasPage() {
           assignedCompanies: data.assignedCompanies || [],
         } as Strategist;
       });
+      // Sort client-side (no composite index needed)
+      strategistsList.sort((a, b) => a.name.localeCompare(b.name));
 
       // Fetch companies
-      const companiesQuery = query(collection(db, 'companies'), orderBy('companyName'));
-      const companiesSnap = await getDocs(companiesQuery);
+      const companiesSnap = await getDocs(collection(db, 'companies'));
       const companiesList = companiesSnap.docs.map(d => ({
         id: d.id,
         companyName: d.data().companyName || '',
       }));
+      companiesList.sort((a, b) => a.companyName.localeCompare(b.companyName));
 
       // Build name map
       const nameMap: Record<string, string> = {};
