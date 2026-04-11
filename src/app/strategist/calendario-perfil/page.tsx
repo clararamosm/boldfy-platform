@@ -148,9 +148,9 @@ export default function StrategistCalendarioPerfilPage() {
     return eachDayOfInterval({ start: calStart, end: calEnd });
   }, [currentMonth]);
 
-  // ─── Navigate to pipeline ──────
+  // ─── Navigate to pipeline editor (deep link) ──────
   const handlePostClick = (post: PipelinePost) => {
-    router.push(`/strategist/pipeline?companyId=${companyId}&tlId=${tlId}`);
+    router.push(`/strategist/pipeline?companyId=${companyId}&tlId=${tlId}&postId=${post.id}`);
   };
 
   // ─── Status counts ──────
