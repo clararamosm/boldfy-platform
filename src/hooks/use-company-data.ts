@@ -16,6 +16,7 @@ export type CompanyDoc = {
   licenses: number;
   tlLicenses?: number;
   strategistId?: string | null;
+  strategistIds?: string[];
   locale: string;
   trialEndsAt?: string;
   trialEndDate?: string;
@@ -87,6 +88,7 @@ export function useCompanyData(companyId: string | undefined | null): UseCompany
           licenses: data.licenses || 0,
           tlLicenses: data.tlLicenses || 0,
           strategistId: data.strategistId || null,
+          strategistIds: data.strategistIds || (data.strategistId ? [data.strategistId] : []),
           locale: data.locale || 'pt-BR',
           trialEndsAt: data.trialEndsAt,
           trialEndDate: data.trialEndDate,

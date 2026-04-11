@@ -32,7 +32,7 @@ type Company = {
     tlLicenses?: number;
     locale?: 'pt-BR' | 'en';
     adminProfile: { email: string; name: string; };
-    strategistId?: string | null;
+    strategistIds: string[];
     createdAt: { toDate?: () => Date } | string | null;
     subscription?: {
         plan?: string;
@@ -121,7 +121,12 @@ export default function MasterEmpresasPage() {
         try {
             const companiesQuery = collection(db, "companies");
             const querySnapshot = await getDocs(query(companiesQuery, orderBy("createdAt", "desc")));
-            const companiesList = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Company));
+            const companiesList = querySnapshot.docs.map(d => {
+                const data = d.data();
+                // Backward compat: read strategistIds (new) or fall back to strategistId (old singular)
+                const strategistIds: string[] = data.strategistIds || (data.strategistId ? [data.strategistId] : []);
+                return { id: d.id, ...data, strategistIds } as Company;
+            });
 
             // Fetch seat counts + detect admin pending for each company
             const counts: Record<string, number> = {};
@@ -147,10 +152,10 @@ export default function MasterEmpresasPage() {
                     }
                 }
             }
-            // Fetch strategist info for each company that has one
+            // Fetch strategist info for all unique strategists across companies
             const stratMap: Record<string, StrategistInfo> = {};
-            const strategistIds = new Set(companiesList.map(c => c.strategistId).filter(Boolean) as string[]);
-            for (const stratId of strategistIds) {
+            const allStratIds = new Set(companiesList.flatMap(c => c.strategistIds));
+            for (const stratId of allStratIds) {
                 try {
                     const stratDoc = await getDoc(doc(db, 'users', stratId));
                     if (stratDoc.exists()) {
@@ -369,17 +374,28 @@ export default function MasterEmpresasPage() {
                                     <TableCell>{company.adminProfile?.email}</TableCell>
                                     <TableCell>{company.tlLicenses ? `${company.tlLicenses}` : '—'}</TableCell>
                                     <TableCell>
-                                        {company.strategistId && strategistMap[company.strategistId] ? (
-                                            <div className="flex items-center gap-2">
-                                                <Avatar className="h-6 w-6">
-                                                    {strategistMap[company.strategistId].avatarUrl && (
-                                                        <AvatarImage src={strategistMap[company.strategistId].avatarUrl} alt={strategistMap[company.strategistId].name} />
-                                                    )}
-                                                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                                                        {strategistMap[company.strategistId].name?.[0]?.toUpperCase() || 'S'}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <span className="text-sm truncate max-w-[100px]">{strategistMap[company.strategistId].name.split(' ')[0]}</span>
+                                        {company.strategistIds.length > 0 ? (
+                                            <div className="flex items-center gap-1">
+                                                <div className="flex -space-x-1.5">
+                                                    {company.strategistIds.map(sId => {
+                                                        const info = strategistMap[sId];
+                                                        if (!info) return null;
+                                                        return (
+                                                            <Avatar key={sId} className="h-6 w-6 border-2 border-background" title={info.name}>
+                                                                {info.avatarUrl && <AvatarImage src={info.avatarUrl} alt={info.name} />}
+                                                                <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                                                    {info.name?.[0]?.toUpperCase() || 'S'}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <span className="text-sm truncate max-w-[120px] ml-1">
+                                                    {company.strategistIds
+                                                        .map(sId => strategistMap[sId]?.name?.split(' ')[0])
+                                                        .filter(Boolean)
+                                                        .join(', ')}
+                                                </span>
                                             </div>
                                         ) : (
                                             <span className="text-xs text-muted-foreground">—</span>

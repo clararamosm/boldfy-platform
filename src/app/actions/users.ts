@@ -439,22 +439,35 @@ export async function assignCompaniesToStrategist(
       assignedCompanies: companyIds,
     });
 
-    // Update each company's strategistId
-    // First clear the old strategist from companies that no longer have this strategist
-    const companiesWithStrategist = await adminDb.collection('companies')
+    // Get previously assigned companies (check both old singular and new array fields)
+    const prevByArray = await adminDb.collection('companies')
+      .where('strategistIds', 'array-contains', strategistId).get();
+    const prevBySingular = await adminDb.collection('companies')
       .where('strategistId', '==', strategistId).get();
 
+    const prevCompanyIds = new Set<string>();
+    prevByArray.docs.forEach(d => prevCompanyIds.add(d.id));
+    prevBySingular.docs.forEach(d => prevCompanyIds.add(d.id));
+
     const batch = adminDb.batch();
-    for (const compDoc of companiesWithStrategist.docs) {
-      if (!companyIds.includes(compDoc.id)) {
-        batch.update(compDoc.ref, { strategistId: null });
+
+    // Remove strategist from companies no longer assigned
+    for (const prevId of prevCompanyIds) {
+      if (!companyIds.includes(prevId)) {
+        const compRef = adminDb.collection('companies').doc(prevId);
+        batch.update(compRef, {
+          strategistIds: FieldValue.arrayRemove(strategistId),
+          strategistId: null, // clean up legacy field
+        });
       }
     }
 
-    // Assign strategist to the selected companies
+    // Add strategist to newly assigned companies
     for (const companyId of companyIds) {
-      batch.update(adminDb.collection('companies').doc(companyId), {
-        strategistId,
+      const compRef = adminDb.collection('companies').doc(companyId);
+      batch.update(compRef, {
+        strategistIds: FieldValue.arrayUnion(strategistId),
+        strategistId: null, // migrate away from singular field
       });
     }
 

@@ -8,5 +8,5 @@ export { submitMissionProof, completeMissionSelf, reviewMissionProof } from './a
 export { redeemReward, markRescueAsPaid } from './actions/rewards';
 export { getCompanyRanking, recalculatePoints, type RankedUser } from './actions/points';
 export { createScheduledPost, updateScheduledPost, deleteScheduledPost, getScheduledPosts, type ScheduledPost } from './actions/posts';
-export { createPipelinePost, updatePipelinePost, deletePipelinePost, getPipelinePosts, approvePipelineIdea, approvePipelinePost, requestPipelineAdjustment, resolvePipelineAdjustment, markPipelinePostPublished, getAllPipelinePostsForStrategist, type PipelinePost, type PipelineStatus, type CalendarPipelinePost } from './actions/content-pipeline';
+export { createPipelinePost, updatePipelinePost, deletePipelinePost, getPipelinePosts, approvePipelineIdea, approvePipelinePost, requestPipelineAdjustment, resolvePipelineAdjustment, markPipelinePostPublished, getAllPipelinePostsForStrategist, getStrategistSidebarData, type PipelinePost, type PipelineStatus, type CalendarPipelinePost, type StrategistSidebarCompany } from './actions/content-pipeline';
 export { saveContentStrategy, getContentStrategy, saveBrandManual, getBrandManual, type ContentStrategyData, type BrandManualData } from './actions/content-strategy';

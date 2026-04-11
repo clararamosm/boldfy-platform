@@ -409,6 +409,58 @@ export async function markPipelinePostPublished(
   }
 }
 
+// ---- Sidebar data for Strategist (server-side, bypasses rules) ----
+
+export type StrategistSidebarCompany = {
+  id: string;
+  name: string;
+  tls: { id: string; name: string }[];
+};
+
+export async function getStrategistSidebarData(
+  idToken: string
+): Promise<{ companies?: StrategistSidebarCompany[]; error?: string }> {
+  try {
+    const user = await requireAuth(idToken);
+    if (user.role !== 'strategist' && user.role !== 'master') {
+      return { error: 'Acesso negado.' };
+    }
+
+    const userDoc = await adminDb.collection('users').doc(user.uid).get();
+    const assignedCompanies = (userDoc.data()?.assignedCompanies as string[]) || [];
+
+    if (assignedCompanies.length === 0) return { companies: [] };
+
+    const result: StrategistSidebarCompany[] = [];
+
+    for (const companyId of assignedCompanies) {
+      const compDoc = await adminDb.collection('companies').doc(companyId).get();
+      if (!compDoc.exists) continue;
+      const companyName = compDoc.data()?.companyName || 'Empresa';
+
+      const tlSnap = await adminDb.collection('users')
+        .where('companyId', '==', companyId)
+        .where('role', '==', 'thoughtleader')
+        .get();
+
+      const tls = tlSnap.docs.map(d => ({
+        id: d.id,
+        name: d.data().profile?.name || d.data().name || 'TL',
+      }));
+      tls.sort((a, b) => a.name.localeCompare(b.name));
+
+      result.push({ id: companyId, name: companyName, tls });
+    }
+
+    result.sort((a, b) => a.name.localeCompare(b.name));
+    return { companies: result };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in getStrategistSidebarData:', msg);
+    return { error: msg };
+  }
+}
+
 // ---- Calendar-oriented: Get ALL pipeline posts for a Strategist ----
 
 export type CalendarPipelinePost = PipelinePost & {

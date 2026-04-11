@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getAuthToken } from '@/lib/auth-client';
+import { getStrategistSidebarData, type StrategistSidebarCompany } from '@/app/actions/content-pipeline';
 import { useAuth } from '@/contexts/auth-context';
 import {
     SidebarGroup,
@@ -21,69 +21,28 @@ import {
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { LayoutDashboard, CalendarDays, ClipboardList, User, ChevronRight, Building2 } from 'lucide-react';
 
-type TLInfo = {
-    id: string;
-    name: string;
-};
-
-type CompanyWithTLs = {
-    id: string;
-    name: string;
-    tls: TLInfo[];
-};
-
 export function StrategistSidebarNav() {
     const { user } = useAuth();
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const currentCompanyId = searchParams.get('companyId');
     const currentTlId = searchParams.get('tlId');
-    const [companies, setCompanies] = useState<CompanyWithTLs[]>([]);
+    const [companies, setCompanies] = useState<StrategistSidebarCompany[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         if (!user?.uid) return;
 
-        const fetchCompaniesAndTLs = async () => {
+        const fetchData = async () => {
             setIsLoading(true);
             try {
-                // Get assigned companies from rawData (already loaded on auth)
-                const assignedIds = (user.rawData?.assignedCompanies as string[]) || [];
-
-                if (assignedIds.length === 0) {
-                    setCompanies([]);
-                    setIsLoading(false);
-                    return;
+                const token = await getAuthToken();
+                const result = await getStrategistSidebarData(token);
+                if (result.companies) {
+                    setCompanies(result.companies);
+                } else {
+                    console.error('Sidebar error:', result.error);
                 }
-
-                const result: CompanyWithTLs[] = [];
-
-                for (const companyId of assignedIds) {
-                    try {
-                        const compDoc = await getDoc(doc(db, 'companies', companyId));
-                        const companyName = compDoc.data()?.companyName || 'Empresa';
-
-                        // Fetch TLs for this company
-                        const tlQuery = query(
-                            collection(db, 'users'),
-                            where('companyId', '==', companyId),
-                            where('role', '==', 'thoughtleader')
-                        );
-                        const tlSnap = await getDocs(tlQuery);
-                        const tls: TLInfo[] = tlSnap.docs.map(d => ({
-                            id: d.id,
-                            name: d.data().profile?.name || d.data().name || 'TL',
-                        }));
-                        tls.sort((a, b) => a.name.localeCompare(b.name));
-
-                        result.push({ id: companyId, name: companyName, tls });
-                    } catch (err) {
-                        console.error(`Error fetching company ${companyId}:`, err);
-                    }
-                }
-
-                result.sort((a, b) => a.name.localeCompare(b.name));
-                setCompanies(result);
             } catch (error) {
                 console.error('Error fetching sidebar data:', error);
             } finally {
@@ -91,8 +50,8 @@ export function StrategistSidebarNav() {
             }
         };
 
-        fetchCompaniesAndTLs();
-    }, [user?.uid, user?.rawData?.assignedCompanies]);
+        fetchData();
+    }, [user?.uid]);
 
     return (
         <>
@@ -117,11 +76,11 @@ export function StrategistSidebarNav() {
                             <SidebarMenuButton
                                 asChild
                                 isActive={pathname === '/strategist/calendario'}
-                                tooltip="Calendario"
+                                tooltip="Calendário"
                             >
                                 <Link href="/strategist/calendario">
                                     <CalendarDays />
-                                    <span>Calendario</span>
+                                    <span>Calendário</span>
                                 </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>
@@ -148,7 +107,7 @@ export function StrategistSidebarNav() {
                     <SidebarGroupLabel>Empresas</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <div className="px-4 py-3 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                            Nenhuma empresa atribuida.
+                            Nenhuma empresa atribuída.
                         </div>
                     </SidebarGroupContent>
                 </SidebarGroup>
