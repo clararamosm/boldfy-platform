@@ -17,7 +17,7 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
-import { inviteCollaborator, deleteCollaborator } from '@/app/actions';
+import { inviteCollaborator, deleteCollaborator, inviteThoughtLeader } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
 import { useT } from '@/lib/i18n/context';
 import { useAuth } from '@/contexts/auth-context';
@@ -82,9 +82,13 @@ export default function AdminColaboradoresPage() {
   const { company } = useCompanyData(companyId);
   const totalLicenses = company?.licenses || 0;
 
+  const totalTLLicenses = company?.tlLicenses || 0;
+
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [thoughtLeaders, setThoughtLeaders] = useState<Collaborator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isTLDialogOpen, setIsTLDialogOpen] = useState(false);
   const [editingCollaborator, setEditingCollaborator] = useState<Collaborator | null>(null);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -97,10 +101,13 @@ export default function AdminColaboradoresPage() {
   const t = useT();
 
   const [inviteState, formAction] = useActionState(inviteCollaborator, { error: undefined, success: undefined });
+  const [inviteTLState, tlFormAction] = useActionState(inviteThoughtLeader, { error: undefined, success: undefined });
+  const tlFormRef = useRef<HTMLFormElement>(null);
 
   const fetchCollaborators = useCallback(async (currentCompanyId: string) => {
     setIsLoading(true);
     try {
+      // Fetch collaborators
       const collaboratorsQuery = query(collection(db, "users"), where("companyId", "==", currentCompanyId), where("role", "==", "colaborador"));
       const querySnapshot = await getDocs(collaboratorsQuery);
       const fetchedCollaborators = querySnapshot.docs.map(d => {
@@ -117,6 +124,24 @@ export default function AdminColaboradoresPage() {
         }
       }) as Collaborator[];
       setCollaborators(fetchedCollaborators);
+
+      // Fetch thought leaders
+      const tlQuery = query(collection(db, "users"), where("companyId", "==", currentCompanyId), where("role", "==", "thoughtleader"));
+      const tlSnapshot = await getDocs(tlQuery);
+      const fetchedTLs = tlSnapshot.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          name: data.profile?.name || '',
+          email: data.profile?.email || '',
+          points: 0,
+          status: data.status || 'Pendente',
+          createdAt: data.createdAt?.toDate(),
+          avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture,
+          linkedinStatus: getLinkedinTokenStatus(data),
+        }
+      }) as Collaborator[];
+      setThoughtLeaders(fetchedTLs);
     } catch (error) {
       console.error("Error fetching collaborators: ", error);
       toast({ variant: "destructive", title: t.adminCollaborators.errorFetch});
@@ -142,6 +167,17 @@ export default function AdminColaboradoresPage() {
       toast({ variant: "destructive", title: t.adminCollaborators.toastInviteError, description: inviteState.error });
     }
   }, [inviteState, toast, companyId, fetchCollaborators]);
+
+  useEffect(() => {
+    if (inviteTLState.success) {
+      toast({ title: t.adminTL.toastInviteSent, description: t.adminTL.toastInviteDescription });
+      setIsTLDialogOpen(false);
+      if (companyId) fetchCollaborators(companyId);
+    }
+    if (inviteTLState.error) {
+      toast({ variant: "destructive", title: t.adminTL.toastInviteError, description: inviteTLState.error });
+    }
+  }, [inviteTLState, toast, companyId, fetchCollaborators]);
 
   const inviteButton = (
     <Button size="sm" disabled={isLoading || !companyId || collaborators.length >= totalLicenses}>
@@ -371,6 +407,120 @@ export default function AdminColaboradoresPage() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Thought Leaders Section */}
+        {totalTLLicenses > 0 && (
+          <Card className="mt-6">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>{t.adminTL.title}</CardTitle>
+                <CardDescription>{thoughtLeaders.length} / {totalTLLicenses} {t.adminTL.availableTLLicenses.toLowerCase()}</CardDescription>
+              </div>
+              <ActionDialog
+                trigger={
+                  <Button size="sm" disabled={isLoading || !companyId || thoughtLeaders.length >= totalTLLicenses}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    {t.adminTL.invite}
+                  </Button>
+                }
+                title={t.adminTL.inviteTitle}
+                description={t.adminTL.inviteDescription}
+                open={isTLDialogOpen}
+                onOpenChange={async (open) => {
+                  if (open) {
+                    const freshToken = await getAuthToken();
+                    setCachedToken(freshToken);
+                  }
+                  setIsTLDialogOpen(open);
+                }}
+              >
+                <form action={tlFormAction} ref={tlFormRef}>
+                  <input type="hidden" name="companyId" value={companyId || ''} />
+                  <input type="hidden" name="idToken" value={cachedToken} />
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="tlName">{t.adminTL.inviteName}</Label>
+                      <Input name="name" id="tlName" placeholder={t.adminTL.inviteNamePlaceholder} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tlEmail">{t.adminTL.inviteEmail}</Label>
+                      <Input name="email" id="tlEmail" type="email" placeholder={t.adminTL.inviteEmailPlaceholder} required />
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-6">
+                    <Button type="submit">{t.adminTL.sendInvite}</Button>
+                  </div>
+                </form>
+              </ActionDialog>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t.adminTL.tableThoughtLeader}</TableHead>
+                    <TableHead>{t.adminTL.tableStatus}</TableHead>
+                    <TableHead>{t.adminTL.tableLinkedin}</TableHead>
+                    <TableHead>{t.adminTL.tableJoinDate}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-6">
+                        <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+                      </TableCell>
+                    </TableRow>
+                  ) : thoughtLeaders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        {t.adminTL.empty}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    thoughtLeaders.map((tl) => (
+                      <TableRow key={tl.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarImage src={tl.avatarUrl} />
+                              <AvatarFallback>{tl.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">{tl.name}</p>
+                              <p className="text-sm text-muted-foreground">{tl.email}</p>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{getStatusBadge(tl.status)}</TableCell>
+                        <TableCell>
+                          {tl.linkedinStatus === 'connected' && (
+                            <Badge variant="outline" className="text-[#0A66C2] border-[#0A66C2]/30 bg-[#0A66C2]/5">
+                              <Linkedin className="h-3 w-3 mr-1" /> {t.adminCollaborators.linkedinConnected}
+                            </Badge>
+                          )}
+                          {tl.linkedinStatus === 'expiring' && (
+                            <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                              <Linkedin className="h-3 w-3 mr-1" /> {t.adminCollaborators.linkedinExpiring}
+                            </Badge>
+                          )}
+                          {tl.linkedinStatus === 'expired' && (
+                            <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50">
+                              <Linkedin className="h-3 w-3 mr-1" /> {t.adminCollaborators.linkedinExpired}
+                            </Badge>
+                          )}
+                          {tl.linkedinStatus === 'not_connected' && (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{tl.createdAt && typeof tl.createdAt === 'object' && tl.createdAt !== null && 'toDate' in tl.createdAt && typeof tl.createdAt.toDate === 'function' ? tl.createdAt.toDate().toLocaleDateString() : tl.createdAt ? new Date(tl.createdAt as string).toLocaleDateString() : 'N/A'}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Edit Collaborator Dialog */}
         <ActionDialog

@@ -14,6 +14,8 @@ export type CompanyDoc = {
   companyName: string;
   status: 'Ativa' | 'Inativa' | 'Trial' | 'pending_payment';
   licenses: number;
+  tlLicenses?: number;
+  strategistId?: string | null;
   locale: string;
   trialEndsAt?: string;
   trialEndDate?: string;
@@ -83,6 +85,8 @@ export function useCompanyData(companyId: string | undefined | null): UseCompany
           companyName: data.companyName || '',
           status: data.status || 'Trial',
           licenses: data.licenses || 0,
+          tlLicenses: data.tlLicenses || 0,
+          strategistId: data.strategistId || null,
           locale: data.locale || 'pt-BR',
           trialEndsAt: data.trialEndsAt,
           trialEndDate: data.trialEndDate,

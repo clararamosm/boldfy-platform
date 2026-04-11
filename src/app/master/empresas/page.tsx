@@ -28,8 +28,10 @@ type Company = {
     companyName: string;
     status: 'Ativa' | 'Inativa' | 'Trial';
     licenses: number;
+    tlLicenses?: number;
     locale?: 'pt-BR' | 'en';
     adminProfile: { email: string; name: string; };
+    strategistId?: string | null;
     createdAt: { toDate?: () => Date } | string | null;
     subscription?: {
         plan?: string;
@@ -62,6 +64,11 @@ function CompanyFormContent() {
                 <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="5" defaultValue="5" disabled={pending} required />
              </div>
              <div className="space-y-2">
+                <Label htmlFor="tlLicenses">Licenças Thought Leader (opcional)</Label>
+                <Input name="tlLicenses" id="tlLicenses" type="number" placeholder="Ex: 2" min="0" defaultValue="0" disabled={pending} />
+                <p className="text-xs text-muted-foreground">Número de assentos para Thought Leaders (Content Full-Service). Cobrados separadamente.</p>
+             </div>
+             <div className="space-y-2">
                 <Label htmlFor="locale">Idioma da Plataforma</Label>
                 <input type="hidden" name="locale" value={locale} />
                 <Select defaultValue="pt-BR" disabled={pending} onValueChange={setLocale}>
@@ -89,6 +96,7 @@ export default function MasterEmpresasPage() {
     const [editingCompany, setEditingCompany] = useState<Company | null>(null);
     const [editCompanyName, setEditCompanyName] = useState("");
     const [editLicenses, setEditLicenses] = useState(0);
+    const [editTLLicenses, setEditTLLicenses] = useState(0);
     const [isEditCompanyOpen, setIsEditCompanyOpen] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmDeleteName, setConfirmDeleteName] = useState("");
@@ -230,6 +238,7 @@ export default function MasterEmpresasPage() {
     setEditingCompany(company);
     setEditCompanyName(company.companyName);
     setEditLicenses(company.licenses);
+    setEditTLLicenses(company.tlLicenses || 0);
     setIsEditCompanyOpen(true);
   };
 
@@ -239,6 +248,7 @@ export default function MasterEmpresasPage() {
       await updateDoc(doc(db, "companies", editingCompany.id), {
         companyName: editCompanyName,
         licenses: editLicenses,
+        tlLicenses: editTLLicenses,
       });
       toast({ title: "Empresa atualizada com sucesso!" });
       setIsEditCompanyOpen(false);
@@ -306,6 +316,7 @@ export default function MasterEmpresasPage() {
                             <TableHead>Status</TableHead>
                             <TableHead>Licenças</TableHead>
                             <TableHead>Admin</TableHead>
+                            <TableHead>TLs</TableHead>
                             <TableHead>Idioma</TableHead>
                             <TableHead>Data de Início</TableHead>
                             <TableHead><span className="sr-only">Ações</span></TableHead>
@@ -314,7 +325,7 @@ export default function MasterEmpresasPage() {
                     <TableBody>
                          {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center h-24">
+                                <TableCell colSpan={8} className="text-center h-24">
                                      <div className="flex justify-center items-center">
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando empresas...
                                     </div>
@@ -322,7 +333,7 @@ export default function MasterEmpresasPage() {
                             </TableRow>
                         ) : companies.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
+                                <TableCell colSpan={8} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
                             </TableRow>
                         ) : (
                             companies.map(company => (
@@ -331,6 +342,7 @@ export default function MasterEmpresasPage() {
                                     <TableCell>{getStatusBadge(company)}</TableCell>
                                     <TableCell>{seatCounts[company.id] || 0} / {company.licenses}</TableCell>
                                     <TableCell>{company.adminProfile?.email}</TableCell>
+                                    <TableCell>{company.tlLicenses ? `${company.tlLicenses}` : '—'}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className="gap-1 text-xs">
                                             <Globe className="h-3 w-3" />
@@ -389,7 +401,7 @@ export default function MasterEmpresasPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="editLicenses">Licenças</Label>
+            <Label htmlFor="editLicenses">Licenças (Colaboradores)</Label>
             <Input
               id="editLicenses"
               type="number"
@@ -397,6 +409,17 @@ export default function MasterEmpresasPage() {
               value={editLicenses}
               onChange={(e) => setEditLicenses(Number(e.target.value))}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="editTLLicenses">Licenças Thought Leader</Label>
+            <Input
+              id="editTLLicenses"
+              type="number"
+              min={0}
+              value={editTLLicenses}
+              onChange={(e) => setEditTLLicenses(Number(e.target.value))}
+            />
+            <p className="text-xs text-muted-foreground">Assentos para Content Full-Service.</p>
           </div>
           <Button onClick={handleSaveCompanyEdit} className="w-full">
             Salvar Alterações

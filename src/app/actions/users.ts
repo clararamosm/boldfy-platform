@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { requireMaster, requireAdmin } from '@/lib/auth-guard';
+import { requireMaster, requireAdmin, requireAdminOrStrategist } from '@/lib/auth-guard';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
@@ -94,6 +94,7 @@ const InviteAdminSchema = z.object({
   adminName: z.string().min(1, 'Nome do admin é obrigatório.'),
   adminEmail: z.string().email('E-mail inválido.'),
   licenses: z.coerce.number().int().min(5, 'O número de licenças deve ser no mínimo 5.').positive('Número de licenças deve ser positivo.'),
+  tlLicenses: z.coerce.number().int().min(0).default(0),
   locale: z.enum(['pt-BR', 'en']).default('pt-BR'),
 });
 
@@ -117,6 +118,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     adminName: formData.get('adminName'),
     adminEmail: formData.get('adminEmail'),
     licenses: formData.get('licenses'),
+    tlLicenses: formData.get('tlLicenses') || 0,
     locale: formData.get('locale') || 'pt-BR',
   });
 
@@ -124,13 +126,14 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     return { error: validatedData.error.errors.map(e => e.message).join(', ') };
   }
 
-  const { companyName, adminName, adminEmail, licenses, locale } = validatedData.data;
+  const { companyName, adminName, adminEmail, licenses, tlLicenses, locale } = validatedData.data;
 
   try {
     const companyRef = await adminDb.collection("companies").add({
       companyName: companyName,
       status: 'Ativa',
       licenses: licenses,
+      tlLicenses: tlLicenses,
       locale: locale,
       adminProfile: { email: adminEmail, name: adminName },
       brandContext: { valueProposition: '', tagline: '', businessKeywords: [], solutions: [], targetPainPoints: [], targetAudience: '', approvedTopics: [], prohibitedPhrases: [] },
@@ -337,5 +340,230 @@ export async function deleteCollaborator(idToken: string, userId: string): Promi
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
     console.error('Error in deleteCollaborator:', errorMessage);
     return { error: `Erro ao remover colaborador: ${errorMessage}` };
+  }
+}
+
+// ---- Invite Strategist Action (by Master) ----
+
+const InviteStrategistSchema = z.object({
+  name: z.string().min(1, 'Nome do estrategista é obrigatório.'),
+  email: z.string().email('E-mail inválido.'),
+});
+
+type InviteStrategistState = {
+  success?: boolean;
+  error?: string;
+};
+
+export async function inviteStrategist(prevState: InviteStrategistState, formData: FormData): Promise<InviteStrategistState> {
+  if (!adminAuth) {
+    return { error: "O serviço de autenticação não está disponível." };
+  }
+
+  const idToken = formData.get('idToken') as string;
+  if (!idToken) return { error: 'Token de autenticacao ausente.' };
+  try { await requireMaster(idToken); } catch (e: unknown) { return { error: e instanceof Error ? e.message : 'Erro de autenticação.' }; }
+
+  const validatedData = InviteStrategistSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+  });
+
+  if (!validatedData.success) {
+    return { error: validatedData.error.errors.map(e => e.message).join(', ') };
+  }
+
+  const { name, email } = validatedData.data;
+
+  try {
+    let userRecord;
+    try {
+      userRecord = await adminAuth.createUser({
+        email,
+        displayName: name,
+        password: crypto.randomBytes(16).toString('base64url') + 'A1!',
+      });
+    } catch (authError: unknown) {
+      if ((authError as { code?: string })?.code === 'auth/email-already-exists') {
+        return { error: `Um usuário com o e-mail ${email} já existe.` };
+      }
+      throw authError;
+    }
+
+    await adminDb.collection("users").doc(userRecord.uid).set({
+      role: 'strategist',
+      name,
+      assignedCompanies: [],
+      status: 'Ativo',
+      profile: { name, email },
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    sendInvitationEmail({
+      to: email,
+      name,
+      companyName: 'Boldfy',
+      role: 'Estrategista',
+      resetLink,
+      locale: 'pt-BR',
+    }).catch((emailError) => {
+      console.error("Error sending strategist invitation email:", emailError);
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+    console.error("Error in inviteStrategist:", errorMessage);
+    return { error: `Erro ao convidar estrategista: ${errorMessage}` };
+  }
+}
+
+// ---- Assign Companies to Strategist (by Master) ----
+
+export async function assignCompaniesToStrategist(
+  idToken: string,
+  strategistId: string,
+  companyIds: string[]
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    await requireMaster(idToken);
+  } catch (e: unknown) {
+    return { error: e instanceof Error ? e.message : 'Erro de autenticação.' };
+  }
+
+  try {
+    // Update strategist's assignedCompanies
+    await adminDb.collection('users').doc(strategistId).update({
+      assignedCompanies: companyIds,
+    });
+
+    // Update each company's strategistId
+    // First clear the old strategist from companies that no longer have this strategist
+    const companiesWithStrategist = await adminDb.collection('companies')
+      .where('strategistId', '==', strategistId).get();
+
+    const batch = adminDb.batch();
+    for (const compDoc of companiesWithStrategist.docs) {
+      if (!companyIds.includes(compDoc.id)) {
+        batch.update(compDoc.ref, { strategistId: null });
+      }
+    }
+
+    // Assign strategist to the selected companies
+    for (const companyId of companyIds) {
+      batch.update(adminDb.collection('companies').doc(companyId), {
+        strategistId,
+      });
+    }
+
+    await batch.commit();
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in assignCompaniesToStrategist:', errorMessage);
+    return { error: `Erro ao atribuir empresas: ${errorMessage}` };
+  }
+}
+
+// ---- Invite Thought Leader Action (by Admin or Master) ----
+
+const InviteThoughtLeaderSchema = z.object({
+  name: z.string().min(1, 'Nome do Thought Leader é obrigatório.'),
+  email: z.string().email('E-mail inválido.'),
+  companyId: z.string().min(1, 'ID da empresa é obrigatório.')
+});
+
+type InviteThoughtLeaderState = {
+  success?: boolean;
+  error?: string;
+};
+
+export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, formData: FormData): Promise<InviteThoughtLeaderState> {
+  if (!adminAuth) {
+    return { error: "O serviço de autenticação não está disponível." };
+  }
+
+  const idToken = formData.get('idToken') as string;
+  const formCompanyId = formData.get('companyId') as string;
+  if (!idToken) return { error: 'Token de autenticacao ausente.' };
+  // Admin or Strategist of the company can invite TLs
+  try { await requireAdminOrStrategist(idToken, formCompanyId); } catch (e: unknown) { return { error: e instanceof Error ? e.message : 'Erro de autenticação.' }; }
+
+  const validatedData = InviteThoughtLeaderSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+    companyId: formData.get('companyId'),
+  });
+
+  if (!validatedData.success) {
+    return { error: validatedData.error.errors.map(e => e.message).join(', ') };
+  }
+
+  const { name, email, companyId } = validatedData.data;
+
+  try {
+    const companyDocSnap = await adminDb.collection("companies").doc(companyId).get();
+    if (!companyDocSnap.exists) {
+      throw new Error("Empresa não encontrada.");
+    }
+    const companyData = companyDocSnap.data();
+    const companyName = companyData?.companyName || '';
+    const companyLocale = (companyData?.locale as 'pt-BR' | 'en') || 'pt-BR';
+
+    // Check TL license limits
+    const tlLicenses = companyData?.tlLicenses || 0;
+    const tlUsersQuery = await adminDb.collection("users")
+      .where("companyId", "==", companyId)
+      .where("role", "==", "thoughtleader")
+      .get();
+
+    if (tlUsersQuery.size >= tlLicenses) {
+      return { error: `Limite de licenças TL atingido (${tlLicenses}). Não é possível convidar mais Thought Leaders.` };
+    }
+
+    let userRecord;
+    try {
+      userRecord = await adminAuth.createUser({
+        email,
+        displayName: name,
+        password: crypto.randomBytes(16).toString('base64url') + 'A1!',
+      });
+    } catch (authError: unknown) {
+      if ((authError as { code?: string })?.code === 'auth/email-already-exists') {
+        return { error: `Um usuário com o e-mail ${email} já existe.` };
+      }
+      throw authError;
+    }
+
+    await adminDb.collection("users").doc(userRecord.uid).set({
+      role: 'thoughtleader',
+      name,
+      companyId,
+      companyName,
+      status: 'Pendente',
+      profile: { name, email },
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    sendInvitationEmail({
+      to: email,
+      name,
+      companyName,
+      role: companyLocale === 'en' ? 'Thought Leader' : 'Thought Leader',
+      resetLink,
+      locale: companyLocale,
+    }).catch((emailError) => {
+      console.error("Error sending thought leader invitation email:", emailError);
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido.';
+    console.error("Error in inviteThoughtLeader:", errorMessage);
+    return { error: `Erro ao convidar Thought Leader: ${errorMessage}` };
   }
 }

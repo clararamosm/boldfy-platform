@@ -129,10 +129,26 @@ export function useAuthGuard(options: UseAuthGuardOptions): UseAuthGuardReturn {
       setCompanyId(undefined);
       setLocale('pt-BR');
     } else if (role === 'thoughtleader' && user.role === 'strategist') {
-      // Strategist viewing TL account — companyId from the TL user being viewed
-      // The strategist layout will handle fetching TL-specific data
-      setCompanyId(undefined);
-      setLocale('pt-BR');
+      // Strategist viewing TL account — fetch TL's company locale
+      const tlUserId = searchParams.get('userId');
+      if (tlUserId) {
+        getDoc(doc(db, 'users', tlUserId)).then((tlDoc) => {
+          if (tlDoc.exists()) {
+            const tlCompanyId = tlDoc.data().companyId;
+            if (tlCompanyId) {
+              setCompanyId(tlCompanyId);
+              getDoc(doc(db, 'companies', tlCompanyId)).then((compDoc) => {
+                if (compDoc.exists()) {
+                  setLocale((compDoc.data().locale as Locale) || 'pt-BR');
+                }
+              });
+            }
+          }
+        });
+      } else {
+        setCompanyId(undefined);
+        setLocale('pt-BR');
+      }
     } else {
       // Admin, Colaborador, or Thought Leader — companyId from user doc
       setCompanyId(user.companyId);
