@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Camera } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from '@/contexts/auth-context';
+import { SlackSettingsCard } from '@/components/dashboard/slack-settings';
 
 type ProfileData = {
   name: string;
@@ -213,6 +214,9 @@ export default function StrategistConfiguracoesPage() {
                   )}
                 </Button>
               </div>
+
+              {/* Slack Notifications Settings */}
+              <SlackSettingsCard />
             </>
           )}
         </div>

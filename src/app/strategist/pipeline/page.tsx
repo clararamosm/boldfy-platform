@@ -55,7 +55,9 @@ export default function StrategistPipelinePage() {
   const searchParams = useSearchParams();
   const urlCompanyId = searchParams.get('companyId');
   const urlTlId = searchParams.get('tlId');
+  const urlPostId = searchParams.get('postId');
   const appliedUrlParams = useRef(false);
+  const deepLinkApplied = useRef(false);
 
   const [thoughtLeaders, setThoughtLeaders] = useState<TLSummary[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -266,6 +268,16 @@ export default function StrategistPipelinePage() {
       setTimeout(checkScroll, 100);
     }
   }, [isPostsLoading, checkScroll]);
+
+  // Deep link: auto-open post dialog when postId is in URL
+  useEffect(() => {
+    if (!urlPostId || isPostsLoading || posts.length === 0 || deepLinkApplied.current) return;
+    const targetPost = posts.find(p => p.id === urlPostId);
+    if (targetPost) {
+      openEditDialog(targetPost);
+      deepLinkApplied.current = true;
+    }
+  }, [urlPostId, isPostsLoading, posts]);
 
   // ─── Posts grouped by status (for kanban) ──────
   const postsByStatus = useMemo(() => {

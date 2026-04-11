@@ -10,3 +10,4 @@ export { getCompanyRanking, recalculatePoints, type RankedUser } from './actions
 export { createScheduledPost, updateScheduledPost, deleteScheduledPost, getScheduledPosts, type ScheduledPost } from './actions/posts';
 export { createPipelinePost, updatePipelinePost, deletePipelinePost, getPipelinePosts, approvePipelineIdea, approvePipelinePost, requestPipelineAdjustment, resolvePipelineAdjustment, markPipelinePostPublished, getAllPipelinePostsForStrategist, getStrategistSidebarData, type PipelinePost, type PipelineStatus, type CalendarPipelinePost, type StrategistSidebarCompany } from './actions/content-pipeline';
 export { saveContentStrategy, getContentStrategy, saveBrandManual, getBrandManual, getCompanyBrandContext, saveCompanyBrandContext, type ContentStrategyData, type BrandManualData, type BrandContextData } from './actions/content-strategy';
+export { getSlackChannels, getSlackConfig, saveSlackConfig, testSlackNotification } from './actions/slack';

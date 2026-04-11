@@ -4,6 +4,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireAuth, requireStrategistForTL, requireAdminOrStrategist } from '@/lib/auth-guard';
+import { triggerSlackNotification } from '@/lib/slack-notifications';
 
 // ---- Types ----
 
@@ -139,6 +140,16 @@ export async function updatePipelinePost(
       ...data,
       updatedAt: new Date().toISOString(),
     });
+
+    // Fire-and-forget: Slack notification when status changes to pronto_pra_postar
+    if (data.status === 'pronto_pra_postar') {
+      const postTitle = data.title || docSnap.data()?.title || '';
+      triggerSlackNotification('post_pronto', {
+        tlUserId,
+        postId,
+        postTitle,
+      }).catch(err => console.error('Slack post_pronto notification failed:', err));
+    }
 
     return { success: true };
   } catch (error) {
@@ -293,6 +304,14 @@ export async function approvePipelinePost(
       updatedAt: new Date().toISOString(),
     });
 
+    // Fire-and-forget: Slack notification for post ready
+    const postTitle = docSnap.data()?.title || '';
+    triggerSlackNotification('post_pronto', {
+      tlUserId: user.uid,
+      postId,
+      postTitle,
+    }).catch(err => console.error('Slack post_pronto notification failed:', err));
+
     return { success: true };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
@@ -333,6 +352,15 @@ export async function requestPipelineAdjustment(
       tlFeedback: feedback,
       updatedAt: new Date().toISOString(),
     });
+
+    // Fire-and-forget: Slack notification for feedback received
+    const postTitle = docSnap.data()?.title || '';
+    triggerSlackNotification('feedback_recebido', {
+      tlUserId: user.uid,
+      postId,
+      postTitle,
+      feedbackText: feedback,
+    }).catch(err => console.error('Slack feedback_recebido notification failed:', err));
 
     return { success: true };
   } catch (error) {

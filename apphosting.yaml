@@ -31,6 +31,10 @@ env:
   - variable: NOTION_API_KEY
     secret: NOTION_API_KEY
 
+  # --- Slack (notifications) ---
+  - variable: SLACK_BOT_TOKEN
+    secret: SLACK_BOT_TOKEN
+
   # --- Session cookie signing (required for login to work) ---
   - variable: COOKIE_SECRET
     secret: COOKIE_SECRET
