@@ -96,7 +96,8 @@ type StrategistInfo = {
 export default function MasterEmpresasPage() {
     const { toast } = useToast();
     const [companies, setCompanies] = useState<Company[]>([]);
-    const [seatCounts, setSeatCounts] = useState<Record<string, number>>({});
+    const [colabCounts, setColabCounts] = useState<Record<string, number>>({});
+    const [tlCounts, setTlCounts] = useState<Record<string, number>>({});
     const [strategistMap, setStrategistMap] = useState<Record<string, StrategistInfo>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -128,17 +129,29 @@ export default function MasterEmpresasPage() {
                 return { id: d.id, ...data, strategistIds } as Company;
             });
 
-            // Fetch seat counts + detect admin pending for each company
-            const counts: Record<string, number> = {};
+            // Fetch seat counts (colab vs TL) + detect admin pending
+            const colabMap: Record<string, number> = {};
+            const tlMap: Record<string, number> = {};
             for (const comp of companiesList) {
-                const usersQuery = query(
+                // Count colaboradores
+                const colabQuery = query(
                     collection(db, "users"),
-                    where("companyId", "==", comp.id)
+                    where("companyId", "==", comp.id),
+                    where("role", "==", "colaborador")
                 );
-                const usersSnap = await getDocs(usersQuery);
-                counts[comp.id] = usersSnap.size;
+                const colabSnap = await getDocs(colabQuery);
+                colabMap[comp.id] = colabSnap.size;
 
-                // Check if admin user has ever logged in (via lastLoginAt metadata)
+                // Count thought leaders
+                const tlQuery = query(
+                    collection(db, "users"),
+                    where("companyId", "==", comp.id),
+                    where("role", "==", "thoughtleader")
+                );
+                const tlSnap = await getDocs(tlQuery);
+                tlMap[comp.id] = tlSnap.size;
+
+                // Check if admin user has ever logged in
                 const adminEmail = comp.adminProfile?.email;
                 if (adminEmail) {
                     const adminQuery = query(
@@ -169,7 +182,8 @@ export default function MasterEmpresasPage() {
             }
 
             setCompanies(companiesList);
-            setSeatCounts(counts);
+            setColabCounts(colabMap);
+            setTlCounts(tlMap);
             setStrategistMap(stratMap);
         } catch (error) {
             console.error("Error fetching companies:", error);
@@ -345,7 +359,6 @@ export default function MasterEmpresasPage() {
                             <TableHead>Status</TableHead>
                             <TableHead>Licenças</TableHead>
                             <TableHead>Admin</TableHead>
-                            <TableHead>TLs</TableHead>
                             <TableHead>Estrategista</TableHead>
                             <TableHead>Idioma</TableHead>
                             <TableHead>Data de Início</TableHead>
@@ -355,7 +368,7 @@ export default function MasterEmpresasPage() {
                     <TableBody>
                          {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={9} className="text-center h-24">
+                                <TableCell colSpan={8} className="text-center h-24">
                                      <div className="flex justify-center items-center">
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando empresas...
                                     </div>
@@ -363,39 +376,41 @@ export default function MasterEmpresasPage() {
                             </TableRow>
                         ) : companies.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={9} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
+                                <TableCell colSpan={8} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
                             </TableRow>
                         ) : (
                             companies.map(company => (
                                 <TableRow key={company.id} className={(company.status !== 'Ativa' && company.status !== 'Trial') ? 'text-muted-foreground' : ''}>
                                     <TableCell className="font-medium">{company.companyName}</TableCell>
                                     <TableCell>{getStatusBadge(company)}</TableCell>
-                                    <TableCell>{seatCounts[company.id] || 0} / {company.licenses}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-1.5">
+                                            <Badge variant="outline" className="text-xs gap-1 font-normal">
+                                                C: {colabCounts[company.id] || 0}/{company.licenses}
+                                            </Badge>
+                                            {(company.tlLicenses ?? 0) > 0 && (
+                                                <Badge variant="outline" className="text-xs gap-1 font-normal">
+                                                    TL: {tlCounts[company.id] || 0}/{company.tlLicenses}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </TableCell>
                                     <TableCell>{company.adminProfile?.email}</TableCell>
-                                    <TableCell>{company.tlLicenses ? `${company.tlLicenses}` : '—'}</TableCell>
                                     <TableCell>
                                         {company.strategistIds.length > 0 ? (
-                                            <div className="flex items-center gap-1">
-                                                <div className="flex -space-x-1.5">
-                                                    {company.strategistIds.map(sId => {
-                                                        const info = strategistMap[sId];
-                                                        if (!info) return null;
-                                                        return (
-                                                            <Avatar key={sId} className="h-6 w-6 border-2 border-background" title={info.name}>
-                                                                {info.avatarUrl && <AvatarImage src={info.avatarUrl} alt={info.name} />}
-                                                                <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                                                                    {info.name?.[0]?.toUpperCase() || 'S'}
-                                                                </AvatarFallback>
-                                                            </Avatar>
-                                                        );
-                                                    })}
-                                                </div>
-                                                <span className="text-sm truncate max-w-[120px] ml-1">
-                                                    {company.strategistIds
-                                                        .map(sId => strategistMap[sId]?.name?.split(' ')[0])
-                                                        .filter(Boolean)
-                                                        .join(', ')}
-                                                </span>
+                                            <div className="flex -space-x-1.5">
+                                                {company.strategistIds.map(sId => {
+                                                    const info = strategistMap[sId];
+                                                    if (!info) return null;
+                                                    return (
+                                                        <Avatar key={sId} className="h-6 w-6 border-2 border-background" title={info.name}>
+                                                            {info.avatarUrl && <AvatarImage src={info.avatarUrl} alt={info.name} />}
+                                                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                                                {info.name?.[0]?.toUpperCase() || 'S'}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                    );
+                                                })}
                                             </div>
                                         ) : (
                                             <span className="text-xs text-muted-foreground">—</span>
