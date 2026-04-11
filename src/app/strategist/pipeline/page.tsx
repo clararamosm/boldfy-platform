@@ -56,8 +56,15 @@ export default function StrategistPipelinePage() {
     const fetchTLs = async () => {
       setIsLoading(true);
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const assignedCompanyIds = userDoc.data()?.assignedCompanies as string[] || [];
+        // Use rawData from auth context as primary source, fallback to Firestore
+        let assignedCompanyIds: string[] = [];
+        const rawAssigned = (user.rawData?.assignedCompanies) as string[] | undefined;
+        if (rawAssigned && Array.isArray(rawAssigned) && rawAssigned.length > 0) {
+          assignedCompanyIds = rawAssigned;
+        } else {
+          const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+          assignedCompanyIds = (userDocSnap.data()?.assignedCompanies as string[]) || [];
+        }
 
         if (assignedCompanyIds.length === 0) {
           setThoughtLeaders([]);

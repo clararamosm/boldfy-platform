@@ -9,7 +9,7 @@ import Logo from "@/components/logo";
 import { StrategistSidebarNav } from "@/components/dashboard/strategist-sidebar-nav";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LogOut, Loader2 } from "lucide-react";
@@ -55,6 +55,9 @@ function StrategistLayoutInner({ children }: { children: React.ReactNode }) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="flex-1 justify-start gap-2 px-2">
                 <Avatar className="h-8 w-8">
+                  {user.profile?.avatarUrl && (
+                    <AvatarImage src={user.profile.avatarUrl} alt={user.name || ''} />
+                  )}
                   <AvatarFallback className="bg-primary/10 text-primary text-xs">
                     {user.name?.substring(0, 2).toUpperCase() || 'ST'}
                   </AvatarFallback>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,7 @@ type AssignedCompany = {
 export default function StrategistEmpresasPage() {
   const { user } = useAuth();
   const t = useT();
+  const { toast } = useToast();
   const [companies, setCompanies] = useState<AssignedCompany[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -33,9 +35,17 @@ export default function StrategistEmpresasPage() {
     const fetchAssignedCompanies = async () => {
       setIsLoading(true);
       try {
-        // Get strategist's assigned companies
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        const assignedCompanyIds = userDoc.data()?.assignedCompanies as string[] || [];
+        // Use rawData from auth context (already fetched on login) as primary source.
+        // Fallback: re-fetch user doc from Firestore.
+        let assignedCompanyIds: string[] = [];
+        const rawAssigned = (user.rawData?.assignedCompanies) as string[] | undefined;
+        if (rawAssigned && Array.isArray(rawAssigned) && rawAssigned.length > 0) {
+          assignedCompanyIds = rawAssigned;
+        } else {
+          // Fallback: read from Firestore directly
+          const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+          assignedCompanyIds = (userDocSnap.data()?.assignedCompanies as string[]) || [];
+        }
 
         if (assignedCompanyIds.length === 0) {
           setCompanies([]);
@@ -71,6 +81,7 @@ export default function StrategistEmpresasPage() {
         setCompanies(companiesList);
       } catch (error) {
         console.error('Error fetching assigned companies:', error);
+        toast({ variant: 'destructive', title: 'Erro ao buscar empresas atribuídas.' });
       } finally {
         setIsLoading(false);
       }

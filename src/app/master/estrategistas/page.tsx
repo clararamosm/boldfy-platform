@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MoreHorizontal, PlusCircle, Loader2, Building2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
@@ -25,6 +26,7 @@ type Strategist = {
   name: string;
   email: string;
   status: string;
+  avatarUrl?: string;
   assignedCompanies: string[];
 };
 
@@ -87,6 +89,7 @@ export default function MasterEstrategistasPage() {
           name: data.name || '',
           email: data.profile?.email || '',
           status: data.status || 'Ativo',
+          avatarUrl: data.profile?.avatarUrl || data.photoURL || '',
           assignedCompanies: data.assignedCompanies || [],
         } as Strategist;
       });
@@ -225,7 +228,19 @@ export default function MasterEstrategistasPage() {
                 ) : (
                   strategists.map(strategist => (
                     <TableRow key={strategist.id}>
-                      <TableCell className="font-medium">{strategist.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-7 w-7">
+                            {strategist.avatarUrl && (
+                              <AvatarImage src={strategist.avatarUrl} alt={strategist.name} />
+                            )}
+                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                              {strategist.name?.[0]?.toUpperCase() || 'S'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{strategist.name}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{strategist.email}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">

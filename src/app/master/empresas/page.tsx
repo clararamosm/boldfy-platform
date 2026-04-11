@@ -4,13 +4,14 @@
 import React, { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, deleteDoc, doc, updateDoc, orderBy, query, where, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, getDoc, deleteDoc, doc, updateDoc, orderBy, query, where, writeBatch } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MoreHorizontal, PlusCircle, LogIn, Loader2, Pencil, Trash2, Globe } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
@@ -87,10 +88,16 @@ function CompanyFormContent() {
     );
 }
 
+type StrategistInfo = {
+    name: string;
+    avatarUrl?: string;
+};
+
 export default function MasterEmpresasPage() {
     const { toast } = useToast();
     const [companies, setCompanies] = useState<Company[]>([]);
     const [seatCounts, setSeatCounts] = useState<Record<string, number>>({});
+    const [strategistMap, setStrategistMap] = useState<Record<string, StrategistInfo>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingCompany, setEditingCompany] = useState<Company | null>(null);
@@ -140,8 +147,25 @@ export default function MasterEmpresasPage() {
                     }
                 }
             }
+            // Fetch strategist info for each company that has one
+            const stratMap: Record<string, StrategistInfo> = {};
+            const strategistIds = new Set(companiesList.map(c => c.strategistId).filter(Boolean) as string[]);
+            for (const stratId of strategistIds) {
+                try {
+                    const stratDoc = await getDoc(doc(db, 'users', stratId));
+                    if (stratDoc.exists()) {
+                        const sd = stratDoc.data();
+                        stratMap[stratId] = {
+                            name: sd.profile?.name || sd.name || '',
+                            avatarUrl: sd.profile?.avatarUrl || sd.photoURL || '',
+                        };
+                    }
+                } catch { /* skip */ }
+            }
+
             setCompanies(companiesList);
             setSeatCounts(counts);
+            setStrategistMap(stratMap);
         } catch (error) {
             console.error("Error fetching companies:", error);
             toast({ variant: 'destructive', title: 'Erro ao buscar empresas' });
@@ -317,6 +341,7 @@ export default function MasterEmpresasPage() {
                             <TableHead>Licenças</TableHead>
                             <TableHead>Admin</TableHead>
                             <TableHead>TLs</TableHead>
+                            <TableHead>Estrategista</TableHead>
                             <TableHead>Idioma</TableHead>
                             <TableHead>Data de Início</TableHead>
                             <TableHead><span className="sr-only">Ações</span></TableHead>
@@ -325,7 +350,7 @@ export default function MasterEmpresasPage() {
                     <TableBody>
                          {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={8} className="text-center h-24">
+                                <TableCell colSpan={9} className="text-center h-24">
                                      <div className="flex justify-center items-center">
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Carregando empresas...
                                     </div>
@@ -333,7 +358,7 @@ export default function MasterEmpresasPage() {
                             </TableRow>
                         ) : companies.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={8} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
+                                <TableCell colSpan={9} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
                             </TableRow>
                         ) : (
                             companies.map(company => (
@@ -343,6 +368,23 @@ export default function MasterEmpresasPage() {
                                     <TableCell>{seatCounts[company.id] || 0} / {company.licenses}</TableCell>
                                     <TableCell>{company.adminProfile?.email}</TableCell>
                                     <TableCell>{company.tlLicenses ? `${company.tlLicenses}` : '—'}</TableCell>
+                                    <TableCell>
+                                        {company.strategistId && strategistMap[company.strategistId] ? (
+                                            <div className="flex items-center gap-2">
+                                                <Avatar className="h-6 w-6">
+                                                    {strategistMap[company.strategistId].avatarUrl && (
+                                                        <AvatarImage src={strategistMap[company.strategistId].avatarUrl} alt={strategistMap[company.strategistId].name} />
+                                                    )}
+                                                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                                        {strategistMap[company.strategistId].name?.[0]?.toUpperCase() || 'S'}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <span className="text-sm truncate max-w-[100px]">{strategistMap[company.strategistId].name.split(' ')[0]}</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">—</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className="gap-1 text-xs">
                                             <Globe className="h-3 w-3" />
