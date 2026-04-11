@@ -27,6 +27,8 @@ export type SlackNotificationConfig = {
   tlId: string;
   companyName: string;
   tlName: string;
+  channelId: string | null;
+  channelName: string | null;
   notifications: Record<SlackNotificationType, NotificationEntry>;
   updatedAt: string;
 };

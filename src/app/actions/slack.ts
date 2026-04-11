@@ -68,6 +68,8 @@ export async function saveSlackConfig(
   data: {
     companyName: string;
     tlName: string;
+    channelId: string | null;
+    channelName: string | null;
     notifications: Record<SlackNotificationType, Partial<NotificationEntry>>;
   }
 ): Promise<{ success?: boolean; error?: string }> {
@@ -82,6 +84,7 @@ export async function saveSlackConfig(
       .doc(configDocId);
 
     // Build full notification config, merging defaults for missing fields
+    // Channel is set at config level; propagate to each notification for backward compat
     const notifications: Record<string, NotificationEntry> = {};
     const notifTypes: SlackNotificationType[] = [
       'resumo_semanal',
@@ -95,12 +98,12 @@ export async function saveSlackConfig(
       const input = data.notifications[type] || {};
       notifications[type] = {
         enabled: input.enabled ?? false,
-        channelId: input.channelId ?? null,
-        channelName: input.channelName ?? null,
+        channelId: data.channelId,
+        channelName: data.channelName,
         template: input.template || DEFAULT_TEMPLATES[type],
         tag: NOTIFICATION_META[type].tag,
         ...(type === 'dropin_semanal' ? {
-          dayOfWeek: input.dayOfWeek ?? 2, // default Tuesday
+          dayOfWeek: input.dayOfWeek ?? 2,
           timeOfDay: input.timeOfDay ?? '10:00',
         } : {}),
       };
@@ -111,6 +114,8 @@ export async function saveSlackConfig(
       tlId,
       companyName: data.companyName,
       tlName: data.tlName,
+      channelId: data.channelId,
+      channelName: data.channelName,
       notifications: notifications as Record<SlackNotificationType, NotificationEntry>,
       updatedAt: new Date().toISOString(),
     };

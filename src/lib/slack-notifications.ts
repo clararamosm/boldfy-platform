@@ -51,7 +51,8 @@ export async function triggerSlackNotification(
       const config = configDoc.data() as SlackNotificationConfig;
       const notifEntry = config.notifications[type as SlackNotificationType];
 
-      if (!notifEntry?.enabled || !notifEntry.channelId) continue;
+      const channelId = config.channelId || notifEntry?.channelId;
+      if (!notifEntry?.enabled || !channelId) continue;
 
       // 3. Get strategist name for template context
       const stratData = stratDoc.data();
@@ -71,8 +72,8 @@ export async function triggerSlackNotification(
         feedbackText: context.feedbackText,
       });
 
-      // 5. Send to Slack
-      const result = await sendSlackMessage(notifEntry.channelId, message);
+      // 5. Send to Slack (use config-level channel, fallback to per-notification)
+      const result = await sendSlackMessage(channelId, message);
       if (!result.ok) {
         console.error(`Slack notification (${type}) failed for strategist ${stratDoc.id}:`, result.error);
       }

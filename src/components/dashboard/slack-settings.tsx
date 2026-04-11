@@ -47,8 +47,6 @@ type Channel = { id: string; name: string };
 
 type NotificationState = {
   enabled: boolean;
-  channelId: string | null;
-  channelName: string | null;
   template: string;
   dayOfWeek?: number;
   timeOfDay?: string;
@@ -82,8 +80,6 @@ function createDefaultNotifications(): Record<SlackNotificationType, Notificatio
   for (const type of NOTIF_TYPES_ORDERED) {
     initial[type] = {
       enabled: false,
-      channelId: null,
-      channelName: null,
       template: DEFAULT_TEMPLATES[type],
       ...(type === 'dropin_semanal' ? { dayOfWeek: 2, timeOfDay: '10:00' } : {}),
     };
@@ -97,14 +93,10 @@ export function SlackSettingsCard() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Data
   const [channels, setChannels] = useState<Channel[]>([]);
   const [companies, setCompanies] = useState<CompanyData[]>([]);
-
-  // Loading
   const [isLoadingInit, setIsLoadingInit] = useState(true);
 
-  // ---- Initial load ----
   const loadInitialData = useCallback(async () => {
     try {
       setIsLoadingInit(true);
@@ -130,8 +122,6 @@ export function SlackSettingsCard() {
     if (user) loadInitialData();
   }, [user, loadInitialData]);
 
-  // ---- Render ----
-
   if (isLoadingInit) {
     return (
       <Card>
@@ -139,7 +129,6 @@ export function SlackSettingsCard() {
           <CardTitle>Notificações Slack</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-32 w-full" />
         </CardContent>
@@ -208,6 +197,8 @@ function CompanyBlock({
   const { toast } = useToast();
 
   const [selectedTl, setSelectedTl] = useState<string>('');
+  const [channelId, setChannelId] = useState<string | null>(null);
+  const [channelName, setChannelName] = useState<string | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [testingType, setTestingType] = useState<string | null>(null);
@@ -233,13 +224,15 @@ function CompanyBlock({
       const result = await getSlackConfig(token, company.id, tlId);
 
       if (result.config) {
+        // Load profile-level channel
+        setChannelId(result.config.channelId ?? null);
+        setChannelName(result.config.channelName ?? null);
+
         const newState: Record<string, NotificationState> = {};
         for (const type of NOTIF_TYPES_ORDERED) {
           const saved = result.config.notifications[type];
           newState[type] = {
             enabled: saved?.enabled ?? false,
-            channelId: saved?.channelId ?? null,
-            channelName: saved?.channelName ?? null,
             template: saved?.template || DEFAULT_TEMPLATES[type],
             ...(type === 'dropin_semanal' ? {
               dayOfWeek: saved?.dayOfWeek ?? 2,
@@ -249,6 +242,8 @@ function CompanyBlock({
         }
         setNotifications(newState as Record<SlackNotificationType, NotificationState>);
       } else {
+        setChannelId(null);
+        setChannelName(null);
         setNotifications(createDefaultNotifications());
       }
     } catch (error) {
@@ -264,19 +259,16 @@ function CompanyBlock({
     }
   }, [selectedTl, loadConfig]);
 
-  // Handlers
+  const handleChannelChange = (newChannelId: string) => {
+    const ch = channels.find(c => c.id === newChannelId);
+    setChannelId(newChannelId);
+    setChannelName(ch?.name || null);
+  };
+
   const handleNotifChange = (type: SlackNotificationType, field: string, value: unknown) => {
     setNotifications(prev => ({
       ...prev,
       [type]: { ...prev[type], [field]: value },
-    }));
-  };
-
-  const handleChannelChange = (type: SlackNotificationType, channelId: string) => {
-    const channel = channels.find(c => c.id === channelId);
-    setNotifications(prev => ({
-      ...prev,
-      [type]: { ...prev[type], channelId, channelName: channel?.name || null },
     }));
   };
 
@@ -289,10 +281,26 @@ function CompanyBlock({
 
       const tl = company.tls.find(t => t.id === selectedTl);
 
+      // Build notification entries (without channel — server will propagate from config level)
+      const notifData: Record<string, Partial<NotificationEntry>> = {};
+      for (const type of NOTIF_TYPES_ORDERED) {
+        const n = notifications[type];
+        notifData[type] = {
+          enabled: n.enabled,
+          template: n.template,
+          ...(type === 'dropin_semanal' ? {
+            dayOfWeek: n.dayOfWeek,
+            timeOfDay: n.timeOfDay,
+          } : {}),
+        };
+      }
+
       const result = await saveSlackConfig(token, company.id, selectedTl, {
         companyName: company.name,
         tlName: tl?.name || '',
-        notifications: notifications as unknown as Record<SlackNotificationType, Partial<NotificationEntry>>,
+        channelId,
+        channelName,
+        notifications: notifData as Record<SlackNotificationType, Partial<NotificationEntry>>,
       });
 
       if (result.success) {
@@ -309,8 +317,7 @@ function CompanyBlock({
   };
 
   const handleTest = async (type: SlackNotificationType) => {
-    const notif = notifications[type];
-    if (!notif.channelId) {
+    if (!channelId) {
       toast({ variant: 'destructive', title: 'Selecione um canal primeiro.' });
       return;
     }
@@ -319,7 +326,7 @@ function CompanyBlock({
       const token = await getAuthToken();
       if (!token) return;
 
-      const result = await testSlackNotification(token, notif.channelId, NOTIFICATION_META[type].label);
+      const result = await testSlackNotification(token, channelId, NOTIFICATION_META[type].label);
       if (result.success) {
         toast({ title: 'Mensagem de teste enviada!' });
       } else {
@@ -334,11 +341,11 @@ function CompanyBlock({
   };
 
   return (
-    <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+    <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
       {/* Company header */}
       <h3 className="font-semibold text-sm">{company.name}</h3>
 
-      {/* TL selector + Channel */}
+      {/* TL selector + Channel — side by side */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Perfil</Label>
@@ -353,28 +360,47 @@ function CompanyBlock({
             </SelectContent>
           </Select>
         </div>
+
+        {selectedTl && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Canal do Slack</Label>
+            <Select value={channelId || ''} onValueChange={handleChannelChange}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Selecione o canal" />
+              </SelectTrigger>
+              <SelectContent>
+                {channels.map(ch => (
+                  <SelectItem key={ch.id} value={ch.id}>
+                    <span className="flex items-center gap-1">
+                      <Hash className="h-3 w-3" />{ch.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
-      {/* Notification cards */}
+      {/* Notification rows — compact */}
       {selectedTl && (
         <>
           {isLoadingConfig ? (
-            <div className="space-y-3">
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {NOTIF_TYPES_ORDERED.map(type => (
                 <NotificationRow
                   key={type}
                   type={type}
                   state={notifications[type]}
-                  channels={channels}
                   isTesting={testingType === type}
+                  hasChannel={!!channelId}
                   onChange={(field, value) => handleNotifChange(type, field, value)}
-                  onChannelChange={(channelId) => handleChannelChange(type, channelId)}
                   onTest={() => handleTest(type)}
                 />
               ))}
@@ -382,7 +408,7 @@ function CompanyBlock({
           )}
 
           {/* Save button */}
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-1">
             <Button onClick={handleSave} disabled={isSaving} size="sm">
               {isSaving ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...</>
@@ -395,7 +421,7 @@ function CompanyBlock({
       )}
 
       {!selectedTl && (
-        <p className="text-sm text-muted-foreground text-center py-4">
+        <p className="text-sm text-muted-foreground text-center py-3">
           Selecione um perfil para configurar as notificações.
         </p>
       )}
@@ -403,23 +429,21 @@ function CompanyBlock({
   );
 }
 
-// ---- Notification Row Component ----
+// ---- Notification Row (compact — no channel selector) ----
 
 function NotificationRow({
   type,
   state,
-  channels,
   isTesting,
+  hasChannel,
   onChange,
-  onChannelChange,
   onTest,
 }: {
   type: SlackNotificationType;
   state: NotificationState;
-  channels: Channel[];
   isTesting: boolean;
+  hasChannel: boolean;
   onChange: (field: string, value: unknown) => void;
-  onChannelChange: (channelId: string) => void;
   onTest: () => void;
 }) {
   const meta = NOTIFICATION_META[type];
@@ -428,68 +452,43 @@ function NotificationRow({
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg border bg-background p-3">
-        {/* Tag above title */}
-        <div className="mb-1.5">
+      <div className="rounded-md border bg-background px-3 py-2">
+        {/* Single compact row: tag + name + schedule + toggle + expand */}
+        <div className="flex items-center gap-2">
           <Badge
             variant={isClient ? 'outline' : 'secondary'}
-            className="text-[10px] px-1.5 py-0 h-4 font-normal"
+            className="text-[10px] px-1.5 py-0 h-4 font-normal shrink-0"
           >
             {isClient ? 'Cliente' : 'Interna'}
           </Badge>
-        </div>
 
-        {/* Header row */}
-        <div className="flex items-center gap-3">
-          {/* Name + schedule */}
           <div className="flex-1 min-w-0">
             <span className="text-sm font-medium">{meta.label}</span>
-            <span className="text-xs text-muted-foreground ml-2">({meta.schedule})</span>
+            <span className="text-xs text-muted-foreground ml-1.5">({meta.schedule})</span>
           </div>
 
-          {/* Channel selector */}
-          <Select
-            value={state.channelId || ''}
-            onValueChange={onChannelChange}
-          >
-            <SelectTrigger className="w-[160px] h-8 text-xs">
-              <SelectValue placeholder="Canal" />
-            </SelectTrigger>
-            <SelectContent>
-              {channels.map(ch => (
-                <SelectItem key={ch.id} value={ch.id}>
-                  <span className="flex items-center gap-1">
-                    <Hash className="h-3 w-3" />{ch.name}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Toggle */}
           <Switch
             checked={state.enabled}
             onCheckedChange={(checked) => onChange('enabled', checked)}
+            className="shrink-0"
           />
 
-          {/* Expand template */}
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-              <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0">
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </Button>
           </CollapsibleTrigger>
         </div>
 
-        {/* Client notification reminder */}
+        {/* Client reminder — only when enabled */}
         {isClient && state.enabled && (
-          <p className="text-xs text-muted-foreground mt-2 italic">
-            Essa notificação chegará no canal interno. Lembre-se de repassar a mensagem no canal do cliente.
+          <p className="text-[11px] text-muted-foreground mt-1 italic pl-[52px]">
+            Chegará no canal interno. Lembre-se de repassar ao cliente.
           </p>
         )}
 
-        {/* Expandable content: template + dropin config */}
-        <CollapsibleContent className="mt-3 space-y-3">
-          {/* Drop-in specific: day + time */}
+        {/* Expandable: template + dropin config + test */}
+        <CollapsibleContent className="mt-2 space-y-2">
           {type === 'dropin_semanal' && (
             <div className="flex gap-3">
               <div className="space-y-1">
@@ -527,24 +526,22 @@ function NotificationRow({
             </div>
           )}
 
-          {/* Template editor */}
           <div className="space-y-1">
             <Label className="text-xs">Template da mensagem</Label>
             <Textarea
               value={state.template}
               onChange={(e) => onChange('template', e.target.value)}
-              className="font-mono text-xs min-h-[100px] resize-y"
+              className="font-mono text-xs min-h-[80px] resize-y"
               placeholder="Template da mensagem..."
             />
           </div>
 
-          {/* Test button */}
           <div className="flex justify-end">
             <Button
               variant="outline"
               size="sm"
               onClick={onTest}
-              disabled={!state.channelId || isTesting}
+              disabled={!hasChannel || isTesting}
             >
               {isTesting ? (
                 <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Enviando...</>

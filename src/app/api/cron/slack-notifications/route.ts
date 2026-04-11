@@ -87,7 +87,8 @@ export async function GET(request: NextRequest) {
 
         // --- Drop-in Semanal: configurable day/time ---
         const dropin = config.notifications.dropin_semanal;
-        if (dropin?.enabled && dropin.channelId && dropin.dayOfWeek === dayOfWeek) {
+        const dropinChannel = config.channelId || dropin?.channelId;
+        if (dropin?.enabled && dropinChannel && dropin.dayOfWeek === dayOfWeek) {
           const configHour = parseInt(dropin.timeOfDay?.split(':')[0] || '10');
           if (hour === configHour) {
             const result = await processNotification(
@@ -129,7 +130,8 @@ async function processNotification(
   configDocRef: FirebaseFirestore.DocumentReference
 ): Promise<'sent' | 'failed' | 'skipped'> {
   const notif = config.notifications[type];
-  if (!notif?.enabled || !notif.channelId) return 'skipped';
+  const channelId = config.channelId || notif?.channelId;
+  if (!notif?.enabled || !channelId) return 'skipped';
 
   // Idempotency: check if already sent this hour
   if (notif.lastSentAt) {
@@ -151,8 +153,8 @@ async function processNotification(
       strategistName,
     });
 
-    // Send to Slack
-    const result = await sendSlackMessage(notif.channelId, message);
+    // Send to Slack (use config-level channel, fallback to per-notification)
+    const result = await sendSlackMessage(channelId, message);
 
     if (result.ok) {
       // Update lastSentAt for idempotency
