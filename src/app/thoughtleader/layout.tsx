@@ -9,15 +9,14 @@ import Logo from "@/components/logo";
 import { ThoughtLeaderSidebarNav } from "@/components/dashboard/thoughtleader-sidebar-nav";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
-import { LogOut, Loader2, AlertTriangle, Linkedin } from "lucide-react";
+import { LogOut, Loader2 } from "lucide-react";
 import { AuthProvider } from "@/contexts/auth-context";
 import { FeedbackDialog } from "@/components/feedback-dialog";
+import { LinkedInSidebarBox } from "@/components/dashboard/linkedin-sidebar-box";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
-import { interpolate } from "@/lib/i18n/interpolate";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useSubscription } from "@/hooks/use-subscription";
 import { SubscriptionGate } from "@/components/subscription-gate";
@@ -56,6 +55,7 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
                 <ThoughtLeaderSidebarNav />
             </SidebarContent>
             <SidebarFooter>
+                <LinkedInSidebarBox tokenStatus={tokenStatus} />
                 <div className="flex items-center w-full gap-1 px-1">
                     <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -101,30 +101,6 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
     return (
         <LocaleProvider locale={locale}>
         <DashboardLayout sidebar={sidebarContent}>
-            {tokenStatus.status === 'expired' && (
-                <div className="bg-red-50 border-b border-red-200 px-4 py-2.5 flex items-center justify-between dark:bg-red-950/30 dark:border-red-900">
-                    <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
-                        <AlertTriangle className="h-4 w-4 shrink-0" />
-                        <span className="text-sm font-medium">{t.tlLayout.tokenExpired}</span>
-                    </div>
-                    <Link href="/thoughtleader/dashboard" className="text-sm font-medium text-red-700 dark:text-red-400 hover:underline whitespace-nowrap flex items-center gap-1">
-                        <Linkedin className="h-3.5 w-3.5" /> {t.tlLayout.reconnect}
-                    </Link>
-                </div>
-            )}
-            {tokenStatus.status === 'expiring_soon' && (
-                <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between dark:bg-amber-950/30 dark:border-amber-900">
-                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                        <AlertTriangle className="h-4 w-4 shrink-0" />
-                        <span className="text-sm font-medium">
-                            {interpolate(t.tlLayout.tokenExpiring, { days: tokenStatus.daysLeft })}
-                        </span>
-                    </div>
-                    <Link href="/thoughtleader/dashboard" className="text-sm font-medium text-amber-700 dark:text-amber-400 hover:underline whitespace-nowrap flex items-center gap-1">
-                        <Linkedin className="h-3.5 w-3.5" /> {t.tlLayout.reconnect}
-                    </Link>
-                </div>
-            )}
             {subscription.loading ? (
                 <div className="flex items-center justify-center min-h-[60vh]">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

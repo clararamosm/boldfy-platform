@@ -16,12 +16,23 @@ export async function GET(request: NextRequest) {
   const errorDescription = searchParams.get('error_description');
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br';
-  const settingsUrl = `${baseUrl}/colaborador/configuracoes`;
+
+  // Helper: build the redirect URL based on user role
+  function getRedirectBase(role?: string): string {
+    switch (role) {
+      case 'thoughtleader':
+        return `${baseUrl}/thoughtleader/dashboard`;
+      case 'colaborador':
+      default:
+        return `${baseUrl}/colaborador/configuracoes`;
+    }
+  }
 
   // Handle LinkedIn error response (user denied access, etc.)
   if (error) {
     console.error('LinkedIn OAuth error:', error, errorDescription);
-    const redirectUrl = new URL(settingsUrl);
+    // Without state we can't determine role — fallback to colaborador
+    const redirectUrl = new URL(getRedirectBase());
     redirectUrl.searchParams.set('linkedin', 'error');
     redirectUrl.searchParams.set(
       'message',
@@ -32,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   // Validate required params
   if (!code || !state) {
-    const redirectUrl = new URL(settingsUrl);
+    const redirectUrl = new URL(getRedirectBase());
     redirectUrl.searchParams.set('linkedin', 'error');
     redirectUrl.searchParams.set('message', 'Parâmetros inválidos na resposta do LinkedIn.');
     return NextResponse.redirect(redirectUrl.toString());
@@ -111,14 +122,15 @@ export async function GET(request: NextRequest) {
 
     await userRef.update(updateData);
 
-    // 6. Redirect back to settings with success
-    const redirectUrl = new URL(settingsUrl);
+    // 6. Redirect back based on user role
+    const userRole = userDoc.data()?.role as string | undefined;
+    const redirectUrl = new URL(getRedirectBase(userRole));
     redirectUrl.searchParams.set('linkedin', 'success');
     return NextResponse.redirect(redirectUrl.toString());
   } catch (err) {
     console.error('LinkedIn OAuth callback error:', err);
     const message = err instanceof Error ? err.message : 'Erro ao conectar LinkedIn.';
-    const redirectUrl = new URL(settingsUrl);
+    const redirectUrl = new URL(getRedirectBase());
     redirectUrl.searchParams.set('linkedin', 'error');
     redirectUrl.searchParams.set('message', message);
     return NextResponse.redirect(redirectUrl.toString());
