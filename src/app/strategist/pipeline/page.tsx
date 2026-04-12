@@ -8,7 +8,6 @@ import { Header } from "@/components/dashboard/header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PipelineCreateDialog } from '@/components/pipeline/create-dialog';
 import {
   Loader2, Plus, Calendar as CalIcon, Users, Clock,
   User, ChevronLeft, ChevronRight,
@@ -46,9 +45,8 @@ export default function StrategistPipelinePage() {
   // Dynamic content pillars from TL's strategy
   const [contentPillars, setContentPillars] = useState<string[]>([]);
 
-  // Create dialog
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogInitialStatus, setDialogInitialStatus] = useState<PipelineStatus>('backlog');
+  // Create post loading
+  const [isCreating, setIsCreating] = useState(false);
 
   // Kanban scroll
   const kanbanRef = useRef<HTMLDivElement>(null);
@@ -261,11 +259,36 @@ export default function StrategistPipelinePage() {
   };
 
 
-  // ─── Dialog handler ──────
-  const openCreateDialog = (forStatus: PipelineStatus = 'backlog') => {
-    setDialogInitialStatus(forStatus);
-    setDialogOpen(true);
-  };
+  // ─── Create post directly (no dialog) ──────
+  const createPostDirect = useCallback(async () => {
+    const effectiveTlId = tlFilter !== 'all' ? tlFilter : companyTLs[0]?.id;
+    if (!effectiveTlId || isCreating) return;
+
+    setIsCreating(true);
+    try {
+      const token = await getAuthToken();
+      const { createPipelinePost } = await import('@/app/actions/content-pipeline');
+      const result = await createPipelinePost(token, effectiveTlId, {
+        title: '',
+        caption: '',
+        scheduledFor: null,
+        status: 'backlog',
+        editorial: '',
+        etapa: '',
+        formato: '',
+        contentPillar: '',
+        leadMagnet: false,
+      });
+
+      if (result.postId) {
+        router.push(`/post/${selectedCompany}/${effectiveTlId}/${result.postId}`);
+      }
+    } catch (error) {
+      console.error('Error creating post:', error);
+    } finally {
+      setIsCreating(false);
+    }
+  }, [tlFilter, companyTLs, selectedCompany, isCreating, router]);
 
   const getStatusLabel = buildGetStatusLabel(t);
 
@@ -333,8 +356,8 @@ export default function StrategistPipelinePage() {
             </SelectContent>
           </Select>
 
-          <Button onClick={() => openCreateDialog('backlog')} disabled={companyTLs.length === 0} size="sm">
-            <Plus className="h-4 w-4 mr-1" />
+          <Button onClick={createPostDirect} disabled={companyTLs.length === 0 || isCreating} size="sm">
+            {isCreating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
             {t.contentPipeline.newPost}
           </Button>
         </div>
@@ -394,7 +417,7 @@ export default function StrategistPipelinePage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => openCreateDialog(status)}
+                      onClick={createPostDirect}
                       className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
                       title="Adicionar post"
                     >
@@ -483,18 +506,6 @@ export default function StrategistPipelinePage() {
         )}
         </div>
 
-        {/* Create Dialog */}
-        <PipelineCreateDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          companyId={selectedCompany}
-          defaultTlId={tlFilter !== 'all' ? tlFilter : companyTLs[0]?.id || null}
-          tlOptions={companyTLs}
-          showTlSelector={tlFilter === 'all' && companyTLs.length > 1}
-          initialStatus={dialogInitialStatus}
-          onCreated={fetchPosts}
-          labels={{ statusLabel: getStatusLabel }}
-        />
       </main>
     </>
   );

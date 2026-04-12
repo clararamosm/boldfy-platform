@@ -9,12 +9,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { getPipelinePosts, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
-import { PipelineCreateDialog } from '@/components/pipeline/create-dialog';
 import {
   ChevronLeft,
   ChevronRight,
   Clock,
   Plus,
+  Loader2,
 } from 'lucide-react';
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 import {
@@ -65,7 +65,7 @@ export default function StrategistCalendarioPerfilPage() {
   const [posts, setPosts] = useState<PipelinePost[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState<PipelineStatus | 'all'>('all');
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   // ─── Fetch posts for this TL ──────
   const fetchData = useCallback(async () => {
@@ -90,6 +90,36 @@ export default function StrategistCalendarioPerfilPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // ─── Create post directly (no dialog) ──────
+  const createPostDirect = useCallback(async () => {
+    if (!tlId || isCreating) return;
+
+    setIsCreating(true);
+    try {
+      const token = await getAuthToken();
+      const { createPipelinePost } = await import('@/app/actions/content-pipeline');
+      const result = await createPipelinePost(token, tlId, {
+        title: '',
+        caption: '',
+        scheduledFor: null,
+        status: 'backlog',
+        editorial: '',
+        etapa: '',
+        formato: '',
+        contentPillar: '',
+        leadMagnet: false,
+      });
+
+      if (result.postId) {
+        router.push(`/post/${companyId}/${tlId}/${result.postId}`);
+      }
+    } catch (error) {
+      console.error('Error creating post:', error);
+    } finally {
+      setIsCreating(false);
+    }
+  }, [tlId, companyId, isCreating, router]);
 
   // ─── Only posts with scheduledFor ──────
   const scheduledPosts = useMemo(() => {
@@ -185,8 +215,8 @@ export default function StrategistCalendarioPerfilPage() {
                 <ChevronRight className="h-5 w-5" />
               </Button>
             </div>
-            <Button size="sm" onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
+            <Button size="sm" onClick={createPostDirect} disabled={isCreating}>
+              {isCreating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
               Novo Post
             </Button>
           </div>
@@ -331,18 +361,6 @@ export default function StrategistCalendarioPerfilPage() {
           </div>
         </div>
 
-        {/* Create Post Dialog */}
-        <PipelineCreateDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          companyId={companyId}
-          defaultTlId={tlId}
-          tlOptions={tlId ? [{ id: tlId, name: decodeURIComponent(tlName) }] : []}
-          showTlSelector={false}
-          initialStatus="backlog"
-          onCreated={fetchData}
-          labels={{ statusLabel: (s: PipelineStatus) => STATUS_CONFIG[s]?.label || s }}
-        />
       </main>
     </>
   );
