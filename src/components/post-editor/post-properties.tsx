@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { CalendarCheck } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth-client';
 import { getContentStrategy } from '@/app/actions/content-strategy';
 import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
@@ -59,7 +61,7 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange }: Props)
 
   // Editable view for strategist
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 py-4 border-y">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4 border-y">
       {/* Status */}
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">Status</Label>
@@ -142,13 +144,35 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange }: Props)
             if (dateVal) {
               // Preserve existing time if any
               const existingTime = post.scheduledFor?.includes('T')
-                ? post.scheduledFor.split('T')[1]
-                : '00:00:00.000Z';
-              onPropertyChange('scheduledFor', `${dateVal}T${existingTime}`);
+                ? post.scheduledFor.split('T')[1]?.substring(0, 5) || '00:00'
+                : '00:00';
+              onPropertyChange('scheduledFor', `${dateVal}T${existingTime}:00.000Z`);
             } else {
               onPropertyChange('scheduledFor', null);
             }
           }}
+          className="h-8 text-xs"
+        />
+      </div>
+
+      {/* Horário */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Horário</Label>
+        <Input
+          type="time"
+          value={
+            post.scheduledFor?.includes('T')
+              ? post.scheduledFor.split('T')[1]?.substring(0, 5) || ''
+              : ''
+          }
+          onChange={(e) => {
+            const timeVal = e.target.value;
+            const dateVal = post.scheduledFor ? post.scheduledFor.split('T')[0] : '';
+            if (dateVal && timeVal) {
+              onPropertyChange('scheduledFor', `${dateVal}T${timeVal}:00.000Z`);
+            }
+          }}
+          disabled={!post.scheduledFor}
           className="h-8 text-xs"
         />
       </div>
@@ -163,6 +187,21 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange }: Props)
           />
         </div>
       </div>
+
+      {/* Forçar Agendamento — only when status is pronto_pra_postar and has date */}
+      {post.status === 'pronto_pra_postar' && post.scheduledFor && (
+        <div className="space-y-1 col-span-2 sm:col-span-4">
+          <Button
+            size="sm"
+            variant="default"
+            className="w-full sm:w-auto"
+            onClick={() => onPropertyChange('status', 'agendado')}
+          >
+            <CalendarCheck className="h-4 w-4 mr-1.5" />
+            Forçar Agendamento
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

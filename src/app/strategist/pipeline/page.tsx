@@ -302,9 +302,9 @@ export default function StrategistPipelinePage() {
   return (
     <>
       <Header title={t.contentPipeline.title} />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
-        {/* Top bar: Company + TL filter + new post */}
-        <div className="mb-4 flex flex-wrap items-center gap-3">
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar: Company + TL filter + new post (sticky) */}
+        <div className="shrink-0 px-4 md:px-6 pt-4 md:pt-6 pb-3 flex flex-wrap items-center gap-3">
           {/* Company selector */}
           {companies.length > 1 && (
             <Select value={selectedCompany || ''} onValueChange={(v) => { setSelectedCompany(v); setTlFilter('all'); }}>
@@ -339,13 +339,14 @@ export default function StrategistPipelinePage() {
           </Button>
         </div>
 
-        {/* Kanban board */}
+        {/* Kanban board (scrollable area) */}
+        <div className="flex-1 overflow-hidden px-4 md:px-6 pb-4 md:pb-6">
         {isPostsLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="relative">
+          <div className="relative h-full">
             {/* Scroll arrows */}
             {canScrollLeft && (
               <button
@@ -369,8 +370,7 @@ export default function StrategistPipelinePage() {
           <div
             ref={kanbanRef}
             onScroll={checkScroll}
-            className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
-            style={{ height: 'calc(100vh - 180px)' }}
+            className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide h-full"
           >
             {PIPELINE_STATUSES.map(status => {
               const cfg = STATUS_CONFIG[status];
@@ -481,6 +481,7 @@ export default function StrategistPipelinePage() {
           </div>
           </div>
         )}
+        </div>
 
         {/* Create Dialog */}
         <PipelineCreateDialog

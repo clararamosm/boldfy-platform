@@ -9,10 +9,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { getPipelinePosts, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
+import { PipelineCreateDialog } from '@/components/pipeline/create-dialog';
 import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Plus,
 } from 'lucide-react';
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 import {
@@ -63,6 +65,7 @@ export default function StrategistCalendarioPerfilPage() {
   const [posts, setPosts] = useState<PipelinePost[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState<PipelineStatus | 'all'>('all');
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // ─── Fetch posts for this TL ──────
   const fetchData = useCallback(async () => {
@@ -169,16 +172,22 @@ export default function StrategistCalendarioPerfilPage() {
       <Header title={`Calendário — ${decodeURIComponent(tlName)}`} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="space-y-4">
-          {/* Month navigation */}
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => subMonths(prev, 1))}>
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <h2 className="text-xl font-semibold capitalize min-w-[180px] text-center">
-              {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
-            </h2>
-            <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => addMonths(prev, 1))}>
-              <ChevronRight className="h-5 w-5" />
+          {/* Month navigation + New Post */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => subMonths(prev, 1))}>
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <h2 className="text-xl font-semibold capitalize min-w-[180px] text-center">
+                {format(currentMonth, 'MMMM yyyy', { locale: ptBR })}
+              </h2>
+              <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(prev => addMonths(prev, 1))}>
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+            </div>
+            <Button size="sm" onClick={() => setDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Novo Post
             </Button>
           </div>
 
@@ -321,6 +330,19 @@ export default function StrategistCalendarioPerfilPage() {
             </div>
           </div>
         </div>
+
+        {/* Create Post Dialog */}
+        <PipelineCreateDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          companyId={companyId}
+          defaultTlId={tlId}
+          tlOptions={tlId ? [{ id: tlId, name: decodeURIComponent(tlName) }] : []}
+          showTlSelector={false}
+          initialStatus="backlog"
+          onCreated={fetchData}
+          labels={{ statusLabel: (s: PipelineStatus) => STATUS_CONFIG[s]?.label || s }}
+        />
       </main>
     </>
   );
