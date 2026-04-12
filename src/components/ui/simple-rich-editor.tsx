@@ -2,8 +2,15 @@
 
 import React, { useRef, useCallback, useEffect } from 'react';
 import DOMPurify from 'dompurify';
-import { Bold, Italic, Underline, Highlighter, Palette } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const SYMBOL_BUTTONS = [
+  { symbol: '→', label: 'Seta', title: 'Inserir seta →' },
+  { symbol: '•', label: 'Bullet', title: 'Inserir bullet •' },
+  { symbol: '✦', label: 'Destaque', title: 'Inserir destaque ✦' },
+  { symbol: '✅', label: 'Check', title: 'Inserir check ✅' },
+  { symbol: '❌', label: 'X', title: 'Inserir ❌' },
+] as const;
 
 interface SimpleRichEditorProps {
   value: string;
@@ -19,11 +26,8 @@ export function SimpleRichEditor({
   className
 }: SimpleRichEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
-  const colorRef = useRef<HTMLInputElement>(null);
   const isInternalChange = useRef(false);
 
-  // Only set innerHTML when value changes externally (not from user typing)
-  // Sanitize with DOMPurify to prevent XSS
   useEffect(() => {
     if (isInternalChange.current) {
       isInternalChange.current = false;
@@ -31,14 +35,15 @@ export function SimpleRichEditor({
     }
     if (editorRef.current && editorRef.current.innerHTML !== value) {
       editorRef.current.innerHTML = DOMPurify.sanitize(value, {
-        ALLOWED_TAGS: ['b', 'i', 'u', 'strong', 'em', 'span', 'br', 'p', 'div', 'mark', 'font'],
-        ALLOWED_ATTR: ['style', 'color', 'face', 'size'],
+        ALLOWED_TAGS: ['span', 'br', 'p', 'div'],
+        ALLOWED_ATTR: [],
       });
     }
   }, [value]);
 
-  const execCmd = useCallback((command: string, val?: string) => {
-    document.execCommand(command, false, val);
+  const insertSymbol = useCallback((symbol: string) => {
+    editorRef.current?.focus();
+    document.execCommand('insertText', false, symbol);
     if (editorRef.current) {
       isInternalChange.current = true;
       onChange(editorRef.current.innerHTML);
@@ -58,53 +63,21 @@ export function SimpleRichEditor({
     document.execCommand('insertText', false, text);
   }, []);
 
-  const ToolbarBtn = ({ onClick, active, title, children }: {
-    onClick: () => void;
-    active?: boolean;
-    title: string;
-    children: React.ReactNode
-  }) => (
-    <button
-      type="button"
-      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
-      title={title}
-      className={cn(
-        'p-1.5 rounded hover:bg-gray-200 transition-colors',
-        active && 'bg-gray-200'
-      )}
-    >
-      {children}
-    </button>
-  );
-
   return (
     <div className={cn('border rounded-md overflow-hidden', className)}>
-      {/* Toolbar */}
-      <div className="flex items-center gap-0.5 p-1.5 border-b bg-gray-50">
-        <ToolbarBtn onClick={() => execCmd('bold')} title="Negrito (Ctrl+B)">
-          <Bold className="w-4 h-4" />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => execCmd('italic')} title="Italico (Ctrl+I)">
-          <Italic className="w-4 h-4" />
-        </ToolbarBtn>
-        <ToolbarBtn onClick={() => execCmd('underline')} title="Sublinhado (Ctrl+U)">
-          <Underline className="w-4 h-4" />
-        </ToolbarBtn>
-        <div className="w-px h-5 bg-gray-300 mx-1" />
-        <ToolbarBtn onClick={() => execCmd('hiliteColor', '#fef08a')} title="Destacar texto">
-          <Highlighter className="w-4 h-4" />
-        </ToolbarBtn>
-        <div className="relative">
-          <ToolbarBtn onClick={() => colorRef.current?.click()} title="Cor do texto">
-            <Palette className="w-4 h-4" />
-          </ToolbarBtn>
-          <input
-            ref={colorRef}
-            type="color"
-            className="absolute opacity-0 w-0 h-0"
-            onChange={(e) => execCmd('foreColor', e.target.value)}
-          />
-        </div>
+      {/* Symbol toolbar */}
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b bg-gray-50">
+        {SYMBOL_BUTTONS.map(({ symbol, label, title }) => (
+          <button
+            key={symbol}
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); insertSymbol(symbol); }}
+            title={title}
+            className="px-2 py-1 rounded text-sm hover:bg-gray-200 transition-colors select-none"
+          >
+            {symbol}
+          </button>
+        ))}
       </div>
       {/* Editable area */}
       <div
