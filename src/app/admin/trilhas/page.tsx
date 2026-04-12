@@ -71,6 +71,9 @@ export default function AdminTrilhasPage() {
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [analyticsTrail, setAnalyticsTrail] = useState<TrilhaAnalytics | null>(null);
 
+  // Delete confirmation
+  const [deleteTrailTarget, setDeleteTrailTarget] = useState<{ trailId: string; sessionId: string } | null>(null);
+
   // ============================================================
   // Load global sessions + trails + activated status
   // ============================================================
@@ -430,16 +433,7 @@ export default function AdminTrilhasPage() {
                             key={trail.id}
                             trail={trail}
                             onEdit={() => openBuilder(session, trail)}
-                            onDelete={async () => {
-                              if (!companyId || !confirm(t.adminTrails.deleteTrailConfirm)) return;
-                              try {
-                                await deleteDoc(doc(db, `companies/${companyId}/sessions/${session.id}/trails`, trail.id));
-                                loadCompanyData();
-                                toast({ title: t.adminTrails.toastTrailDeleted });
-                              } catch (err) {
-                                toast({ variant: 'destructive', title: t.adminTrails.toastTrailDeleteError, description: err instanceof Error ? err.message : '' });
-                              }
-                            }}
+                            onDelete={() => setDeleteTrailTarget({ trailId: trail.id, sessionId: session.id })}
                             onAnalytics={() => openAnalytics(trail)}
                             onToggle={() => toggleCompanyTrailActive(trail, session.id)}
                           />
@@ -496,6 +490,30 @@ export default function AdminTrilhasPage() {
       <div className="flex justify-center pt-4 pb-2">
         <SuggestTrailDialog pagina="Trilhas Admin" />
       </div>
+
+      {/* DELETE TRAIL CONFIRMATION */}
+      <Dialog open={!!deleteTrailTarget} onOpenChange={(open) => { if (!open) setDeleteTrailTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{'Excluir trilha'}</DialogTitle>
+            <DialogDescription>{t.adminTrails.deleteTrailConfirm}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTrailTarget(null)}>{t.common.cancel || 'Cancelar'}</Button>
+            <Button variant="destructive" onClick={async () => {
+              if (!companyId || !deleteTrailTarget) return;
+              try {
+                await deleteDoc(doc(db, `companies/${companyId}/sessions/${deleteTrailTarget.sessionId}/trails`, deleteTrailTarget.trailId));
+                loadCompanyData();
+                toast({ title: t.adminTrails.toastTrailDeleted });
+              } catch (err) {
+                toast({ variant: 'destructive', title: t.adminTrails.toastTrailDeleteError, description: err instanceof Error ? err.message : '' });
+              }
+              setDeleteTrailTarget(null);
+            }}>{t.common.delete || 'Excluir'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </main>
     </>
   );

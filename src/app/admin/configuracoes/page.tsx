@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Camera, CreditCard, ExternalLink, CheckCircle, AlertTriangle, Clock } from "lucide-react";
@@ -366,35 +366,7 @@ function ConfiguracoesPageContent() {
                     {/* Billing / Subscription card */}
                     <BillingCard companyId={companyData.id} />
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t.adminSettings.notificationsTitle}</CardTitle>
-                            <CardDescription>{t.adminSettings.notificationsDescription}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center justify-between rounded-lg border p-4">
-                                <div className="space-y-0.5">
-                                    <Label htmlFor="new-missions" className={isReadOnly ? 'text-muted-foreground' : ''}>{t.adminSettings.notifRewards}</Label>
-                                    <p className="text-sm text-muted-foreground">{t.adminSettings.notifRewardsDescription}</p>
-                                </div>
-                                <Switch id="new-missions" defaultChecked disabled={isReadOnly}/>
-                            </div>
-                            <div className="flex items-center justify-between rounded-lg border p-4">
-                                <div className="space-y-0.5">
-                                    <Label htmlFor="new-trails" className={isReadOnly ? 'text-muted-foreground' : ''}>{t.adminSettings.notifNewCollaborators}</Label>
-                                    <p className="text-sm text-muted-foreground">{t.adminSettings.notifNewCollaboratorsDescription}</p>
-                                </div>
-                                <Switch id="new-trails" defaultChecked disabled={isReadOnly}/>
-                            </div>
-                            <div className="flex items-center justify-between rounded-lg border p-4">
-                                <div className="space-y-0.5">
-                                    <Label htmlFor="points-available" className={isReadOnly ? 'text-muted-foreground' : ''}>{t.adminSettings.notifWeeklyReports}</Label>
-                                    <p className="text-sm text-muted-foreground">{t.adminSettings.notifWeeklyReportsDescription}</p>
-                                </div>
-                                <Switch id="points-available" defaultChecked disabled={isReadOnly}/>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    {/* Notification settings — removed until backend notification system is implemented */}
 
                     {/* Privacy policy link */}
                     <div className="text-center py-4">

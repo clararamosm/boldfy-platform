@@ -230,6 +230,7 @@ export default function MasterEstrategistasPage() {
             </ActionDialog>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -316,6 +317,7 @@ export default function MasterEstrategistasPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 

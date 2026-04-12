@@ -80,6 +80,7 @@ export default function AdminBibliotecaPage() {
     const [companyId, setCompanyId] = useState<string | null>(null);
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState<string | null>(null);
+    const [deleteAsset, setDeleteAsset] = useState<Asset | null>(null);
     const { toast } = useToast();
     const t = useT();
     const formRef = useRef<HTMLFormElement>(null);
@@ -178,9 +179,10 @@ export default function AdminBibliotecaPage() {
         }
     };
     
-    const handleDelete = async (asset: Asset) => {
-        if (!companyId || !confirm(t.adminLibrary.deleteConfirm.replace('{name}', asset.name))) return;
-        
+    const handleDeleteConfirmed = async () => {
+        const asset = deleteAsset;
+        if (!companyId || !asset) return;
+
         try {
             if (asset.filePath) {
                 const fileRef = ref(storage, asset.filePath);
@@ -194,6 +196,7 @@ export default function AdminBibliotecaPage() {
                 title: t.adminLibrary.toastDeleted,
                 description: t.adminLibrary.toastDeletedDescription,
             });
+            setDeleteAsset(null);
             fetchAssets(companyId);
         } catch(error) {
             console.error("Error deleting asset:", error);
@@ -247,6 +250,7 @@ export default function AdminBibliotecaPage() {
             </ActionDialog>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -294,7 +298,7 @@ export default function AdminBibliotecaPage() {
                                     <a href={asset.fileUrl} target="_blank" rel="noopener noreferrer">{t.adminLibrary.download}</a>
                                 </DropdownMenuItem>
                                 <EditAssetButton asset={asset} />
-                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(asset)}>
+                                <DropdownMenuItem className="text-destructive" onSelect={() => setDeleteAsset(asset)}>
                                     {t.common.delete}
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -304,8 +308,22 @@ export default function AdminBibliotecaPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <ActionDialog
+          open={!!deleteAsset}
+          onOpenChange={(open) => { if (!open) setDeleteAsset(null); }}
+          title={'Excluir asset'}
+          description={t.adminLibrary.deleteConfirm.replace('{name}', deleteAsset?.name || '')}
+        >
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setDeleteAsset(null)}>{t.common.cancel || 'Cancelar'}</Button>
+            <Button variant="destructive" onClick={handleDeleteConfirmed}>{t.common.delete}</Button>
+          </div>
+        </ActionDialog>
       </main>
     </>
   );

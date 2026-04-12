@@ -226,11 +226,14 @@ export default function AdminColaboradoresPage() {
     }
   }, [inviteTLState, toast, companyId, fetchCollaborators]);
 
+  const isLicenseLimitReached = collaborators.length >= totalLicenses;
   const inviteButton = (
-    <Button size="sm" disabled={isLoading || !companyId || collaborators.length >= totalLicenses}>
-      <PlusCircle className="mr-2 h-4 w-4" />
-      {t.adminCollaborators.invite}
-    </Button>
+    <div title={isLicenseLimitReached ? 'Limite de licenças atingido' : undefined}>
+      <Button size="sm" disabled={isLoading || !companyId || isLicenseLimitReached}>
+        <PlusCircle className="mr-2 h-4 w-4" />
+        {t.adminCollaborators.invite}
+      </Button>
+    </div>
   );
 
   const getStatusBadge = (status: Collaborator['status']) => {
@@ -375,6 +378,7 @@ export default function AdminColaboradoresPage() {
             <CardDescription>{t.adminCollaborators.teamDescription}</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -446,7 +450,6 @@ export default function AdminColaboradoresPage() {
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>{t.common.viewProfile}</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEditOpen(user)}>{t.common.edit}</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleToggleStatus(user)}>{user.status === "Ativo" ? t.common.deactivate : t.common.activate}</DropdownMenuItem>
@@ -459,6 +462,7 @@ export default function AdminColaboradoresPage() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 
@@ -472,10 +476,12 @@ export default function AdminColaboradoresPage() {
               </div>
               <ActionDialog
                 trigger={
+                  <div title={thoughtLeaders.length >= totalTLLicenses ? 'Limite de licenças de TL atingido' : undefined}>
                   <Button size="sm" disabled={isLoading || !companyId || thoughtLeaders.length >= totalTLLicenses}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     {t.adminTL.invite}
                   </Button>
+                  </div>
                 }
                 title={t.adminTL.inviteTitle}
                 description={t.adminTL.inviteDescription}
@@ -498,6 +504,7 @@ export default function AdminColaboradoresPage() {
               </ActionDialog>
             </CardHeader>
             <CardContent>
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -562,6 +569,7 @@ export default function AdminColaboradoresPage() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         )}

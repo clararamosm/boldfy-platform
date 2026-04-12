@@ -76,6 +76,8 @@ export default function AdminRecompensasPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [deleteRewardId, setDeleteRewardId] = useState<string | null>(null);
+    const [deleteRewardName, setDeleteRewardName] = useState('');
     const formRef = useRef<HTMLFormElement>(null);
 
     const fetchRewards = useCallback(async (currentCompanyId: string) => {
@@ -171,12 +173,14 @@ export default function AdminRecompensasPage() {
         }
     }
 
-    const handleDelete = async (rewardId: string) => {
-        if (!companyId || !confirm(t.adminRewards.deleteConfirm)) return;
+    const handleDeleteConfirmed = async () => {
+        if (!companyId || !deleteRewardId) return;
         try {
-            const rewardDoc = doc(db, "companies", companyId, "rewards", rewardId);
+            const rewardDoc = doc(db, "companies", companyId, "rewards", deleteRewardId);
             await deleteDoc(rewardDoc);
             toast({ title: t.adminRewards.toastDeleted });
+            setDeleteRewardId(null);
+            setDeleteRewardName('');
             fetchRewards(companyId);
         } catch (error) {
             console.error("Error deleting reward:", error);
@@ -307,6 +311,7 @@ export default function AdminRecompensasPage() {
                 <CardDescription>{t.adminRewards.manageDescription}</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -334,7 +339,7 @@ export default function AdminRecompensasPage() {
                               <DropdownMenuContent align="end">
                                 <EditRewardButton reward={reward} />
                                 <DropdownMenuItem onSelect={() => handleToggleStatus(reward)}>{reward.status === 'Disponível' ? t.common.deactivate : t.common.activate}</DropdownMenuItem>
-                                <DropdownMenuItem className="text-destructive" onSelect={() => handleDelete(reward.id)}>{t.common.delete}</DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onSelect={() => { setDeleteRewardId(reward.id); setDeleteRewardName(reward.name); }}>{t.common.delete}</DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -342,6 +347,7 @@ export default function AdminRecompensasPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -352,6 +358,7 @@ export default function AdminRecompensasPage() {
                 <CardDescription>{t.adminRewards.historyDescription}</CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -384,10 +391,24 @@ export default function AdminRecompensasPage() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Delete Confirmation Dialog */}
+        <ActionDialog
+          open={!!deleteRewardId}
+          onOpenChange={(open) => { if (!open) { setDeleteRewardId(null); setDeleteRewardName(''); } }}
+          title={'Excluir recompensa'}
+          description={t.adminRewards.deleteConfirm}
+        >
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => { setDeleteRewardId(null); setDeleteRewardName(''); }}>{t.common.cancel || 'Cancelar'}</Button>
+            <Button variant="destructive" onClick={handleDeleteConfirmed}>{t.common.delete}</Button>
+          </div>
+        </ActionDialog>
       </main>
     </>
   );

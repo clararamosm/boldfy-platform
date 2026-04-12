@@ -113,6 +113,7 @@ export default function MasterDashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -153,6 +154,7 @@ export default function MasterDashboardPage() {
                     )}
                 </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
       </main>

@@ -9,6 +9,7 @@ import {
   ChevronUp, ChevronDown, Minus, Award, BarChart3, Activity,
 } from "lucide-react";
 import { CoinIcon } from "@/components/coin-icon";
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n/context';
@@ -22,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth-client';
 import { getAdminDashboardData, type DashboardData } from '@/app/actions/dashboard';
 import { useAuth } from '@/contexts/auth-context';
@@ -196,6 +198,7 @@ function DashboardSkeleton() {
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [period, setPeriod] = useState<PeriodKey>('this_month');
   const { user } = useAuth();
   const { toast } = useToast();
@@ -203,17 +206,20 @@ export default function AdminDashboardPage() {
 
   const fetchData = useCallback(async (companyId: string) => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const token = await getAuthToken();
       const result = await getAdminDashboardData(token, companyId, getPeriodRange(period));
 
       if (result.error) {
+        setFetchError(result.error);
         toast({ variant: 'destructive', title: t.adminDashboard.loadingError, description: result.error });
       } else if (result.data) {
         setData(result.data);
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
+      setFetchError('Erro ao carregar dados do dashboard.');
       toast({ variant: 'destructive', title: t.adminDashboard.loadingError });
     } finally {
       setIsLoading(false);
@@ -233,12 +239,37 @@ export default function AdminDashboardPage() {
     getCompanyAndFetch();
   }, [user, fetchData]);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <>
         <Header title={t.adminDashboard.title} />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <DashboardSkeleton />
+        </main>
+      </>
+    );
+  }
+
+  if (fetchError || !data) {
+    return (
+      <>
+        <Header title={t.adminDashboard.title} />
+        <main className="flex-1 overflow-auto p-4 md:p-6">
+          <Card className="max-w-md mx-auto mt-12">
+            <CardContent className="pt-6 text-center space-y-4">
+              <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+              <div>
+                <p className="font-semibold">Erro ao carregar dashboard</p>
+                <p className="text-sm text-muted-foreground mt-1">{fetchError || 'Não foi possível carregar os dados.'}</p>
+              </div>
+              <Button variant="outline" onClick={() => resolvedCompanyId && fetchData(resolvedCompanyId)} className="gap-2">
+                <RotateCcw className="h-4 w-4" />
+                Tentar novamente
+              </Button>
+            </CardContent>
+          </Card>
         </main>
       </>
     );

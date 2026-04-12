@@ -16,7 +16,8 @@ import { PostBodyEditor } from './post-body-editor';
 import { PostMediaSection } from './post-media-section';
 import { CommentsSidebar } from './comments-sidebar';
 import { VersionHistory } from './version-history';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error';
 
@@ -34,6 +35,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
   // Core state
   const [post, setPost] = useState<PipelinePost | null>(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const [userName, setUserName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -362,10 +364,27 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
         onBack={handleBack}
       />
 
+      {/* Mobile comments toggle */}
+      <div className="lg:hidden fixed bottom-4 right-4 z-50">
+        <Button
+          size="icon"
+          variant={showComments ? "default" : "outline"}
+          className="rounded-full h-12 w-12 shadow-lg"
+          onClick={() => setShowComments(!showComments)}
+        >
+          <MessageSquare className="h-5 w-5" />
+          {comments.length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center">
+              {comments.length}
+            </span>
+          )}
+        </Button>
+      </div>
+
       {/* Main content area */}
       <div className="flex">
         {/* Editor area */}
-        <main className="flex-1 max-w-4xl mx-auto px-6 py-8 space-y-6">
+        <main className={`flex-1 max-w-4xl mx-auto px-4 md:px-6 py-8 space-y-6 ${showComments ? 'hidden lg:block' : ''}`}>
           {/* Title */}
           <PostTitle
             value={title}
@@ -409,7 +428,8 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
           )}
         </main>
 
-        {/* Comments sidebar */}
+        {/* Comments sidebar — hidden on mobile, toggle with floating button */}
+        <div className={`${showComments ? 'block' : 'hidden'} lg:block`}>
         <CommentsSidebar
           comments={comments}
           setComments={setComments}
@@ -417,6 +437,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
           postId={postId}
           canEdit={canEdit}
         />
+        </div>
       </div>
     </div>
   );
