@@ -9,15 +9,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
-import { getAllPipelinePostsForStrategist, type CalendarPipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
+import {
+  getAllPipelinePostsForStrategist,
+  updatePipelinePost,
+  type CalendarPipelinePost,
+  type PipelineStatus,
+} from '@/app/actions/content-pipeline';
 import {
   ChevronLeft,
   ChevronRight,
-  Clock,
   User,
   Building2,
 } from 'lucide-react';
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
+import { CalendarPostCard, type CalendarCardPost, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
+import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 import {
   format,
   startOfMonth,
@@ -29,7 +35,6 @@ import {
   addMonths,
   subMonths,
   isToday,
-  parseISO,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -72,6 +77,11 @@ export default function StrategistCalendarioPage() {
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [tlFilter, setTlFilter] = useState<string>('all');
 
+  // ─── Drag & drop state ──────
+  const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
+  const [draggedTlUserId, setDraggedTlUserId] = useState<string | null>(null);
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null);
+
   // ─── Fetch all pipeline posts ──────
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -85,7 +95,7 @@ export default function StrategistCalendarioPage() {
       }
     } catch (err) {
       console.error('Calendar fetch error:', err);
-      toast({ variant: 'destructive', title: 'Erro ao carregar calendário.' });
+      toast({ variant: 'destructive', title: 'Erro ao carregar calendario.' });
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +109,6 @@ export default function StrategistCalendarioPage() {
   useEffect(() => {
     if (allPosts.length === 0) return;
     if (urlCompanySlug) {
-      // Find the company ID from slug
       const matchedPost = allPosts.find(p => p.companySlug === urlCompanySlug);
       if (matchedPost) {
         setCompanyFilter(matchedPost.companyId);
@@ -190,7 +199,7 @@ export default function StrategistCalendarioPage() {
     const map = new Map<string, CalendarPipelinePost[]>();
     filteredPosts.forEach(post => {
       if (!post.scheduledFor) return;
-      const dayKey = post.scheduledFor.substring(0, 10); // yyyy-MM-dd
+      const dayKey = post.scheduledFor.substring(0, 10);
       const existing = map.get(dayKey) || [];
       existing.push(post);
       map.set(dayKey, existing);
@@ -207,15 +216,84 @@ export default function StrategistCalendarioPage() {
     return eachDayOfInterval({ start: calStart, end: calEnd });
   }, [currentMonth]);
 
-  // ─── Navigate to dedicated post page ──────
+  // ─── Navigate to post editor ──────
   const handlePostClick = (post: CalendarPipelinePost) => {
     router.push(`/post/${post.companySlug}/${post.tlSlug}/${post.id}`);
+  };
+
+  // ─── Drag & drop handlers ──────
+  const handleDragStart = (post: CalendarPipelinePost, e: React.DragEvent) => {
+    setDraggedPostId(post.id);
+    setDraggedTlUserId(post.tlUserId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', post.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPostId(null);
+    setDraggedTlUserId(null);
+    setDragOverDay(null);
+  };
+
+  const handleDrop = async (dayKey: string) => {
+    if (!draggedPostId || !draggedTlUserId) return;
+
+    const post = allPosts.find(p => p.id === draggedPostId && p.tlUserId === draggedTlUserId);
+    if (!post || !post.scheduledFor) return;
+
+    // Keep the original time, change only the date
+    const originalTime = post.scheduledFor.substring(10); // "T12:00:00..." part
+    const newScheduledFor = dayKey + originalTime;
+
+    if (newScheduledFor === post.scheduledFor) {
+      handleDragEnd();
+      return;
+    }
+
+    // Optimistic update
+    setAllPosts(prev => prev.map(p =>
+      p.id === draggedPostId && p.tlUserId === draggedTlUserId
+        ? { ...p, scheduledFor: newScheduledFor }
+        : p
+    ));
+
+    handleDragEnd();
+
+    try {
+      const token = await getAuthToken();
+      const result = await updatePipelinePost(token, post.tlUserId, post.id, {
+        scheduledFor: newScheduledFor,
+      });
+      if (result.error) {
+        // Revert
+        setAllPosts(prev => prev.map(p =>
+          p.id === post.id && p.tlUserId === post.tlUserId
+            ? { ...p, scheduledFor: post.scheduledFor }
+            : p
+        ));
+        toast({ variant: 'destructive', title: 'Erro ao mover post', description: result.error });
+      }
+    } catch {
+      // Revert
+      setAllPosts(prev => prev.map(p =>
+        p.id === post.id && p.tlUserId === post.tlUserId
+          ? { ...p, scheduledFor: post.scheduledFor }
+          : p
+      ));
+      toast({ variant: 'destructive', title: 'Erro ao mover post' });
+    }
+  };
+
+  // ─── Config adapter ──────
+  const getCardConfig = (status: string): CalendarCardConfig => {
+    const cfg = STATUS_CONFIG[status as PipelineStatus] || STATUS_CONFIG.backlog;
+    return { label: cfg.label, badge: cfg.badge, dot: cfg.dot };
   };
 
   if (isLoading) {
     return (
       <>
-        <Header title="Calendário" />
+        <Header title="Calendario" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <CalendarSkeleton />
         </main>
@@ -223,17 +301,19 @@ export default function StrategistCalendarioPage() {
     );
   }
 
-  // ─── Status filter buttons config ──────
+  // ─── Status filter buttons ──────
   const statusFilterButtons: { key: StatusFilter; label: string; color: string }[] = [
     { key: 'all', label: 'Todos', color: 'bg-muted text-foreground' },
     ...PIPELINE_STATUSES
-      .filter(s => s !== 'arquivado') // Don't show archived in filter
+      .filter(s => s !== 'arquivado')
       .map(s => ({ key: s as StatusFilter, label: STATUS_CONFIG[s].label, color: STATUS_CONFIG[s].badge })),
   ];
 
+  const isProfileView = tlFilter !== 'all';
+
   return (
     <>
-      <Header title="Calendário" />
+      <Header title="Calendario" />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="space-y-4">
           {/* Month navigation + filters */}
@@ -310,7 +390,7 @@ export default function StrategistCalendarioPage() {
             })}
           </div>
 
-          {/* Calendar grid — FULL WIDTH */}
+          {/* Calendar grid */}
           <div className="border rounded-lg overflow-hidden">
             {/* Header row */}
             <div className="grid grid-cols-7 bg-muted/50">
@@ -326,87 +406,38 @@ export default function StrategistCalendarioPage() {
               {calendarDays.map((day, idx) => {
                 const dayKey = format(day, 'yyyy-MM-dd');
                 const dayPosts = postsByDay.get(dayKey) || [];
-                const inMonth = isSameMonth(day, currentMonth);
-                const today = isToday(day);
 
                 return (
-                  <div
+                  <CalendarDayCell
                     key={idx}
-                    className={`
-                      min-h-[140px] p-1.5 border-b border-r text-left
-                      ${!inMonth ? 'bg-muted/10' : ''}
-                    `}
+                    day={day}
+                    inMonth={isSameMonth(day, currentMonth)}
+                    isToday={isToday(day)}
+                    droppable={!!draggedPostId}
+                    isDragOver={dragOverDay === dayKey}
+                    onDragOver={() => setDragOverDay(dayKey)}
+                    onDragLeave={() => { if (dragOverDay === dayKey) setDragOverDay(null); }}
+                    onDrop={() => handleDrop(dayKey)}
                   >
-                    <span
-                      className={`
-                        inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium
-                        ${today ? 'bg-primary text-primary-foreground' : ''}
-                        ${!inMonth ? 'text-muted-foreground/50' : 'text-foreground'}
-                      `}
-                    >
-                      {format(day, 'd')}
-                    </span>
-
-                    {/* Post cards — context-aware: profile vs general */}
-                    <div className="mt-1 space-y-1">
-                      {dayPosts.slice(0, 3).map(post => {
-                        const cfg = STATUS_CONFIG[post.status] || STATUS_CONFIG.backlog;
-                        const time = post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : '';
-                        const showTime = time && time !== '00:00';
-                        const firstName = post.tlName.split(' ')[0];
-                        const isProfileView = tlFilter !== 'all';
-
-                        return (
-                          <button
-                            key={`${post.tlUserId}-${post.id}`}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePostClick(post);
-                            }}
-                            className="w-full text-left rounded-md border bg-card p-1.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-0.5"
-                            title={`${post.title || 'Sem título'} — ${firstName} · ${post.companyName} — ${cfg.label}`}
-                          >
-                            {/* Title */}
-                            <p className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
-                              {post.title || 'Sem título'}
-                            </p>
-
-                            {/* Status */}
-                            <div className="flex items-center gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cfg.dot}`} />
-                              <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.badge}`}>
-                                {cfg.label}
-                              </span>
-                            </div>
-
-                            {/* Time */}
-                            {showTime && (
-                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                                <Clock className="h-2.5 w-2.5" />
-                                <span>{time}</span>
-                              </div>
-                            )}
-
-                            {/* Profile + Company */}
-                            {!isProfileView && (
-                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                                <User className="h-2.5 w-2.5" />
-                                <span className="truncate">{firstName}</span>
-                                <span>·</span>
-                                <span className="truncate">{post.companyName}</span>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
-                      {dayPosts.length > 3 && (
-                        <div className="text-[10px] text-muted-foreground px-1 font-medium">
-                          +{dayPosts.length - 3} mais
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    {dayPosts.slice(0, 3).map(post => (
+                      <CalendarPostCard
+                        key={`${post.tlUserId}-${post.id}`}
+                        post={post}
+                        statusConfig={getCardConfig(post.status)}
+                        onClick={() => handlePostClick(post)}
+                        showProfile={!isProfileView}
+                        draggable
+                        onDragStart={(e) => handleDragStart(post, e)}
+                        onDragEnd={handleDragEnd}
+                        isDragging={draggedPostId === post.id && draggedTlUserId === post.tlUserId}
+                      />
+                    ))}
+                    {dayPosts.length > 3 && (
+                      <div className="text-[10px] text-muted-foreground px-1 font-medium">
+                        +{dayPosts.length - 3} mais
+                      </div>
+                    )}
+                  </CalendarDayCell>
                 );
               })}
             </div>

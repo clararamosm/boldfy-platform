@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getAuthToken } from '@/lib/auth-client';
-import { getScheduledPosts, deleteScheduledPost, type ScheduledPost } from '@/app/actions/posts';
+import { getScheduledPosts, deleteScheduledPost, updateScheduledPost, type ScheduledPost } from '@/app/actions/posts';
 import {
   ChevronLeft,
   ChevronRight,
@@ -40,13 +40,14 @@ import {
   subMonths,
   isToday,
   parseISO,
-  isWithinInterval,
   isBefore,
   isAfter,
 } from 'date-fns';
 import { useT, useLocale } from '@/lib/i18n/context';
 import { getDateLocale } from '@/lib/i18n/date-utils';
 import type { Dictionary } from '@/lib/i18n/dictionaries/pt-BR';
+import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
+import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 
 // ─── Types ──────
 type CalendarMission = {
@@ -71,35 +72,40 @@ function getPostStatusConfig(t: Dictionary) {
       tag: t.colabCalendar.tagPostPublished,
       color: 'bg-[#0A66C2]/10 text-[#0A66C2] dark:bg-[#0A66C2]/20',
       cardBorder: 'border-l-4 border-l-[#0A66C2]',
-      calendarColor: 'bg-[#0A66C2]/15 text-[#0A66C2]',
+      badge: 'bg-[#0A66C2]/10 text-[#0A66C2]',
+      dot: 'bg-[#0A66C2]',
       icon: CheckCircle2,
     },
     scheduled: {
       tag: t.colabCalendar.tagPostScheduled,
       color: 'bg-[#0A66C2]/10 text-[#0A66C2] dark:bg-[#0A66C2]/20',
       cardBorder: 'border-l-4 border-l-[#0A66C2]/60',
-      calendarColor: 'bg-[#0A66C2]/10 text-[#0A66C2]',
+      badge: 'bg-[#0A66C2]/10 text-[#0A66C2]',
+      dot: 'bg-[#0A66C2]/60',
       icon: Clock,
     },
     in_progress: {
       tag: t.colabCalendar.tagPostInProgress,
       color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
       cardBorder: 'border-l-4 border-l-yellow-500',
-      calendarColor: 'bg-yellow-100 text-yellow-700',
+      badge: 'bg-yellow-100 text-yellow-700',
+      dot: 'bg-yellow-500',
       icon: Edit3,
     },
     draft: {
       tag: t.colabCalendar.tagPostIdea,
       color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
       cardBorder: 'border-l-4 border-l-gray-400',
-      calendarColor: 'bg-gray-100 text-gray-600',
+      badge: 'bg-gray-100 text-gray-600',
+      dot: 'bg-gray-400',
       icon: Edit3,
     },
     failed: {
       tag: t.colabCalendar.tagPostFailed,
       color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
       cardBorder: 'border-l-4 border-l-red-500',
-      calendarColor: 'bg-red-100 text-red-700',
+      badge: 'bg-red-100 text-red-700',
+      dot: 'bg-red-500',
       icon: AlertCircle,
     },
   };
@@ -148,6 +154,10 @@ export default function CalendarioPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const { toast } = useToast();
   const router = useRouter();
+
+  // ─── Drag & drop state ──────
+  const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null);
 
   // ─── Fetch posts + missions ──────
   const fetchData = useCallback(async (uid: string) => {
@@ -210,7 +220,7 @@ export default function CalendarioPage() {
 
             calMissions.push({
               id: docSnap.id,
-              name: data.name || 'Sem título',
+              name: data.name || 'Sem titulo',
               description: data.description || '',
               points: data.points || 0,
               startDate: start,
@@ -339,6 +349,83 @@ export default function CalendarioPage() {
     router.push(`/colaborador/calendario/novo?${params.toString()}`);
   };
 
+  // ─── Drag & drop handlers ──────
+  const handleDragStart = (post: ScheduledPost, e: React.DragEvent) => {
+    setDraggedPostId(post.id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', post.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPostId(null);
+    setDragOverDay(null);
+  };
+
+  const handleDrop = async (dayKey: string) => {
+    if (!draggedPostId || !userId) return;
+
+    const post = posts.find(p => p.id === draggedPostId);
+    if (!post) return;
+
+    // Keep original time, change only the date
+    const originalTime = post.scheduledFor.substring(10);
+    const newScheduledFor = dayKey + originalTime;
+
+    if (newScheduledFor === post.scheduledFor) {
+      handleDragEnd();
+      return;
+    }
+
+    // Optimistic update
+    setPosts(prev => prev.map(p =>
+      p.id === draggedPostId ? { ...p, scheduledFor: newScheduledFor } : p
+    ));
+
+    handleDragEnd();
+
+    try {
+      const token = await getAuthToken();
+      const result = await updateScheduledPost(token, userId, post.id, {
+        scheduledFor: newScheduledFor,
+      });
+      if (result.error) {
+        setPosts(prev => prev.map(p =>
+          p.id === post.id ? { ...p, scheduledFor: post.scheduledFor } : p
+        ));
+        toast({ variant: 'destructive', title: t.common.error, description: result.error });
+      }
+    } catch {
+      setPosts(prev => prev.map(p =>
+        p.id === post.id ? { ...p, scheduledFor: post.scheduledFor } : p
+      ));
+      toast({ variant: 'destructive', title: t.common.error });
+    }
+  };
+
+  // ─── Card config adapter ──────
+  const getCardConfig = (status: string): CalendarCardConfig => {
+    const cfg = postStatusConfig[status as keyof typeof postStatusConfig] || postStatusConfig.draft;
+    return { label: cfg.tag, badge: cfg.badge, dot: cfg.dot };
+  };
+
+  // ─── Calendar cell indicator helpers ──────
+  const getCalendarCellLabel = (item: CalendarItem): string => {
+    if (item.kind === 'post') {
+      return `${format(parseISO(item.data.scheduledFor), 'HH:mm')} · ${item.data.caption.slice(0, 18)}`;
+    }
+    return item.data.name.slice(0, 22);
+  };
+
+  const getCalendarCellColor = (item: CalendarItem): string => {
+    if (item.kind === 'post') {
+      const config = postStatusConfig[item.data.status as keyof typeof postStatusConfig];
+      return config ? `${config.badge}` : 'bg-gray-100 text-gray-600';
+    }
+    return item.data.calendarStatus === 'active'
+      ? 'bg-primary/15 text-primary'
+      : 'bg-primary/8 text-primary/60';
+  };
+
   const weekDays = t.colabCalendar.dayNames;
 
   if (isLoading && !userId) {
@@ -352,29 +439,11 @@ export default function CalendarioPage() {
     );
   }
 
-  // ─── Render helpers ──────
-  const getCalendarCellLabel = (item: CalendarItem): string => {
-    if (item.kind === 'post') {
-      return `${format(parseISO(item.data.scheduledFor), 'HH:mm')} · ${item.data.caption.slice(0, 18)}`;
-    }
-    return item.data.name.slice(0, 22);
-  };
-
-  const getCalendarCellColor = (item: CalendarItem): string => {
-    if (item.kind === 'post') {
-      const config = postStatusConfig[item.data.status];
-      return config?.calendarColor || 'bg-gray-100 text-gray-600';
-    }
-    // Mission: active = solid purple, scheduled = lighter purple
-    return item.data.calendarStatus === 'active'
-      ? 'bg-primary/15 text-primary'
-      : 'bg-primary/8 text-primary/60';
-  };
-
+  // ─── Sidebar card render ──────
   const renderSidebarCard = (item: CalendarItem, idx: number) => {
     if (item.kind === 'post') {
       const post = item.data;
-      const config = postStatusConfig[post.status] || postStatusConfig.draft;
+      const config = postStatusConfig[post.status as keyof typeof postStatusConfig] || postStatusConfig.draft;
       const StatusIcon = config.icon;
 
       return (
@@ -433,7 +502,7 @@ export default function CalendarioPage() {
                 className="flex items-center gap-1.5 text-xs text-[#0A66C2] hover:underline font-medium"
               >
                 <Linkedin className="h-3.5 w-3.5" />
-                {t.colabCalendar.viewOnLinkedin} ↗
+                {t.colabCalendar.viewOnLinkedin}
               </a>
             )}
 
@@ -560,7 +629,7 @@ export default function CalendarioPage() {
                 {calendarDays.map((day, idx) => {
                   const dayKey = format(day, 'yyyy-MM-dd');
                   const dayItems = itemsByDay.get(dayKey) || [];
-                  // Deduplicate missions (same mission appears on multiple days)
+                  // Deduplicate missions
                   const seen = new Set<string>();
                   const uniqueItems = dayItems.filter(item => {
                     const key = item.kind === 'post' ? `p-${item.data.id}` : `m-${item.data.id}`;
@@ -568,51 +637,61 @@ export default function CalendarioPage() {
                     seen.add(key);
                     return true;
                   });
-                  const inMonth = isSameMonth(day, currentMonth);
-                  const today = isToday(day);
                   const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
 
-                  return (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setSelectedDay(day)}
-                      className={`
-                        min-h-[90px] p-1.5 border-b border-r text-left transition-colors
-                        hover:bg-muted/30
-                        ${!inMonth ? 'bg-muted/10' : ''}
-                        ${isSelected ? 'ring-2 ring-primary ring-inset bg-primary/5' : ''}
-                      `}
-                    >
-                      <span
-                        className={`
-                          inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium
-                          ${today ? 'bg-primary text-primary-foreground' : ''}
-                          ${!inMonth ? 'text-muted-foreground/50' : 'text-foreground'}
-                        `}
-                      >
-                        {format(day, 'd')}
-                      </span>
+                  // Separate posts and missions for rendering
+                  const postItems = uniqueItems.filter((i): i is { kind: 'post'; data: ScheduledPost } => i.kind === 'post');
+                  const missionItems = uniqueItems.filter((i): i is { kind: 'mission'; data: CalendarMission } => i.kind === 'mission');
 
-                      {/* Item indicators */}
-                      <div className="mt-1 space-y-0.5">
-                        {uniqueItems.slice(0, 2).map(item => (
-                          <div
-                            key={item.kind === 'post' ? `p-${item.data.id}` : `m-${item.data.id}`}
-                            className={`text-[10px] px-1 py-0.5 rounded truncate ${getCalendarCellColor(item)}`}
-                          >
-                            {item.kind === 'mission' && <Zap className="h-2.5 w-2.5 inline mr-0.5 -mt-px" />}
-                            {item.kind === 'post' && <Linkedin className="h-2.5 w-2.5 inline mr-0.5 -mt-px" />}
-                            {getCalendarCellLabel(item)}
-                          </div>
-                        ))}
-                        {uniqueItems.length > 2 && (
-                          <div className="text-[10px] text-muted-foreground px-1">
-                            +{uniqueItems.length - 2}
-                          </div>
-                        )}
-                      </div>
-                    </button>
+                  return (
+                    <CalendarDayCell
+                      key={idx}
+                      day={day}
+                      inMonth={isSameMonth(day, currentMonth)}
+                      isToday={isToday(day)}
+                      isSelected={isSelected}
+                      onClick={() => setSelectedDay(day)}
+                      droppable={!!draggedPostId}
+                      isDragOver={dragOverDay === dayKey}
+                      onDragOver={() => setDragOverDay(dayKey)}
+                      onDragLeave={() => { if (dragOverDay === dayKey) setDragOverDay(null); }}
+                      onDrop={() => handleDrop(dayKey)}
+                      minHeight="min-h-[90px]"
+                    >
+                      {/* Post cards — draggable */}
+                      {postItems.slice(0, 2).map(item => (
+                        <CalendarPostCard
+                          key={`p-${item.data.id}`}
+                          post={{
+                            id: item.data.id,
+                            caption: item.data.caption,
+                            scheduledFor: item.data.scheduledFor,
+                            status: item.data.status,
+                          }}
+                          statusConfig={getCardConfig(item.data.status)}
+                          draggable={item.data.status !== 'published'}
+                          onDragStart={(e) => handleDragStart(item.data, e)}
+                          onDragEnd={handleDragEnd}
+                          isDragging={draggedPostId === item.data.id}
+                          onClick={() => setSelectedDay(day)}
+                        />
+                      ))}
+                      {/* Mission indicators (not draggable) */}
+                      {missionItems.slice(0, postItems.length > 0 ? 1 : 2).map(item => (
+                        <div
+                          key={`m-${item.data.id}`}
+                          className={`text-[10px] px-1 py-0.5 rounded truncate ${getCalendarCellColor(item)}`}
+                        >
+                          <Zap className="h-2.5 w-2.5 inline mr-0.5 -mt-px" />
+                          {getCalendarCellLabel(item)}
+                        </div>
+                      ))}
+                      {uniqueItems.length > 2 && (
+                        <div className="text-[10px] text-muted-foreground px-1">
+                          +{uniqueItems.length - 2}
+                        </div>
+                      )}
+                    </CalendarDayCell>
                   );
                 })}
               </div>
@@ -638,7 +717,6 @@ export default function CalendarioPage() {
             {selectedDay ? (
               selectedDayItems.length > 0 ? (
                 <div className="space-y-3">
-                  {/* Deduplicate for sidebar too */}
                   {(() => {
                     const seen = new Set<string>();
                     return selectedDayItems.filter(item => {
