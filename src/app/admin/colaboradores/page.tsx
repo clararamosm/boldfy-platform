@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useCallback, useActionState, useRef } from 'react';
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, query, where, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
-import { inviteCollaborator, deleteCollaborator, inviteThoughtLeader } from '@/app/actions';
+import { inviteCollaborator, deleteCollaborator, inviteThoughtLeader, updateCollaboratorProfile, toggleCollaboratorStatus } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
 import { useT } from '@/lib/i18n/context';
 import { useAuth } from '@/contexts/auth-context';
@@ -283,10 +283,12 @@ export default function AdminColaboradoresPage() {
   const handleSaveEdit = async () => {
     if (!editingCollaborator) return;
     try {
-      await updateDoc(doc(db, "users", editingCollaborator.id), {
-        'profile.name': editName,
-        'profile.email': editEmail,
-      });
+      const token = await getAuthToken();
+      const result = await updateCollaboratorProfile(token, companyId || '', editingCollaborator.id, editName, editEmail);
+      if (result.error) {
+        toast({ title: t.adminCollaborators.toastUpdateError, description: result.error, variant: "destructive" });
+        return;
+      }
       toast({ title: t.adminCollaborators.toastUpdated });
       setIsEditDialogOpen(false);
       setEditingCollaborator(null);
@@ -299,7 +301,12 @@ export default function AdminColaboradoresPage() {
   const handleToggleStatus = async (collab: Collaborator) => {
     const newStatus = collab.status === "Ativo" ? "Inativo" : "Ativo";
     try {
-      await updateDoc(doc(db, "users", collab.id), { status: newStatus });
+      const token = await getAuthToken();
+      const result = await toggleCollaboratorStatus(token, companyId || '', collab.id, newStatus);
+      if (result.error) {
+        toast({ title: t.adminCollaborators.toastToggleError, description: result.error, variant: "destructive" });
+        return;
+      }
       toast({ title: newStatus === "Ativo" ? t.adminCollaborators.toastActivated : t.adminCollaborators.toastDeactivated });
       await refreshCollaborators();
     } catch (error) {

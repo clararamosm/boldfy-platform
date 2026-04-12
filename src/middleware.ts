@@ -46,8 +46,8 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // /post route — accessible by strategist, thoughtleader, and master
-  if (pathname.startsWith('/post') && (role === 'strategist' || role === 'thoughtleader' || role === 'master' || role === 'colaborador')) {
+  // /post route — accessible by strategist, thoughtleader, master, admin, and colaborador
+  if (pathname.startsWith('/post') && (role === 'strategist' || role === 'thoughtleader' || role === 'master' || role === 'admin' || role === 'colaborador')) {
     return NextResponse.next();
   }
 

@@ -790,3 +790,64 @@ export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, f
     return { error: `Erro ao convidar Thought Leader: ${errorMessage}` };
   }
 }
+
+// ---- Update Collaborator Profile (server-side) ----
+
+export async function updateCollaboratorProfile(
+  idToken: string,
+  companyId: string,
+  collaboratorId: string,
+  name: string,
+  email: string,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    await requireAdminOrStrategist(idToken, companyId);
+
+    const schema = z.object({
+      collaboratorId: z.string().min(1),
+      name: z.string().min(1),
+      email: z.string().email(),
+    });
+    const parsed = schema.parse({ collaboratorId, name, email });
+
+    await adminDb.collection('users').doc(parsed.collaboratorId).update({
+      'profile.name': parsed.name,
+      'profile.email': parsed.email,
+    });
+
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in updateCollaboratorProfile:', msg);
+    return { error: msg };
+  }
+}
+
+// ---- Toggle Collaborator Status (server-side) ----
+
+export async function toggleCollaboratorStatus(
+  idToken: string,
+  companyId: string,
+  collaboratorId: string,
+  newStatus: 'Ativo' | 'Inativo',
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    await requireAdminOrStrategist(idToken, companyId);
+
+    const schema = z.object({
+      collaboratorId: z.string().min(1),
+      newStatus: z.enum(['Ativo', 'Inativo']),
+    });
+    const parsed = schema.parse({ collaboratorId, newStatus });
+
+    await adminDb.collection('users').doc(parsed.collaboratorId).update({
+      status: parsed.newStatus,
+    });
+
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in toggleCollaboratorStatus:', msg);
+    return { error: msg };
+  }
+}
