@@ -11,9 +11,9 @@ import { generateSlug } from '@/lib/slugify';
 
 // ---- Email Invitation Helper ----
 
-// FAI sender configuration — shared with notifications.ts
-const FAI_NAME = 'FAI';
-const FAI_ROLE = 'Gerente do Aplicativo';
+// Fai sender configuration — shared with notifications.ts
+const FAI_NAME = 'Fai da Boldfy';
+const FAI_ROLE = 'Gerente de Educação e Sucesso do Cliente';
 const FAI_EMAIL = 'admin@boldfy.com.br';
 
 function getInviteBaseUrl() {
@@ -38,37 +38,67 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink, loc
 
   const appUrl = getInviteBaseUrl();
   const faiPhoto = `${appUrl}/images/email/fai-avatar.png`;
-  const boldfyLogo = `${appUrl}/images/email/boldfy-logo.png`;
+  const boldfyLogo = `${appUrl}/images/email/boldfy-logo.svg`;
 
   const isEN = locale === 'en';
+  const firstName = name?.split(' ')[0] || name;
 
   const subject = isEN
     ? `You've been invited to ${companyName} on Boldfy!`
-    : `Você foi convidado para a ${companyName} na Boldfy!`;
-
-  const greeting = isEN ? `Hi, ${name}!` : `Oi, ${name}!`;
-
-  const inviteText = isEN
-    ? `You've been invited as <strong>${role}</strong> at <strong>${companyName}</strong> on the Boldfy platform.`
-    : `Você foi convidado como <strong>${role}</strong> na empresa <strong>${companyName}</strong> na plataforma Boldfy.`;
-
-  const ctaText = isEN
-    ? 'To get started, click the button below to set your password and access your account:'
-    : 'Para começar, clique no botão abaixo para criar sua senha e acessar sua conta:';
-
-  const buttonText = isEN ? 'Set My Password & Sign In' : 'Criar minha senha e acessar';
-
-  const afterLabel = isEN ? '<strong>After setting your password:</strong>' : '<strong>Depois de criar sua senha:</strong>';
-  const afterText = isEN
-    ? `Access the platform at <a href="${appUrl}/login" style="color: #bd58e7;">${appUrl}/login</a> and sign in with your email and the password you just created.`
-    : `Acesse a plataforma em <a href="${appUrl}/login" style="color: #bd58e7;">${appUrl}/login</a> e faça login com seu e-mail e a senha que acabou de criar.`;
+    : `Você foi convidado pra ${companyName} na Boldfy!`;
 
   const footer = isEN
     ? 'If you were not expecting this invitation, you can safely ignore this email.'
-    : 'Se você não esperava este convite, pode ignorar este e-mail com segurança.';
+    : 'Se você não esperava este convite, pode ignorar este e-mail.';
+
+  const afterNote = isEN
+    ? `After that, you can always sign in at <a href="${appUrl}/login" style="color: #9333ea; text-decoration: none;">${appUrl}/login</a>.`
+    : `Depois disso, é só acessar <a href="${appUrl}/login" style="color: #9333ea; text-decoration: none;">${appUrl}/login</a> sempre que quiser.`;
+
+  const bodyContent = isEN
+    ? `
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Hi, ${firstName}! 👋
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        You've been invited as <strong>${role}</strong> at <strong>${companyName}</strong>
+        on the Boldfy platform.
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+        Click below to set your password and get started:
+      </p>
+      <p style="margin: 0 0 24px;">
+        <a href="${resetLink}"
+           style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+          → Set my password &amp; sign in
+        </a>
+      </p>
+      <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">
+        ${afterNote}
+      </p>`
+    : `
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Oi, ${firstName}! 👋
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Você foi convidado como <strong>${role}</strong> na empresa
+        <strong>${companyName}</strong> na plataforma Boldfy.
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+        Clica aqui embaixo pra criar sua senha e acessar:
+      </p>
+      <p style="margin: 0 0 24px;">
+        <a href="${resetLink}"
+           style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+          → Criar minha senha e acessar
+        </a>
+      </p>
+      <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">
+        ${afterNote}
+      </p>`;
 
   await transporter.sendMail({
-    from: `"${FAI_NAME} | Boldfy" <${process.env.SMTP_EMAIL}>`,
+    from: `"${FAI_NAME}" <${process.env.SMTP_EMAIL}>`,
     replyTo: FAI_EMAIL,
     to,
     subject,
@@ -78,56 +108,29 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink, loc
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    @keyframes subtleGlow {
-      0%, 100% { opacity: 0.85; }
-      50% { opacity: 1; }
-    }
-  </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f4f0f8;">
-  <div style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 16px;">
+<body style="margin: 0; padding: 0; background-color: #ffffff;">
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 24px 32px; color: #374151;">
 
-    <!-- Main Content Card -->
-    <div style="background-color: #ffffff; border-radius: 16px; padding: 32px 28px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
-      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
-        ${greeting}
-      </p>
-      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 6px;">
-        ${inviteText}
-      </p>
-      <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-        ${ctaText}
-      </p>
-      <div style="text-align: center; margin: 24px 0;">
-        <a href="${resetLink}"
-           style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
-          ${buttonText}
-        </a>
-      </div>
-      <div style="margin-top: 16px; padding: 14px 16px; background-color: #f9f5ff; border-radius: 10px;">
-        <p style="color: #4B5563; font-size: 13px; margin: 0; line-height: 1.6;">
-          ${afterLabel}<br/>${afterText}
-        </p>
-      </div>
-    </div>
+    <!-- Body -->
+    ${bodyContent}
 
-    <!-- FAI Signature -->
-    <div style="margin-top: 24px; padding: 0 4px;">
-      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+    <!-- Signature -->
+    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+      <table cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td style="width: 56px; vertical-align: top; padding-right: 14px;">
-            <img src="${faiPhoto}" alt="${FAI_NAME}" width="52" height="52"
-              style="border-radius: 50%; border: 2px solid #bd58e7; display: block;" />
+          <td style="vertical-align: top; padding-right: 14px;">
+            <img src="${faiPhoto}" alt="Fai" width="48" height="48"
+              style="border-radius: 50%; display: block;" />
           </td>
           <td style="vertical-align: top;">
-            <p style="margin: 0 0 2px; font-size: 15px; font-weight: 600; color: #1F2937;">
+            <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">
               ${FAI_NAME}
             </p>
-            <p style="margin: 0 0 4px; font-size: 13px; color: #6B7280;">
+            <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">
               ${FAI_ROLE}
             </p>
-            <a href="mailto:${FAI_EMAIL}" style="font-size: 12px; color: #bd58e7; text-decoration: none;">
+            <a href="mailto:${FAI_EMAIL}" style="font-size: 12px; color: #9333ea; text-decoration: none;">
               ${FAI_EMAIL}
             </a>
           </td>
@@ -135,19 +138,17 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink, loc
       </table>
     </div>
 
-    <!-- Divider -->
-    <div style="margin: 20px 0 16px; border-top: 1px solid #e5e0eb;"></div>
-
-    <!-- Footer with Boldfy Logo -->
-    <div style="text-align: center;">
-      <a href="${appUrl}" style="text-decoration: none; display: inline-block;">
-        <img src="${boldfyLogo}" alt="Boldfy" width="100" height="auto"
-          style="display: block; margin: 0 auto; animation: subtleGlow 3s ease-in-out infinite;" />
+    <!-- Logo -->
+    <div style="margin-top: 28px; text-align: center;">
+      <a href="${appUrl}" style="text-decoration: none;">
+        <img src="${boldfyLogo}" alt="Boldfy" width="90" height="auto" style="display: inline-block;" />
       </a>
-      <p style="color: #A89BB5; font-size: 11px; margin: 12px 0 0; line-height: 1.5;">
-        ${footer}
-      </p>
     </div>
+
+    <!-- Footer -->
+    <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">
+      ${footer}
+    </p>
   </div>
 </body>
 </html>

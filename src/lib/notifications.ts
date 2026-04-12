@@ -1,7 +1,6 @@
 // src/lib/notifications.ts
-// Email notification system — sends branded transactional emails via nodemailer (Gmail SMTP).
-// All emails are sent from FAI (our platform manager persona) at admin@boldfy.com.br.
-// Each notification type checks the recipient's `notificationPrefs` before sending.
+// Email notification system — sends personal-style emails from Fai (platform manager)
+// via nodemailer (Gmail SMTP). Each notification checks recipient's prefs before sending.
 
 import nodemailer from 'nodemailer';
 import { db as adminDb } from '@/lib/firebase-admin';
@@ -21,7 +20,6 @@ export type NotificationPrefs = {
   post_ready_for_review?: boolean;
 };
 
-// Default: all enabled
 const DEFAULT_PREFS: NotificationPrefs = {
   mission_submitted: true,
   mission_reviewed: true,
@@ -29,22 +27,14 @@ const DEFAULT_PREFS: NotificationPrefs = {
   post_ready_for_review: true,
 };
 
-// ── FAI Sender Config ────────────────────────────────────────────────
+// ── Fai Sender Config ───────────────────────────────────────────────
 
-const FAI_NAME = 'FAI';
-const FAI_ROLE = 'Gerente do Aplicativo';
+const FAI_NAME = 'Fai da Boldfy';
+const FAI_ROLE = 'Gerente de Educação e Sucesso do Cliente';
 const FAI_EMAIL = 'admin@boldfy.com.br';
 
 function getBaseUrl() {
   return process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br';
-}
-
-function getFaiPhotoUrl() {
-  return `${getBaseUrl()}/images/email/fai-avatar.png`;
-}
-
-function getBoldfyLogoUrl() {
-  return `${getBaseUrl()}/images/email/boldfy-logo.png`;
 }
 
 // ── Transport ────────────────────────────────────────────────────────
@@ -71,12 +61,12 @@ async function getUserNotifPrefs(userId: string): Promise<NotificationPrefs> {
   }
 }
 
-// ── Email Template ──────────────────────────────────────────────────
+// ── Email Template — clean, personal style ──────────────────────────
 
 function wrapInTemplate(body: string): string {
-  const faiPhoto = getFaiPhotoUrl();
-  const boldfyLogo = getBoldfyLogoUrl();
   const baseUrl = getBaseUrl();
+  const faiPhoto = `${baseUrl}/images/email/fai-avatar.png`;
+  const boldfyLogo = `${baseUrl}/images/email/boldfy-logo.svg`;
 
   return `
 <!DOCTYPE html>
@@ -84,37 +74,29 @@ function wrapInTemplate(body: string): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    @keyframes subtleGlow {
-      0%, 100% { opacity: 0.85; }
-      50% { opacity: 1; }
-    }
-  </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #f4f0f8;">
-  <div style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 16px;">
+<body style="margin: 0; padding: 0; background-color: #ffffff;">
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 24px 32px; color: #374151;">
 
-    <!-- Main Content Card -->
-    <div style="background-color: #ffffff; border-radius: 16px; padding: 32px 28px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
-      ${body}
-    </div>
+    <!-- Body -->
+    ${body}
 
-    <!-- FAI Signature -->
-    <div style="margin-top: 24px; padding: 0 4px;">
-      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+    <!-- Signature -->
+    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+      <table cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td style="width: 56px; vertical-align: top; padding-right: 14px;">
-            <img src="${faiPhoto}" alt="${FAI_NAME}" width="52" height="52"
-              style="border-radius: 50%; border: 2px solid #bd58e7; display: block;" />
+          <td style="vertical-align: top; padding-right: 14px;">
+            <img src="${faiPhoto}" alt="Fai" width="48" height="48"
+              style="border-radius: 50%; display: block;" />
           </td>
           <td style="vertical-align: top;">
-            <p style="margin: 0 0 2px; font-size: 15px; font-weight: 600; color: #1F2937;">
+            <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">
               ${FAI_NAME}
             </p>
-            <p style="margin: 0 0 4px; font-size: 13px; color: #6B7280;">
+            <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">
               ${FAI_ROLE}
             </p>
-            <a href="mailto:${FAI_EMAIL}" style="font-size: 12px; color: #bd58e7; text-decoration: none;">
+            <a href="mailto:${FAI_EMAIL}" style="font-size: 12px; color: #9333ea; text-decoration: none;">
               ${FAI_EMAIL}
             </a>
           </td>
@@ -122,22 +104,19 @@ function wrapInTemplate(body: string): string {
       </table>
     </div>
 
-    <!-- Divider -->
-    <div style="margin: 20px 0 16px; border-top: 1px solid #e5e0eb;"></div>
-
-    <!-- Footer with Boldfy Logo -->
-    <div style="text-align: center;">
-      <a href="${baseUrl}" style="text-decoration: none; display: inline-block;">
-        <img src="${boldfyLogo}" alt="Boldfy" width="100" height="auto"
-          style="display: block; margin: 0 auto; animation: subtleGlow 3s ease-in-out infinite;" />
+    <!-- Logo -->
+    <div style="margin-top: 28px; text-align: center;">
+      <a href="${baseUrl}" style="text-decoration: none;">
+        <img src="${boldfyLogo}" alt="Boldfy" width="90" height="auto" style="display: inline-block;" />
       </a>
-      <p style="color: #A89BB5; font-size: 11px; margin: 12px 0 0; line-height: 1.5;">
-        Você recebeu este e-mail porque tem notificações ativas na Boldfy.<br/>
-        Para ajustar suas preferências, acesse
-        <a href="${baseUrl}/login" style="color: #bd58e7; text-decoration: underline;">Configurações</a>
-        na plataforma.
-      </p>
     </div>
+
+    <!-- Opt-out -->
+    <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">
+      Você recebeu este e-mail porque tem notificações ativas na
+      <a href="${baseUrl}" style="color: #9CA3AF;">Boldfy</a>.<br/>
+      Acesse <a href="${baseUrl}/login" style="color: #9333ea;">Configurações</a> para ajustar suas preferências.
+    </p>
   </div>
 </body>
 </html>`;
@@ -147,7 +126,7 @@ async function sendNotificationEmail(to: string, subject: string, body: string) 
   try {
     const transporter = getTransporter();
     await transporter.sendMail({
-      from: `"${FAI_NAME} | Boldfy" <${process.env.SMTP_EMAIL}>`,
+      from: `"${FAI_NAME}" <${process.env.SMTP_EMAIL}>`,
       replyTo: FAI_EMAIL,
       to,
       subject,
@@ -193,21 +172,22 @@ export async function notifyMissionSubmitted({
       email,
       `Nova comprovação de missão — ${collaboratorName}`,
       `
-      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
-        Oi, ${adminName}!
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Oi, ${adminName}! 👋
       </p>
-      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 6px;">
-        <strong>${collaboratorName}</strong> acabou de enviar uma comprovação para a missão <strong>${missionName}</strong>.
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        O <strong>${collaboratorName}</strong> acabou de enviar uma comprovação
+        pra missão <strong>"${missionName}"</strong>.
       </p>
-      <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-        Quando puder, dá uma olhada e aprova ou rejeita.
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+        Dá uma olhada quando puder?
       </p>
-      <div style="text-align: center; margin: 24px 0 8px;">
+      <p style="margin: 0;">
         <a href="${baseUrl}/admin/missoes"
-           style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
-          Revisar comprovação
+           style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+          → Revisar comprovação
         </a>
-      </div>`,
+      </p>`,
     );
   }
 }
@@ -240,48 +220,66 @@ export async function notifyMissionReviewed({
   const approved = action === 'approve';
   const baseUrl = getBaseUrl();
 
-  const statusText = approved ? 'aprovada' : 'rejeitada';
-  const statusColor = approved ? '#059669' : '#DC2626';
-  const statusBg = approved ? '#ecfdf5' : '#fef2f2';
-  const emoji = approved ? '✅' : '❌';
+  if (approved) {
+    let pointsLine = '';
+    if (pointsAwarded) {
+      pointsLine = `Você ganhou <strong>+${pointsAwarded} pontos</strong>! 🎉`;
+    }
 
-  let extraInfo = '';
-  if (approved && pointsAwarded) {
-    extraInfo = `
-    <div style="margin: 16px 0; padding: 14px 16px; background-color: #ecfdf5; border-radius: 10px; text-align: center;">
-      <p style="color: #059669; font-weight: 700; font-size: 16px; margin: 0;">+${pointsAwarded} pontos</p>
-      <p style="color: #6B7280; font-size: 12px; margin: 4px 0 0;">adicionados ao seu saldo</p>
-    </div>`;
-  }
-  if (!approved && feedback) {
-    extraInfo = `
-    <div style="margin: 16px 0; padding: 14px 16px; background-color: #fef2f2; border-radius: 10px; border-left: 3px solid #DC2626;">
-      <p style="color: #374151; font-size: 13px; margin: 0 0 4px; font-weight: 600;">Feedback:</p>
-      <p style="color: #4B5563; font-size: 14px; margin: 0; line-height: 1.5;">${feedback}</p>
-    </div>`;
-  }
-
-  await sendNotificationEmail(
-    email,
-    `${emoji} Missão ${statusText}: ${missionName}`,
-    `
-    <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
-      Oi, ${name}!
-    </p>
-    <div style="background-color: ${statusBg}; border-radius: 10px; padding: 16px; margin: 0 0 8px;">
-      <p style="color: #374151; font-size: 15px; line-height: 1.6; margin: 0;">
-        Sua comprovação da missão <strong>${missionName}</strong> foi
-        <span style="color: ${statusColor}; font-weight: 700;">${statusText}</span>.
+    await sendNotificationEmail(
+      email,
+      `✅ Missão aprovada: ${missionName}`,
+      `
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Oi, ${name}! 🎊
       </p>
-    </div>
-    ${extraInfo}
-    <div style="text-align: center; margin: 24px 0 8px;">
-      <a href="${baseUrl}/colaborador/missoes"
-         style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
-        Ver minhas missões
-      </a>
-    </div>`,
-  );
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Boa notícia! Sua comprovação da missão <strong>"${missionName}"</strong>
+        foi <strong style="color: #059669;">aprovada</strong>.
+      </p>
+      ${pointsLine ? `<p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">${pointsLine}</p>` : ''}
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+        Continue assim! 💪
+      </p>
+      <p style="margin: 0;">
+        <a href="${baseUrl}/colaborador/missoes"
+           style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+          → Ver minhas missões
+        </a>
+      </p>`,
+    );
+  } else {
+    let feedbackBlock = '';
+    if (feedback) {
+      feedbackBlock = `
+      <div style="margin: 16px 0 20px; padding: 12px 16px; background-color: #f9fafb; border-left: 3px solid #d1d5db; border-radius: 4px;">
+        <p style="font-size: 13px; color: #6B7280; margin: 0 0 4px; font-weight: 600;">Feedback:</p>
+        <p style="font-size: 14px; color: #374151; margin: 0; line-height: 1.5;">${feedback}</p>
+      </div>`;
+    }
+
+    await sendNotificationEmail(
+      email,
+      `Missão não aprovada: ${missionName}`,
+      `
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Oi, ${name}!
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 4px;">
+        Sua comprovação da missão <strong>"${missionName}"</strong> não foi aprovada dessa vez.
+      </p>
+      ${feedbackBlock}
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+        Sem stress — dá pra enviar de novo! 😊
+      </p>
+      <p style="margin: 0;">
+        <a href="${baseUrl}/colaborador/missoes"
+           style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+          → Ver minhas missões
+        </a>
+      </p>`,
+    );
+  }
 }
 
 /**
@@ -319,22 +317,22 @@ export async function notifyRewardRedeemed({
       email,
       `Resgate de recompensa — ${collaboratorName}`,
       `
-      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
-        Oi, ${adminName}!
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Oi, ${adminName}! 👋
       </p>
-      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 6px;">
-        <strong>${collaboratorName}</strong> resgatou a recompensa <strong>${rewardName}</strong>
-        por <strong>${pointsSpent} pontos</strong>.
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        O <strong>${collaboratorName}</strong> resgatou a recompensa
+        <strong>"${rewardName}"</strong> por <strong>${pointsSpent} pontos</strong>.
       </p>
-      <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-        Acesse a plataforma para marcar como entregue quando for o caso.
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+        Quando rolar a entrega, é só marcar como entregue na plataforma.
       </p>
-      <div style="text-align: center; margin: 24px 0 8px;">
+      <p style="margin: 0;">
         <a href="${baseUrl}/admin/recompensas"
-           style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
-          Ver resgates
+           style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+          → Ver resgates
         </a>
-      </div>`,
+      </p>`,
     );
   }
 }
@@ -362,22 +360,23 @@ export async function notifyPostReadyForReview({
 
   await sendNotificationEmail(
     email,
-    `Post pronto para revisão: ${postTitle || 'Sem título'}`,
+    `Post pronto pra revisão: ${postTitle || 'Sem título'}`,
     `
-    <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
-      Oi, ${name}!
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+      Oi, ${name}! 👋
     </p>
-    <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 6px;">
-      O post <strong>"${postTitle || 'Sem título'}"</strong> está pronto para sua revisão.
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+      Tem um post novo prontinho pra você revisar:
+      <strong>"${postTitle || 'Sem título'}"</strong>.
     </p>
-    <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
-      Quando puder, confira e aprove na plataforma.
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+      Confere lá quando der?
     </p>
-    <div style="text-align: center; margin: 24px 0 8px;">
-      <a href="${baseUrl}/login"
-         style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
-        Ver na plataforma
+    <p style="margin: 0;">
+      <a href="${baseUrl}/thoughtleader/backlog"
+         style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+        → Ver na plataforma
       </a>
-    </div>`,
+    </p>`,
   );
 }
