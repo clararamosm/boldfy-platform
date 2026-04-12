@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useActionState, useRef } from 
 import { useFormStatus } from 'react-dom';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, query, where, updateDoc } from 'firebase/firestore';
+import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,7 +79,7 @@ function InviteFormContent() {
 
 export default function AdminColaboradoresPage() {
   const { user } = useAuth();
-  const companyId = user?.companyId || null;
+  const companyId = useResolvedCompanyId();
   const { company } = useCompanyData(companyId);
   const totalLicenses = company?.licenses || 0;
 
@@ -446,6 +447,12 @@ export default function AdminColaboradoresPage() {
                       <Label htmlFor="tlEmail">{t.adminTL.inviteEmail}</Label>
                       <Input name="email" id="tlEmail" type="email" placeholder={t.adminTL.inviteEmailPlaceholder} required />
                     </div>
+                    {(user?.role === 'master' || user?.role === 'strategist') && (
+                      <div className="flex items-center gap-2 pt-2">
+                        <input type="checkbox" name="skipInvite" value="true" id="tlSkipInvite" className="h-4 w-4 rounded border-gray-300" />
+                        <Label htmlFor="tlSkipInvite" className="text-sm font-normal text-muted-foreground">Criar sem enviar convite</Label>
+                      </div>
+                    )}
                   </div>
                   <div className="flex justify-end mt-6">
                     <Button type="submit">{t.adminTL.sendInvite}</Button>

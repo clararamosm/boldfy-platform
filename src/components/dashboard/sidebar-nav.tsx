@@ -21,7 +21,12 @@ export function SidebarNav({ items }: SidebarNavProps) {
   const pathname = usePathname();
     const searchParams = useSearchParams();
     const companySlug = searchParams.get('c');
-    const buildHref = (href: string) => companySlug ? `${href}?c=${companySlug}` : href;
+    const companyId = searchParams.get('companyId');
+    const buildHref = (href: string) => {
+      if (companySlug) return `${href}?c=${companySlug}`;
+      if (companyId) return `${href}?companyId=${companyId}`;
+      return href;
+    };
   const [bouncingItem, setBouncingItem] = useState<string | null>(null);
 
   const handleDisabledClick = (href: string) => {

@@ -6,6 +6,7 @@ import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
+import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,6 +76,7 @@ export default function AdminBibliotecaPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { user: authUser } = useAuth();
+    const resolvedCompanyId = useResolvedCompanyId();
     const [companyId, setCompanyId] = useState<string | null>(null);
     const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState<string | null>(null);
@@ -99,21 +101,10 @@ export default function AdminBibliotecaPage() {
     }, [toast]);
 
     useEffect(() => {
-        if (!authUser?.uid) return;
-        const init = async () => {
-            const userDocRef = doc(db, "users", authUser.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-                const userCompanyId = userDocSnap.data().companyId;
-                setCompanyId(userCompanyId);
-                fetchAssets(userCompanyId);
-            } else {
-                toast({ variant: "destructive", title: t.adminLibrary.toastUserNotFound});
-                setIsLoading(false);
-            }
-        };
-        init();
-    }, [authUser?.uid, fetchAssets, toast]);
+        if (!resolvedCompanyId) { setIsLoading(false); return; }
+        setCompanyId(resolvedCompanyId);
+        fetchAssets(resolvedCompanyId);
+    }, [resolvedCompanyId, fetchAssets]);
     
 
     const handleAction = async (assetId?: string) => {

@@ -182,18 +182,22 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
-    sendInvitationEmail({
-      to: adminEmail,
-      name: adminName,
-      companyName: companyName,
-      role: locale === 'en' ? 'Administrator' : 'Administrador',
-      resetLink,
-      locale,
-    }).catch((emailError) => {
-      console.error("Error sending admin invitation email:", emailError);
-    });
+    // Skip invitation email if skipInvite flag is set (for pre-populating accounts)
+    const skipInvite = formData.get('skipInvite') === 'true';
+    if (!skipInvite) {
+      const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+      const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
+      sendInvitationEmail({
+        to: adminEmail,
+        name: adminName,
+        companyName: companyName,
+        role: locale === 'en' ? 'Administrator' : 'Administrador',
+        resetLink,
+        locale,
+      }).catch((emailError) => {
+        console.error("Error sending admin invitation email:", emailError);
+      });
+    }
 
     return { success: true };
   } catch (error) {
@@ -654,18 +658,22 @@ export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, f
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
-    sendInvitationEmail({
-      to: email,
-      name,
-      companyName,
-      role: companyLocale === 'en' ? 'Thought Leader' : 'Thought Leader',
-      resetLink,
-      locale: companyLocale,
-    }).catch((emailError) => {
-      console.error("Error sending thought leader invitation email:", emailError);
-    });
+    // Skip invitation email if skipInvite flag is set (for pre-populating accounts)
+    const skipInvite = formData.get('skipInvite') === 'true';
+    if (!skipInvite) {
+      const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+      const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+      sendInvitationEmail({
+        to: email,
+        name,
+        companyName,
+        role: companyLocale === 'en' ? 'Thought Leader' : 'Thought Leader',
+        resetLink,
+        locale: companyLocale,
+      }).catch((emailError) => {
+        console.error("Error sending thought leader invitation email:", emailError);
+      });
+    }
 
     return { success: true };
   } catch (error) {

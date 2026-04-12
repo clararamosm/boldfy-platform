@@ -25,6 +25,7 @@ import {
 import { getAuthToken } from '@/lib/auth-client';
 import { getAdminDashboardData, type DashboardData } from '@/app/actions/dashboard';
 import { useAuth } from '@/contexts/auth-context';
+import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 
 // ─── Period Filter ──────────────────────────────────────────────────
 type PeriodKey = 'this_week' | 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months';
@@ -219,22 +220,14 @@ export default function AdminDashboardPage() {
     }
   }, [period, toast]);
 
-  // Get companyId from auth context or Firestore
+  const resolvedCompanyId = useResolvedCompanyId();
+
+  // Fetch data when companyId is resolved
   useEffect(() => {
-    if (!user) return;
+    if (!user || !resolvedCompanyId) return;
 
     const getCompanyAndFetch = async () => {
-      let cId = user.companyId;
-
-      // For master viewing admin panel, companyId comes from URL
-      if (!cId && user.role === 'master') {
-        const params = new URLSearchParams(window.location.search);
-        cId = params.get('companyId') || undefined;
-      }
-
-      if (cId) {
-        fetchData(cId);
-      }
+      fetchData(resolvedCompanyId);
     };
 
     getCompanyAndFetch();

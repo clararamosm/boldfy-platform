@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
+import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 import { markRescueAsPaid } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
 import { Header } from "@/components/dashboard/header";
@@ -66,7 +67,7 @@ export default function AdminRecompensasPage() {
     const { toast } = useToast();
     const t = useT();
     const { user } = useAuth();
-    const companyId = user?.companyId || null;
+    const companyId = useResolvedCompanyId();
     const { company } = useCompanyData(companyId);
 
     const [rewards, setRewards] = useState<Reward[]>([]);

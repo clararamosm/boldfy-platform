@@ -6,6 +6,7 @@ import {
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, Timestamp, setDoc,
 } from 'firebase/firestore';
+import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +34,7 @@ export default function AdminTrilhasPage() {
   const { user } = useAuth();
   const locale = useLocale();
   const t = useT();
-  const companyId = user?.companyId || null;
+  const companyId = useResolvedCompanyId();
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('global');

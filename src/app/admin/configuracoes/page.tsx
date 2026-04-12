@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useT } from '@/lib/i18n/context';
 import { useAuth } from '@/contexts/auth-context';
 import { useCompanyData } from '@/hooks/use-company-data';
+import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 import { useSubscription } from '@/hooks/use-subscription';
 
 type CompanyData = {
@@ -253,7 +254,8 @@ function ConfiguracoesPageContent() {
     const t = useT();
     const { toast } = useToast();
     const { user } = useAuth();
-    const { company, isLoading: companyLoading } = useCompanyData(user?.companyId);
+    const companyId = useResolvedCompanyId();
+    const { company, isLoading: companyLoading } = useCompanyData(companyId);
 
     const [isLoading, setIsLoading] = useState(true);
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);

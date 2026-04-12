@@ -86,6 +86,10 @@ function CompanyFormContent() {
                 <p className="text-xs text-muted-foreground">Define o idioma de toda a interface para esta empresa.</p>
              </div>
              <p className="text-xs text-muted-foreground">Licenças contam apenas colaboradores (a conta de admin é gratuita). Mínimo de 5 licenças.</p>
+             <div className="flex items-center gap-2 pt-2">
+                <input type="checkbox" name="skipInvite" value="true" id="skipInvite" className="h-4 w-4 rounded border-gray-300" />
+                <Label htmlFor="skipInvite" className="text-sm font-normal text-muted-foreground">Criar sem enviar convite (popular conta antes)</Label>
+             </div>
         </div>
     );
 }
