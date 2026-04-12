@@ -53,11 +53,11 @@ env:
 
   # --- Sentry (error monitoring) ---
   - variable: NEXT_PUBLIC_SENTRY_DSN
-    secret: SENTRY_DSN
+    value: https://a2e7f575ee31e1da49ad2d905e70f8f3@o4511207197573120.ingest.us.sentry.io/4511207201832960
   - variable: SENTRY_ORG
     value: boldfy
   - variable: SENTRY_PROJECT
-    value: boldfy-platform
+    value: javascript-nextjs
 
   # --- Variáveis públicas do Notion ---
   - variable: NOTION_FEEDBACK_DB_ID
