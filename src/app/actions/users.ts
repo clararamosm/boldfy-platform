@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { requireMaster, requireAdmin, requireAdminOrStrategist } from '@/lib/auth-guard';
+import { requireAuth, requireMaster, requireAdmin, requireAdminOrStrategist } from '@/lib/auth-guard';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { generateSlug } from '@/lib/slugify';
@@ -848,6 +848,44 @@ export async function toggleCollaboratorStatus(
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
     console.error('Error in toggleCollaboratorStatus:', msg);
+    return { error: msg };
+  }
+}
+
+// ---- Save Notification Preferences ----
+
+export async function saveNotificationPrefs(
+  idToken: string,
+  prefs: Record<string, boolean>,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const user = await requireAuth(idToken);
+
+    await adminDb.collection('users').doc(user.uid).update({
+      notificationPrefs: prefs,
+    });
+
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in saveNotificationPrefs:', msg);
+    return { error: msg };
+  }
+}
+
+// ---- Get Notification Preferences ----
+
+export async function getNotificationPrefs(
+  idToken: string,
+): Promise<{ prefs?: Record<string, boolean>; error?: string }> {
+  try {
+    const user = await requireAuth(idToken);
+    const doc = await adminDb.collection('users').doc(user.uid).get();
+    const data = doc.data();
+    return { prefs: data?.notificationPrefs || {} };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in getNotificationPrefs:', msg);
     return { error: msg };
   }
 }

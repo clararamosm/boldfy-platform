@@ -21,6 +21,12 @@ import { useAuth } from '@/contexts/auth-context';
 import { useCompanyData } from '@/hooks/use-company-data';
 import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 import { useSubscription } from '@/hooks/use-subscription';
+import { NotificationSettings } from '@/components/notification-settings';
+
+const ADMIN_NOTIF_OPTIONS = [
+  { key: 'mission_submitted', label: 'Comprovações de missão', description: 'Receber quando um colaborador enviar uma comprovação de missão.' },
+  { key: 'reward_redeemed', label: 'Resgates de recompensa', description: 'Receber quando um colaborador resgatar uma recompensa.' },
+];
 
 type CompanyData = {
     id: string;
@@ -366,7 +372,7 @@ function ConfiguracoesPageContent() {
                     {/* Billing / Subscription card */}
                     <BillingCard companyId={companyData.id} />
 
-                    {/* Notification settings — removed until backend notification system is implemented */}
+                    <NotificationSettings options={ADMIN_NOTIF_OPTIONS} disabled={isReadOnly} />
 
                     {/* Privacy policy link */}
                     <div className="text-center py-4">

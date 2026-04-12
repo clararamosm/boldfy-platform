@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 // Select removido — voice agora é textarea livre
-import { Switch } from "@/components/ui/switch";
+import { NotificationSettings } from '@/components/notification-settings';
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
@@ -503,43 +503,11 @@ function SettingsPageContent() {
                             </Card>
 
                             {/* Notificações */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>{t.adminSettings.notificationsTitle}</CardTitle>
-                                    <CardDescription>
-                                        {t.adminSettings.notificationsDescription}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-0.5">
-                                            <Label>Notificações por e-mail</Label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Receba atualizações sobre novos conteúdos e análises.
-                                            </p>
-                                        </div>
-                                        <Switch defaultChecked />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-0.5">
-                                            <Label>Lembretes de postagem</Label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Seja lembrado quando houver conteúdo pronto para publicar.
-                                            </p>
-                                        </div>
-                                        <Switch defaultChecked />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div className="space-y-0.5">
-                                            <Label>Relatórios semanais</Label>
-                                            <p className="text-sm text-muted-foreground">
-                                                Receba um resumo semanal do desempenho dos seus posts.
-                                            </p>
-                                        </div>
-                                        <Switch />
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <NotificationSettings
+                                options={[
+                                    { key: 'mission_reviewed', label: 'Resultado de missões', description: 'Receber quando uma missão for aprovada ou rejeitada.' },
+                                ]}
+                            />
 
                             {/* Botão Salvar */}
                             <div className="flex justify-end">

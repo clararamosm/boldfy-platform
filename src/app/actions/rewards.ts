@@ -4,6 +4,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireSelf, requireAdmin } from '@/lib/auth-guard';
+import { notifyRewardRedeemed } from '@/lib/notifications';
 
 // ---- Reward Redemption ----
 
@@ -121,6 +122,14 @@ export async function redeemReward(
     batch.update(adminDb.collection('users').doc(userId), userUpdateData);
 
     await batch.commit();
+
+    // Notify admin(s) — fire and forget
+    notifyRewardRedeemed({
+      companyId,
+      collaboratorName: userName,
+      rewardName: reward.name,
+      pointsSpent: reward.points,
+    }).catch((err) => console.error('[Notification] notifyRewardRedeemed failed:', err));
 
     return { success: true };
   } catch (error) {

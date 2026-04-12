@@ -4,6 +4,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireSelf, requireAdmin } from '@/lib/auth-guard';
+import { notifyMissionSubmitted, notifyMissionReviewed } from '@/lib/notifications';
 
 // ---- Mission Proof Submission ----
 
@@ -61,6 +62,14 @@ export async function submitMissionProof(
         status: 'pending',
         submittedAt: FieldValue.serverTimestamp(),
       });
+
+    // Notify admin(s) — fire and forget
+    const missionData = missionDoc.data();
+    notifyMissionSubmitted({
+      companyId,
+      collaboratorName: userName,
+      missionName: missionData?.name || 'Missão',
+    }).catch((err) => console.error('[Notification] notifyMissionSubmitted failed:', err));
 
     return { success: true };
   } catch (error) {
@@ -242,6 +251,17 @@ export async function reviewMissionProof(
         adminFeedback: adminFeedback || null,
       });
     }
+
+    // Notify collaborator — fire and forget
+    const missionData = missionDoc.exists ? missionDoc.data() : null;
+    const missionPoints = missionData?.points || 0;
+    notifyMissionReviewed({
+      collaboratorId: subData.userId,
+      missionName: missionData?.name || 'Missão',
+      action,
+      feedback: adminFeedback,
+      pointsAwarded: action === 'approve' ? missionPoints : undefined,
+    }).catch((err) => console.error('[Notification] notifyMissionReviewed failed:', err));
 
     return { success: true };
   } catch (error) {

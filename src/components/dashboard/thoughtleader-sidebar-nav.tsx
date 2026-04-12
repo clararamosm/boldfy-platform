@@ -1,7 +1,7 @@
 'use client';
 
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { LayoutDashboard, ClipboardList, CalendarDays, Newspaper, UserSearch, FileText, BookOpen } from "lucide-react";
+import { LayoutDashboard, ClipboardList, CalendarDays, Newspaper, UserSearch, FileText, BookOpen, Settings } from "lucide-react";
 import { useT } from '@/lib/i18n/context';
 
 export function ThoughtLeaderSidebarNav() {
@@ -14,6 +14,7 @@ export function ThoughtLeaderSidebarNav() {
         { title: t.nav.linkedinLeads, href: "/thoughtleader/linkedin-leads", icon: UserSearch, badge: t.nav.comingSoon, disabled: true },
         { title: t.nav.strategy, href: "/thoughtleader/estrategia", icon: FileText },
         { title: t.nav.brandManual, href: "/thoughtleader/manual", icon: BookOpen },
+        { title: t.nav.settings, href: "/thoughtleader/configuracoes", icon: Settings },
     ];
     return <SidebarNav items={navItems} />;
 }

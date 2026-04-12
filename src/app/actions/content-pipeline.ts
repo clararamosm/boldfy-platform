@@ -6,6 +6,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { requireAuth, requireStrategistForTL, requireAdminOrStrategist, requireTLOrMaster, requireActiveSubscription } from '@/lib/auth-guard';
 import { triggerSlackNotification } from '@/lib/slack-notifications';
 import { generateSlug } from '@/lib/slugify';
+import { notifyPostReadyForReview } from '@/lib/notifications';
 
 // ---- Types ----
 
@@ -198,6 +199,15 @@ export async function updatePipelinePost(
         postId,
         postTitle,
       }).catch(err => console.error('Slack post_pronto notification failed:', err));
+    }
+
+    // Notify TL by email when post moves to aprovar_post (ready for TL review)
+    if (data.status === 'aprovar_post') {
+      const postTitle = data.title || docSnap.data()?.title || '';
+      notifyPostReadyForReview({
+        tlUserId,
+        postTitle,
+      }).catch(err => console.error('[Notification] notifyPostReadyForReview failed:', err));
     }
 
     return { success: true };

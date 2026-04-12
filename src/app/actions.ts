@@ -2,7 +2,7 @@
 // Barrel file — re-exports all server actions from domain modules.
 // Existing imports from '@/app/actions' continue to work without changes.
 
-export { inviteAdmin, inviteAdminToCompany, inviteCollaborator, deleteCollaborator, inviteStrategist, deleteStrategist, assignCompaniesToStrategist, inviteThoughtLeader, updateCollaboratorProfile, toggleCollaboratorStatus } from './actions/users';
+export { inviteAdmin, inviteAdminToCompany, inviteCollaborator, deleteCollaborator, inviteStrategist, deleteStrategist, assignCompaniesToStrategist, inviteThoughtLeader, updateCollaboratorProfile, toggleCollaboratorStatus, saveNotificationPrefs, getNotificationPrefs } from './actions/users';
 export { handleAlignContent, toggleStarContent, generateHooks, generateWithHook } from './actions/content';
 export { submitMissionProof, completeMissionSelf, reviewMissionProof } from './actions/missions';
 export { redeemReward, markRescueAsPaid } from './actions/rewards';
