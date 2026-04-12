@@ -8,9 +8,10 @@ import { Header } from "@/components/dashboard/header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Loader2, Plus, Calendar as CalIcon, Users, Clock,
-  User, ChevronLeft, ChevronRight,
+  User, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
@@ -25,6 +26,7 @@ type TLSummary = {
   companyName: string;
 };
 
+const MAX_VISIBLE_POSTS = 10;
 
 export default function StrategistPipelinePage() {
   const { user } = useAuth();
@@ -48,25 +50,11 @@ export default function StrategistPipelinePage() {
   // Create post loading
   const [isCreating, setIsCreating] = useState(false);
 
-  // Kanban scroll
-  const kanbanRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  // Agendados toggle
+  const [showAgendados, setShowAgendados] = useState(true);
 
-  const checkScroll = useCallback(() => {
-    const el = kanbanRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 0);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
-  }, []);
-
-  const scrollKanban = (direction: 'left' | 'right') => {
-    const el = kanbanRef.current;
-    if (!el) return;
-    const amount = 300;
-    el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
-    setTimeout(checkScroll, 350);
-  };
+  // "Ver todos" dialog
+  const [dialogStatus, setDialogStatus] = useState<PipelineStatus | null>(null);
 
 
   // ─── Fetch TLs ──────
@@ -219,13 +207,6 @@ export default function StrategistPipelinePage() {
     fetchPosts();
   }, [fetchPosts]);
 
-  // Check scroll arrows after posts load
-  useEffect(() => {
-    if (!isPostsLoading) {
-      setTimeout(checkScroll, 100);
-    }
-  }, [isPostsLoading, checkScroll]);
-
   // Deep link: redirect to dedicated post page
   useEffect(() => {
     const urlPostId = searchParams.get('postId');
@@ -237,7 +218,7 @@ export default function StrategistPipelinePage() {
     }
   }, [searchParams, isPostsLoading, posts]);
 
-  // ─── Posts grouped by status (for kanban) ──────
+  // ─── Posts grouped by status ──────
   const postsByStatus = useMemo(() => {
     const map: Record<string, PipelinePost[]> = {};
     PIPELINE_STATUSES.forEach(s => { map[s] = []; });
@@ -292,6 +273,16 @@ export default function StrategistPipelinePage() {
 
   const getStatusLabel = buildGetStatusLabel(t);
 
+  // ─── Navigate to post ──────
+  const handlePostClick = (post: PipelinePost) => {
+    const postTlId = (post as PipelinePost & { _tlId?: string })._tlId || activeTlIds[0];
+    router.push(`/post/${selectedCompany}/${postTlId}/${post.id}`);
+  };
+
+  // ─── Statuses to show in the grid (excludes agendado — shown below) ──────
+  const gridStatuses = PIPELINE_STATUSES.filter(s => s !== 'agendado' && s !== 'arquivado');
+  const agendadoPosts = postsByStatus['agendado'] || [];
+
   // ─── Loading state ──────
   if (isLoading) {
     return (
@@ -323,11 +314,11 @@ export default function StrategistPipelinePage() {
   }
 
   return (
-    <div className="flex flex-col h-svh overflow-hidden">
+    <>
       <Header title={t.contentPipeline.title} />
-      <main className="flex-1 flex flex-col overflow-hidden min-h-0">
-        {/* Top bar: Company + TL filter + new post (sticky) */}
-        <div className="shrink-0 px-4 md:px-6 pt-4 md:pt-6 pb-3 flex flex-wrap items-center gap-3">
+      <main className="flex-1 overflow-auto p-4 md:p-6">
+        {/* Top bar: Company + TL filter + new post */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
           {/* Company selector */}
           {companies.length > 1 && (
             <Select value={selectedCompany || ''} onValueChange={(v) => { setSelectedCompany(v); setTlFilter('all'); }}>
@@ -362,151 +353,202 @@ export default function StrategistPipelinePage() {
           </Button>
         </div>
 
-        {/* Kanban board (scrollable area) */}
-        <div className="flex-1 overflow-hidden px-4 md:px-6 pb-4 md:pb-6">
         {isPostsLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="relative h-full">
-            {/* Scroll arrows */}
-            {canScrollLeft && (
-              <button
-                type="button"
-                onClick={() => scrollKanban('left')}
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-background/90 border shadow-md flex items-center justify-center hover:bg-accent transition-colors"
-              >
-                <ChevronLeft className="h-5 w-5" />
-              </button>
-            )}
-            {canScrollRight && (
-              <button
-                type="button"
-                onClick={() => scrollKanban('right')}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 h-10 w-10 rounded-full bg-background/90 border shadow-md flex items-center justify-center hover:bg-accent transition-colors"
-              >
-                <ChevronRight className="h-5 w-5" />
-              </button>
-            )}
+          <div className="space-y-4">
+            {/* Grid of status boxes — 3 columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {gridStatuses.map(status => {
+                const cfg = STATUS_CONFIG[status];
+                const columnPosts = postsByStatus[status] || [];
+                const showBox = columnPosts.length > 0 || ['backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post', 'post_aprovado', 'pronto_pra_postar'].includes(status);
 
-          <div
-            ref={kanbanRef}
-            onScroll={checkScroll}
-            className="flex gap-3 overflow-x-auto overflow-y-hidden pb-2 scrollbar-hide h-full"
-          >
-            {PIPELINE_STATUSES.map(status => {
-              const cfg = STATUS_CONFIG[status];
-              const columnPosts = postsByStatus[status] || [];
-              const showColumn = columnPosts.length > 0 || ['backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post', 'post_aprovado', 'pronto_pra_postar', 'agendado'].includes(status);
+                if (!showBox) return null;
 
-              if (!showColumn) return null;
+                const visiblePosts = columnPosts.slice(0, MAX_VISIBLE_POSTS);
+                const hasMore = columnPosts.length > MAX_VISIBLE_POSTS;
 
-              return (
-                <div
-                  key={status}
-                  className="flex-shrink-0 w-[280px] flex flex-col h-full min-h-0"
-                >
-                  {/* Column header */}
-                  <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-t-2 bg-muted/30 ${cfg.kanbanBorder}`}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{getStatusLabel(status)}</span>
-                      <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
-                        {columnPosts.length}
-                      </span>
+                return (
+                  <div key={status} className={`rounded-lg border bg-card overflow-hidden border-t-2 ${cfg.kanbanBorder}`}>
+                    {/* Box header */}
+                    <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{getStatusLabel(status)}</span>
+                        <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                          {columnPosts.length}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={createPostDirect}
+                        className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+                        title="Adicionar post"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={createPostDirect}
-                      className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-                      title="Adicionar post"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
 
-                  {/* Column cards */}
-                  <div className="flex-1 min-h-0 bg-muted/10 rounded-b-lg p-1.5 space-y-1.5 overflow-y-auto">
-                    {columnPosts.map(post => {
-                      const tlName = getTlName(post);
-                      const showDate = post.scheduledFor;
-                      let dateStr = '';
-                      let timeStr = '';
-                      if (showDate) {
-                        const d = new Date(post.scheduledFor!);
-                        dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
-                        const hh = String(d.getHours()).padStart(2, '0');
-                        const mm = String(d.getMinutes()).padStart(2, '0');
-                        if (`${hh}:${mm}` !== '00:00') timeStr = `${hh}:${mm}`;
-                      }
-
-                      return (
-                        <button
+                    {/* Post list — compact horizontal rows */}
+                    <div className="divide-y">
+                      {visiblePosts.length === 0 && (
+                        <div className="px-3 py-4 text-center">
+                          <p className="text-xs text-muted-foreground">Nenhum post</p>
+                        </div>
+                      )}
+                      {visiblePosts.map(post => (
+                        <PostRow
                           key={post.id}
+                          post={post}
+                          tlName={getTlName(post)}
+                          showTl={tlFilter === 'all'}
+                          onClick={() => handlePostClick(post)}
+                        />
+                      ))}
+                    </div>
+
+                    {/* "Ver todos" button */}
+                    {hasMore && (
+                      <div className="border-t px-3 py-2">
+                        <button
                           type="button"
-                          onClick={() => {
-                            const postTlId = (post as PipelinePost & { _tlId?: string })._tlId || activeTlIds[0];
-                            router.push(`/post/${selectedCompany}/${postTlId}/${post.id}`);
-                          }}
-                          className="w-full text-left rounded-lg border bg-card p-2.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-1.5"
+                          onClick={() => setDialogStatus(status)}
+                          className="w-full text-center text-xs font-medium text-primary hover:underline"
                         >
-                          {/* Title */}
-                          <p className="text-sm font-medium leading-tight line-clamp-2">{post.title || 'Sem título'}</p>
-
-                          {/* Tags row */}
-                          <div className="flex flex-wrap gap-1">
-                            {post.formato && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                {post.formato}
-                              </span>
-                            )}
-                            {post.etapa && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                {post.etapa}
-                              </span>
-                            )}
-                            {post.contentPillar && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                                {post.contentPillar}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Meta row: date, time, profile */}
-                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            {showDate && (
-                              <>
-                                <CalIcon className="h-3 w-3" />
-                                <span>{dateStr}</span>
-                                {timeStr && (
-                                  <>
-                                    <Clock className="h-3 w-3 ml-0.5" />
-                                    <span>{timeStr}</span>
-                                  </>
-                                )}
-                              </>
-                            )}
-                            {tlFilter === 'all' && tlName && (
-                              <>
-                                {showDate && <span className="mx-0.5">·</span>}
-                                <User className="h-3 w-3" />
-                                <span className="truncate">{tlName}</span>
-                              </>
-                            )}
-                          </div>
+                          Ver todos ({columnPosts.length})
                         </button>
-                      );
-                    })}
+                      </div>
+                    )}
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+
+            {/* Agendados section — horizontal box below */}
+            {agendadoPosts.length > 0 && (
+              <div className={`rounded-lg border bg-card overflow-hidden border-t-2 ${STATUS_CONFIG.agendado.kanbanBorder}`}>
+                {/* Toggle header */}
+                <button
+                  type="button"
+                  onClick={() => setShowAgendados(prev => !prev)}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{getStatusLabel('agendado')}</span>
+                    <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                      {agendadoPosts.length}
+                    </span>
+                  </div>
+                  {showAgendados ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                </button>
+
+                {/* Agendados list */}
+                {showAgendados && (
+                  <div className="divide-y">
+                    {agendadoPosts.map(post => (
+                      <PostRow
+                        key={post.id}
+                        post={post}
+                        tlName={getTlName(post)}
+                        showTl={tlFilter === 'all'}
+                        onClick={() => handlePostClick(post)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
-        </div>
 
+        {/* "Ver todos" dialog */}
+        <Dialog open={!!dialogStatus} onOpenChange={() => setDialogStatus(null)}>
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>
+                {dialogStatus && getStatusLabel(dialogStatus)} ({dialogStatus ? (postsByStatus[dialogStatus]?.length || 0) : 0})
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto divide-y border rounded-md">
+              {dialogStatus && (postsByStatus[dialogStatus] || []).map(post => (
+                <PostRow
+                  key={post.id}
+                  post={post}
+                  tlName={getTlName(post)}
+                  showTl={tlFilter === 'all'}
+                  onClick={() => { setDialogStatus(null); handlePostClick(post); }}
+                />
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
-    </div>
+    </>
+  );
+}
+
+// ─── Compact Post Row Component ──────
+
+function PostRow({
+  post,
+  tlName,
+  showTl,
+  onClick,
+}: {
+  post: PipelinePost;
+  tlName: string;
+  showTl: boolean;
+  onClick: () => void;
+}) {
+  let dateStr = '';
+  let timeStr = '';
+  if (post.scheduledFor) {
+    const d = new Date(post.scheduledFor);
+    dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    if (`${hh}:${mm}` !== '00:00') timeStr = `${hh}:${mm}`;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors cursor-pointer group"
+    >
+      {/* Title — takes remaining space */}
+      <span className="flex-1 text-sm leading-tight truncate font-medium min-w-0">
+        {post.title || 'Sem título'}
+      </span>
+
+      {/* Meta: tags + date + profile */}
+      <div className="flex items-center gap-1.5 shrink-0 text-[10px] text-muted-foreground">
+        {post.formato && (
+          <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 font-medium">
+            {post.formato}
+          </span>
+        )}
+        {post.scheduledFor && (
+          <span className="inline-flex items-center gap-0.5">
+            <CalIcon className="h-3 w-3" />
+            {dateStr}
+            {timeStr && (
+              <>
+                <Clock className="h-3 w-3 ml-0.5" />
+                {timeStr}
+              </>
+            )}
+          </span>
+        )}
+        {showTl && tlName && (
+          <span className="hidden md:inline-flex items-center gap-0.5">
+            <User className="h-3 w-3" />
+            {tlName}
+          </span>
+        )}
+      </div>
+    </button>
   );
 }
