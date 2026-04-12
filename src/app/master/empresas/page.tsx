@@ -306,6 +306,8 @@ export default function MasterEmpresasPage() {
     setEditLicenses(company.licenses);
     setEditTLLicenses(company.tlLicenses || 0);
     setEditLogoUrl(company.logoUrl);
+    setInviteAdminName('');
+    setInviteAdminEmail('');
     setIsEditCompanyOpen(true);
   };
 
@@ -349,11 +351,12 @@ export default function MasterEmpresasPage() {
   };
 
   const handleInviteAdminToCompany = async () => {
-    if (!inviteAdminCompany) return;
+    const targetCompany = inviteAdminCompany || editingCompany;
+    if (!targetCompany) return;
     setIsInvitingAdmin(true);
     try {
       const token = await getAuthToken();
-      const result = await inviteAdminToCompany(token, inviteAdminCompany.id, inviteAdminName, inviteAdminEmail);
+      const result = await inviteAdminToCompany(token, targetCompany.id, inviteAdminName, inviteAdminEmail);
       if (result.error) {
         toast({ variant: 'destructive', title: 'Erro', description: result.error });
       } else {
@@ -361,6 +364,7 @@ export default function MasterEmpresasPage() {
         setInviteAdminCompany(null);
         setInviteAdminName('');
         setInviteAdminEmail('');
+        setIsEditCompanyOpen(false);
         fetchCompanies();
       }
     } catch {
@@ -504,11 +508,6 @@ export default function MasterEmpresasPage() {
                                                 <DropdownMenuItem asChild disabled={company.status === 'Inativa'}>
                                                     <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
                                                 </DropdownMenuItem>
-                                                {company.adminPending && !company.adminProfile?.email && (
-                                                  <DropdownMenuItem onClick={() => { setInviteAdminCompany(company); setInviteAdminName(''); setInviteAdminEmail(''); }}>
-                                                    <Mail className="mr-2 h-4 w-4" />Convidar Admin
-                                                  </DropdownMenuItem>
-                                                )}
                                                 <DropdownMenuItem onClick={() => handleToggleStatus(company)}>
                                                     {company.status === 'Ativa' ? 'Desativar' : 'Ativar'}
                                                 </DropdownMenuItem>
@@ -608,28 +607,31 @@ export default function MasterEmpresasPage() {
           <Button onClick={handleSaveCompanyEdit} className="w-full">
             Salvar Alterações
           </Button>
-        </div>
-      </ActionDialog>
-
-      {/* Invite Admin to Existing Company Dialog */}
-      <ActionDialog
-        open={!!inviteAdminCompany}
-        onOpenChange={(open) => { if (!open) setInviteAdminCompany(null); }}
-        title="Convidar Admin"
-        description={`Envie um convite para o administrador da empresa "${inviteAdminCompany?.companyName}".`}
-      >
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label htmlFor="invAdminName">Nome do Admin</Label>
-            <Input id="invAdminName" placeholder="Ex: João Silva" value={inviteAdminName} onChange={(e) => setInviteAdminName(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="invAdminEmail">E-mail do Admin</Label>
-            <Input id="invAdminEmail" type="email" placeholder="admin@empresa.com" value={inviteAdminEmail} onChange={(e) => setInviteAdminEmail(e.target.value)} />
-          </div>
-          <Button onClick={handleInviteAdminToCompany} disabled={isInvitingAdmin || !inviteAdminName || !inviteAdminEmail} className="w-full">
-            {isInvitingAdmin ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando...</> : 'Enviar Convite'}
-          </Button>
+          {/* Invite Admin section — only when company has no admin */}
+          {editingCompany?.adminPending && (
+            <div className="border-t pt-4 mt-4 space-y-3">
+              <div>
+                <p className="text-sm font-medium">Convidar Admin</p>
+                <p className="text-xs text-muted-foreground">Esta empresa ainda não tem um administrador. Preencha os dados abaixo para enviar o convite.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invAdminName">Nome do Admin</Label>
+                <Input id="invAdminName" placeholder="Ex: João Silva" value={inviteAdminName} onChange={(e) => setInviteAdminName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invAdminEmail">E-mail do Admin</Label>
+                <Input id="invAdminEmail" type="email" placeholder="admin@empresa.com" value={inviteAdminEmail} onChange={(e) => setInviteAdminEmail(e.target.value)} />
+              </div>
+              <Button
+                variant="secondary"
+                onClick={() => { setInviteAdminCompany(editingCompany); handleInviteAdminToCompany(); }}
+                disabled={isInvitingAdmin || !inviteAdminName || !inviteAdminEmail}
+                className="w-full"
+              >
+                {isInvitingAdmin ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando...</> : <><Mail className="mr-2 h-4 w-4" /> Enviar Convite ao Admin</>}
+              </Button>
+            </div>
+          )}
         </div>
       </ActionDialog>
 
