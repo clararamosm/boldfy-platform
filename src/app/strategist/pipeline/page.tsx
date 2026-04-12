@@ -323,9 +323,9 @@ export default function StrategistPipelinePage() {
   }
 
   return (
-    <>
+    <div className="flex flex-col h-svh overflow-hidden">
       <Header title={t.contentPipeline.title} />
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Top bar: Company + TL filter + new post (sticky) */}
         <div className="shrink-0 px-4 md:px-6 pt-4 md:pt-6 pb-3 flex flex-wrap items-center gap-3">
           {/* Company selector */}
@@ -393,7 +393,7 @@ export default function StrategistPipelinePage() {
           <div
             ref={kanbanRef}
             onScroll={checkScroll}
-            className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide h-full"
+            className="flex gap-3 overflow-x-auto overflow-y-hidden pb-2 scrollbar-hide h-full"
           >
             {PIPELINE_STATUSES.map(status => {
               const cfg = STATUS_CONFIG[status];
@@ -405,7 +405,7 @@ export default function StrategistPipelinePage() {
               return (
                 <div
                   key={status}
-                  className="flex-shrink-0 w-[280px] flex flex-col"
+                  className="flex-shrink-0 w-[280px] flex flex-col h-full min-h-0"
                 >
                   {/* Column header */}
                   <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-t-2 bg-muted/30 ${cfg.kanbanBorder}`}>
@@ -426,7 +426,7 @@ export default function StrategistPipelinePage() {
                   </div>
 
                   {/* Column cards */}
-                  <div className="flex-1 bg-muted/10 rounded-b-lg p-1.5 space-y-1.5 overflow-y-auto">
+                  <div className="flex-1 min-h-0 bg-muted/10 rounded-b-lg p-1.5 space-y-1.5 overflow-y-auto">
                     {columnPosts.map(post => {
                       const tlName = getTlName(post);
                       const showDate = post.scheduledFor;
@@ -507,6 +507,6 @@ export default function StrategistPipelinePage() {
         </div>
 
       </main>
-    </>
+    </div>
   );
 }
