@@ -48,20 +48,37 @@ type Company = {
 function CompanyFormContent() {
     const { pending } = useFormStatus();
     const [locale, setLocale] = useState('pt-BR');
+    const [skipInvite, setSkipInvite] = useState(false);
     return (
         <div className="space-y-4">
             <div className="space-y-2">
                 <Label htmlFor="companyName">Nome da Empresa</Label>
                 <Input name="companyName" id="companyName" placeholder="Ex: TechCorp" disabled={pending} required />
             </div>
-            <div className="space-y-2">
-                <Label htmlFor="adminName">Nome do Admin</Label>
-                <Input name="adminName" id="adminName" placeholder="Ex: João Silva" disabled={pending} required />
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="adminEmail">E-mail do Admin</Label>
-                <Input name="adminEmail" id="adminEmail" type="email" placeholder="admin@techcorp.com" disabled={pending} required />
-            </div>
+             <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  name="skipInvite"
+                  value="true"
+                  id="skipInvite"
+                  className="h-4 w-4 rounded border-gray-300"
+                  checked={skipInvite}
+                  onChange={(e) => setSkipInvite(e.target.checked)}
+                />
+                <Label htmlFor="skipInvite" className="text-sm font-normal text-muted-foreground">Criar sem convidar admin (popular conta antes)</Label>
+             </div>
+            {!skipInvite && (
+              <>
+                <div className="space-y-2">
+                    <Label htmlFor="adminName">Nome do Admin</Label>
+                    <Input name="adminName" id="adminName" placeholder="Ex: João Silva" disabled={pending} required />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="adminEmail">E-mail do Admin</Label>
+                    <Input name="adminEmail" id="adminEmail" type="email" placeholder="admin@techcorp.com" disabled={pending} required />
+                </div>
+              </>
+            )}
              <div className="space-y-2">
                 <Label htmlFor="licenses">Número de Licenças (mín. 5)</Label>
                 <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="5" defaultValue="5" disabled={pending} required />
@@ -86,10 +103,6 @@ function CompanyFormContent() {
                 <p className="text-xs text-muted-foreground">Define o idioma de toda a interface para esta empresa.</p>
              </div>
              <p className="text-xs text-muted-foreground">Licenças contam apenas colaboradores (a conta de admin é gratuita). Mínimo de 5 licenças.</p>
-             <div className="flex items-center gap-2 pt-2">
-                <input type="checkbox" name="skipInvite" value="true" id="skipInvite" className="h-4 w-4 rounded border-gray-300" />
-                <Label htmlFor="skipInvite" className="text-sm font-normal text-muted-foreground">Criar sem enviar convite (popular conta antes)</Label>
-             </div>
         </div>
     );
 }

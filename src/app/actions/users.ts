@@ -92,11 +92,12 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink, loc
 
 const InviteAdminSchema = z.object({
   companyName: z.string().min(1, 'Nome da empresa é obrigatório.'),
-  adminName: z.string().min(1, 'Nome do admin é obrigatório.'),
-  adminEmail: z.string().email('E-mail inválido.'),
+  adminName: z.string().optional().default(''),
+  adminEmail: z.string().optional().default(''),
   licenses: z.coerce.number().int().min(5, 'O número de licenças deve ser no mínimo 5.').positive('Número de licenças deve ser positivo.'),
   tlLicenses: z.coerce.number().int().min(0).default(0),
   locale: z.enum(['pt-BR', 'en']).default('pt-BR'),
+  skipInvite: z.string().optional(),
 });
 
 type InviteAdminState = {
@@ -116,18 +117,26 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
 
   const validatedData = InviteAdminSchema.safeParse({
     companyName: formData.get('companyName'),
-    adminName: formData.get('adminName'),
-    adminEmail: formData.get('adminEmail'),
+    adminName: formData.get('adminName') || '',
+    adminEmail: formData.get('adminEmail') || '',
     licenses: formData.get('licenses'),
     tlLicenses: formData.get('tlLicenses') || 0,
     locale: formData.get('locale') || 'pt-BR',
+    skipInvite: formData.get('skipInvite') || undefined,
   });
 
   if (!validatedData.success) {
     return { error: validatedData.error.errors.map(e => e.message).join(', ') };
   }
 
-  const { companyName, adminName, adminEmail, licenses, tlLicenses, locale } = validatedData.data;
+  const { companyName, adminName, adminEmail, licenses, tlLicenses, locale, skipInvite: skipInviteVal } = validatedData.data;
+  const skipInvite = skipInviteVal === 'true';
+
+  // When NOT skipping invite, admin name and email are required
+  if (!skipInvite) {
+    if (!adminName) return { error: 'Nome do admin é obrigatório.' };
+    if (!adminEmail || !z.string().email().safeParse(adminEmail).success) return { error: 'E-mail do admin inválido.' };
+  }
 
   try {
     const companyRef = await adminDb.collection("companies").add({
@@ -136,7 +145,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       licenses: licenses,
       tlLicenses: tlLicenses,
       locale: locale,
-      adminProfile: { email: adminEmail, name: adminName },
+      adminProfile: adminEmail ? { email: adminEmail, name: adminName } : { email: '', name: '' },
       brandContext: { valueProposition: '', tagline: '', businessKeywords: [], solutions: [], targetPainPoints: [], targetAudience: '', approvedTopics: [], prohibitedPhrases: [] },
       subscription: {
         plan: 'trial',
@@ -166,6 +175,11 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    // When skipInvite is set, only create the company (no admin user yet)
+    if (skipInvite) {
+      return { success: true };
+    }
+
     const userRecord = await adminAuth.createUser({
       email: adminEmail,
       displayName: adminName,
@@ -182,22 +196,18 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // Skip invitation email if skipInvite flag is set (for pre-populating accounts)
-    const skipInvite = formData.get('skipInvite') === 'true';
-    if (!skipInvite) {
-      const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-      const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
-      sendInvitationEmail({
-        to: adminEmail,
-        name: adminName,
-        companyName: companyName,
-        role: locale === 'en' ? 'Administrator' : 'Administrador',
-        resetLink,
-        locale,
-      }).catch((emailError) => {
-        console.error("Error sending admin invitation email:", emailError);
-      });
-    }
+    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+    const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
+    sendInvitationEmail({
+      to: adminEmail,
+      name: adminName,
+      companyName: companyName,
+      role: locale === 'en' ? 'Administrator' : 'Administrador',
+      resetLink,
+      locale,
+    }).catch((emailError) => {
+      console.error("Error sending admin invitation email:", emailError);
+    });
 
     return { success: true };
   } catch (error) {
