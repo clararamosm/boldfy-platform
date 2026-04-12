@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuthToken } from '@/lib/auth-client';
 import { useAuth } from '@/contexts/auth-context';
-import { getPostWithAccess, savePostWithVersion, getPostComments, getPostVersions, addBotComment } from '@/app/actions/post-editor';
+import { getPostWithAccess, savePostWithVersion, getPostComments, getPostVersions, addBotComment, validateForceSchedule } from '@/app/actions/post-editor';
 import { updatePipelinePost } from '@/app/actions/content-pipeline';
 import { useToast } from '@/hooks/use-toast';
 import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
@@ -219,20 +219,39 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
 
   // ---- Handle force schedule ----
   const handleForceSchedule = useCallback(async () => {
-    if (!canEdit || !post || !post.scheduledFor) return;
-
-    // Optimistic: update status to agendado
-    const previousStatus = post.status;
-    setPost(prev => prev ? { ...prev, status: 'agendado' as PipelineStatus } : prev);
+    if (!canEdit || !post) return;
 
     try {
       const token = await getAuthToken();
 
+      // 1. Validate before scheduling
+      const validation = await validateForceSchedule(token, tlId, postId);
+
+      if (!validation.valid) {
+        // Validation failed — add bot comment with the specific error
+        const errorMessage = `⚠️ Post não foi agendado: ${validation.error || 'Erro desconhecido.'}`;
+        const commentResult = await addBotComment(token, tlId, postId, errorMessage);
+        if (commentResult.comment) {
+          setComments(prev => [...prev, commentResult.comment!]);
+        }
+
+        toast({
+          title: 'Agendamento não realizado',
+          description: validation.error || 'Verifique os requisitos e tente novamente.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // 2. Validation passed — proceed with scheduling
+      const previousStatus = post.status;
+      setPost(prev => prev ? { ...prev, status: 'agendado' as PipelineStatus } : prev);
+
       // Update status to agendado
       await updatePipelinePost(token, tlId, postId, { status: 'agendado' });
 
-      // Format date for bot comment
-      const d = new Date(post.scheduledFor);
+      // Format date for bot success comment
+      const d = new Date(post.scheduledFor!);
       const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const hh = String(d.getHours()).padStart(2, '0');
       const mm = String(d.getMinutes()).padStart(2, '0');
@@ -240,7 +259,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
 
       const botMessage = `📅 Post agendado com sucesso para ${dateStr}${timeStr}.`;
 
-      // Add bot comment
+      // Add bot success comment
       const commentResult = await addBotComment(token, tlId, postId, botMessage);
       if (commentResult.comment) {
         setComments(prev => [...prev, commentResult.comment!]);
@@ -251,8 +270,6 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
         description: `Post agendado para ${dateStr}${timeStr}.`,
       });
     } catch {
-      // Revert on error
-      setPost(prev => prev ? { ...prev, status: previousStatus } : prev);
       toast({
         title: 'Erro ao agendar',
         description: 'Não foi possível forçar o agendamento. Tente novamente.',

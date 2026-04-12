@@ -4,6 +4,8 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireAuth } from '@/lib/auth-guard';
+import { isTokenExpired } from '@/lib/linkedin';
+import type { LinkedInConnection } from '@/lib/linkedin';
 import type { PostComment, PostVersion } from '@/lib/post-editor-types';
 import type { PipelinePost } from '@/app/actions/content-pipeline';
 
@@ -449,5 +451,77 @@ export async function addBotComment(
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Erro ao adicionar comentário do bot.';
     return { error: msg };
+  }
+}
+
+// ---- Validate Force Schedule ----
+
+export async function validateForceSchedule(
+  idToken: string,
+  tlUserId: string,
+  postId: string
+): Promise<{ valid: boolean; error?: string }> {
+  try {
+    const user = await requirePostAccess(idToken, tlUserId);
+    if (!user.canEdit) return { valid: false, error: 'Sem permissão para agendar.' };
+
+    // 1. Check post exists and has scheduledFor
+    const postDoc = await adminDb
+      .collection('users')
+      .doc(tlUserId)
+      .collection('contentPipeline')
+      .doc(postId)
+      .get();
+
+    if (!postDoc.exists) return { valid: false, error: 'Post não encontrado.' };
+
+    const postData = postDoc.data()!;
+    const scheduledFor = postData.scheduledFor as string | null;
+
+    if (!scheduledFor) {
+      return { valid: false, error: '📋 Defina uma data antes de agendar o post.' };
+    }
+
+    // 2. Check time is set (not 00:00)
+    const timePart = scheduledFor.includes('T')
+      ? scheduledFor.split('T')[1]?.substring(0, 5)
+      : null;
+
+    if (!timePart || timePart === '00:00') {
+      return { valid: false, error: '🕐 Defina um horário para o agendamento (não pode ser 00:00).' };
+    }
+
+    // 3. Check scheduled date is in the future
+    const scheduledDate = new Date(scheduledFor);
+    if (scheduledDate.getTime() < Date.now()) {
+      return { valid: false, error: '📅 A data/horário de agendamento já passou. Escolha uma data futura.' };
+    }
+
+    // 4. Check LinkedIn connection on TL
+    const tlDoc = await adminDb.collection('users').doc(tlUserId).get();
+    if (!tlDoc.exists) return { valid: false, error: 'Thought Leader não encontrado.' };
+
+    const tlData = tlDoc.data()!;
+    const connection = tlData.linkedinConnection as LinkedInConnection | undefined;
+
+    if (!connection) {
+      return {
+        valid: false,
+        error: '🔗 LinkedIn não conectado. O Thought Leader precisa conectar o LinkedIn antes de agendar posts.',
+      };
+    }
+
+    // 5. Check token validity
+    if (isTokenExpired(connection.tokenExpiresAt)) {
+      return {
+        valid: false,
+        error: '🔑 Token do LinkedIn expirado. O Thought Leader precisa reconectar o LinkedIn para renovar o acesso.',
+      };
+    }
+
+    return { valid: true };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Erro ao validar agendamento.';
+    return { valid: false, error: msg };
   }
 }
