@@ -220,6 +220,82 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
   }
 }
 
+// ---- Invite Admin to Existing Company (by Master) ----
+
+export async function inviteAdminToCompany(
+  idToken: string,
+  companyId: string,
+  adminName: string,
+  adminEmail: string,
+): Promise<{ success?: boolean; error?: string }> {
+  if (!adminAuth) return { error: "Serviço de autenticação indisponível." };
+
+  try {
+    await requireMaster(idToken);
+  } catch (e: unknown) {
+    return { error: e instanceof Error ? e.message : 'Erro de autenticação.' };
+  }
+
+  if (!adminName || !adminEmail) return { error: 'Nome e e-mail do admin são obrigatórios.' };
+  if (!z.string().email().safeParse(adminEmail).success) return { error: 'E-mail inválido.' };
+
+  try {
+    const companyDoc = await adminDb.collection('companies').doc(companyId).get();
+    if (!companyDoc.exists) return { error: 'Empresa não encontrada.' };
+    const companyData = companyDoc.data()!;
+    const companyName = companyData.companyName || '';
+    const locale = (companyData.locale as 'pt-BR' | 'en') || 'pt-BR';
+
+    // Check if admin already exists for this company
+    const existingAdmin = await adminDb.collection('users')
+      .where('companyId', '==', companyId)
+      .where('role', '==', 'admin')
+      .get();
+    if (!existingAdmin.empty) return { error: 'Esta empresa já possui um admin.' };
+
+    const userRecord = await adminAuth.createUser({
+      email: adminEmail,
+      displayName: adminName,
+      password: crypto.randomBytes(16).toString('base64url') + 'A1!',
+    });
+
+    await adminDb.collection('users').doc(userRecord.uid).set({
+      role: 'admin',
+      name: adminName,
+      companyId,
+      companyName,
+      points: 0,
+      profile: { name: adminName, email: adminEmail },
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    // Update company adminProfile
+    await adminDb.collection('companies').doc(companyId).update({
+      adminProfile: { email: adminEmail, name: adminName },
+    });
+
+    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+    const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
+    sendInvitationEmail({
+      to: adminEmail,
+      name: adminName,
+      companyName,
+      role: locale === 'en' ? 'Administrator' : 'Administrador',
+      resetLink,
+      locale,
+    }).catch((err) => console.error("Error sending admin invite:", err));
+
+    return { success: true };
+  } catch (error) {
+    if ((error as { code?: string })?.code === 'auth/email-already-exists') {
+      return { error: `Usuário com e-mail ${adminEmail} já existe.` };
+    }
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in inviteAdminToCompany:', msg);
+    return { error: `Erro ao convidar admin: ${msg}` };
+  }
+}
+
 // ---- Invite Collaborator Action (by Admin) ----
 
 const InviteCollaboratorSchema = z.object({

@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, PlusCircle, LogIn, Loader2, Pencil, Trash2, Globe } from "lucide-react";
+import { MoreHorizontal, PlusCircle, LogIn, Loader2, Pencil, Trash2, Globe, Mail } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -22,7 +22,7 @@ import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { getAuthToken } from '@/lib/auth-client';
-import { inviteAdmin } from '@/app/actions';
+import { inviteAdmin, inviteAdminToCompany } from '@/app/actions';
 import { deleteCompany } from '@/app/deleteCompanyAction';
 
 type Company = {
@@ -130,6 +130,10 @@ export default function MasterEmpresasPage() {
     const logoInputRef = useRef<HTMLInputElement>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmDeleteName, setConfirmDeleteName] = useState("");
+    const [inviteAdminCompany, setInviteAdminCompany] = useState<Company | null>(null);
+    const [inviteAdminName, setInviteAdminName] = useState('');
+    const [inviteAdminEmail, setInviteAdminEmail] = useState('');
+    const [isInvitingAdmin, setIsInvitingAdmin] = useState(false);
     const [cachedToken, setCachedToken] = useState('');
     const formRef = useRef<HTMLFormElement>(null);
 
@@ -347,6 +351,28 @@ export default function MasterEmpresasPage() {
     }
   };
 
+  const handleInviteAdminToCompany = async () => {
+    if (!inviteAdminCompany) return;
+    setIsInvitingAdmin(true);
+    try {
+      const token = await getAuthToken();
+      const result = await inviteAdminToCompany(token, inviteAdminCompany.id, inviteAdminName, inviteAdminEmail);
+      if (result.error) {
+        toast({ variant: 'destructive', title: 'Erro', description: result.error });
+      } else {
+        toast({ title: 'Admin convidado com sucesso!', description: 'O admin receberá um e-mail para criar sua senha.' });
+        setInviteAdminCompany(null);
+        setInviteAdminName('');
+        setInviteAdminEmail('');
+        fetchCompanies();
+      }
+    } catch {
+      toast({ variant: 'destructive', title: 'Erro ao convidar admin.' });
+    } finally {
+      setIsInvitingAdmin(false);
+    }
+  };
+
   const handleDeleteCompanyConfirm = (company: Company) => {
     setConfirmDeleteId(company.id);
     setConfirmDeleteName(company.companyName);
@@ -481,6 +507,11 @@ export default function MasterEmpresasPage() {
                                                 <DropdownMenuItem asChild disabled={company.status === 'Inativa'}>
                                                     <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
                                                 </DropdownMenuItem>
+                                                {company.adminPending && !company.adminProfile?.email && (
+                                                  <DropdownMenuItem onClick={() => { setInviteAdminCompany(company); setInviteAdminName(''); setInviteAdminEmail(''); }}>
+                                                    <Mail className="mr-2 h-4 w-4" />Convidar Admin
+                                                  </DropdownMenuItem>
+                                                )}
                                                 <DropdownMenuItem onClick={() => handleToggleStatus(company)}>
                                                     {company.status === 'Ativa' ? 'Desativar' : 'Ativar'}
                                                 </DropdownMenuItem>
@@ -579,6 +610,28 @@ export default function MasterEmpresasPage() {
           </div>
           <Button onClick={handleSaveCompanyEdit} className="w-full">
             Salvar Alterações
+          </Button>
+        </div>
+      </ActionDialog>
+
+      {/* Invite Admin to Existing Company Dialog */}
+      <ActionDialog
+        open={!!inviteAdminCompany}
+        onOpenChange={(open) => { if (!open) setInviteAdminCompany(null); }}
+        title="Convidar Admin"
+        description={`Envie um convite para o administrador da empresa "${inviteAdminCompany?.companyName}".`}
+      >
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="invAdminName">Nome do Admin</Label>
+            <Input id="invAdminName" placeholder="Ex: João Silva" value={inviteAdminName} onChange={(e) => setInviteAdminName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="invAdminEmail">E-mail do Admin</Label>
+            <Input id="invAdminEmail" type="email" placeholder="admin@empresa.com" value={inviteAdminEmail} onChange={(e) => setInviteAdminEmail(e.target.value)} />
+          </div>
+          <Button onClick={handleInviteAdminToCompany} disabled={isInvitingAdmin || !inviteAdminName || !inviteAdminEmail} className="w-full">
+            {isInvitingAdmin ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando...</> : 'Enviar Convite'}
           </Button>
         </div>
       </ActionDialog>
