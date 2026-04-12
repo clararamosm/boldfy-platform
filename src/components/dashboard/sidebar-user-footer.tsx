@@ -31,6 +31,7 @@ type SidebarUserFooterProps = {
   };
   roleLabel: string;
   fallbackInitials?: string;
+  avatarOverride?: string;
   feedbackPage?: string;
   menuItems?: FooterMenuItem[];
   onLogout: () => void;
@@ -43,19 +44,21 @@ export function SidebarUserFooter({
   user,
   roleLabel,
   fallbackInitials = 'US',
+  avatarOverride,
   feedbackPage,
   menuItems = [],
   onLogout,
   logoutLabel,
 }: SidebarUserFooterProps) {
+  const avatarSrc = avatarOverride || user.profile?.avatarUrl;
   return (
     <div className="flex items-center w-full gap-1 px-1">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="flex-1 justify-start gap-2 px-2 py-3 h-auto min-w-0">
             <Avatar className="h-9 w-9 shrink-0">
-              {user.profile?.avatarUrl && (
-                <AvatarImage src={user.profile.avatarUrl} alt={user.name || ''} />
+              {avatarSrc && (
+                <AvatarImage src={avatarSrc} alt={user.name || ''} />
               )}
               <AvatarFallback className="bg-primary/10 text-primary text-xs">
                 {user.name?.substring(0, 2).toUpperCase() || fallbackInitials}

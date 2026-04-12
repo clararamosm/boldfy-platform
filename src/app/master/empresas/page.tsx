@@ -3,7 +3,8 @@
 
 import React, { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, getDocs, getDoc, deleteDoc, doc, updateDoc, orderBy, query, where, writeBatch } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ type Company = {
     };
     /** True when the admin has never logged in (no password set yet) */
     adminPending?: boolean;
+    logoUrl?: string;
 };
 
 function CompanyFormContent() {
@@ -106,6 +108,9 @@ export default function MasterEmpresasPage() {
     const [editLicenses, setEditLicenses] = useState(0);
     const [editTLLicenses, setEditTLLicenses] = useState(0);
     const [isEditCompanyOpen, setIsEditCompanyOpen] = useState(false);
+    const [editLogoUrl, setEditLogoUrl] = useState<string | undefined>(undefined);
+    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const logoInputRef = useRef<HTMLInputElement>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmDeleteName, setConfirmDeleteName] = useState("");
     const [cachedToken, setCachedToken] = useState('');
@@ -282,7 +287,29 @@ export default function MasterEmpresasPage() {
     setEditCompanyName(company.companyName);
     setEditLicenses(company.licenses);
     setEditTLLicenses(company.tlLicenses || 0);
+    setEditLogoUrl(company.logoUrl);
     setIsEditCompanyOpen(true);
+  };
+
+  const handleLogoUpload = async (file: File) => {
+    if (!editingCompany || !file) return;
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ variant: 'destructive', title: 'Use PNG, JPG ou WEBP.' });
+      return;
+    }
+    setIsUploadingLogo(true);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const storageRef = ref(storage, `companies/${editingCompany.id}/logo.${ext}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setEditLogoUrl(url);
+    } catch {
+      toast({ variant: 'destructive', title: 'Erro ao fazer upload do logo.' });
+    } finally {
+      setIsUploadingLogo(false);
+    }
   };
 
   const handleSaveCompanyEdit = async () => {
@@ -292,6 +319,7 @@ export default function MasterEmpresasPage() {
         companyName: editCompanyName,
         licenses: editLicenses,
         tlLicenses: editTLLicenses,
+        ...(editLogoUrl !== undefined && { logoUrl: editLogoUrl }),
       });
       toast({ title: "Empresa atualizada com sucesso!" });
       setIsEditCompanyOpen(false);
@@ -465,6 +493,44 @@ export default function MasterEmpresasPage() {
         description="Altere o nome e as licenças da empresa."
       >
         <div className="space-y-4 py-4">
+          {/* Logo */}
+          <div className="space-y-2">
+            <Label>Logo da Empresa</Label>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16 border">
+                {editLogoUrl ? (
+                  <AvatarImage src={editLogoUrl} alt="Logo" />
+                ) : null}
+                <AvatarFallback className="bg-muted text-muted-foreground text-lg">
+                  {editCompanyName?.substring(0, 2).toUpperCase() || 'EM'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={isUploadingLogo}
+                >
+                  {isUploadingLogo ? (
+                    <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Enviando...</>
+                  ) : editLogoUrl ? 'Trocar Logo' : 'Upload Logo'}
+                </Button>
+                <p className="text-[11px] text-muted-foreground">PNG, JPG ou WEBP</p>
+              </div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                className="hidden"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleLogoUpload(file);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="editCompanyName">Nome da Empresa</Label>
             <Input

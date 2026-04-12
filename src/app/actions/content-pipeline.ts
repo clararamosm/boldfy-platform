@@ -446,6 +446,7 @@ export async function markPipelinePostPublished(
 export type StrategistSidebarCompany = {
   id: string;
   name: string;
+  logoUrl?: string;
   tls: { id: string; name: string }[];
 };
 
@@ -468,7 +469,9 @@ export async function getStrategistSidebarData(
     for (const companyId of assignedCompanies) {
       const compDoc = await adminDb.collection('companies').doc(companyId).get();
       if (!compDoc.exists) continue;
-      const companyName = compDoc.data()?.companyName || 'Empresa';
+      const compData = compDoc.data();
+      const companyName = compData?.companyName || 'Empresa';
+      const logoUrl = compData?.logoUrl as string | undefined;
 
       const tlSnap = await adminDb.collection('users')
         .where('companyId', '==', companyId)
@@ -481,7 +484,7 @@ export async function getStrategistSidebarData(
       }));
       tls.sort((a, b) => a.name.localeCompare(b.name));
 
-      result.push({ id: companyId, name: companyName, tls });
+      result.push({ id: companyId, name: companyName, logoUrl, tls });
     }
 
     result.sort((a, b) => a.name.localeCompare(b.name));

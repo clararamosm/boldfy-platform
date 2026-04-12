@@ -29,6 +29,7 @@ import {
     BookOpen,
     FileText,
 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export function StrategistSidebarNav() {
     const { user } = useAuth();
@@ -133,7 +134,16 @@ export function StrategistSidebarNav() {
                         <SidebarGroup className="py-0">
                             <SidebarGroupLabel asChild>
                                 <CollapsibleTrigger className="flex w-full items-center gap-1 cursor-pointer">
-                                    <Building2 className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                                    {company.logoUrl ? (
+                                        <Avatar className="h-4 w-4 shrink-0">
+                                            <AvatarImage src={company.logoUrl} alt={company.name} />
+                                            <AvatarFallback className="text-[8px]">
+                                                {company.name.substring(0, 2).toUpperCase()}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                    ) : (
+                                        <Building2 className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                                    )}
                                     <span className="truncate">{company.name}</span>
                                     <ChevronRight className="ml-auto h-3 w-3 shrink-0 transition-transform group-data-[state=open]/company:rotate-90" />
                                 </CollapsibleTrigger>
@@ -155,7 +165,9 @@ export function StrategistSidebarNav() {
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
 
-                                        {/* Pipeline */}
+                                        {/* Pipeline + TL Profiles — only when company has TLs */}
+                                        {company.tls.length > 0 && (
+                                        <>
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
                                                 asChild
@@ -169,7 +181,6 @@ export function StrategistSidebarNav() {
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>
 
-                                        {/* TL Profiles */}
                                         {company.tls.map(tl => (
                                             <SidebarMenuItem key={tl.id}>
                                                 <Collapsible className="group/tl w-full">
@@ -223,6 +234,8 @@ export function StrategistSidebarNav() {
                                                 </Collapsible>
                                             </SidebarMenuItem>
                                         ))}
+                                        </>
+                                        )}
                                     </SidebarMenu>
                                 </SidebarGroupContent>
                             </CollapsibleContent>
