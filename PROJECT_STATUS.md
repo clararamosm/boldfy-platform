@@ -1,15 +1,16 @@
 # Boldfy Platform — Project Status
 
-> Atualizado em: Abril 2026
+> Atualizado em: 12 Abril 2026
 > Build: LIMPO (0 erros, 0 warnings)
 > TypeScript: LIMPO (0 erros)
-> Seguranca: Auditado e corrigido (2 rodadas)
+> Seguranca: Auditado 3 rodadas (ultima: Abril 2026)
+> Diagnostico: Completo — ver secao "Audit Abril 2026"
 
 ---
 
 ## O que e a Boldfy
 
-Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaboradores ganham pontos completando trilhas de aprendizado e missoes no LinkedIn, e trocam por recompensas. O conteudo e alinhado com a marca da empresa via IA.
+Plataforma de **employee advocacy, thought leadership e engajamento** para empresas B2B. Colaboradores ganham pontos completando trilhas de aprendizado e missoes no LinkedIn, e trocam por recompensas. Thought Leaders tem pipeline de conteudo gerenciado por estrategistas com IA. O conteudo e alinhado com a marca da empresa via IA.
 
 ---
 
@@ -33,6 +34,7 @@ Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaborador
 - Cria empresas e convida admins
 - Gerencia trilhas globais (templates)
 - Visualiza analytics da plataforma
+- Aprova posts e ideias do pipeline de TLs
 
 ### Admin (Administrador da Empresa)
 - Acessa `/admin/`
@@ -42,6 +44,24 @@ Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaborador
 - Configura brand context da empresa
 - Visualiza dashboard com metricas
 
+### Strategist (Estrategista de Conteudo)
+- Acessa `/strategist/`
+- Gerencia pipeline de conteudo para Thought Leaders
+- Cria e edita posts (briefing, caption, design)
+- Calendario drag & drop com agendamento
+- Configuracao de Slack notifications
+- Brand manual e estrategia de conteudo por TL
+- Publicacao direta no LinkedIn do TL
+
+### Thought Leader
+- Acessa `/thoughtleader/`
+- Visualiza e aprova briefings e posts no backlog
+- Calendario read-only com todos os posts do pipeline
+- Feed de LinkedIn (posts publicados da empresa)
+- Manual de marca pessoal (visual rico)
+- Estrategia de conteudo (read-only)
+- Conecta LinkedIn para publicacao
+
 ### Colaborador (Funcionario)
 - Acessa `/colaborador/`
 - Completa trilhas e missoes
@@ -49,6 +69,8 @@ Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaborador
 - Publica no LinkedIn (agendamento + publicacao direta)
 - Usa assistente de IA para alinhar conteudo
 - Gerencia perfil e marca pessoal
+- Calendario de posts pessoais
+- Feed de LinkedIn da empresa
 
 ---
 
@@ -61,6 +83,7 @@ Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaborador
 | `/login` | Autenticacao (Firebase Auth) |
 | `/beta-test` | Formulario de leads beta |
 | `/privacidade` | Politica de privacidade |
+| `/post/[company]/[tl]/[postId]` | Pagina publica de post (preview) |
 
 ### Master
 | Rota | Funcao |
@@ -81,6 +104,25 @@ Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaborador
 | `/admin/linkedin-feed` | Feed de posts publicados pelos colaboradores |
 | `/admin/configuracoes` | Brand context, locale, preferencias da empresa |
 | `/admin/suporte` | Enviar feedback/bugs para Notion |
+
+### Strategist
+| Rota | Funcao |
+|------|--------|
+| `/strategist/dashboard` | Visao geral de todos TLs e pipeline |
+| `/strategist/calendario` | Calendario drag & drop com agendamento |
+| `/strategist/posts/[id]` | Editor de post (briefing, caption, design, publicacao) |
+| `/strategist/conteudo` | Pipeline kanban/lista de conteudo |
+| `/strategist/configuracoes` | Slack, integracao LinkedIn, configuracoes gerais |
+
+### Thought Leader
+| Rota | Funcao |
+|------|--------|
+| `/thoughtleader/backlog` | 3 boxes: Aprovar Post, Aprovar Briefing, Backlog + Adicionar Ideia |
+| `/thoughtleader/calendario` | Calendario read-only com posts do pipeline |
+| `/thoughtleader/linkedin-feed` | Feed de posts publicados da empresa |
+| `/thoughtleader/manual` | Manual de marca pessoal (design visual rico) |
+| `/thoughtleader/estrategia` | Estrategia de conteudo (read-only) |
+| `/thoughtleader/configuracoes` | LinkedIn connection, perfil |
 
 ### Colaborador
 | Rota | Funcao |
@@ -122,13 +164,15 @@ Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaborador
 | `missions.ts` | submitMissionProof, completeMissionSelf, reviewMissionProof | requireAuth + company check |
 | `rewards.ts` | redeemReward, markRescueAsPaid | requireAuth/requireSelf/requireAdmin |
 | `points.ts` | getCompanyRanking, recalculatePoints | requireAuth |
-| `posts.ts` | createScheduledPost, updateScheduledPost, deleteScheduledPost, etc | requireSelf |
+| `posts.ts` | createScheduledPost, updateScheduledPost, deleteScheduledPost, getCompanyFeed, markFeedAsRead | requireSelf/requireAuth |
 | `linkedin.ts` | getLinkedInAuthUrl, disconnectLinkedIn, publishToLinkedIn, etc | requireSelf |
 | `content.ts` | handleAlignContent, generateHooks, generateWithHook, toggleStarContent | requireAuth + userId + companyId check |
+| `content-pipeline.ts` | getPipelinePosts, createPipelineIdea, approvePipelineIdea, approvePipelinePost, rejectPipeline*, resolveSlugs, updatePostStatus, etc | requireAuth + manual role checks |
+| `slack.ts` | getSlackChannels, getSlackConfig, saveSlackConfig, testSlackNotification | requireStrategist (master bloqueado exceto test) |
 | `hot-topics.ts` | getHotTopics, regenerateHotTopics | requireAuth + admin check |
 | `feedback.ts` | sendFeedbackToNotion, sendSupportToNotion | requireAuth + server-verified identity |
 | `dashboard.ts` | getAdminDashboardData | requireAdmin |
-| `beta-leads.ts` | sendBetaLeadToNotion | Publico (form de leads) |
+| `beta-leads.ts` | sendBetaLeadToNotion | Publico (sem auth — risco de spam) |
 
 ---
 
@@ -156,7 +200,12 @@ Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaborador
 - `pointsHistory` — Log de transacoes de pontos (ganho/gasto)
 - `rescues` — Resgates do usuario
 - `generatedContent` — Conteudo gerado pela IA (arquivo pessoal)
-- `scheduledPosts` — Posts agendados/publicados no LinkedIn
+- `scheduledPosts` — Posts agendados/publicados no LinkedIn (colaboradores)
+- `contentPipeline` — Pipeline de conteudo do TL (gerenciado por strategist)
+
+### Subcolecoes de Company > ThoughtLeaders
+- `brandManual/main` — Manual de marca pessoal (personalidade, arquetipos, tom de voz, vocabulario, etc.)
+- `contentStrategy/main` — Estrategia de conteudo (pilares, topicos, narrativa, messaging)
 
 ---
 
@@ -205,6 +254,47 @@ Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaborador
 - pointsHistory: client so cria entries tipo 'gain' + source 'trilha', cap 500pts
 - Campos protegidos: role, companyId, companyName, points (nao alteraveis client-side)
 - Company subcollections: write restrito a admin/master
+
+---
+
+## Audit Abril 2026 — Diagnostico Completo
+
+### Seguranca & Roles
+
+| Sev | Issue | Local | Acao |
+|-----|-------|-------|------|
+| MEDIUM | Beta leads sem auth | `actions/beta-leads.ts` | Adicionar rate limit ou CAPTCHA |
+| MEDIUM | resolveSlugs sem role check | `actions/content-pipeline.ts:558` | Qualquer user autenticado enumera empresas/TLs — restringir por role |
+| MEDIUM | Slack bloqueado pra master | `actions/slack.ts` | `requireStrategist` em 3/4 funcoes bloqueia master — ajustar guard |
+| MEDIUM | Approvals sem guard tipado | `actions/content-pipeline.ts:288,328` | `requireAuth` + check manual — funciona mas risco de regressao |
+| LOW | Admin excluido do post editor | `actions/posts.ts` | `requireSelf` impede admin de editar posts de colaboradores |
+| LOW | Session cookie role stale | `middleware.ts` | Cookie nao reflete mudancas de role ate relogin |
+| LOW | console.error abundante | Projeto inteiro | ~115 ocorrencias — migrar para logger estruturado |
+
+### Complexidade & Reuso
+
+| Pri | Issue | Impacto | Acao |
+|-----|-------|---------|------|
+| HIGH | LinkedIn Feed triplicado | 3 paginas ~270 linhas cada, quase identicas | Extrair `<LinkedInFeedView>` compartilhado |
+| HIGH | N+1 queries no strategist | Loop sequencial sobre TLs (1 query/TL) | Collection group query ou batch parallel |
+| HIGH | Master dashboard client-side | Firebase SDK no client com N+1 subcollections | Migrar para server action com Admin SDK |
+| MEDIUM | 6 layouts duplicados | Mesmo padrao (auth + sidebar + footer + Suspense) | Criar `<RoleLayout>` generico parametrizado |
+| MEDIUM | 14 arquivos +500 linhas | content-pipeline.ts (780+), admin config, etc | Split em modulos menores |
+| MEDIUM | i18n inconsistente | Strategist/master hardcoded em portugues | Internacionalizar com sistema i18n existente |
+| MEDIUM | Import patterns mistos | Dynamic import() vs static sem padrao claro | Padronizar: static para server actions, dynamic para lazy load |
+| MEDIUM | Zero React.memo | Nenhum componente usa memo; listas re-renderizam tudo | Adicionar em FeedPostCard, CalendarPostCard, BacklogCard |
+| LOW | Dead code | Variaveis/imports nao-usados espalhados | Lint cleanup |
+
+### Recomendacoes (ordem de prioridade)
+
+1. Extrair `<LinkedInFeedView>` — elimina 500+ linhas duplicadas (30min)
+2. Collection group query para pipeline — elimina N+1 no strategist
+3. Migrar master dashboard para server action — seguranca + perf
+4. `<RoleLayout>` generico — 5 layouts → 1 componente + configs
+5. Rate limiting no beta-leads — previne spam
+6. Permitir master no Slack config — ajustar guards
+7. i18n no strategist/master — consistencia
+8. React.memo em componentes de lista — quick win de perf
 
 ---
 
@@ -261,8 +351,39 @@ Plataforma de **employee advocacy e engajamento** para empresas B2B. Colaborador
 - [FIX] .env.example atualizado com todas variaveis
 - [FIX] AuthUser type expandido com campo name
 
+### Fase 2 — Roles Expandidos (Strategist + Thought Leader)
+- Novos roles: `strategist` e `thoughtleader`
+- Pipeline de conteudo completo (backlog → producao → aprovacao → publicacao)
+- Calendario drag & drop para strategist com agendamento
+- Editor de post rico (briefing, caption, design copy, mediaUrl)
+- Brand manual editor por TL (personalidade, arquetipos, tom, vocabulario)
+- Content strategy editor por TL (pilares, topicos, narrativa)
+- Slack notifications configuraveis por empresa
+- Publicacao no LinkedIn do TL via strategist
+- Pipeline status machine com 10 estados
+- Shared calendar components (CalendarPostCard, CalendarDayCell)
+
+### Fase 2.5 — Alinhamento TL + Redesign Visual
+- TL backlog rewrite (3 boxes: Aprovar Post, Aprovar Briefing, Backlog + Adicionar Ideia)
+- TL calendario read-only (compartilha CalendarPostCard/CalendarDayCell)
+- TL LinkedIn feed (expandiu getCompanyFeed para suportar role thoughtleader)
+- TL manual de marca: redesign visual completo (do layout de cards simples para visual rico com grids, gradientes, atributos estilizados, arquetipos destacados, vocabulary pills, summary cards com accent bar)
+- Company logo no sidebar do TL
+- createPipelineIdea server action (TL pode sugerir ideias direto pro backlog)
+
+### Fase 2.7 — Diagnostico & Audit (Abril 2026)
+- Varredura completa de seguranca e roles (5 roles, 50+ server actions)
+- Audit de complexidade e oportunidades de reuso
+- Identificados 4 MEDIUM security issues, 3 HIGH complexity issues
+- PROJECT_STATUS.md atualizado com diagnostico completo
+- Nenhum item critico/blocker identificado
+
 ---
 
 ## Proximo Passo
 
-**Fase 2**: Nova camada de complexidade nos roles de usuario (conforme solicitado pela Clara). Detalhes a definir.
+**Fase 3**: Resolver os HIGH priority items do diagnostico:
+1. Extrair `<LinkedInFeedView>` compartilhado (DRY)
+2. Collection group query para eliminar N+1 no strategist
+3. Migrar master dashboard para server action
+4. Criar `<RoleLayout>` generico
