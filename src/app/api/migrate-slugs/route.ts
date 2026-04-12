@@ -1,27 +1,22 @@
 // src/app/api/migrate-slugs/route.ts
 // One-time migration: adds slug to companies and thought leaders that don't have one.
-// Call: POST /api/migrate-slugs (requires master role)
+// Call: POST /api/migrate-slugs with Authorization: Bearer <idToken>
 
-import { NextResponse } from 'next/server';
-import { db, auth } from '@/lib/firebase-admin';
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/firebase-admin';
+import { requireMaster } from '@/lib/auth-guard';
 import { generateSlug } from '@/lib/slugify';
-import { cookies } from 'next/headers';
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
     // Auth check: require master role
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('session')?.value;
-    if (!sessionCookie) {
-      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    const authHeader = req.headers.get('authorization') || '';
+    const idToken = authHeader.replace('Bearer ', '');
+    if (!idToken) {
+      return NextResponse.json({ error: 'Token não fornecido.' }, { status: 401 });
     }
 
-    const decoded = await auth.verifyIdToken(sessionCookie);
-    const userDoc = await db.collection('users').doc(decoded.uid).get();
-    const role = userDoc.data()?.role;
-    if (role !== 'master') {
-      return NextResponse.json({ error: 'Acesso negado. Apenas master.' }, { status: 403 });
-    }
+    await requireMaster(idToken);
 
     const log: string[] = [];
 
