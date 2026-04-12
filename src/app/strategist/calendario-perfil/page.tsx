@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
-import { getPipelinePosts, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
+import { getPipelinePosts, resolveSlugs, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
 import {
   ChevronLeft,
   ChevronRight,
@@ -59,9 +59,13 @@ export default function StrategistCalendarioPerfilPage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const companyId = searchParams.get('companyId');
-  const tlId = searchParams.get('tlId');
-  const tlName = searchParams.get('tlName') || 'Perfil';
+  const companySlug = searchParams.get('c');
+  const tlSlug = searchParams.get('tl');
+
+  // Resolved Firestore IDs from slugs
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [tlId, setTlId] = useState<string | null>(null);
+  const [tlName, setTlName] = useState('Perfil');
 
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<PipelinePost[]>([]);
@@ -71,6 +75,23 @@ export default function StrategistCalendarioPerfilPage() {
 
   // Pillar color map: pillarName → colorKey
   const [pillarColorMap, setPillarColorMap] = useState<Record<string, string>>({});
+
+  // ─── Resolve slugs to IDs ──────
+  useEffect(() => {
+    if (!companySlug || !tlSlug) return;
+    const resolve = async () => {
+      try {
+        const token = await getAuthToken();
+        const result = await resolveSlugs(token, companySlug, tlSlug);
+        if (result.companyId) setCompanyId(result.companyId);
+        if (result.tlId) setTlId(result.tlId);
+        if (result.tlName) setTlName(result.tlName);
+      } catch {
+        // silent
+      }
+    };
+    resolve();
+  }, [companySlug, tlSlug]);
 
   // ─── Fetch posts for this TL ──────
   const fetchData = useCallback(async () => {
@@ -138,14 +159,14 @@ export default function StrategistCalendarioPerfilPage() {
       });
 
       if (result.postId) {
-        router.push(`/post/${companyId}/${tlId}/${result.postId}`);
+        router.push(`/post/${companySlug}/${tlSlug}/${result.postId}`);
       }
     } catch (error) {
       console.error('Error creating post:', error);
     } finally {
       setIsCreating(false);
     }
-  }, [tlId, companyId, isCreating, router]);
+  }, [tlId, companySlug, tlSlug, isCreating, router]);
 
   // ─── Only posts with scheduledFor ──────
   const scheduledPosts = useMemo(() => {
@@ -182,7 +203,7 @@ export default function StrategistCalendarioPerfilPage() {
 
   // ─── Navigate to dedicated post page ──────
   const handlePostClick = (post: PipelinePost) => {
-    router.push(`/post/${companyId}/${tlId}/${post.id}`);
+    router.push(`/post/${companySlug}/${tlSlug}/${post.id}`);
   };
 
   // ─── Status counts ──────
@@ -194,7 +215,7 @@ export default function StrategistCalendarioPerfilPage() {
     return counts;
   }, [scheduledPosts]);
 
-  if (!tlId) {
+  if (!tlSlug) {
     return (
       <>
         <Header title="Calendário" />
@@ -225,7 +246,7 @@ export default function StrategistCalendarioPerfilPage() {
 
   return (
     <>
-      <Header title={`Calendário — ${decodeURIComponent(tlName)}`} />
+      <Header title={`Calendário — ${tlName}`} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="space-y-4">
           {/* Month navigation + New Post */}

@@ -20,8 +20,8 @@ interface SidebarNavProps {
 export function SidebarNav({ items }: SidebarNavProps) {
   const pathname = usePathname();
     const searchParams = useSearchParams();
-    const companyId = searchParams.get('companyId');
-    const buildHref = (href: string) => companyId ? `${href}?companyId=${companyId}` : href;
+    const companySlug = searchParams.get('c');
+    const buildHref = (href: string) => companySlug ? `${href}?c=${companySlug}` : href;
   const [bouncingItem, setBouncingItem] = useState<string | null>(null);
 
   const handleDisabledClick = (href: string) => {

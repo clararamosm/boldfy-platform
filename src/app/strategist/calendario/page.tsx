@@ -62,15 +62,15 @@ export default function StrategistCalendarioPage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const urlCompanyId = searchParams.get('companyId');
-  const urlTlId = searchParams.get('tlId');
+  const urlCompanySlug = searchParams.get('c');
+  const urlTlSlug = searchParams.get('tl');
 
   const [isLoading, setIsLoading] = useState(true);
   const [allPosts, setAllPosts] = useState<CalendarPipelinePost[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [companyFilter, setCompanyFilter] = useState<string>(urlCompanyId || 'all');
-  const [tlFilter, setTlFilter] = useState<string>(urlTlId || 'all');
+  const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [tlFilter, setTlFilter] = useState<string>('all');
 
   // ─── Fetch all pipeline posts ──────
   const fetchData = useCallback(async () => {
@@ -95,11 +95,21 @@ export default function StrategistCalendarioPage() {
     fetchData();
   }, [fetchData]);
 
-  // ─── Apply URL params on mount ──────
+  // ─── Apply URL slug params after posts are loaded ──────
   useEffect(() => {
-    if (urlCompanyId) setCompanyFilter(urlCompanyId);
-    if (urlTlId) setTlFilter(urlTlId);
-  }, [urlCompanyId, urlTlId]);
+    if (allPosts.length === 0) return;
+    if (urlCompanySlug) {
+      // Find the company ID from slug
+      const matchedPost = allPosts.find(p => p.companySlug === urlCompanySlug);
+      if (matchedPost) {
+        setCompanyFilter(matchedPost.companyId);
+        if (urlTlSlug) {
+          const matchedTl = allPosts.find(p => p.tlSlug === urlTlSlug && p.companyId === matchedPost.companyId);
+          if (matchedTl) setTlFilter(matchedTl.tlUserId);
+        }
+      }
+    }
+  }, [allPosts, urlCompanySlug, urlTlSlug]);
 
   // ─── Derive companies and TLs for filters ──────
   const { companies, tls } = useMemo(() => {
@@ -199,7 +209,7 @@ export default function StrategistCalendarioPage() {
 
   // ─── Navigate to dedicated post page ──────
   const handlePostClick = (post: CalendarPipelinePost) => {
-    router.push(`/post/${post.companyId}/${post.tlUserId}/${post.id}`);
+    router.push(`/post/${post.companySlug}/${post.tlSlug}/${post.id}`);
   };
 
   if (isLoading) {

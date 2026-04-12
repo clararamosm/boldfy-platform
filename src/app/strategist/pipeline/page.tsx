@@ -17,12 +17,15 @@ import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
 import { getAuthToken } from '@/lib/auth-client';
 import { STATUS_CONFIG, PIPELINE_STATUSES, buildGetStatusLabel } from '@/lib/pipeline-config';
-import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
+import { resolveSlugs, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
+import { generateSlug } from '@/lib/slugify';
 
 type TLSummary = {
   id: string;
+  slug: string;
   name: string;
   companyId: string;
+  companySlug: string;
   companyName: string;
 };
 
@@ -33,8 +36,8 @@ export default function StrategistPipelinePage() {
   const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const urlCompanyId = searchParams.get('companyId');
-  const urlTlId = searchParams.get('tlId');
+  const urlCompanySlug = searchParams.get('c');
+  const urlTlSlug = searchParams.get('tl');
   const appliedUrlParams = useRef(false);
 
   const [thoughtLeaders, setThoughtLeaders] = useState<TLSummary[]>([]);
@@ -83,7 +86,9 @@ export default function StrategistPipelinePage() {
 
         for (const companyId of assignedCompanyIds) {
           const compDoc = await getDoc(doc(db, 'companies', companyId));
-          const companyName = compDoc.data()?.companyName || '';
+          const compData = compDoc.data();
+          const companyName = compData?.companyName || '';
+          const companySlug = (compData?.slug as string) || generateSlug(companyName, companyId);
 
           const tlQuery = query(
             collection(db, 'users'),
@@ -94,10 +99,13 @@ export default function StrategistPipelinePage() {
 
           for (const tlDoc of tlSnap.docs) {
             const data = tlDoc.data();
+            const tlName = data.name || data.profile?.name || '';
             allTLs.push({
               id: tlDoc.id,
-              name: data.name || data.profile?.name || '',
+              slug: (data.slug as string) || generateSlug(tlName, tlDoc.id),
+              name: tlName,
               companyId,
+              companySlug,
               companyName,
             });
           }
@@ -105,11 +113,17 @@ export default function StrategistPipelinePage() {
 
         setThoughtLeaders(allTLs);
 
+        // Resolve URL slugs to IDs for pre-selection
         if (!appliedUrlParams.current) {
-          if (urlCompanyId) {
-            setSelectedCompany(urlCompanyId);
-            if (urlTlId && allTLs.some(tl => tl.id === urlTlId)) {
-              setTlFilter(urlTlId);
+          if (urlCompanySlug) {
+            // Find company by slug
+            const matchedCompany = allTLs.find(tl => tl.companySlug === urlCompanySlug);
+            if (matchedCompany) {
+              setSelectedCompany(matchedCompany.companyId);
+              if (urlTlSlug) {
+                const matchedTl = allTLs.find(tl => tl.slug === urlTlSlug && tl.companyId === matchedCompany.companyId);
+                if (matchedTl) setTlFilter(matchedTl.id);
+              }
             }
           } else if (allTLs.length > 0) {
             setSelectedCompany(allTLs[0].companyId);
@@ -128,11 +142,11 @@ export default function StrategistPipelinePage() {
 
   // ─── Derived: unique companies ──────
   const companies = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, { name: string; slug: string }>();
     thoughtLeaders.forEach(tl => {
-      if (!map.has(tl.companyId)) map.set(tl.companyId, tl.companyName);
+      if (!map.has(tl.companyId)) map.set(tl.companyId, { name: tl.companyName, slug: tl.companySlug });
     });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    return Array.from(map.entries()).map(([id, info]) => ({ id, name: info.name, slug: info.slug }));
   }, [thoughtLeaders]);
 
   // ─── Derived: TLs for selected company ──────
@@ -213,8 +227,10 @@ export default function StrategistPipelinePage() {
     if (!urlPostId || isPostsLoading || posts.length === 0) return;
     const targetPost = posts.find(p => p.id === urlPostId);
     if (targetPost) {
-      const postTlId = (targetPost as PipelinePost & { _tlId?: string })._tlId || activeTlIds[0];
-      router.replace(`/post/${selectedCompany}/${postTlId}/${targetPost.id}`);
+      const tl = getTlForPost(targetPost);
+      const cSlug = tl?.companySlug || selectedCompanySlug;
+      const tlSlug = tl?.slug || '';
+      router.replace(`/post/${cSlug}/${tlSlug}/${targetPost.id}`);
     }
   }, [searchParams, isPostsLoading, posts]);
 
@@ -232,12 +248,23 @@ export default function StrategistPipelinePage() {
     return map;
   }, [posts]);
 
-  // ─── Get TL name from id ──────
-  const getTlName = (post: PipelinePost) => {
+  // ─── Get TL info from post ──────
+  const getTlForPost = (post: PipelinePost) => {
     const tlId = (post as PipelinePost & { _tlId?: string })._tlId;
-    const tl = thoughtLeaders.find(t => t.id === tlId);
+    return thoughtLeaders.find(t => t.id === tlId);
+  };
+
+  const getTlName = (post: PipelinePost) => {
+    const tl = getTlForPost(post);
     return tl ? tl.name.split(' ')[0] : '';
   };
+
+  // ─── Get selected company slug ──────
+  const selectedCompanySlug = useMemo(() => {
+    if (!selectedCompany) return '';
+    const comp = companies.find(c => c.id === selectedCompany);
+    return comp?.slug || '';
+  }, [selectedCompany, companies]);
 
 
   // ─── Create post directly (no dialog) ──────
@@ -262,7 +289,8 @@ export default function StrategistPipelinePage() {
       });
 
       if (result.postId) {
-        router.push(`/post/${selectedCompany}/${effectiveTlId}/${result.postId}`);
+        const tl = thoughtLeaders.find(t => t.id === effectiveTlId);
+        router.push(`/post/${selectedCompanySlug}/${tl?.slug || effectiveTlId}/${result.postId}`);
       }
     } catch (error) {
       console.error('Error creating post:', error);
@@ -275,8 +303,10 @@ export default function StrategistPipelinePage() {
 
   // ─── Navigate to post ──────
   const handlePostClick = (post: PipelinePost) => {
-    const postTlId = (post as PipelinePost & { _tlId?: string })._tlId || activeTlIds[0];
-    router.push(`/post/${selectedCompany}/${postTlId}/${post.id}`);
+    const tl = getTlForPost(post);
+    const cSlug = tl?.companySlug || selectedCompanySlug;
+    const tlSlug = tl?.slug || '';
+    router.push(`/post/${cSlug}/${tlSlug}/${post.id}`);
   };
 
   // ─── Statuses to show in the grid (excludes agendado — shown below) ──────

@@ -5,6 +5,7 @@ import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireAuth, requireStrategistForTL, requireAdminOrStrategist } from '@/lib/auth-guard';
 import { triggerSlackNotification } from '@/lib/slack-notifications';
+import { generateSlug } from '@/lib/slugify';
 
 // ---- Types ----
 
@@ -446,9 +447,10 @@ export async function markPipelinePostPublished(
 
 export type StrategistSidebarCompany = {
   id: string;
+  slug: string;
   name: string;
   logoUrl?: string;
-  tls: { id: string; name: string }[];
+  tls: { id: string; slug: string; name: string }[];
 };
 
 export async function getStrategistSidebarData(
@@ -473,19 +475,22 @@ export async function getStrategistSidebarData(
       const compData = compDoc.data();
       const companyName = compData?.companyName || 'Empresa';
       const logoUrl = compData?.logoUrl as string | undefined;
+      const companySlug = (compData?.slug as string) || generateSlug(companyName, companyId);
 
       const tlSnap = await adminDb.collection('users')
         .where('companyId', '==', companyId)
         .where('role', '==', 'thoughtleader')
         .get();
 
-      const tls = tlSnap.docs.map(d => ({
-        id: d.id,
-        name: d.data().profile?.name || d.data().name || 'TL',
-      }));
+      const tls = tlSnap.docs.map(d => {
+        const tlData = d.data();
+        const tlName = tlData.profile?.name || tlData.name || 'TL';
+        const tlSlug = (tlData.slug as string) || generateSlug(tlName, d.id);
+        return { id: d.id, slug: tlSlug, name: tlName };
+      });
       tls.sort((a, b) => a.name.localeCompare(b.name));
 
-      result.push({ id: companyId, name: companyName, logoUrl, tls });
+      result.push({ id: companyId, slug: companySlug, name: companyName, logoUrl, tls });
     }
 
     result.sort((a, b) => a.name.localeCompare(b.name));
@@ -497,13 +502,77 @@ export async function getStrategistSidebarData(
   }
 }
 
+// ---- Resolve slugs to Firestore IDs ----
+
+export async function resolveSlugs(
+  idToken: string,
+  companySlug: string,
+  tlSlug?: string
+): Promise<{ companyId?: string; tlId?: string; tlName?: string; error?: string }> {
+  try {
+    await requireAuth(idToken);
+
+    // Resolve company slug
+    let companyId: string | undefined;
+    const companySnap = await adminDb.collection('companies')
+      .where('slug', '==', companySlug)
+      .limit(1)
+      .get();
+
+    if (!companySnap.empty) {
+      companyId = companySnap.docs[0].id;
+    } else {
+      // Fallback: check if slug is actually a raw ID
+      const directDoc = await adminDb.collection('companies').doc(companySlug).get();
+      if (directDoc.exists) {
+        companyId = companySlug;
+      }
+    }
+
+    if (!companyId) return { error: 'Empresa não encontrada.' };
+
+    // Resolve TL slug (if provided)
+    let tlId: string | undefined;
+    let tlName: string | undefined;
+    if (tlSlug) {
+      const tlSnap = await adminDb.collection('users')
+        .where('slug', '==', tlSlug)
+        .where('companyId', '==', companyId)
+        .where('role', '==', 'thoughtleader')
+        .limit(1)
+        .get();
+
+      if (!tlSnap.empty) {
+        tlId = tlSnap.docs[0].id;
+        tlName = tlSnap.docs[0].data().profile?.name || tlSnap.docs[0].data().name || '';
+      } else {
+        // Fallback: check if slug is actually a raw ID
+        const directDoc = await adminDb.collection('users').doc(tlSlug).get();
+        if (directDoc.exists && directDoc.data()?.role === 'thoughtleader') {
+          tlId = tlSlug;
+          tlName = directDoc.data()?.profile?.name || directDoc.data()?.name || '';
+        }
+      }
+
+      if (!tlId) return { companyId, error: 'Thought Leader não encontrado.' };
+    }
+
+    return { companyId, tlId, tlName };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    return { error: msg };
+  }
+}
+
 // ---- Calendar-oriented: Get ALL pipeline posts for a Strategist ----
 
 export type CalendarPipelinePost = PipelinePost & {
   tlUserId: string;
+  tlSlug: string;
   tlName: string;
   companyName: string;
   companyId: string;
+  companySlug: string;
 };
 
 export async function getAllPipelinePostsForStrategist(
@@ -524,9 +593,11 @@ export async function getAllPipelinePostsForStrategist(
     const allPosts: CalendarPipelinePost[] = [];
 
     for (const companyId of assignedCompanies) {
-      // Get company name
+      // Get company info
       const compDoc = await adminDb.collection('companies').doc(companyId).get();
-      const companyName = compDoc.data()?.companyName || '';
+      const compData = compDoc.data();
+      const companyName = compData?.companyName || '';
+      const companySlug = (compData?.slug as string) || generateSlug(companyName, companyId);
 
       // Get TLs in this company
       const tlSnap = await adminDb.collection('users')
@@ -537,6 +608,7 @@ export async function getAllPipelinePostsForStrategist(
       for (const tlDoc of tlSnap.docs) {
         const tlData = tlDoc.data();
         const tlName = tlData.profile?.name || tlData.name || '';
+        const tlSlug = (tlData.slug as string) || generateSlug(tlName, tlDoc.id);
 
         // Get pipeline posts for this TL
         const postsSnap = await adminDb
@@ -549,9 +621,11 @@ export async function getAllPipelinePostsForStrategist(
             id: postDoc.id,
             ...(postDoc.data() as Omit<PipelinePost, 'id'>),
             tlUserId: tlDoc.id,
+            tlSlug,
             tlName,
             companyName,
             companyId,
+            companySlug,
           });
         }
       }

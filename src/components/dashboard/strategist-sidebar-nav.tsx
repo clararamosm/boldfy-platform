@@ -35,8 +35,8 @@ export function StrategistSidebarNav() {
     const { user } = useAuth();
     const pathname = usePathname();
     const searchParams = useSearchParams();
-    const currentCompanyId = searchParams.get('companyId');
-    const currentTlId = searchParams.get('tlId');
+    const currentCompanySlug = searchParams.get('c');
+    const currentTlSlug = searchParams.get('tl');
     const [companies, setCompanies] = useState<StrategistSidebarCompany[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -63,10 +63,10 @@ export function StrategistSidebarNav() {
         fetchData();
     }, [user?.uid]);
 
-    const isActive = (path: string, companyId?: string, tlId?: string) => {
+    const isActive = (path: string, companySlug?: string, tlSlug?: string) => {
         if (pathname !== path) return false;
-        if (companyId && currentCompanyId !== companyId) return false;
-        if (tlId && currentTlId !== tlId) return false;
+        if (companySlug && currentCompanySlug !== companySlug) return false;
+        if (tlSlug && currentTlSlug !== tlSlug) return false;
         return true;
     };
 
@@ -92,7 +92,7 @@ export function StrategistSidebarNav() {
                         <SidebarMenuItem>
                             <SidebarMenuButton
                                 asChild
-                                isActive={pathname === '/strategist/calendario' && !currentCompanyId}
+                                isActive={pathname === '/strategist/calendario' && !currentCompanySlug}
                                 tooltip="Calendário"
                             >
                                 <Link href="/strategist/calendario">
@@ -155,10 +155,10 @@ export function StrategistSidebarNav() {
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
                                                 asChild
-                                                isActive={isActive('/strategist/brand-context', company.id)}
+                                                isActive={isActive('/strategist/brand-context', company.slug)}
                                                 size="sm"
                                             >
-                                                <Link href={`/strategist/brand-context?companyId=${company.id}`}>
+                                                <Link href={`/strategist/brand-context?c=${company.slug}`}>
                                                     <Building2 />
                                                     <span>Brand Context</span>
                                                 </Link>
@@ -171,10 +171,10 @@ export function StrategistSidebarNav() {
                                         <SidebarMenuItem>
                                             <SidebarMenuButton
                                                 asChild
-                                                isActive={isActive('/strategist/pipeline', company.id) && !currentTlId}
+                                                isActive={isActive('/strategist/pipeline', company.slug) && !currentTlSlug}
                                                 size="sm"
                                             >
-                                                <Link href={`/strategist/pipeline?companyId=${company.id}`}>
+                                                <Link href={`/strategist/pipeline?c=${company.slug}`}>
                                                     <ClipboardList />
                                                     <span>Pipeline</span>
                                                 </Link>
@@ -197,9 +197,9 @@ export function StrategistSidebarNav() {
                                                                 <SidebarMenuSubButton
                                                                     asChild
                                                                     size="sm"
-                                                                    isActive={isActive('/strategist/calendario-perfil', company.id, tl.id)}
+                                                                    isActive={isActive('/strategist/calendario-perfil', company.slug, tl.slug)}
                                                                 >
-                                                                    <Link href={`/strategist/calendario-perfil?companyId=${company.id}&tlId=${tl.id}&tlName=${encodeURIComponent(tl.name)}`}>
+                                                                    <Link href={`/strategist/calendario-perfil?c=${company.slug}&tl=${tl.slug}`}>
                                                                         <CalendarDays className="h-3 w-3" />
                                                                         <span>Calendário</span>
                                                                     </Link>
@@ -209,9 +209,9 @@ export function StrategistSidebarNav() {
                                                                 <SidebarMenuSubButton
                                                                     asChild
                                                                     size="sm"
-                                                                    isActive={isActive('/strategist/manual', company.id, tl.id)}
+                                                                    isActive={isActive('/strategist/manual', company.slug, tl.slug)}
                                                                 >
-                                                                    <Link href={`/strategist/manual?companyId=${company.id}&tlId=${tl.id}`}>
+                                                                    <Link href={`/strategist/manual?c=${company.slug}&tl=${tl.slug}`}>
                                                                         <BookOpen className="h-3 w-3" />
                                                                         <span>Manual de Marca</span>
                                                                     </Link>
@@ -221,9 +221,9 @@ export function StrategistSidebarNav() {
                                                                 <SidebarMenuSubButton
                                                                     asChild
                                                                     size="sm"
-                                                                    isActive={isActive('/strategist/estrategia', company.id, tl.id)}
+                                                                    isActive={isActive('/strategist/estrategia', company.slug, tl.slug)}
                                                                 >
-                                                                    <Link href={`/strategist/estrategia?companyId=${company.id}&tlId=${tl.id}`}>
+                                                                    <Link href={`/strategist/estrategia?c=${company.slug}&tl=${tl.slug}`}>
                                                                         <FileText className="h-3 w-3" />
                                                                         <span>Estratégia</span>
                                                                     </Link>

@@ -32,6 +32,38 @@ export default function ThoughtLeaderBacklogPage() {
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
   const targetUserId = searchParams?.get('userId') || user?.uid;
 
+  // Slugs for navigation
+  const [companySlug, setCompanySlug] = useState('');
+  const [tlSlug, setTlSlug] = useState('');
+
+  useEffect(() => {
+    if (!targetUserId || !user?.companyId) return;
+    const fetchSlugs = async () => {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('@/lib/firebase');
+        const { generateSlug } = await import('@/lib/slugify');
+
+        // Fetch TL slug
+        const tlDoc = await getDoc(doc(db, 'users', targetUserId));
+        const tlData = tlDoc.data();
+        const tlName = tlData?.name || tlData?.profile?.name || '';
+        setTlSlug((tlData?.slug as string) || generateSlug(tlName, targetUserId));
+
+        // Fetch company slug
+        const compDoc = await getDoc(doc(db, 'companies', user.companyId!));
+        const compData = compDoc.data();
+        const compName = compData?.companyName || '';
+        setCompanySlug((compData?.slug as string) || generateSlug(compName, user.companyId!));
+      } catch {
+        // fallback: use raw IDs (resolveSlugs handles this)
+        setCompanySlug(user?.companyId || '');
+        setTlSlug(targetUserId);
+      }
+    };
+    fetchSlugs();
+  }, [targetUserId, user?.companyId]);
+
   const fetchPosts = useCallback(async () => {
     if (!targetUserId) return;
     setIsLoading(true);
@@ -184,7 +216,7 @@ export default function ThoughtLeaderBacklogPage() {
                         variant="ghost"
                         size="sm"
                         className="h-7 gap-1 text-xs"
-                        onClick={() => router.push(`/post/${user?.companyId}/${targetUserId}/${post.id}`)}
+                        onClick={() => router.push(`/post/${companySlug || user?.companyId}/${tlSlug || targetUserId}/${post.id}`)}
                       >
                         <ExternalLink className="h-3 w-3" />
                         Ver

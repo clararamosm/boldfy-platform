@@ -7,6 +7,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { requireMaster, requireAdmin, requireAdminOrStrategist } from '@/lib/auth-guard';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import { generateSlug } from '@/lib/slugify';
 
 // ---- Email Invitation Helper ----
 
@@ -147,6 +148,10 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       createdAt: FieldValue.serverTimestamp(),
     });
     const companyId = companyRef.id;
+
+    // Generate and save slug for clean URLs
+    const companySlug = generateSlug(companyName, companyId);
+    await companyRef.update({ slug: companySlug });
 
     // Seed default AI credits reward for the new company
     await adminDb.collection('companies').doc(companyId).collection('rewards').add({
@@ -636,9 +641,12 @@ export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, f
       throw authError;
     }
 
+    const tlSlug = generateSlug(name, userRecord.uid);
+
     await adminDb.collection("users").doc(userRecord.uid).set({
       role: 'thoughtleader',
       name,
+      slug: tlSlug,
       companyId,
       companyName,
       status: 'Pendente',

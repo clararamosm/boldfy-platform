@@ -35,28 +35,41 @@ function emptyStrategy(): ContentStrategyData {
 
 export default function StrategistEstrategiaPage() {
   const searchParams = useSearchParams();
-  const companyId = searchParams.get('companyId');
-  const tlId = searchParams.get('tlId');
+  const companySlug = searchParams.get('c');
+  const tlSlug = searchParams.get('tl');
   const { toast } = useToast();
 
+  // Resolved Firestore IDs
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [tlId, setTlId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [tlName, setTlName] = useState('');
   const [data, setData] = useState<ContentStrategyData>(emptyStrategy());
+
+  // Resolve slugs
+  useEffect(() => {
+    if (!companySlug || !tlSlug) return;
+    const resolve = async () => {
+      try {
+        const token = await getAuthToken();
+        const { resolveSlugs } = await import('@/app/actions/content-pipeline');
+        const result = await resolveSlugs(token, companySlug, tlSlug);
+        if (result.companyId) setCompanyId(result.companyId);
+        if (result.tlId) setTlId(result.tlId);
+        if (result.tlName) setTlName(result.tlName);
+      } catch {
+        // silent
+      }
+    };
+    resolve();
+  }, [companySlug, tlSlug]);
 
   const fetchData = useCallback(async () => {
     if (!tlId) return;
     setIsLoading(true);
     try {
       const token = await getAuthToken();
-
-      // Get TL name
-      const { doc, getDoc } = await import('firebase/firestore');
-      const { db } = await import('@/lib/firebase');
-      const tlDoc = await getDoc(doc(db, 'users', tlId));
-      if (tlDoc.exists()) {
-        setTlName(tlDoc.data()?.name || tlDoc.data()?.profile?.name || '');
-      }
 
       const result = await getContentStrategy(token, tlId);
       if (result.data) {
@@ -117,7 +130,7 @@ export default function StrategistEstrategiaPage() {
 
   // ─── No TL selected ──────
 
-  if (!tlId || !companyId) {
+  if (!tlSlug || !companySlug) {
     return (
       <>
         <Header title="Estratégia de Conteúdo" />
