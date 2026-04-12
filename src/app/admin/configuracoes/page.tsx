@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Camera, CreditCard, ExternalLink, CheckCircle, AlertTriangle, Clock } from "lucide-react";
@@ -28,15 +27,6 @@ type CompanyData = {
     companyName: string;
     email: string;
     adminPhotoURL?: string;
-    // Brand Context corporativo (8 campos)
-    valueProposition: string;
-    tagline: string;
-    businessKeywords: string;
-    solutions: string;
-    targetPainPoints: string;
-    targetAudience: string;
-    approvedTopics: string;
-    prohibitedPhrases: string;
     status: 'Ativa' | 'Inativa' | 'Trial' | 'pending_payment';
     licenses: number;
     trialEndsAt?: string;
@@ -266,7 +256,6 @@ function ConfiguracoesPageContent() {
     const { company, isLoading: companyLoading } = useCompanyData(user?.companyId);
 
     const [isLoading, setIsLoading] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [companyData, setCompanyData] = useState<CompanyData | null>(null);
@@ -277,22 +266,12 @@ function ConfiguracoesPageContent() {
             if (!companyLoading) setIsLoading(false);
             return;
         }
-        const bc = company.brandContext || {} as NonNullable<typeof company.brandContext>;
-        const arrToStr = (v: string[] | string | undefined) => Array.isArray(v) ? v.join(', ') : (v || '');
         setCompanyData({
             id: company.id,
             adminName: company.adminProfile?.name || '',
             companyName: company.companyName || '',
             email: company.adminProfile?.email || '',
             adminPhotoURL: company.adminPhotoURL,
-            valueProposition: bc.valueProposition || '',
-            tagline: bc.tagline || '',
-            businessKeywords: arrToStr(bc.businessKeywords),
-            solutions: arrToStr(bc.solutions),
-            targetPainPoints: arrToStr(bc.targetPainPoints),
-            targetAudience: bc.targetAudience || '',
-            approvedTopics: arrToStr(bc.approvedTopics),
-            prohibitedPhrases: arrToStr(bc.prohibitedPhrases),
             status: company.status || 'Trial',
             licenses: company.licenses || 5,
             trialEndsAt: company.trialEndsAt,
@@ -318,45 +297,6 @@ function ConfiguracoesPageContent() {
         } finally {
             setIsUploadingPhoto(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
-        }
-    };
-    const splitToArray = (text: string): string[] =>
-        text.split(',').map(s => s.trim()).filter(Boolean);
-
-    const handleSaveChanges = async (section: 'brandContext') => {
-        if (!companyData) return;
-        setIsSaving(true);
-        try {
-            const companyDocRef = doc(db, "companies", companyData.id);
-            let dataToSave = {};
-            if (section === 'brandContext') {
-                dataToSave = {
-                    brandContext: {
-                        valueProposition: companyData.valueProposition,
-                        tagline: companyData.tagline,
-                        businessKeywords: splitToArray(companyData.businessKeywords),
-                        solutions: splitToArray(companyData.solutions),
-                        targetPainPoints: splitToArray(companyData.targetPainPoints),
-                        targetAudience: companyData.targetAudience,
-                        approvedTopics: splitToArray(companyData.approvedTopics),
-                        prohibitedPhrases: splitToArray(companyData.prohibitedPhrases),
-                    }
-                };
-            }
-            await setDoc(companyDocRef, dataToSave, { merge: true });
-            toast({ title: t.adminSettings.toastBrandSaved, description: t.adminSettings.toastBrandSavedDescription });
-        } catch (error) {
-            console.error("Error saving settings: ", error);
-            toast({ variant: 'destructive', title: t.adminSettings.toastBrandError, description: t.adminSettings.toastBrandErrorDescription });
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { id, value } = e.target;
-        if (companyData) {
-            setCompanyData(prev => ({ ...prev!, [id]: value }));
         }
     };
 
@@ -423,58 +363,6 @@ function ConfiguracoesPageContent() {
 
                     {/* Billing / Subscription card */}
                     <BillingCard companyId={companyData.id} />
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t.adminSettings.brandContextTitle}</CardTitle>
-                            <CardDescription>{t.adminSettings.brandContextDescription}</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="valueProposition">{t.adminSettings.valueProposition}</Label>
-                                <Textarea id="valueProposition" placeholder={t.adminSettings.valuePropositionPlaceholder} value={companyData.valueProposition} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="tagline">{t.adminSettings.tagline}</Label>
-                                <Input id="tagline" placeholder={t.adminSettings.taglinePlaceholder} value={companyData.tagline} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="businessKeywords">{t.adminSettings.businessKeywords}</Label>
-                                <Textarea id="businessKeywords" placeholder={t.adminSettings.businessKeywordsPlaceholder} value={companyData.businessKeywords} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">{t.adminSettings.businessKeywordsHelp}</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="solutions">{t.adminSettings.solutions}</Label>
-                                <Textarea id="solutions" placeholder={t.adminSettings.solutionsPlaceholder} value={companyData.solutions} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">{t.adminSettings.solutionsHelp}</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="targetPainPoints">{t.adminSettings.targetPainPoints}</Label>
-                                <Textarea id="targetPainPoints" placeholder={t.adminSettings.targetPainPointsPlaceholder} value={companyData.targetPainPoints} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">{t.adminSettings.targetPainPointsHelp}</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="targetAudience">{t.adminSettings.targetAudience}</Label>
-                                <Textarea id="targetAudience" placeholder={t.adminSettings.targetAudiencePlaceholder} value={companyData.targetAudience} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="approvedTopics">{t.adminSettings.approvedTopics}</Label>
-                                <Textarea id="approvedTopics" placeholder={t.adminSettings.approvedTopicsPlaceholder} value={companyData.approvedTopics} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">{t.adminSettings.approvedTopicsHelp}</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="prohibitedPhrases">{t.adminSettings.prohibitedPhrases}</Label>
-                                <Textarea id="prohibitedPhrases" placeholder={t.adminSettings.prohibitedPhrasesPlaceholder} value={companyData.prohibitedPhrases} onChange={handleInputChange} disabled={isSaving || isReadOnly} />
-                                <p className="text-xs text-muted-foreground">{t.adminSettings.prohibitedPhrasesHelp}</p>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="border-t px-6 py-4">
-                            <Button onClick={() => handleSaveChanges('brandContext')} disabled={isSaving || isReadOnly}>
-                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {t.adminSettings.saveBrandContext}
-                            </Button>
-                        </CardFooter>
-                    </Card>
 
                     <Card>
                         <CardHeader>

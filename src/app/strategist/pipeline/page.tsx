@@ -2,24 +2,21 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { PipelineCreateDialog } from '@/components/pipeline/create-dialog';
 import {
-  Loader2, Plus, FileText, Calendar as CalIcon, Users, Clock, Tag,
-  Layers, LayoutGrid, SquareCheck, Upload, X, Image as ImageIcon, File,
+  Loader2, Plus, Calendar as CalIcon, Users, Clock,
   User, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
 import { getAuthToken } from '@/lib/auth-client';
+import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
 
 type TLSummary = {
@@ -29,25 +26,6 @@ type TLSummary = {
   companyName: string;
 };
 
-// ─── Status display config ──────
-const STATUS_CONFIG: Record<PipelineStatus, { label: string; color: string; headerBg: string }> = {
-  backlog:            { label: 'Backlog',          color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',             headerBg: 'border-gray-300 dark:border-gray-600' },
-  aprovar_ideia:      { label: 'Aprovar Ideia',    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',      headerBg: 'border-amber-400 dark:border-amber-500' },
-  em_producao:        { label: 'Em Produção',      color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',          headerBg: 'border-blue-400 dark:border-blue-500' },
-  aprovar_post:       { label: 'Aprovar Post',     color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',  headerBg: 'border-orange-400 dark:border-orange-500' },
-  post_aprovado:      { label: 'Aprovado',         color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', headerBg: 'border-emerald-400 dark:border-emerald-500' },
-  pronto_pra_postar:  { label: 'Pronto',           color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',      headerBg: 'border-green-500 dark:border-green-500' },
-  postado:            { label: 'Postado',          color: 'bg-[#0A66C2]/10 text-[#0A66C2]',                                           headerBg: 'border-[#0A66C2]' },
-  ajuste:             { label: 'Ajuste',           color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',              headerBg: 'border-red-400 dark:border-red-500' },
-  arquivado:          { label: 'Arquivado',        color: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500',             headerBg: 'border-gray-300 dark:border-gray-500' },
-};
-
-const KANBAN_STATUSES: PipelineStatus[] = [
-  'backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post',
-  'post_aprovado', 'pronto_pra_postar', 'postado', 'ajuste', 'arquivado',
-];
-
-const ALL_STATUSES: PipelineStatus[] = [...KANBAN_STATUSES];
 
 export default function StrategistPipelinePage() {
   const { user } = useAuth();
@@ -70,19 +48,7 @@ export default function StrategistPipelinePage() {
 
   // Create dialog
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogTlId, setDialogTlId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    caption: '',
-    scheduledFor: '',
-    scheduledTime: '10:00',
-    status: 'backlog' as PipelineStatus,
-    etapa: '',
-    formato: '',
-    contentPillar: '',
-    leadMagnet: false,
-  });
-  const [formLoading, setFormLoading] = useState(false);
+  const [dialogInitialStatus, setDialogInitialStatus] = useState<PipelineStatus>('backlog');
 
   // Kanban scroll
   const kanbanRef = useRef<HTMLDivElement>(null);
@@ -104,11 +70,6 @@ export default function StrategistPipelinePage() {
     setTimeout(checkScroll, 350);
   };
 
-  // Media upload
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ─── Fetch TLs ──────
   useEffect(() => {
@@ -281,7 +242,7 @@ export default function StrategistPipelinePage() {
   // ─── Posts grouped by status (for kanban) ──────
   const postsByStatus = useMemo(() => {
     const map: Record<string, PipelinePost[]> = {};
-    KANBAN_STATUSES.forEach(s => { map[s] = []; });
+    PIPELINE_STATUSES.forEach(s => { map[s] = []; });
     posts.forEach(post => {
       if (map[post.status]) {
         map[post.status].push(post);
@@ -299,119 +260,11 @@ export default function StrategistPipelinePage() {
     return tl ? tl.name.split(' ')[0] : '';
   };
 
-  // ─── Media handling ──────
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      return;
-    }
-
-    setMediaFile(file);
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (ev) => setMediaPreview(ev.target?.result as string);
-      reader.readAsDataURL(file);
-    } else {
-      setMediaPreview(null);
-    }
-  };
-
-  const clearMedia = () => {
-    setMediaFile(null);
-    setMediaPreview(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const uploadMedia = async (tlId: string, postId: string): Promise<{ url: string; type: string } | null> => {
-    if (!mediaFile) return null;
-    setIsUploading(true);
-    try {
-      const ext = mediaFile.name.split('.').pop() || 'file';
-      const path = `pipeline/${tlId}/${postId}/media.${ext}`;
-      const storageRef = ref(storage, path);
-      await uploadBytes(storageRef, mediaFile);
-      const url = await getDownloadURL(storageRef);
-      const type = mediaFile.type.startsWith('image/') ? 'image' : 'pdf';
-      return { url, type };
-    } catch (error) {
-      console.error('Upload error:', error);
-      return null;
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  // ─── Dialog handlers ──────
+  // ─── Dialog handler ──────
   const openCreateDialog = (forStatus: PipelineStatus = 'backlog') => {
-    // Use the first active TL or the filter value
-    const targetTl = tlFilter !== 'all' ? tlFilter : companyTLs[0]?.id || null;
-    setDialogTlId(targetTl);
-    setFormData({
-      title: '',
-      caption: '',
-      scheduledFor: '',
-      scheduledTime: '10:00',
-      status: forStatus,
-      etapa: '',
-      formato: '',
-      contentPillar: '',
-      leadMagnet: false,
-    });
-    clearMedia();
+    setDialogInitialStatus(forStatus);
     setDialogOpen(true);
-  };
-
-
-  const handleSubmit = async () => {
-    if (!dialogTlId || !formData.title.trim()) return;
-    setFormLoading(true);
-    try {
-      const token = await getAuthToken();
-      let scheduledFor: string | null = null;
-      if (formData.scheduledFor) {
-        const time = formData.scheduledTime || '10:00';
-        scheduledFor = new Date(`${formData.scheduledFor}T${time}:00`).toISOString();
-      }
-
-      const postPayload: Record<string, unknown> = {
-        title: formData.title,
-        caption: formData.caption,
-        scheduledFor,
-        status: formData.status,
-        editorial: '',
-        etapa: formData.etapa,
-        formato: formData.formato,
-        contentPillar: formData.contentPillar,
-        leadMagnet: formData.leadMagnet,
-      };
-
-      const { createPipelinePost } = await import('@/app/actions/content-pipeline');
-      const result = await createPipelinePost(token, dialogTlId, postPayload as Parameters<typeof createPipelinePost>[2]);
-
-      if (result.postId) {
-        // Upload media for new post
-        if (mediaFile) {
-          const media = await uploadMedia(dialogTlId, result.postId);
-          if (media) {
-            const { updatePipelinePost: update } = await import('@/app/actions/content-pipeline');
-            await update(token, dialogTlId, result.postId, { mediaUrl: media.url, mediaType: media.type });
-          }
-        }
-        // Redirect to the dedicated post page
-        setDialogOpen(false);
-        router.push(`/post/${selectedCompany}/${dialogTlId}/${result.postId}`);
-      } else {
-        setDialogOpen(false);
-        fetchPosts();
-      }
-    } catch (error) {
-      console.error('Error creating post:', error);
-    } finally {
-      setFormLoading(false);
-    }
   };
 
   const getStatusLabel = (status: PipelineStatus) => {
@@ -532,7 +385,7 @@ export default function StrategistPipelinePage() {
             className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide"
             style={{ height: 'calc(100vh - 180px)' }}
           >
-            {KANBAN_STATUSES.map(status => {
+            {PIPELINE_STATUSES.map(status => {
               const cfg = STATUS_CONFIG[status];
               const columnPosts = postsByStatus[status] || [];
               const showColumn = columnPosts.length > 0 || ['backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post', 'post_aprovado', 'pronto_pra_postar'].includes(status);
@@ -545,7 +398,7 @@ export default function StrategistPipelinePage() {
                   className="flex-shrink-0 w-[280px] flex flex-col"
                 >
                   {/* Column header */}
-                  <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-t-2 bg-muted/30 ${cfg.headerBg}`}>
+                  <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border-t-2 bg-muted/30 ${cfg.kanbanBorder}`}>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{getStatusLabel(status)}</span>
                       <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
@@ -642,68 +495,18 @@ export default function StrategistPipelinePage() {
           </div>
         )}
 
-        {/* Create Dialog — simplified, redirects to /post page after creation */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto p-0">
-            {/* Title */}
-            <div className="px-6 pt-6 pb-2">
-              <Input
-                value={formData.title}
-                onChange={(e) => setFormData(p => ({ ...p, title: e.target.value }))}
-                placeholder="Título do post"
-                className="text-xl font-semibold border-0 p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/50"
-              />
-            </div>
-
-            {/* Properties */}
-            <div className="px-6 py-3 border-y space-y-2">
-              {/* Perfil (TL) — only when filter is "all" */}
-              {tlFilter === 'all' && companyTLs.length > 1 && (
-                <div className="flex items-center gap-3 min-h-[32px]">
-                  <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
-                    <User className="h-4 w-4" /> Perfil
-                  </div>
-                  <Select value={dialogTlId || ''} onValueChange={setDialogTlId}>
-                    <SelectTrigger className="h-8 w-auto min-w-[140px] border-0 bg-muted/50 hover:bg-muted">
-                      <SelectValue placeholder="—" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companyTLs.map(tl => (
-                        <SelectItem key={tl.id} value={tl.id}>{tl.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Status */}
-              <div className="flex items-center gap-3 min-h-[32px]">
-                <div className="flex items-center gap-2 w-32 shrink-0 text-sm text-muted-foreground">
-                  <SquareCheck className="h-4 w-4" /> Status
-                </div>
-                <Select value={formData.status} onValueChange={(v) => setFormData(p => ({ ...p, status: v as PipelineStatus }))}>
-                  <SelectTrigger className="h-8 w-auto min-w-[140px] border-0 bg-muted/50 hover:bg-muted">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ALL_STATUSES.map(s => (
-                      <SelectItem key={s} value={s}>{getStatusLabel(s)}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-3 border-t flex items-center justify-end gap-2 bg-muted/20">
-              <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-              <Button size="sm" onClick={handleSubmit} disabled={formLoading || !formData.title.trim()}>
-                {formLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                Criar Post
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Create Dialog */}
+        <PipelineCreateDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          companyId={selectedCompany}
+          defaultTlId={tlFilter !== 'all' ? tlFilter : companyTLs[0]?.id || null}
+          tlOptions={companyTLs}
+          showTlSelector={tlFilter === 'all' && companyTLs.length > 1}
+          initialStatus={dialogInitialStatus}
+          onCreated={fetchPosts}
+          labels={{ statusLabel: getStatusLabel }}
+        />
       </main>
     </>
   );

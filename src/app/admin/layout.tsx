@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle, Clock } from "lucide-react";
+import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle, Clock, Palette } from "lucide-react";
 import { AuthProvider } from "@/contexts/auth-context";
 import { FeedbackDialog } from "@/components/feedback-dialog";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
@@ -114,6 +114,12 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                             <Link href="/admin/configuracoes">
                                 <UserIcon className="mr-2 h-4 w-4" />
                                 <span>{t.nav.settings}</span>
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href="/admin/brand-context">
+                                <Palette className="mr-2 h-4 w-4" />
+                                <span>Brand Context</span>
                             </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>

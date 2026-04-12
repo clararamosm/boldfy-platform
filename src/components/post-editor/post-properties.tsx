@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { getAuthToken } from '@/lib/auth-client';
 import { getContentStrategy } from '@/app/actions/content-strategy';
 import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
+import { STATUS_CONFIG, PIPELINE_STATUSES, ETAPA_OPTIONS, FORMATO_OPTIONS } from '@/lib/pipeline-config';
 
 type Props = {
   post: PipelinePost;
@@ -16,22 +17,6 @@ type Props = {
   tlId: string;
   onPropertyChange: (field: string, value: unknown) => void;
 };
-
-const STATUS_OPTIONS: { value: PipelineStatus; label: string; color: string }[] = [
-  { value: 'backlog', label: 'Backlog', color: 'bg-gray-100 text-gray-700' },
-  { value: 'aprovar_ideia', label: 'Aprovar Ideia', color: 'bg-purple-100 text-purple-700' },
-  { value: 'em_producao', label: 'Em Produção', color: 'bg-blue-100 text-blue-700' },
-  { value: 'aprovar_post', label: 'Aprovar Post', color: 'bg-yellow-100 text-yellow-700' },
-  { value: 'post_aprovado', label: 'Post Aprovado', color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'pronto_pra_postar', label: 'Pronto pra Postar', color: 'bg-green-100 text-green-700' },
-  { value: 'postado', label: 'Postado', color: 'bg-green-200 text-green-800' },
-  { value: 'ajuste', label: 'Ajuste', color: 'bg-red-100 text-red-700' },
-  { value: 'arquivado', label: 'Arquivado', color: 'bg-gray-200 text-gray-600' },
-];
-
-const ETAPA_OPTIONS = ['Visibilidade', 'Autoridade', 'Conversão'];
-
-const FORMATO_OPTIONS = ['Vídeo', 'Texto', 'GIF', 'One Pager', 'Carrossel', 'Foto', 'Quote', 'Meme', 'Print'];
 
 export function PostProperties({ post, canEdit, tlId, onPropertyChange }: Props) {
   const [contentPillars, setContentPillars] = useState<string[]>([]);
@@ -52,13 +37,13 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange }: Props)
     loadPillars();
   }, [tlId]);
 
-  const statusInfo = STATUS_OPTIONS.find(s => s.value === post.status) || STATUS_OPTIONS[0];
+  const statusInfo = STATUS_CONFIG[post.status] || STATUS_CONFIG.backlog;
 
   // Read-only view for TL
   if (!canEdit) {
     return (
       <div className="flex flex-wrap gap-2 py-3 border-y">
-        <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
+        <Badge className={statusInfo.badge}>{statusInfo.label}</Badge>
         {post.etapa && <Badge variant="outline">{post.etapa}</Badge>}
         {post.formato && <Badge variant="outline">{post.formato}</Badge>}
         {post.contentPillar && <Badge variant="outline">{post.contentPillar}</Badge>}
@@ -83,9 +68,9 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange }: Props)
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {STATUS_OPTIONS.map(opt => (
-              <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                {opt.label}
+            {PIPELINE_STATUSES.map(s => (
+              <SelectItem key={s} value={s} className="text-xs">
+                {STATUS_CONFIG[s].label}
               </SelectItem>
             ))}
           </SelectContent>

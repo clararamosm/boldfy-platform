@@ -14,17 +14,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  CheckCircle2,
-  Edit3,
-  FileText,
   User,
   Building2,
-  AlertTriangle,
-  Archive,
-  CircleDot,
-  Send,
-  ThumbsUp,
 } from 'lucide-react';
+import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 import {
   format,
   startOfMonth,
@@ -40,88 +33,6 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-// ─── Status config ──────
-const pipelineStatusConfig: Record<PipelineStatus, {
-  label: string;
-  color: string;
-  calendarBg: string;
-  calendarText: string;
-  dotColor: string;
-  icon: typeof Clock;
-}> = {
-  backlog: {
-    label: 'Backlog',
-    color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-    calendarBg: 'bg-gray-50 dark:bg-gray-800/50',
-    calendarText: 'text-gray-600 dark:text-gray-400',
-    dotColor: 'bg-gray-400',
-    icon: FileText,
-  },
-  aprovar_ideia: {
-    label: 'Aprovar Ideia',
-    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    calendarBg: 'bg-amber-50 dark:bg-amber-900/20',
-    calendarText: 'text-amber-700 dark:text-amber-400',
-    dotColor: 'bg-amber-500',
-    icon: CircleDot,
-  },
-  em_producao: {
-    label: 'Em Produção',
-    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    calendarBg: 'bg-blue-50 dark:bg-blue-900/20',
-    calendarText: 'text-blue-700 dark:text-blue-400',
-    dotColor: 'bg-blue-500',
-    icon: Edit3,
-  },
-  aprovar_post: {
-    label: 'Aprovar Post',
-    color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-    calendarBg: 'bg-orange-50 dark:bg-orange-900/20',
-    calendarText: 'text-orange-700 dark:text-orange-400',
-    dotColor: 'bg-orange-500',
-    icon: ThumbsUp,
-  },
-  post_aprovado: {
-    label: 'Aprovado',
-    color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-    calendarBg: 'bg-emerald-50 dark:bg-emerald-900/20',
-    calendarText: 'text-emerald-700 dark:text-emerald-400',
-    dotColor: 'bg-emerald-500',
-    icon: CheckCircle2,
-  },
-  pronto_pra_postar: {
-    label: 'Pronto',
-    color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    calendarBg: 'bg-green-50 dark:bg-green-900/20',
-    calendarText: 'text-green-700 dark:text-green-400',
-    dotColor: 'bg-green-600',
-    icon: Send,
-  },
-  postado: {
-    label: 'Postado',
-    color: 'bg-[#0A66C2]/10 text-[#0A66C2] dark:bg-[#0A66C2]/20',
-    calendarBg: 'bg-[#0A66C2]/5 dark:bg-[#0A66C2]/10',
-    calendarText: 'text-[#0A66C2]',
-    dotColor: 'bg-[#0A66C2]',
-    icon: CheckCircle2,
-  },
-  ajuste: {
-    label: 'Ajuste',
-    color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    calendarBg: 'bg-red-50 dark:bg-red-900/20',
-    calendarText: 'text-red-700 dark:text-red-400',
-    dotColor: 'bg-red-500',
-    icon: AlertTriangle,
-  },
-  arquivado: {
-    label: 'Arquivado',
-    color: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500',
-    calendarBg: 'bg-gray-50/50 dark:bg-gray-800/30',
-    calendarText: 'text-gray-400',
-    dotColor: 'bg-gray-300',
-    icon: Archive,
-  },
-};
 
 // ─── Skeleton ──────
 function CalendarSkeleton() {
@@ -305,14 +216,9 @@ export default function StrategistCalendarioPage() {
   // ─── Status filter buttons config ──────
   const statusFilterButtons: { key: StatusFilter; label: string; color: string }[] = [
     { key: 'all', label: 'Todos', color: 'bg-muted text-foreground' },
-    { key: 'backlog', label: 'Backlog', color: pipelineStatusConfig.backlog.color },
-    { key: 'aprovar_ideia', label: 'Aprovar Ideia', color: pipelineStatusConfig.aprovar_ideia.color },
-    { key: 'em_producao', label: 'Em Produção', color: pipelineStatusConfig.em_producao.color },
-    { key: 'aprovar_post', label: 'Aprovar Post', color: pipelineStatusConfig.aprovar_post.color },
-    { key: 'post_aprovado', label: 'Aprovado', color: pipelineStatusConfig.post_aprovado.color },
-    { key: 'pronto_pra_postar', label: 'Pronto', color: pipelineStatusConfig.pronto_pra_postar.color },
-    { key: 'postado', label: 'Postado', color: pipelineStatusConfig.postado.color },
-    { key: 'ajuste', label: 'Ajuste', color: pipelineStatusConfig.ajuste.color },
+    ...PIPELINE_STATUSES
+      .filter(s => s !== 'arquivado') // Don't show archived in filter
+      .map(s => ({ key: s as StatusFilter, label: STATUS_CONFIG[s].label, color: STATUS_CONFIG[s].badge })),
   ];
 
   return (
@@ -434,7 +340,7 @@ export default function StrategistCalendarioPage() {
                     {/* Post cards — context-aware: profile vs general */}
                     <div className="mt-1 space-y-1">
                       {dayPosts.slice(0, 3).map(post => {
-                        const cfg = pipelineStatusConfig[post.status] || pipelineStatusConfig.backlog;
+                        const cfg = STATUS_CONFIG[post.status] || STATUS_CONFIG.backlog;
                         const time = post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : '';
                         const showTime = time && time !== '00:00';
                         const firstName = post.tlName.split(' ')[0];
@@ -453,7 +359,7 @@ export default function StrategistCalendarioPage() {
                           >
                             {/* Title row with status dot */}
                             <div className="flex items-start gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 mt-[5px] ${cfg.dotColor}`} />
+                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 mt-[5px] ${cfg.dot}`} />
                               <span className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
                                 {post.title || 'Sem título'}
                               </span>
@@ -462,7 +368,7 @@ export default function StrategistCalendarioPage() {
                             {/* Tags row */}
                             <div className="flex flex-wrap gap-0.5 pl-2.5">
                               {/* Status tag — always shown */}
-                              <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.color}`}>
+                              <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.badge}`}>
                                 {cfg.label}
                               </span>
                               {/* Formato — always shown */}

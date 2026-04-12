@@ -13,18 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  CheckCircle2,
-  Edit3,
-  FileText,
-  AlertTriangle,
-  Archive,
-  CircleDot,
-  Send,
-  ThumbsUp,
-  Tag,
-  Layers,
-  LayoutGrid,
 } from 'lucide-react';
+import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 import {
   format,
   startOfMonth,
@@ -40,23 +30,6 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-// ─── Status config ──────
-const statusConfig: Record<PipelineStatus, {
-  label: string;
-  color: string;
-  dotColor: string;
-  icon: typeof Clock;
-}> = {
-  backlog: { label: 'Backlog', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400', dotColor: 'bg-gray-400', icon: FileText },
-  aprovar_ideia: { label: 'Aprovar Ideia', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', dotColor: 'bg-amber-500', icon: CircleDot },
-  em_producao: { label: 'Em Produção', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400', dotColor: 'bg-blue-500', icon: Edit3 },
-  aprovar_post: { label: 'Aprovar Post', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400', dotColor: 'bg-orange-500', icon: ThumbsUp },
-  post_aprovado: { label: 'Aprovado', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', dotColor: 'bg-emerald-500', icon: CheckCircle2 },
-  pronto_pra_postar: { label: 'Pronto', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', dotColor: 'bg-green-600', icon: Send },
-  postado: { label: 'Postado', color: 'bg-[#0A66C2]/10 text-[#0A66C2]', dotColor: 'bg-[#0A66C2]', icon: CheckCircle2 },
-  ajuste: { label: 'Ajuste', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', dotColor: 'bg-red-500', icon: AlertTriangle },
-  arquivado: { label: 'Arquivado', color: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500', dotColor: 'bg-gray-300', icon: Archive },
-};
 
 function CalendarSkeleton() {
   return (
@@ -186,14 +159,9 @@ export default function StrategistCalendarioPerfilPage() {
 
   const statusFilterButtons: { key: PipelineStatus | 'all'; label: string; color: string }[] = [
     { key: 'all', label: 'Todos', color: 'bg-muted text-foreground' },
-    { key: 'backlog', label: 'Backlog', color: statusConfig.backlog.color },
-    { key: 'aprovar_ideia', label: 'Aprovar Ideia', color: statusConfig.aprovar_ideia.color },
-    { key: 'em_producao', label: 'Em Produção', color: statusConfig.em_producao.color },
-    { key: 'aprovar_post', label: 'Aprovar Post', color: statusConfig.aprovar_post.color },
-    { key: 'post_aprovado', label: 'Aprovado', color: statusConfig.post_aprovado.color },
-    { key: 'pronto_pra_postar', label: 'Pronto', color: statusConfig.pronto_pra_postar.color },
-    { key: 'postado', label: 'Postado', color: statusConfig.postado.color },
-    { key: 'ajuste', label: 'Ajuste', color: statusConfig.ajuste.color },
+    ...PIPELINE_STATUSES
+      .filter(s => s !== 'arquivado')
+      .map(s => ({ key: s as PipelineStatus | 'all', label: STATUS_CONFIG[s].label, color: STATUS_CONFIG[s].badge })),
   ];
 
   return (
@@ -281,7 +249,7 @@ export default function StrategistCalendarioPerfilPage() {
                     {/* Post cards — detailed for profile view */}
                     <div className="mt-1 space-y-1">
                       {dayPosts.slice(0, 3).map(post => {
-                        const cfg = statusConfig[post.status] || statusConfig.backlog;
+                        const cfg = STATUS_CONFIG[post.status] || STATUS_CONFIG.backlog;
                         const time = post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : '';
                         const showTime = time && time !== '00:00';
 
@@ -298,7 +266,7 @@ export default function StrategistCalendarioPerfilPage() {
                           >
                             {/* Title + status dot */}
                             <div className="flex items-start gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 mt-[5px] ${cfg.dotColor}`} />
+                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 mt-[5px] ${cfg.dot}`} />
                               <span className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
                                 {post.title || 'Sem título'}
                               </span>
@@ -306,7 +274,7 @@ export default function StrategistCalendarioPerfilPage() {
 
                             {/* Tags: status + formato + etapa + pilar */}
                             <div className="flex flex-wrap gap-0.5 pl-2.5">
-                              <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.color}`}>
+                              <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.badge}`}>
                                 {cfg.label}
                               </span>
                               {post.formato && (
