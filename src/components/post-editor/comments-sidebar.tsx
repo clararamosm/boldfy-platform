@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquare, Send, Trash2, Loader2 } from 'lucide-react';
+import { BoldfyIcon } from '@/components/icons/boldfy-icon';
 import type { PostComment } from '@/lib/post-editor-types';
 
 type Props = {
@@ -170,12 +171,15 @@ function CommentItem({
 }) {
   const timeAgo = getRelativeTime(comment.createdAt);
 
+  const isBot = comment.authorId === 'system';
+
   return (
     <div className={`rounded-md border p-2.5 space-y-1.5 ${comment.resolved ? 'opacity-60 bg-muted/50' : 'bg-background'}`}>
       {/* Author + time */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium">{comment.authorName}</span>
+          {isBot && <BoldfyIcon className="h-4 w-4 rounded-sm shrink-0" />}
+          <span className="text-xs font-medium">{isBot ? 'Boldfy Bot' : comment.authorName}</span>
           <span className="text-[10px] text-muted-foreground">{timeAgo}</span>
         </div>
         <button

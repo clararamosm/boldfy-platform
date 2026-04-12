@@ -435,7 +435,7 @@ export async function addBotComment(
 
     const commentData: Omit<PostComment, 'id'> = {
       authorId: 'system',
-      authorName: '🤖 Boldfy Bot',
+      authorName: 'Boldfy Bot',
       authorRole: 'strategist',
       content: content.trim(),
       resolved: false,
