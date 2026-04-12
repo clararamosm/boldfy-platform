@@ -1368,6 +1368,7 @@ const en: Dictionary = {
       aprovarPost: 'Approve Post',
       postAprovado: 'Post Approved',
       prontoPraPostar: 'Ready to Post',
+      agendado: 'Scheduled',
       postado: 'Posted',
     },
     format: {

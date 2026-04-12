@@ -1368,6 +1368,7 @@ const ptBR = {
       aprovarPost: 'Aprovar Post',
       postAprovado: 'Post Aprovado',
       prontoPraPostar: 'Pronto pra Postar',
+      agendado: 'Agendado',
       postado: 'Postado',
     },
     format: {

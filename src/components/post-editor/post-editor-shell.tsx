@@ -221,15 +221,15 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
   const handleForceSchedule = useCallback(async () => {
     if (!canEdit || !post || !post.scheduledFor) return;
 
-    // Optimistic: update status to postado (scheduled for publishing)
+    // Optimistic: update status to agendado
     const previousStatus = post.status;
-    setPost(prev => prev ? { ...prev, status: 'postado' as PipelineStatus } : prev);
+    setPost(prev => prev ? { ...prev, status: 'agendado' as PipelineStatus } : prev);
 
     try {
       const token = await getAuthToken();
 
-      // Update status to postado
-      await updatePipelinePost(token, tlId, postId, { status: 'postado' });
+      // Update status to agendado
+      await updatePipelinePost(token, tlId, postId, { status: 'agendado' });
 
       // Format date for bot comment
       const d = new Date(post.scheduledFor);

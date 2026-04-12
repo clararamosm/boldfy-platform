@@ -375,7 +375,7 @@ export default function StrategistPipelinePage() {
             {PIPELINE_STATUSES.map(status => {
               const cfg = STATUS_CONFIG[status];
               const columnPosts = postsByStatus[status] || [];
-              const showColumn = columnPosts.length > 0 || ['backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post', 'post_aprovado', 'pronto_pra_postar'].includes(status);
+              const showColumn = columnPosts.length > 0 || ['backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post', 'post_aprovado', 'pronto_pra_postar', 'agendado'].includes(status);
 
               if (!showColumn) return null;
 

@@ -10,6 +10,7 @@ import {
   ThumbsUp,
   CheckCircle2,
   Send,
+  CalendarCheck,
   AlertTriangle,
   Archive,
   type LucideIcon,
@@ -87,6 +88,15 @@ export const STATUS_CONFIG: Record<PipelineStatus, StatusConfig> = {
     calendarText: 'text-green-700 dark:text-green-400',
     dot: 'bg-green-600',
   },
+  agendado: {
+    label: 'Agendado',
+    icon: CalendarCheck,
+    badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    kanbanBorder: 'border-purple-500 dark:border-purple-500',
+    calendarBg: 'bg-purple-50 dark:bg-purple-900/20',
+    calendarText: 'text-purple-700 dark:text-purple-400',
+    dot: 'bg-purple-600',
+  },
   postado: {
     label: 'Postado',
     icon: CheckCircle2,
@@ -121,13 +131,13 @@ export const STATUS_CONFIG: Record<PipelineStatus, StatusConfig> = {
 /** All statuses in kanban column order */
 export const PIPELINE_STATUSES: PipelineStatus[] = [
   'backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post',
-  'post_aprovado', 'pronto_pra_postar', 'postado', 'ajuste', 'arquivado',
+  'post_aprovado', 'pronto_pra_postar', 'agendado', 'postado', 'ajuste', 'arquivado',
 ];
 
 /** Statuses relevant for TL (backlog filter) */
 export const TL_VISIBLE_STATUSES: PipelineStatus[] = [
   'aprovar_ideia', 'em_producao', 'aprovar_post',
-  'post_aprovado', 'pronto_pra_postar', 'postado', 'ajuste',
+  'post_aprovado', 'pronto_pra_postar', 'agendado', 'postado', 'ajuste',
 ];
 
 // ─── Property options ──────────────────────────────────
@@ -158,6 +168,7 @@ export function buildGetStatusLabel(t: {
       aprovarPost: string;
       postAprovado: string;
       prontoPraPostar: string;
+      agendado: string;
       postado: string;
     };
   };
@@ -170,6 +181,7 @@ export function buildGetStatusLabel(t: {
       aprovar_post: t.contentPipeline.status.aprovarPost,
       post_aprovado: t.contentPipeline.status.postAprovado,
       pronto_pra_postar: t.contentPipeline.status.prontoPraPostar,
+      agendado: t.contentPipeline.status.agendado,
       postado: t.contentPipeline.status.postado,
       ajuste: 'Ajuste',
       arquivado: 'Arquivado',

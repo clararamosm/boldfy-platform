@@ -15,6 +15,7 @@ export type PipelineStatus =
   | 'aprovar_post'
   | 'post_aprovado'
   | 'pronto_pra_postar'
+  | 'agendado'
   | 'postado'
   | 'ajuste'
   | 'arquivado';
