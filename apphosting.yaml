@@ -58,8 +58,8 @@ env:
     value: boldfy
   - variable: SENTRY_PROJECT
     value: javascript-nextjs
-  - variable: SENTRY_AUTH_TOKEN
-    secret: SENTRY_AUTH_TOKEN
+  # SENTRY_AUTH_TOKEN — add after creating secret:
+  # firebase apphosting:secrets:set SENTRY_AUTH_TOKEN
 
   # --- Variáveis públicas do Notion ---
   - variable: NOTION_FEEDBACK_DB_ID
