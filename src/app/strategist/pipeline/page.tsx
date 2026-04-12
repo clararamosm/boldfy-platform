@@ -16,7 +16,7 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
 import { getAuthToken } from '@/lib/auth-client';
-import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
+import { STATUS_CONFIG, PIPELINE_STATUSES, buildGetStatusLabel } from '@/lib/pipeline-config';
 import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
 
 type TLSummary = {
@@ -267,20 +267,7 @@ export default function StrategistPipelinePage() {
     setDialogOpen(true);
   };
 
-  const getStatusLabel = (status: PipelineStatus) => {
-    const map: Record<PipelineStatus, string> = {
-      backlog: t.contentPipeline.status.backlog,
-      aprovar_ideia: t.contentPipeline.status.aprovarIdeia,
-      em_producao: t.contentPipeline.status.emProducao,
-      aprovar_post: t.contentPipeline.status.aprovarPost,
-      post_aprovado: t.contentPipeline.status.postAprovado,
-      pronto_pra_postar: t.contentPipeline.status.prontoPraPostar,
-      postado: t.contentPipeline.status.postado,
-      ajuste: 'Ajuste',
-      arquivado: 'Arquivado',
-    };
-    return map[status] || status;
-  };
+  const getStatusLabel = buildGetStatusLabel(t);
 
   // ─── Loading state ──────
   if (isLoading) {

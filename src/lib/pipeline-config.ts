@@ -139,8 +139,41 @@ export const FORMATO_OPTIONS = [
   'Foto', 'Quote', 'Meme', 'Print',
 ] as const;
 
-// ─── Helper: get config for a status ───────────────────
+// ─── Helpers ────────────────────────────────────────────
 
 export function getStatusConfig(status: PipelineStatus): StatusConfig {
   return STATUS_CONFIG[status] || STATUS_CONFIG.backlog;
+}
+
+/**
+ * Build a getStatusLabel function from i18n translations.
+ * Usage: const getStatusLabel = buildGetStatusLabel(t);
+ */
+export function buildGetStatusLabel(t: {
+  contentPipeline: {
+    status: {
+      backlog: string;
+      aprovarIdeia: string;
+      emProducao: string;
+      aprovarPost: string;
+      postAprovado: string;
+      prontoPraPostar: string;
+      postado: string;
+    };
+  };
+}) {
+  return (status: PipelineStatus): string => {
+    const map: Record<PipelineStatus, string> = {
+      backlog: t.contentPipeline.status.backlog,
+      aprovar_ideia: t.contentPipeline.status.aprovarIdeia,
+      em_producao: t.contentPipeline.status.emProducao,
+      aprovar_post: t.contentPipeline.status.aprovarPost,
+      post_aprovado: t.contentPipeline.status.postAprovado,
+      pronto_pra_postar: t.contentPipeline.status.prontoPraPostar,
+      postado: t.contentPipeline.status.postado,
+      ajuste: 'Ajuste',
+      arquivado: 'Arquivado',
+    };
+    return map[status] || status;
+  };
 }

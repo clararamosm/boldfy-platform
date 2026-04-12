@@ -9,13 +9,11 @@ import Logo from "@/components/logo";
 import { AdminSidebarNav } from "@/components/dashboard/admin-sidebar-nav";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle, Clock, Palette } from "lucide-react";
+import { User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle, Clock, Palette } from "lucide-react";
+import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { AuthProvider } from "@/contexts/auth-context";
-import { FeedbackDialog } from "@/components/feedback-dialog";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useSubscription } from "@/hooks/use-subscription";
@@ -79,63 +77,19 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 <AdminSidebarNav />
             </SidebarContent>
             <SidebarFooter>
-                <div className="flex items-center w-full gap-1 px-1">
-                    <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="flex-1 justify-start gap-2 px-2 py-3 h-auto min-w-0">
-                            <Avatar className="h-9 w-9 shrink-0">
-                                {user.profile?.avatarUrl && (
-                                    <AvatarImage src={user.profile.avatarUrl} alt={user.name || ''} />
-                                )}
-                                <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                                    {user.name?.substring(0, 2).toUpperCase() || 'AD'}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
-                                <span className="text-sm font-medium truncate max-w-[130px]">{(user.name || '').split(' ')[0]}</span>
-                                <span className="text-xs text-muted-foreground truncate max-w-[130px]">{t.roles.admin}</span>
-                            </div>
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <div className="shrink-0 group-data-[state=collapsed]:hidden">
-                        <FeedbackDialog pagina="Sidebar" />
-                    </div>
-                    <DropdownMenuContent align="end" side="top" className="min-w-56 max-w-72">
-                        <DropdownMenuLabel>
-                            <div className="flex flex-col gap-0.5">
-                                <span className="truncate">{user.name || ''}</span>
-                                <p className="text-[11px] leading-none text-muted-foreground truncate">
-                                    {user.email || ''}
-                                </p>
-                            </div>
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                            <Link href="/admin/configuracoes">
-                                <UserIcon className="mr-2 h-4 w-4" />
-                                <span>{t.nav.settings}</span>
-                            </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <Link href="/admin/brand-context">
-                                <Palette className="mr-2 h-4 w-4" />
-                                <span>Brand Context</span>
-                            </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                            <Link href="/admin/suporte">
-                                <HelpCircle className="mr-2 h-4 w-4" />
-                                <span>{t.nav.support}</span>
-                            </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={handleLogout}>
-                            <LogOut className="mr-2 h-4 w-4" />
-                            {t.nav.signOut}
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                </div>
+                <SidebarUserFooter
+                    user={user}
+                    roleLabel={t.roles.admin}
+                    fallbackInitials="AD"
+                    feedbackPage="Sidebar"
+                    menuItems={[
+                        { href: '/admin/configuracoes', label: t.nav.settings, icon: UserIcon },
+                        { href: '/admin/brand-context', label: 'Brand Context', icon: Palette },
+                        { href: '/admin/suporte', label: t.nav.support, icon: HelpCircle },
+                    ]}
+                    onLogout={handleLogout}
+                    logoutLabel={t.nav.signOut}
+                />
             </SidebarFooter>
         </>
     );

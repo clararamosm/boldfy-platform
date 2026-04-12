@@ -8,11 +8,9 @@ import { SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/si
 import Logo from "@/components/logo";
 import { MasterSidebarNav } from "@/components/dashboard/master-sidebar-nav";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { LogOut, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { AuthProvider } from "@/contexts/auth-context";
 import { LocaleProvider } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
@@ -48,37 +46,14 @@ function MasterLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
         <MasterSidebarNav />
       </SidebarContent>
-      <SidebarFooter className="p-2 mt-auto">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start gap-2 px-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                  {user.name?.substring(0, 2).toUpperCase() || 'MA'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
-                <span className="text-sm font-medium truncate max-w-[150px]">{(user.name || '').split(' ')[0]}</span>
-                <span className="text-xs text-muted-foreground truncate max-w-[150px]">Master</span>
-              </div>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56 mb-2" align="end" side="top">
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user.name || ''}</p>
-                <p className="text-xs leading-none text-muted-foreground">
-                  {user.email || ''}
-                </p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Sair
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <SidebarFooter>
+        <SidebarUserFooter
+          user={user}
+          roleLabel="Master"
+          fallbackInitials="MA"
+          onLogout={handleLogout}
+          logoutLabel="Sair"
+        />
       </SidebarFooter>
     </>
   );
