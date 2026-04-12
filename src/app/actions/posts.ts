@@ -153,36 +153,50 @@ export async function getCompanyFeed(
   try {
     const authUser = await requireAuth(idToken);
     if (!authUser.companyId) return { error: 'Empresa nao encontrada.' };
-    if (authUser.role !== 'colaborador' && authUser.role !== 'admin') {
+    if (authUser.role !== 'colaborador' && authUser.role !== 'admin' && authUser.role !== 'thoughtleader') {
       return { error: 'Acesso nao autorizado.' };
     }
 
-    // 1. Get all collaborators in the company (admins don't create content)
-    const usersSnap = await adminDb.collection('users')
-      .where('companyId', '==', authUser.companyId)
-      .where('role', '==', 'colaborador')
-      .get();
+    // 1. Get collaborators AND thought leaders in the company
+    const [colabSnap, tlSnap] = await Promise.all([
+      adminDb.collection('users')
+        .where('companyId', '==', authUser.companyId)
+        .where('role', '==', 'colaborador')
+        .get(),
+      adminDb.collection('users')
+        .where('companyId', '==', authUser.companyId)
+        .where('role', '==', 'thoughtleader')
+        .get(),
+    ]);
 
-    if (usersSnap.empty) return { posts: [] };
-
-    // 2. Build user info map
-    const userMap = new Map<string, { name: string; avatar?: string; position?: string }>();
-    for (const userDoc of usersSnap.docs) {
+    // 2. Build user info map for all content creators
+    const userMap = new Map<string, { name: string; avatar?: string; position?: string; role: string }>();
+    for (const userDoc of colabSnap.docs) {
       const data = userDoc.data();
       userMap.set(userDoc.id, {
         name: data.profile?.name || data.name || 'Colaborador',
         avatar: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture,
         position: data.linkedinConnection?.position || data.profile?.position || '',
+        role: 'colaborador',
+      });
+    }
+    for (const userDoc of tlSnap.docs) {
+      const data = userDoc.data();
+      userMap.set(userDoc.id, {
+        name: data.profile?.name || data.name || 'Thought Leader',
+        avatar: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture,
+        position: data.linkedinConnection?.position || data.profile?.position || '',
+        role: 'thoughtleader',
       });
     }
 
-    // 3. Fetch published posts from all collaborators (parallel, limited)
+    if (userMap.size === 0) return { posts: [] };
+
     const allPosts: FeedPost[] = [];
 
-    const fetchPromises = usersSnap.docs.map(async (userDoc) => {
+    // 3a. Fetch published scheduledPosts from collaborators (parallel)
+    const colabPromises = colabSnap.docs.map(async (userDoc) => {
       try {
-        // Query only by status — no orderBy to avoid needing a composite index
-        // Sorting is done in-memory after collecting all posts
         const postsSnap = await adminDb
           .collection('users')
           .doc(userDoc.id)
@@ -209,11 +223,44 @@ export async function getCompanyFeed(
           });
         }
       } catch (e) {
-        console.error(`[Feed] Error fetching posts for user ${userDoc.id}:`, e);
+        console.error(`[Feed] Error fetching posts for colab ${userDoc.id}:`, e);
       }
     });
 
-    await Promise.all(fetchPromises);
+    // 3b. Fetch published pipeline posts from TLs (status === 'postado')
+    const tlPromises = tlSnap.docs.map(async (userDoc) => {
+      try {
+        const postsSnap = await adminDb
+          .collection('users')
+          .doc(userDoc.id)
+          .collection('contentPipeline')
+          .where('status', '==', 'postado')
+          .limit(10)
+          .get();
+
+        const userInfo = userMap.get(userDoc.id);
+
+        for (const postDoc of postsSnap.docs) {
+          const data = postDoc.data();
+          allPosts.push({
+            id: postDoc.id,
+            userId: userDoc.id,
+            authorName: userInfo?.name || 'Thought Leader',
+            authorAvatar: userInfo?.avatar,
+            authorPosition: userInfo?.position,
+            caption: data.caption || '',
+            mediaUrl: data.mediaUrl || undefined,
+            mediaType: data.mediaType || undefined,
+            linkedinPostUrl: data.linkedinPostUrl || undefined,
+            publishedAt: data.publishedAt || data.updatedAt || data.createdAt || '',
+          });
+        }
+      } catch (e) {
+        console.error(`[Feed] Error fetching pipeline posts for TL ${userDoc.id}:`, e);
+      }
+    });
+
+    await Promise.all([...colabPromises, ...tlPromises]);
 
     // 4. Sort all posts by publishedAt descending
     allPosts.sort((a, b) => {

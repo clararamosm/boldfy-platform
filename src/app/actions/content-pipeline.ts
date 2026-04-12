@@ -109,6 +109,51 @@ export async function createPipelinePost(
   }
 }
 
+// ---- Create Pipeline Idea (Thought Leader only) ----
+
+export async function createPipelineIdea(
+  idToken: string,
+  title: string,
+): Promise<ActionResult> {
+  try {
+    const user = await requireAuth(idToken);
+    if (user.role !== 'thoughtleader') {
+      return { error: 'Apenas Thought Leaders podem adicionar ideias.' };
+    }
+
+    const now = new Date().toISOString();
+    const postData = {
+      title: title.trim() || 'Ideia sem titulo',
+      caption: '',
+      scheduledFor: null,
+      status: 'backlog' as PipelineStatus,
+      editorial: '',
+      etapa: '',
+      formato: '',
+      leadMagnet: false,
+      contentPillar: '',
+      mediaUrl: null,
+      mediaType: null,
+      tlFeedback: null,
+      tlApprovedAt: null,
+      linkedinPostId: null,
+      linkedinPostUrl: null,
+      publishedAt: null,
+      createdBy: user.uid,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const docRef = await adminDb.collection(getPipelinePath(user.uid)).add(postData);
+
+    return { success: true, postId: docRef.id };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in createPipelineIdea:', msg);
+    return { error: msg };
+  }
+}
+
 // ---- Update Pipeline Post (Strategist only) ----
 
 export async function updatePipelinePost(

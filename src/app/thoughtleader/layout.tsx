@@ -1,9 +1,10 @@
 'use client';
 
 import type React from "react";
-import { Suspense } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from 'firebase/firestore';
 import { SidebarHeader, SidebarContent, SidebarFooter } from "@/components/ui/sidebar";
 import Logo from "@/components/logo";
 import { ThoughtLeaderSidebarNav } from "@/components/dashboard/thoughtleader-sidebar-nav";
@@ -26,6 +27,14 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
     });
     const subscription = useSubscription(companyId);
     const router = useRouter();
+    const [companyLogoUrl, setCompanyLogoUrl] = useState<string | undefined>();
+
+    useEffect(() => {
+        if (!companyId) return;
+        getDoc(doc(db, 'companies', companyId)).then(snap => {
+            setCompanyLogoUrl(snap.data()?.logoUrl || undefined);
+        }).catch(() => {});
+    }, [companyId]);
 
     const handleLogout = async () => {
         await signOut(auth);
@@ -57,6 +66,7 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
                     user={user}
                     roleLabel={t.roles.thoughtLeader}
                     fallbackInitials="TL"
+                    avatarOverride={companyLogoUrl}
                     feedbackPage="TL Sidebar"
                     onLogout={handleLogout}
                     logoutLabel={t.nav.signOut}
