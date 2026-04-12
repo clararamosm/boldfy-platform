@@ -77,6 +77,52 @@ function InviteFormContent() {
   );
 }
 
+function TLInviteForm({ formAction, companyId, cachedToken, userRole, t }: {
+  formAction: (payload: FormData) => void;
+  companyId: string;
+  cachedToken: string;
+  userRole?: string;
+  t: ReturnType<typeof useT>;
+}) {
+  const [skipInvite, setSkipInvite] = useState(false);
+  const canSkip = userRole === 'master' || userRole === 'strategist';
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="companyId" value={companyId} />
+      <input type="hidden" name="idToken" value={cachedToken} />
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="tlName">{t.adminTL.inviteName}</Label>
+          <Input name="name" id="tlName" placeholder={t.adminTL.inviteNamePlaceholder} required />
+        </div>
+        {canSkip && (
+          <div className="flex items-center gap-2 pt-2">
+            <input
+              type="checkbox"
+              name="skipInvite"
+              value="true"
+              id="tlSkipInvite"
+              className="h-4 w-4 rounded border-gray-300"
+              checked={skipInvite}
+              onChange={(e) => setSkipInvite(e.target.checked)}
+            />
+            <Label htmlFor="tlSkipInvite" className="text-sm font-normal text-muted-foreground">Criar sem enviar convite</Label>
+          </div>
+        )}
+        {!skipInvite && (
+          <div className="space-y-2">
+            <Label htmlFor="tlEmail">{t.adminTL.inviteEmail}</Label>
+            <Input name="email" id="tlEmail" type="email" placeholder={t.adminTL.inviteEmailPlaceholder} required />
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end mt-6">
+        <Button type="submit">{skipInvite ? 'Criar Thought Leader' : t.adminTL.sendInvite}</Button>
+      </div>
+    </form>
+  );
+}
+
 export default function AdminColaboradoresPage() {
   const { user } = useAuth();
   const companyId = useResolvedCompanyId();
@@ -103,7 +149,7 @@ export default function AdminColaboradoresPage() {
 
   const [inviteState, formAction] = useActionState(inviteCollaborator, { error: undefined, success: undefined });
   const [inviteTLState, tlFormAction] = useActionState(inviteThoughtLeader, { error: undefined, success: undefined });
-  const tlFormRef = useRef<HTMLFormElement>(null);
+
 
   const fetchCollaborators = useCallback(async (currentCompanyId: string) => {
     setIsLoading(true);
@@ -435,29 +481,13 @@ export default function AdminColaboradoresPage() {
                   setIsTLDialogOpen(open);
                 }}
               >
-                <form action={tlFormAction} ref={tlFormRef}>
-                  <input type="hidden" name="companyId" value={companyId || ''} />
-                  <input type="hidden" name="idToken" value={cachedToken} />
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="tlName">{t.adminTL.inviteName}</Label>
-                      <Input name="name" id="tlName" placeholder={t.adminTL.inviteNamePlaceholder} required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="tlEmail">{t.adminTL.inviteEmail}</Label>
-                      <Input name="email" id="tlEmail" type="email" placeholder={t.adminTL.inviteEmailPlaceholder} required />
-                    </div>
-                    {(user?.role === 'master' || user?.role === 'strategist') && (
-                      <div className="flex items-center gap-2 pt-2">
-                        <input type="checkbox" name="skipInvite" value="true" id="tlSkipInvite" className="h-4 w-4 rounded border-gray-300" />
-                        <Label htmlFor="tlSkipInvite" className="text-sm font-normal text-muted-foreground">Criar sem enviar convite</Label>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex justify-end mt-6">
-                    <Button type="submit">{t.adminTL.sendInvite}</Button>
-                  </div>
-                </form>
+                <TLInviteForm
+                  formAction={tlFormAction}
+                  companyId={companyId || ''}
+                  cachedToken={cachedToken}
+                  userRole={user?.role}
+                  t={t}
+                />
               </ActionDialog>
             </CardHeader>
             <CardContent>

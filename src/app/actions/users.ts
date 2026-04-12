@@ -589,8 +589,9 @@ export async function deleteStrategist(idToken: string, strategistId: string): P
 
 const InviteThoughtLeaderSchema = z.object({
   name: z.string().min(1, 'Nome do Thought Leader é obrigatório.'),
-  email: z.string().email('E-mail inválido.'),
-  companyId: z.string().min(1, 'ID da empresa é obrigatório.')
+  email: z.string().optional().default(''),
+  companyId: z.string().min(1, 'ID da empresa é obrigatório.'),
+  skipInvite: z.string().optional(),
 });
 
 type InviteThoughtLeaderState = {
@@ -611,15 +612,22 @@ export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, f
 
   const validatedData = InviteThoughtLeaderSchema.safeParse({
     name: formData.get('name'),
-    email: formData.get('email'),
+    email: formData.get('email') || '',
     companyId: formData.get('companyId'),
+    skipInvite: formData.get('skipInvite') || undefined,
   });
 
   if (!validatedData.success) {
     return { error: validatedData.error.errors.map(e => e.message).join(', ') };
   }
 
-  const { name, email, companyId } = validatedData.data;
+  const { name, email, companyId, skipInvite: skipInviteVal } = validatedData.data;
+  const skipInvite = skipInviteVal === 'true';
+
+  // When NOT skipping invite, email is required
+  if (!skipInvite) {
+    if (!email || !z.string().email().safeParse(email).success) return { error: 'E-mail do Thought Leader inválido.' };
+  }
 
   try {
     const companyDocSnap = await adminDb.collection("companies").doc(companyId).get();
@@ -639,6 +647,24 @@ export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, f
 
     if (tlUsersQuery.size >= tlLicenses) {
       return { error: `Limite de licenças TL atingido (${tlLicenses}). Não é possível convidar mais Thought Leaders.` };
+    }
+
+    // When skipInvite, create a placeholder doc without Firebase Auth user
+    if (skipInvite) {
+      const placeholderId = crypto.randomBytes(16).toString('hex');
+      const tlSlug = generateSlug(name, placeholderId);
+      await adminDb.collection("users").doc(placeholderId).set({
+        role: 'thoughtleader',
+        name,
+        slug: tlSlug,
+        companyId,
+        companyName,
+        status: 'Pendente',
+        profile: { name, email: '' },
+        pendingSetup: true,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+      return { success: true };
     }
 
     let userRecord;
@@ -668,22 +694,18 @@ export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, f
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    // Skip invitation email if skipInvite flag is set (for pre-populating accounts)
-    const skipInvite = formData.get('skipInvite') === 'true';
-    if (!skipInvite) {
-      const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-      const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
-      sendInvitationEmail({
-        to: email,
-        name,
-        companyName,
-        role: companyLocale === 'en' ? 'Thought Leader' : 'Thought Leader',
-        resetLink,
-        locale: companyLocale,
-      }).catch((emailError) => {
-        console.error("Error sending thought leader invitation email:", emailError);
-      });
-    }
+    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    sendInvitationEmail({
+      to: email,
+      name,
+      companyName,
+      role: companyLocale === 'en' ? 'Thought Leader' : 'Thought Leader',
+      resetLink,
+      locale: companyLocale,
+    }).catch((emailError) => {
+      console.error("Error sending thought leader invitation email:", emailError);
+    });
 
     return { success: true };
   } catch (error) {
