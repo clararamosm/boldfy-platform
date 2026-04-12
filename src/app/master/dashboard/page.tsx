@@ -2,8 +2,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, orderBy, limit, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,26 +12,9 @@ import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n/context';
 import { getAuthToken } from '@/lib/auth-client';
+import { getMasterDashboardData, type MasterDashboardData } from '@/app/actions/dashboard';
 
-
-type Company = {
-    id: string;
-    companyName: string;
-    status: 'Ativa' | 'Inativa' | 'Trial';
-    licenses: number;
-    adminProfile: { email: string };
-    createdAt?: { toDate?: () => Date } | string | null;
-    activeSeats?: number;
-};
-
-type MasterStats = {
-    activeCompanies: number;
-    totalCollaborators: number;
-    globalTrails: number;
-    activeCollaborators: number;
-};
-
-const StatCard = ({ title, value, description, icon: Icon, isLoading }: { title: string, value: string, description: string, icon: React.ElementType, isLoading: boolean }) => (
+const StatCard = ({ title, value, description, icon: Icon, isLoading }: { title: string; value: string; description: string; icon: React.ElementType; isLoading: boolean }) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -52,8 +33,7 @@ const StatCard = ({ title, value, description, icon: Icon, isLoading }: { title:
 
 export default function MasterDashboardPage() {
     const t = useT();
-    const [stats, setStats] = useState<MasterStats | null>(null);
-    const [recentCompanies, setRecentCompanies] = useState<Company[]>([]);
+    const [data, setData] = useState<MasterDashboardData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
     const [isMigrating, setIsMigrating] = useState(false);
@@ -66,11 +46,11 @@ export default function MasterDashboardPage() {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + token },
         });
-        const data = await res.json();
-        if (data.success) {
-          toast({ title: `Migração concluída! ${data.companiesMigrated} empresas, ${data.tlMigrated} TLs.` });
+        const result = await res.json();
+        if (result.success) {
+          toast({ title: `Migração concluída! ${result.companiesMigrated} empresas, ${result.tlMigrated} TLs.` });
         } else {
-          toast({ variant: 'destructive', title: 'Erro', description: data.error });
+          toast({ variant: 'destructive', title: 'Erro', description: result.error });
         }
       } catch {
         toast({ variant: 'destructive', title: 'Erro na migração.' });
@@ -83,50 +63,13 @@ export default function MasterDashboardPage() {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                // Fetch all companies
-                const allCompaniesSnap = await getDocs(collection(db, "companies"));
-                const allCompanies = allCompaniesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Company[];
-
-                // Fetch all collaborators (role=colaborador)
-                const collabQuery = query(collection(db, "users"), where("role", "==", "colaborador"));
-                const collabSnap = await getDocs(collabQuery);
-
-                // Build per-company seat counts
-                const seatCounts: Record<string, number> = {};
-                collabSnap.docs.forEach(d => {
-                    const cId = d.data().companyId;
-                    if (cId) seatCounts[cId] = (seatCounts[cId] || 0) + 1;
-                });
-
-                // Count active collaborators (status === 'Ativo')
-                const activeCollabCount = collabSnap.docs.filter(d => d.data().status === 'Ativo').length;
-
-                // Fetch global trail count (sum trails across all globalSessions)
-                const sessionsSnap = await getDocs(collection(db, "globalSessions"));
-                let totalGlobalTrails = 0;
-                for (const sess of sessionsSnap.docs) {
-                    const trailsSnap = await getDocs(collection(db, `globalSessions/${sess.id}/trails`));
-                    totalGlobalTrails += trailsSnap.size;
+                const token = await getAuthToken();
+                const result = await getMasterDashboardData(token);
+                if (result.error) {
+                    toast({ variant: 'destructive', title: t.masterDashboard.fetchError, description: result.error });
+                } else if (result.data) {
+                    setData(result.data);
                 }
-
-                // Recent companies (sorted desc by createdAt, top 5)
-                const sorted = [...allCompanies].sort((a, b) => {
-                    const da = a.createdAt && typeof a.createdAt === 'object' && a.createdAt !== null && 'toDate' in a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate() : new Date(a.createdAt as string || 0);
-                    const db2 = b.createdAt && typeof b.createdAt === 'object' && b.createdAt !== null && 'toDate' in b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate() : new Date(b.createdAt as string || 0);
-                    return db2.getTime() - da.getTime();
-                });
-
-                setRecentCompanies(sorted.slice(0, 5).map(c => ({
-                    ...c,
-                    activeSeats: seatCounts[c.id] || 0,
-                })));
-
-                setStats({
-                    activeCompanies: allCompanies.filter(c => c.status === 'Ativa' || c.status === 'Trial').length,
-                    totalCollaborators: collabSnap.size,
-                    globalTrails: totalGlobalTrails,
-                    activeCollaborators: activeCollabCount,
-                });
             } catch (error) {
                 console.error("Error fetching master data:", error);
                 toast({ variant: 'destructive', title: t.masterDashboard.fetchError });
@@ -135,17 +78,17 @@ export default function MasterDashboardPage() {
             }
         };
         fetchData();
-    }, [toast]);
+    }, [toast, t]);
 
   return (
     <>
       <Header title={t.masterDashboard.title} />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-           <StatCard title={t.masterDashboard.activeCompanies} value={stats?.activeCompanies.toString() || '0'} description={t.masterDashboard.activeCompaniesDescription} icon={Building2} isLoading={isLoading} />
-           <StatCard title={t.masterDashboard.totalCollaborators} value={stats?.totalCollaborators.toString() || '0'} description={t.masterDashboard.totalCollaboratorsDescription} icon={Users} isLoading={isLoading} />
-           <StatCard title={t.masterDashboard.globalTrails} value={stats?.globalTrails.toString() || '0'} description={t.masterDashboard.globalTrailsDescription} icon={Globe} isLoading={isLoading} />
-           <StatCard title={t.masterDashboard.avgEngagement} value={stats?.activeCollaborators.toString() || '0'} description={t.masterDashboard.avgEngagementDescription} icon={BookOpen} isLoading={isLoading} />
+           <StatCard title={t.masterDashboard.activeCompanies} value={data?.activeCompanies.toString() || '0'} description={t.masterDashboard.activeCompaniesDescription} icon={Building2} isLoading={isLoading} />
+           <StatCard title={t.masterDashboard.totalCollaborators} value={data?.totalCollaborators.toString() || '0'} description={t.masterDashboard.totalCollaboratorsDescription} icon={Users} isLoading={isLoading} />
+           <StatCard title={t.masterDashboard.globalTrails} value={data?.globalTrails.toString() || '0'} description={t.masterDashboard.globalTrailsDescription} icon={Globe} isLoading={isLoading} />
+           <StatCard title={t.masterDashboard.avgEngagement} value={data?.activeCollaborators.toString() || '0'} description={t.masterDashboard.avgEngagementDescription} icon={BookOpen} isLoading={isLoading} />
         </div>
 
         {/* One-time migration button */}
@@ -189,17 +132,17 @@ export default function MasterDashboardPage() {
                                 </div>
                             </TableCell>
                         </TableRow>
-                    ) : recentCompanies.length === 0 ? (
+                    ) : !data?.recentCompanies?.length ? (
                          <TableRow>
                             <TableCell colSpan={5} className="text-center h-24">Nenhuma empresa encontrada.</TableCell>
                         </TableRow>
                     ) : (
-                        recentCompanies.map(company => (
+                        data.recentCompanies.map(company => (
                              <TableRow key={company.id}>
                                 <TableCell className="font-medium">{company.companyName}</TableCell>
                                 <TableCell><Badge variant={company.status === 'Ativa' ? 'default' : 'destructive'}>{company.status}</Badge></TableCell>
-                                <TableCell>0 / {company.licenses}</TableCell>
-                                <TableCell>{company.adminProfile?.email}</TableCell>
+                                <TableCell>{company.activeSeats} / {company.licenses}</TableCell>
+                                <TableCell>{company.adminEmail}</TableCell>
                                 <TableCell>
                                     <Button variant="outline" size="sm" asChild>
                                        <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar</Link>

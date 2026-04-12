@@ -3,7 +3,7 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { requireAuth, requireStrategistForTL, requireAdminOrStrategist } from '@/lib/auth-guard';
+import { requireAuth, requireStrategistForTL, requireAdminOrStrategist, requireTLOrMaster } from '@/lib/auth-guard';
 import { triggerSlackNotification } from '@/lib/slack-notifications';
 import { generateSlug } from '@/lib/slugify';
 
@@ -285,11 +285,7 @@ export async function approvePipelineIdea(
   postId: string
 ): Promise<ActionResult> {
   try {
-    const user = await requireAuth(idToken);
-
-    if (user.role !== 'thoughtleader' && user.role !== 'master') {
-      return { error: 'Apenas o Thought Leader pode aprovar ideias.' };
-    }
+    const user = await requireTLOrMaster(idToken);
 
     const collPath = getPipelinePath(user.uid);
     const docRef = adminDb.collection(collPath).doc(postId);
@@ -325,11 +321,7 @@ export async function approvePipelinePost(
   postId: string
 ): Promise<ActionResult> {
   try {
-    const user = await requireAuth(idToken);
-
-    if (user.role !== 'thoughtleader' && user.role !== 'master') {
-      return { error: 'Apenas o Thought Leader pode aprovar posts.' };
-    }
+    const user = await requireTLOrMaster(idToken);
 
     const collPath = getPipelinePath(user.uid);
     const docRef = adminDb.collection(collPath).doc(postId);
@@ -375,11 +367,7 @@ export async function requestPipelineAdjustment(
   feedback: string
 ): Promise<ActionResult> {
   try {
-    const user = await requireAuth(idToken);
-
-    if (user.role !== 'thoughtleader' && user.role !== 'master') {
-      return { error: 'Apenas o Thought Leader pode solicitar ajustes.' };
-    }
+    const user = await requireTLOrMaster(idToken);
 
     const collPath = getPipelinePath(user.uid);
     const docRef = adminDb.collection(collPath).doc(postId);
@@ -512,30 +500,40 @@ export async function getStrategistSidebarData(
 
     if (assignedCompanies.length === 0) return { companies: [] };
 
+    // Parallel fetch: all companies + all TLs for those companies at once
+    const [companyDocs, allTlSnap] = await Promise.all([
+      Promise.all(assignedCompanies.map(cId => adminDb.collection('companies').doc(cId).get())),
+      // Single query for all TLs across assigned companies (avoids N+1)
+      adminDb.collection('users')
+        .where('companyId', 'in', assignedCompanies.slice(0, 30)) // Firestore 'in' limit: 30
+        .where('role', '==', 'thoughtleader')
+        .get(),
+    ]);
+
+    // Group TLs by companyId
+    const tlsByCompany = new Map<string, { id: string; slug: string; name: string }[]>();
+    allTlSnap.docs.forEach(d => {
+      const tlData = d.data();
+      const cId = tlData.companyId as string;
+      const tlName = tlData.profile?.name || tlData.name || 'TL';
+      const tlSlug = (tlData.slug as string) || generateSlug(tlName, d.id);
+      if (!tlsByCompany.has(cId)) tlsByCompany.set(cId, []);
+      tlsByCompany.get(cId)!.push({ id: d.id, slug: tlSlug, name: tlName });
+    });
+
     const result: StrategistSidebarCompany[] = [];
 
-    for (const companyId of assignedCompanies) {
-      const compDoc = await adminDb.collection('companies').doc(companyId).get();
+    for (const compDoc of companyDocs) {
       if (!compDoc.exists) continue;
       const compData = compDoc.data();
       const companyName = compData?.companyName || 'Empresa';
       const logoUrl = compData?.logoUrl as string | undefined;
-      const companySlug = (compData?.slug as string) || generateSlug(companyName, companyId);
+      const companySlug = (compData?.slug as string) || generateSlug(companyName, compDoc.id);
 
-      const tlSnap = await adminDb.collection('users')
-        .where('companyId', '==', companyId)
-        .where('role', '==', 'thoughtleader')
-        .get();
-
-      const tls = tlSnap.docs.map(d => {
-        const tlData = d.data();
-        const tlName = tlData.profile?.name || tlData.name || 'TL';
-        const tlSlug = (tlData.slug as string) || generateSlug(tlName, d.id);
-        return { id: d.id, slug: tlSlug, name: tlName };
-      });
+      const tls = tlsByCompany.get(compDoc.id) || [];
       tls.sort((a, b) => a.name.localeCompare(b.name));
 
-      result.push({ id: companyId, slug: companySlug, name: companyName, logoUrl, tls });
+      result.push({ id: compDoc.id, slug: companySlug, name: companyName, logoUrl, tls });
     }
 
     result.sort((a, b) => a.name.localeCompare(b.name));
@@ -555,7 +553,12 @@ export async function resolveSlugs(
   tlSlug?: string
 ): Promise<{ companyId?: string; tlId?: string; tlName?: string; error?: string }> {
   try {
-    await requireAuth(idToken);
+    const user = await requireAuth(idToken);
+
+    // Only strategist, master, and admin can resolve slugs
+    if (user.role !== 'strategist' && user.role !== 'master' && user.role !== 'admin') {
+      return { error: 'Acesso negado.' };
+    }
 
     // Resolve company slug
     let companyId: string | undefined;
@@ -635,44 +638,66 @@ export async function getAllPipelinePostsForStrategist(
 
     if (assignedCompanies.length === 0) return { posts: [] };
 
+    // Step 1: Parallel fetch companies + all TLs in one batch (avoids N+1)
+    const [companyDocs, allTlSnap] = await Promise.all([
+      Promise.all(assignedCompanies.map(cId => adminDb.collection('companies').doc(cId).get())),
+      adminDb.collection('users')
+        .where('companyId', 'in', assignedCompanies.slice(0, 30))
+        .where('role', '==', 'thoughtleader')
+        .get(),
+    ]);
+
+    // Build company info map
+    const companyMap = new Map<string, { name: string; slug: string }>();
+    for (const compDoc of companyDocs) {
+      if (!compDoc.exists) continue;
+      const compData = compDoc.data();
+      const name = compData?.companyName || '';
+      companyMap.set(compDoc.id, {
+        name,
+        slug: (compData?.slug as string) || generateSlug(name, compDoc.id),
+      });
+    }
+
+    // Step 2: Parallel fetch pipeline posts for ALL TLs at once
+    const tlInfoList = allTlSnap.docs.map(d => {
+      const tlData = d.data();
+      const tlName = tlData.profile?.name || tlData.name || '';
+      return {
+        id: d.id,
+        name: tlName,
+        slug: (tlData.slug as string) || generateSlug(tlName, d.id),
+        companyId: tlData.companyId as string,
+      };
+    });
+
+    const pipelineSnapshots = await Promise.all(
+      tlInfoList.map(tl =>
+        adminDb.collection(getPipelinePath(tl.id))
+          .orderBy('createdAt', 'desc')
+          .get()
+          .then(snap => ({ tl, snap }))
+      )
+    );
+
+    // Step 3: Assemble results
     const allPosts: CalendarPipelinePost[] = [];
 
-    for (const companyId of assignedCompanies) {
-      // Get company info
-      const compDoc = await adminDb.collection('companies').doc(companyId).get();
-      const compData = compDoc.data();
-      const companyName = compData?.companyName || '';
-      const companySlug = (compData?.slug as string) || generateSlug(companyName, companyId);
+    for (const { tl, snap } of pipelineSnapshots) {
+      const company = companyMap.get(tl.companyId);
+      if (!company) continue;
 
-      // Get TLs in this company
-      const tlSnap = await adminDb.collection('users')
-        .where('companyId', '==', companyId)
-        .where('role', '==', 'thoughtleader')
-        .get();
-
-      for (const tlDoc of tlSnap.docs) {
-        const tlData = tlDoc.data();
-        const tlName = tlData.profile?.name || tlData.name || '';
-        const tlSlug = (tlData.slug as string) || generateSlug(tlName, tlDoc.id);
-
-        // Get pipeline posts for this TL
-        const postsSnap = await adminDb
-          .collection(getPipelinePath(tlDoc.id))
-          .orderBy('createdAt', 'desc')
-          .get();
-
-        for (const postDoc of postsSnap.docs) {
-          allPosts.push({
-            id: postDoc.id,
-            ...(postDoc.data() as Omit<PipelinePost, 'id'>),
-            tlUserId: tlDoc.id,
-            tlSlug,
-            tlName,
-            companyName,
-            companyId,
-            companySlug,
-          });
-        }
+      for (const postDoc of snap.docs) {
+        allPosts.push({
+          id: postDoc.id,
+          ...(postDoc.data() as Omit<PipelinePost, 'id'>),
+          tlUserId: tl.id,
+          tlSlug: tl.slug,
+          tlName: tl.name,
+          companyName: company.name,
+          companyId: tl.companyId,
+          companySlug: company.slug,
+        });
       }
     }
 

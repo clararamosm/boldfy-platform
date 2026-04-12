@@ -18,7 +18,7 @@ type TokenInfo = {
   daysLeft: number;
 };
 
-type UseAuthGuardOptions = {
+export type UseAuthGuardOptions = {
   /** The required role for this route */
   role: 'master' | 'admin' | 'colaborador' | 'thoughtleader' | 'strategist';
   /** If true, check LinkedIn token status (colaborador / thoughtleader) */

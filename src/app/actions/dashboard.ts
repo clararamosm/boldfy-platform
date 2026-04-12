@@ -2,7 +2,7 @@
 'use server';
 
 import { db as adminDb } from '@/lib/firebase-admin';
-import { requireAdmin } from '@/lib/auth-guard';
+import { requireAdmin, requireMaster } from '@/lib/auth-guard';
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -218,5 +218,98 @@ export async function getAdminDashboardData(
   } catch (error) {
     console.error('Error in getAdminDashboardData:', error);
     return { error: 'Erro ao carregar dados do dashboard.' };
+  }
+}
+
+// ─── Master Dashboard Server Action ─────────────────────────────
+
+export type MasterDashboardData = {
+  activeCompanies: number;
+  totalCollaborators: number;
+  globalTrails: number;
+  activeCollaborators: number;
+  recentCompanies: {
+    id: string;
+    companyName: string;
+    status: string;
+    licenses: number;
+    adminEmail: string;
+    activeSeats: number;
+    createdAt: string | null;
+  }[];
+};
+
+export async function getMasterDashboardData(
+  idToken: string,
+): Promise<{ data?: MasterDashboardData; error?: string }> {
+  try {
+    await requireMaster(idToken);
+
+    // Parallel top-level fetches (server-side Admin SDK — no Firestore rules)
+    const [allCompaniesSnap, collabSnap, sessionsSnap] = await Promise.all([
+      adminDb.collection('companies').get(),
+      adminDb.collection('users').where('role', '==', 'colaborador').get(),
+      adminDb.collection('globalSessions').get(),
+    ]);
+
+    const allCompanies = allCompaniesSnap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        companyName: data.companyName as string | undefined,
+        status: data.status as string | undefined,
+        licenses: data.licenses as number | undefined,
+        adminProfile: data.adminProfile as { email?: string } | undefined,
+        createdAt: data.createdAt as unknown,
+      };
+    });
+
+    // Per-company seat counts
+    const seatCounts: Record<string, number> = {};
+    collabSnap.docs.forEach(d => {
+      const cId = d.data().companyId as string;
+      if (cId) seatCounts[cId] = (seatCounts[cId] || 0) + 1;
+    });
+
+    // Active collaborators
+    const activeCollabCount = collabSnap.docs.filter(d => d.data().status === 'Ativo').length;
+
+    // Global trails — parallel batch
+    const trailSnaps = await Promise.all(
+      sessionsSnap.docs.map(s =>
+        adminDb.collection(`globalSessions/${s.id}/trails`).get()
+      )
+    );
+    const totalGlobalTrails = trailSnaps.reduce((sum, snap) => sum + snap.size, 0);
+
+    // Sort companies by createdAt desc, take top 5
+    const sorted = [...allCompanies].sort((a, b) => {
+      const da = toDate(a.createdAt) || new Date(0);
+      const db2 = toDate(b.createdAt) || new Date(0);
+      return db2.getTime() - da.getTime();
+    });
+
+    const recentCompanies = sorted.slice(0, 5).map(c => ({
+      id: c.id,
+      companyName: c.companyName || '',
+      status: c.status || 'Inativa',
+      licenses: c.licenses || 0,
+      adminEmail: c.adminProfile?.email || '',
+      activeSeats: seatCounts[c.id] || 0,
+      createdAt: toDate(c.createdAt)?.toISOString() || null,
+    }));
+
+    return {
+      data: {
+        activeCompanies: allCompanies.filter(c => c.status === 'Ativa' || c.status === 'Trial').length,
+        totalCollaborators: collabSnap.size,
+        globalTrails: totalGlobalTrails,
+        activeCollaborators: activeCollabCount,
+        recentCompanies,
+      },
+    };
+  } catch (error) {
+    console.error('Error in getMasterDashboardData:', error);
+    return { error: 'Erro ao carregar dados do painel master.' };
   }
 }

@@ -22,7 +22,7 @@ interface CalendarDayCellProps {
   minHeight?: string;
 }
 
-export function CalendarDayCell({
+export const CalendarDayCell = React.memo(function CalendarDayCell({
   day,
   inMonth,
   isToday: today,
@@ -72,4 +72,4 @@ export function CalendarDayCell({
       </div>
     </Tag>
   );
-}
+});

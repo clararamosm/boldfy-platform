@@ -1,9 +1,38 @@
 'use server';
 
 // Server action to send beta test leads to Notion
+// Rate-limited: max 5 submissions per email per hour
 
 const NOTION_API_KEY = process.env.NOTION_API_KEY;
 const NOTION_BETA_DB_ID = process.env.NOTION_BETA_DB_ID;
+
+// ─── In-memory rate limiter ────────────────────────────────────
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
+
+// Clean stale entries periodically (every 100 calls)
+let cleanCounter = 0;
+function maybePurgeStale() {
+  if (++cleanCounter % 100 !== 0) return;
+  const now = Date.now();
+  for (const [key, entry] of rateLimitMap) {
+    if (now > entry.resetAt) rateLimitMap.delete(key);
+  }
+}
 
 type BetaLeadInput = {
   nome: string;
@@ -19,6 +48,13 @@ type BetaLeadInput = {
 };
 
 export async function sendBetaLeadToNotion(input: BetaLeadInput): Promise<{ success: boolean; error?: string }> {
+  // Rate limit by email to prevent spam
+  maybePurgeStale();
+  const emailKey = input.email.toLowerCase().trim();
+  if (!checkRateLimit(emailKey)) {
+    return { success: false, error: 'Muitas tentativas. Tente novamente mais tarde.' };
+  }
+
   if (!NOTION_API_KEY || !NOTION_BETA_DB_ID) {
     console.error('Notion beta leads credentials not configured');
     return { success: false, error: 'Integração com Notion não configurada.' };

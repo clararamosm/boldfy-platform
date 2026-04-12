@@ -132,6 +132,34 @@ export async function requireAdminOrStrategist(idToken: string, companyId: strin
 }
 
 /**
+ * Verifica autenticacao + garante que o usuario e thoughtleader ou master.
+ * Usado para aprovar/rejeitar posts e ideias no pipeline.
+ */
+export async function requireTLOrMaster(idToken: string): Promise<AuthUser> {
+  const user = await requireAuth(idToken);
+
+  if (user.role !== 'thoughtleader' && user.role !== 'master') {
+    throw new Error('Acesso negado: permissao de Thought Leader ou Master necessaria.');
+  }
+
+  return user;
+}
+
+/**
+ * Verifica autenticacao + garante que o usuario e strategist ou master.
+ * Usado para funcoes de gestao de conteudo/config que permitem ambos os roles.
+ */
+export async function requireStrategistOrMaster(idToken: string): Promise<AuthUser> {
+  const user = await requireAuth(idToken);
+
+  if (user.role !== 'strategist' && user.role !== 'master') {
+    throw new Error('Acesso negado: permissao de estrategista ou master necessaria.');
+  }
+
+  return user;
+}
+
+/**
  * Verifica que o strategist tem acesso ao Thought Leader especifico.
  * O TL deve pertencer a uma empresa atribuida ao strategist.
  */

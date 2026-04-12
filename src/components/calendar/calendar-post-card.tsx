@@ -40,7 +40,7 @@ interface CalendarPostCardProps {
   className?: string;
 }
 
-export function CalendarPostCard({
+export const CalendarPostCard = React.memo(function CalendarPostCard({
   post,
   statusConfig,
   onClick,
@@ -107,4 +107,4 @@ export function CalendarPostCard({
       )}
     </button>
   );
-}
+});

@@ -2,7 +2,7 @@
 'use server';
 
 import { db as adminDb } from '@/lib/firebase-admin';
-import { requireAuth, requireStrategist } from '@/lib/auth-guard';
+import { requireStrategistOrMaster } from '@/lib/auth-guard';
 import { listSlackChannels, sendSlackMessage } from '@/lib/slack';
 import {
   type SlackNotificationConfig,
@@ -19,7 +19,7 @@ export async function getSlackChannels(idToken: string): Promise<{
   error?: string;
 }> {
   try {
-    await requireStrategist(idToken);
+    await requireStrategistOrMaster(idToken);
     const channels = await listSlackChannels();
     return { channels };
   } catch (error) {
@@ -37,7 +37,7 @@ export async function getSlackConfig(
   tlId: string
 ): Promise<{ config?: SlackNotificationConfig | null; error?: string }> {
   try {
-    const user = await requireStrategist(idToken);
+    const user = await requireStrategistOrMaster(idToken);
 
     const configDocId = `${companyId}_${tlId}`;
     const configDoc = await adminDb
@@ -74,7 +74,7 @@ export async function saveSlackConfig(
   }
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    const user = await requireStrategist(idToken);
+    const user = await requireStrategistOrMaster(idToken);
 
     const configDocId = `${companyId}_${tlId}`;
     const docRef = adminDb
@@ -138,12 +138,7 @@ export async function testSlackNotification(
   notificationLabel: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    const user = await requireAuth(idToken);
-
-    // Allow strategist and master to test
-    if (user.role !== 'strategist' && user.role !== 'master') {
-      return { error: 'Acesso negado: permissão de estrategista necessária.' };
-    }
+    await requireStrategistOrMaster(idToken);
 
     if (!channelId) {
       return { error: 'Canal não especificado.' };
