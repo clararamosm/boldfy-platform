@@ -47,6 +47,15 @@ export async function GET(request: NextRequest) {
       const userId = post.userId;
 
       try {
+        // Atomic lock: mark as 'publishing' to prevent double-publish on retry
+        const lockSuccess = await adminDb.runTransaction(async (tx) => {
+          const freshDoc = await tx.get(postDoc.ref);
+          if (freshDoc.data()?.status !== 'scheduled') return false; // already picked up
+          tx.update(postDoc.ref, { status: 'publishing', updatedAt: now });
+          return true;
+        });
+        if (!lockSuccess) { skipped++; continue; }
+
         // Get user's LinkedIn connection
         const userDoc = await adminDb.collection('users').doc(userId).get();
         if (!userDoc.exists) {

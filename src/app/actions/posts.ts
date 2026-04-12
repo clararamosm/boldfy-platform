@@ -3,7 +3,7 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { requireSelf, requireAuth } from '@/lib/auth-guard';
+import { requireSelf, requireAuth, requireActiveSubscription } from '@/lib/auth-guard';
 
 export type ScheduledPost = {
   id: string;
@@ -31,7 +31,8 @@ export async function createScheduledPost(
   }
 ): Promise<{ success?: boolean; postId?: string; error?: string }> {
   try {
-    await requireSelf(idToken, userId);
+    const user = await requireSelf(idToken, userId);
+    await requireActiveSubscription(user);
     if (!data.caption.trim()) return { error: 'A legenda não pode estar vazia.' };
     if (!data.scheduledFor) return { error: 'Data de agendamento é obrigatória.' };
 

@@ -50,15 +50,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Idempotency: check if we already processed this event
+    // Idempotency: atomic check-and-set via Firestore transaction
     const eventRef = adminDb.collection('stripeEvents').doc(event.id);
-    const eventDoc = await eventRef.get();
-    if (eventDoc.exists) {
+    const alreadyProcessed = await adminDb.runTransaction(async (tx) => {
+      const eventDoc = await tx.get(eventRef);
+      if (eventDoc.exists) return true;
+      tx.set(eventRef, { type: event.type, processedAt: new Date(), status: 'processing' });
+      return false;
+    });
+    if (alreadyProcessed) {
       console.log(`Webhook event ${event.id} already processed, skipping`);
       return NextResponse.json({ received: true, skipped: true });
     }
-    // Mark as processing immediately to prevent concurrent handling
-    await eventRef.set({ type: event.type, processedAt: new Date(), status: 'processing' });
 
     switch (event.type) {
       case 'checkout.session.completed': {

@@ -3,7 +3,7 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { requireAuth, requireStrategistForTL, requireAdminOrStrategist, requireTLOrMaster } from '@/lib/auth-guard';
+import { requireAuth, requireStrategistForTL, requireAdminOrStrategist, requireTLOrMaster, requireActiveSubscription } from '@/lib/auth-guard';
 import { triggerSlackNotification } from '@/lib/slack-notifications';
 import { generateSlug } from '@/lib/slugify';
 
@@ -75,6 +75,7 @@ export async function createPipelinePost(
 ): Promise<ActionResult> {
   try {
     const user = await requireStrategistForTL(idToken, tlUserId);
+    await requireActiveSubscription(user);
 
     const now = new Date().toISOString();
     const postData = {
@@ -120,6 +121,7 @@ export async function createPipelineIdea(
     if (user.role !== 'thoughtleader') {
       return { error: 'Apenas Thought Leaders podem adicionar ideias.' };
     }
+    await requireActiveSubscription(user);
 
     const now = new Date().toISOString();
     const postData = {

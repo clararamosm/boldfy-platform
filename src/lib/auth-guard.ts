@@ -160,6 +160,33 @@ export async function requireStrategistOrMaster(idToken: string): Promise<AuthUs
 }
 
 /**
+ * Verifica se a empresa do usuario tem subscription ativa.
+ * Use nas actions que geram valor (criar posts, pipeline, AI, etc).
+ * NAO use em actions de leitura ou configuracao (admin precisa acessar mesmo se vencido).
+ * Master e strategist sao isentos (nao pertencem a uma empresa pagante).
+ */
+export async function requireActiveSubscription(user: AuthUser): Promise<void> {
+  // Master e strategist nao tem subscription propria
+  if (user.role === 'master' || user.role === 'strategist') return;
+
+  if (!user.companyId) {
+    throw new Error('Usuario sem empresa vinculada.');
+  }
+
+  const companyDoc = await adminDb.collection('companies').doc(user.companyId).get();
+  const subscription = companyDoc.data()?.subscription;
+
+  if (!subscription) {
+    throw new Error('Assinatura nao encontrada. Entre em contato com o administrador.');
+  }
+
+  const activeStatuses = ['active', 'trialing', 'past_due'];
+  if (!activeStatuses.includes(subscription.status)) {
+    throw new Error('Assinatura inativa. Renove sua assinatura para continuar usando a plataforma.');
+  }
+}
+
+/**
  * Verifica que o strategist tem acesso ao Thought Leader especifico.
  * O TL deve pertencer a uma empresa atribuida ao strategist.
  */

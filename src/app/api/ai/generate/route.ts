@@ -66,6 +66,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User has no associated company" }, { status: 403 });
     }
 
+    // Check active subscription (skip for master)
+    if (role !== 'master' && userData?.companyId) {
+      const companyDoc = await adminDb.collection('companies').doc(userData.companyId).get();
+      const subStatus = companyDoc.data()?.subscription?.status;
+      if (subStatus && !['active', 'trialing', 'past_due'].includes(subStatus)) {
+        return NextResponse.json({ error: "Assinatura inativa. Renove para usar o assistente de IA." }, { status: 403 });
+      }
+    }
+
     // Validate input with Zod
     const body = await req.json();
     const parsed = GenerateSchema.safeParse(body);
