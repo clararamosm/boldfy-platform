@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Loader2, Plus, Calendar as CalIcon, Users, Clock,
-  User, ChevronDown, ChevronUp,
+  User, ChevronDown, ChevronUp, GripVertical, ArrowRight,
 } from "lucide-react";
 import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
@@ -19,6 +19,8 @@ import { getAuthToken } from '@/lib/auth-client';
 import { STATUS_CONFIG, PIPELINE_STATUSES, buildGetStatusLabel } from '@/lib/pipeline-config';
 import { resolveSlugs, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
 import { generateSlug } from '@/lib/slugify';
+import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type TLSummary = {
   id: string;
@@ -39,6 +41,7 @@ export default function StrategistPipelinePage() {
   const urlCompanySlug = searchParams.get('c');
   const urlTlSlug = searchParams.get('tl');
   const appliedUrlParams = useRef(false);
+  const { toast } = useToast();
 
   const [thoughtLeaders, setThoughtLeaders] = useState<TLSummary[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
@@ -59,6 +62,13 @@ export default function StrategistPipelinePage() {
   // "Ver todos" dialog
   const [dialogStatus, setDialogStatus] = useState<PipelineStatus | null>(null);
 
+  // ─── Selection state ──────
+  const [selectedPosts, setSelectedPosts] = useState<Set<string>>(new Set());
+  const [isMoving, setIsMoving] = useState(false);
+
+  // ─── Drag & drop state ──────
+  const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<PipelineStatus | null>(null);
 
   // ─── Fetch TLs ──────
   useEffect(() => {
@@ -116,7 +126,6 @@ export default function StrategistPipelinePage() {
         // Resolve URL slugs to IDs for pre-selection
         if (!appliedUrlParams.current) {
           if (urlCompanySlug) {
-            // Find company by slug
             const matchedCompany = allTLs.find(tl => tl.companySlug === urlCompanySlug);
             if (matchedCompany) {
               setSelectedCompany(matchedCompany.companyId);
@@ -161,7 +170,7 @@ export default function StrategistPipelinePage() {
     return companyTLs.map(tl => tl.id);
   }, [tlFilter, companyTLs]);
 
-  // ─── Fetch content pillars (uses first active TL) ──────
+  // ─── Fetch content pillars ──────
   useEffect(() => {
     if (activeTlIds.length === 0) {
       setContentPillars([]);
@@ -202,7 +211,6 @@ export default function StrategistPipelinePage() {
       for (const tlId of activeTlIds) {
         const result = await getPipelinePosts(token, tlId, null);
         if (result.posts) {
-          // Tag each post with its TL id for display
           result.posts.forEach(p => {
             (p as PipelinePost & { _tlId?: string })._tlId = tlId;
           });
@@ -267,7 +275,7 @@ export default function StrategistPipelinePage() {
   }, [selectedCompany, companies]);
 
 
-  // ─── Create post directly (no dialog) ──────
+  // ─── Create post directly ──────
   const createPostDirect = useCallback(async () => {
     const effectiveTlId = tlFilter !== 'all' ? tlFilter : companyTLs[0]?.id;
     if (!effectiveTlId || isCreating) return;
@@ -309,9 +317,93 @@ export default function StrategistPipelinePage() {
     router.push(`/post/${cSlug}/${tlSlug}/${post.id}`);
   };
 
-  // ─── Statuses to show in the grid (excludes agendado — shown below) ──────
+  // ─── Selection helpers ──────
+  const toggleSelect = (postId: string) => {
+    setSelectedPosts(prev => {
+      const next = new Set(prev);
+      if (next.has(postId)) next.delete(postId);
+      else next.add(postId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedPosts(new Set());
+
+  // ─── Move posts to a new status ──────
+  const movePostsToStatus = async (postIds: string[], newStatus: PipelineStatus) => {
+    setIsMoving(true);
+    try {
+      const token = await getAuthToken();
+      const { updatePipelinePost } = await import('@/app/actions/content-pipeline');
+
+      for (const postId of postIds) {
+        const post = posts.find(p => p.id === postId);
+        if (!post || post.status === newStatus) continue;
+        const tlId = (post as PipelinePost & { _tlId?: string })._tlId;
+        if (!tlId) continue;
+        await updatePipelinePost(token, tlId, postId, { status: newStatus });
+      }
+
+      // Update local state optimistically
+      setPosts(prev => prev.map(p =>
+        postIds.includes(p.id) ? { ...p, status: newStatus } : p
+      ));
+
+      clearSelection();
+      toast({ title: `${postIds.length} post${postIds.length > 1 ? 's' : ''} movido${postIds.length > 1 ? 's' : ''}.` });
+    } catch (error) {
+      console.error('Error moving posts:', error);
+      toast({ variant: 'destructive', title: 'Erro ao mover posts.' });
+    } finally {
+      setIsMoving(false);
+    }
+  };
+
+  // ─── Drag & drop handlers ──────
+  const handleDragStart = (e: React.DragEvent, postId: string) => {
+    setDraggedPostId(postId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', postId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, status: PipelineStatus) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverStatus(status);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverStatus(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: PipelineStatus) => {
+    e.preventDefault();
+    setDragOverStatus(null);
+
+    const postId = draggedPostId || e.dataTransfer.getData('text/plain');
+    setDraggedPostId(null);
+
+    if (!postId) return;
+
+    // If there are selected posts and the dragged one is selected, move all selected
+    const idsToMove = selectedPosts.has(postId) && selectedPosts.size > 0
+      ? Array.from(selectedPosts)
+      : [postId];
+
+    await movePostsToStatus(idsToMove, targetStatus);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPostId(null);
+    setDragOverStatus(null);
+  };
+
+  // ─── Statuses for grid and agendado ──────
   const gridStatuses = PIPELINE_STATUSES.filter(s => s !== 'agendado' && s !== 'arquivado');
   const agendadoPosts = postsByStatus['agendado'] || [];
+
+  // ─── All available move targets (for bulk move) ──────
+  const moveTargetStatuses = PIPELINE_STATUSES.filter(s => s !== 'arquivado');
 
   // ─── Loading state ──────
   if (isLoading) {
@@ -351,7 +443,7 @@ export default function StrategistPipelinePage() {
         <div className="flex flex-wrap items-center gap-3 mb-4">
           {/* Company selector */}
           {companies.length > 1 && (
-            <Select value={selectedCompany || ''} onValueChange={(v) => { setSelectedCompany(v); setTlFilter('all'); }}>
+            <Select value={selectedCompany || ''} onValueChange={(v) => { setSelectedCompany(v); setTlFilter('all'); clearSelection(); }}>
               <SelectTrigger className="w-[220px]">
                 <SelectValue placeholder="Empresa" />
               </SelectTrigger>
@@ -364,7 +456,7 @@ export default function StrategistPipelinePage() {
           )}
 
           {/* TL / profile filter */}
-          <Select value={tlFilter} onValueChange={setTlFilter}>
+          <Select value={tlFilter} onValueChange={(v) => { setTlFilter(v); clearSelection(); }}>
             <SelectTrigger className="w-[200px]">
               <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
               <SelectValue placeholder="Perfil" />
@@ -383,6 +475,44 @@ export default function StrategistPipelinePage() {
           </Button>
         </div>
 
+        {/* Selection action bar */}
+        {selectedPosts.size > 0 && (
+          <div className="flex items-center gap-3 mb-3 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20">
+            <span className="text-sm font-medium">
+              {selectedPosts.size} selecionado{selectedPosts.size > 1 ? 's' : ''}
+            </span>
+
+            <Select
+              value=""
+              onValueChange={(v) => movePostsToStatus(Array.from(selectedPosts), v as PipelineStatus)}
+              disabled={isMoving}
+            >
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                {isMoving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <ArrowRight className="h-3 w-3 mr-1" />}
+                <SelectValue placeholder="Mover para..." />
+              </SelectTrigger>
+              <SelectContent>
+                {moveTargetStatuses.map(s => (
+                  <SelectItem key={s} value={s}>
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${STATUS_CONFIG[s].dot}`} />
+                      {getStatusLabel(s)}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-xs text-muted-foreground hover:text-foreground ml-auto"
+            >
+              Limpar
+            </button>
+          </div>
+        )}
+
         {isPostsLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -400,9 +530,18 @@ export default function StrategistPipelinePage() {
 
                 const visiblePosts = columnPosts.slice(0, MAX_VISIBLE_POSTS);
                 const hasMore = columnPosts.length > MAX_VISIBLE_POSTS;
+                const isDragTarget = dragOverStatus === status;
 
                 return (
-                  <div key={status} className={`rounded-lg border bg-card overflow-hidden border-t-2 ${cfg.kanbanBorder}`}>
+                  <div
+                    key={status}
+                    className={`rounded-lg border bg-card overflow-hidden border-t-2 ${cfg.kanbanBorder} transition-all ${
+                      isDragTarget ? 'ring-2 ring-primary/40 bg-primary/5' : ''
+                    }`}
+                    onDragOver={(e) => handleDragOver(e, status)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, status)}
+                  >
                     {/* Box header */}
                     <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
                       <div className="flex items-center gap-2">
@@ -435,6 +574,11 @@ export default function StrategistPipelinePage() {
                           tlName={getTlName(post)}
                           showTl={tlFilter === 'all'}
                           onClick={() => handlePostClick(post)}
+                          isSelected={selectedPosts.has(post.id)}
+                          onToggleSelect={() => toggleSelect(post.id)}
+                          isDragging={draggedPostId === post.id}
+                          onDragStart={(e) => handleDragStart(e, post.id)}
+                          onDragEnd={handleDragEnd}
                         />
                       ))}
                     </div>
@@ -458,7 +602,14 @@ export default function StrategistPipelinePage() {
 
             {/* Agendados section — horizontal box below */}
             {agendadoPosts.length > 0 && (
-              <div className={`rounded-lg border bg-card overflow-hidden border-t-2 ${STATUS_CONFIG.agendado.kanbanBorder}`}>
+              <div
+                className={`rounded-lg border bg-card overflow-hidden border-t-2 ${STATUS_CONFIG.agendado.kanbanBorder} transition-all ${
+                  dragOverStatus === 'agendado' ? 'ring-2 ring-primary/40 bg-primary/5' : ''
+                }`}
+                onDragOver={(e) => handleDragOver(e, 'agendado')}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDrop(e, 'agendado')}
+              >
                 {/* Toggle header */}
                 <button
                   type="button"
@@ -484,6 +635,11 @@ export default function StrategistPipelinePage() {
                         tlName={getTlName(post)}
                         showTl={tlFilter === 'all'}
                         onClick={() => handlePostClick(post)}
+                        isSelected={selectedPosts.has(post.id)}
+                        onToggleSelect={() => toggleSelect(post.id)}
+                        isDragging={draggedPostId === post.id}
+                        onDragStart={(e) => handleDragStart(e, post.id)}
+                        onDragEnd={handleDragEnd}
                       />
                     ))}
                   </div>
@@ -509,6 +665,11 @@ export default function StrategistPipelinePage() {
                   tlName={getTlName(post)}
                   showTl={tlFilter === 'all'}
                   onClick={() => { setDialogStatus(null); handlePostClick(post); }}
+                  isSelected={selectedPosts.has(post.id)}
+                  onToggleSelect={() => toggleSelect(post.id)}
+                  isDragging={false}
+                  onDragStart={(e) => handleDragStart(e, post.id)}
+                  onDragEnd={handleDragEnd}
                 />
               ))}
             </div>
@@ -526,11 +687,21 @@ function PostRow({
   tlName,
   showTl,
   onClick,
+  isSelected,
+  onToggleSelect,
+  isDragging,
+  onDragStart,
+  onDragEnd,
 }: {
   post: PipelinePost;
   tlName: string;
   showTl: boolean;
   onClick: () => void;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  isDragging: boolean;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
 }) {
   let dateStr = '';
   let timeStr = '';
@@ -543,15 +714,33 @@ function PostRow({
   }
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors cursor-pointer group"
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      className={`flex items-center gap-1.5 px-2 py-2 hover:bg-muted/50 transition-all cursor-grab active:cursor-grabbing group ${
+        isDragging ? 'opacity-40 bg-muted/30' : ''
+      } ${isSelected ? 'bg-primary/5' : ''}`}
     >
-      {/* Title — takes remaining space */}
-      <span className="flex-1 text-sm leading-tight truncate font-medium min-w-0">
+      {/* Drag handle */}
+      <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 group-hover:text-muted-foreground transition-colors" />
+
+      {/* Checkbox */}
+      <Checkbox
+        checked={isSelected}
+        onCheckedChange={() => onToggleSelect()}
+        onClick={(e) => e.stopPropagation()}
+        className="shrink-0 h-3.5 w-3.5"
+      />
+
+      {/* Title — clickable, takes remaining space */}
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex-1 text-left text-sm leading-tight truncate font-medium min-w-0 hover:text-primary transition-colors"
+      >
         {post.title || 'Sem título'}
-      </span>
+      </button>
 
       {/* Meta: tags + date + profile */}
       <div className="flex items-center gap-1.5 shrink-0 text-[10px] text-muted-foreground">
@@ -579,6 +768,6 @@ function PostRow({
           </span>
         )}
       </div>
-    </button>
+    </div>
   );
 }
