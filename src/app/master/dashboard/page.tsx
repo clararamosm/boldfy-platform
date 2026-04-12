@@ -9,10 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, Building2, BookOpen, Globe, LogIn, Loader2 } from "lucide-react";
+import { Users, Building2, BookOpen, Globe, LogIn, Loader2, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n/context';
+import { getAuthToken } from '@/lib/auth-client';
 
 
 type Company = {
@@ -55,6 +56,28 @@ export default function MasterDashboardPage() {
     const [recentCompanies, setRecentCompanies] = useState<Company[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
+    const [isMigrating, setIsMigrating] = useState(false);
+
+    const handleMigrateSlugs = async () => {
+      setIsMigrating(true);
+      try {
+        const token = await getAuthToken();
+        const res = await fetch('/api/migrate-slugs', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        const data = await res.json();
+        if (data.success) {
+          toast({ title: `Migração concluída! ${data.companiesMigrated} empresas, ${data.tlMigrated} TLs.` });
+        } else {
+          toast({ variant: 'destructive', title: 'Erro', description: data.error });
+        }
+      } catch {
+        toast({ variant: 'destructive', title: 'Erro na migração.' });
+      } finally {
+        setIsMigrating(false);
+      }
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -124,6 +147,21 @@ export default function MasterDashboardPage() {
            <StatCard title={t.masterDashboard.globalTrails} value={stats?.globalTrails.toString() || '0'} description={t.masterDashboard.globalTrailsDescription} icon={Globe} isLoading={isLoading} />
            <StatCard title={t.masterDashboard.avgEngagement} value={stats?.activeCollaborators.toString() || '0'} description={t.masterDashboard.avgEngagementDescription} icon={BookOpen} isLoading={isLoading} />
         </div>
+
+        {/* One-time migration button */}
+        <Card>
+          <CardContent className="flex items-center justify-between py-4">
+            <div>
+              <p className="text-sm font-medium">Migrar Slugs</p>
+              <p className="text-xs text-muted-foreground">Adiciona slugs para URLs limpas em empresas e TLs existentes.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleMigrateSlugs} disabled={isMigrating}>
+              {isMigrating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Wrench className="h-4 w-4 mr-1" />}
+              {isMigrating ? 'Migrando...' : 'Migrar'}
+            </Button>
+          </CardContent>
+        </Card>
+
          <Card>
           <CardHeader>
             <CardTitle>{t.masterDashboard.recentCompanies}</CardTitle>
