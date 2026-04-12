@@ -75,7 +75,7 @@ export async function getPostWithAccess(
     let companyName = 'Empresa';
     if (tlCompanyId) {
       const companyDoc = await adminDb.collection('companies').doc(tlCompanyId).get();
-      companyName = companyDoc.data()?.name || companyName;
+      companyName = companyDoc.data()?.companyName || companyName;
     }
 
     const data = postDoc.data()!;
