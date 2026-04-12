@@ -47,19 +47,35 @@ export async function getPostWithAccess(
   idToken: string,
   tlUserId: string,
   postId: string
-): Promise<{ post?: PipelinePost; canEdit?: boolean; userName?: string; error?: string }> {
+): Promise<{
+  post?: PipelinePost;
+  canEdit?: boolean;
+  userName?: string;
+  companyName?: string;
+  tlName?: string;
+  error?: string;
+}> {
   try {
     const user = await requirePostAccess(idToken, tlUserId);
 
-    const postDoc = await adminDb
-      .collection('users')
-      .doc(tlUserId)
-      .collection('contentPipeline')
-      .doc(postId)
-      .get();
+    // Fetch post and TL user doc in parallel
+    const [postDoc, tlDoc] = await Promise.all([
+      adminDb.collection('users').doc(tlUserId).collection('contentPipeline').doc(postId).get(),
+      adminDb.collection('users').doc(tlUserId).get(),
+    ]);
 
     if (!postDoc.exists) {
       return { error: 'Post não encontrado.' };
+    }
+
+    // Resolve TL name and company name for breadcrumb
+    const tlData = tlDoc.data();
+    const tlName = tlData?.name || tlData?.displayName || 'Thought Leader';
+    const tlCompanyId = tlData?.companyId as string | undefined;
+    let companyName = 'Empresa';
+    if (tlCompanyId) {
+      const companyDoc = await adminDb.collection('companies').doc(tlCompanyId).get();
+      companyName = companyDoc.data()?.name || companyName;
     }
 
     const data = postDoc.data()!;
@@ -86,7 +102,7 @@ export async function getPostWithAccess(
       updatedAt: data.updatedAt || '',
     };
 
-    return { post, canEdit: user.canEdit, userName: user.name || 'Usuário' };
+    return { post, canEdit: user.canEdit, userName: user.name || 'Usuário', companyName, tlName };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Erro ao carregar post.';
     return { error: msg };

@@ -36,6 +36,10 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Breadcrumb names
+  const [companyName, setCompanyName] = useState('');
+  const [tlName, setTlName] = useState('');
+
   // Editable fields (local state for auto-save)
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
@@ -75,6 +79,8 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
         setPost(result.post);
         setCanEdit(result.canEdit ?? false);
         setUserName(result.userName ?? '');
+        setCompanyName(result.companyName ?? '');
+        setTlName(result.tlName ?? '');
         setTitle(result.post.title);
         setCaption(result.post.caption);
         setIsLoading(false);
@@ -286,8 +292,8 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <PostHeaderBar
-        companyName={companyId}
-        tlName={tlId}
+        companyName={companyName}
+        tlName={tlName}
         postTitle={title || 'Sem título'}
         saveStatus={saveStatus}
         onBack={handleBack}
