@@ -1,5 +1,6 @@
 // src/lib/notifications.ts
 // Email notification system — sends branded transactional emails via nodemailer (Gmail SMTP).
+// All emails are sent from FAI (our platform manager persona) at admin@boldfy.com.br.
 // Each notification type checks the recipient's `notificationPrefs` before sending.
 
 import nodemailer from 'nodemailer';
@@ -28,6 +29,24 @@ const DEFAULT_PREFS: NotificationPrefs = {
   post_ready_for_review: true,
 };
 
+// ── FAI Sender Config ────────────────────────────────────────────────
+
+const FAI_NAME = 'FAI';
+const FAI_ROLE = 'Gerente do Aplicativo';
+const FAI_EMAIL = 'admin@boldfy.com.br';
+
+function getBaseUrl() {
+  return process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br';
+}
+
+function getFaiPhotoUrl() {
+  return `${getBaseUrl()}/images/email/fai-avatar.png`;
+}
+
+function getBoldfyLogoUrl() {
+  return `${getBaseUrl()}/images/email/boldfy-logo.png`;
+}
+
 // ── Transport ────────────────────────────────────────────────────────
 
 function getTransporter() {
@@ -52,29 +71,84 @@ async function getUserNotifPrefs(userId: string): Promise<NotificationPrefs> {
   }
 }
 
-// ── Email Wrapper ────────────────────────────────────────────────────
+// ── Email Template ──────────────────────────────────────────────────
 
 function wrapInTemplate(body: string): string {
+  const faiPhoto = getFaiPhotoUrl();
+  const boldfyLogo = getBoldfyLogoUrl();
+  const baseUrl = getBaseUrl();
+
   return `
-  <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff;">
-    <div style="text-align: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #e5e7eb;">
-      <h1 style="color: #7C3AED; margin: 0; font-size: 24px;">Boldfy</h1>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    @keyframes subtleGlow {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f0f8;">
+  <div style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 16px;">
+
+    <!-- Main Content Card -->
+    <div style="background-color: #ffffff; border-radius: 16px; padding: 32px 28px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+      ${body}
     </div>
-    ${body}
-    <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center;">
-      <p style="color: #9CA3AF; font-size: 11px; margin: 0;">
+
+    <!-- FAI Signature -->
+    <div style="margin-top: 24px; padding: 0 4px;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+        <tr>
+          <td style="width: 56px; vertical-align: top; padding-right: 14px;">
+            <img src="${faiPhoto}" alt="${FAI_NAME}" width="52" height="52"
+              style="border-radius: 50%; border: 2px solid #bd58e7; display: block;" />
+          </td>
+          <td style="vertical-align: top;">
+            <p style="margin: 0 0 2px; font-size: 15px; font-weight: 600; color: #1F2937;">
+              ${FAI_NAME}
+            </p>
+            <p style="margin: 0 0 4px; font-size: 13px; color: #6B7280;">
+              ${FAI_ROLE}
+            </p>
+            <a href="mailto:${FAI_EMAIL}" style="font-size: 12px; color: #bd58e7; text-decoration: none;">
+              ${FAI_EMAIL}
+            </a>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Divider -->
+    <div style="margin: 20px 0 16px; border-top: 1px solid #e5e0eb;"></div>
+
+    <!-- Footer with Boldfy Logo -->
+    <div style="text-align: center;">
+      <a href="${baseUrl}" style="text-decoration: none; display: inline-block;">
+        <img src="${boldfyLogo}" alt="Boldfy" width="100" height="auto"
+          style="display: block; margin: 0 auto; animation: subtleGlow 3s ease-in-out infinite;" />
+      </a>
+      <p style="color: #A89BB5; font-size: 11px; margin: 12px 0 0; line-height: 1.5;">
         Você recebeu este e-mail porque tem notificações ativas na Boldfy.<br/>
-        Para ajustar suas preferências, acesse Configurações na plataforma.
+        Para ajustar suas preferências, acesse
+        <a href="${baseUrl}/login" style="color: #bd58e7; text-decoration: underline;">Configurações</a>
+        na plataforma.
       </p>
     </div>
-  </div>`;
+  </div>
+</body>
+</html>`;
 }
 
 async function sendNotificationEmail(to: string, subject: string, body: string) {
   try {
     const transporter = getTransporter();
     await transporter.sendMail({
-      from: `"Boldfy" <${process.env.SMTP_EMAIL}>`,
+      from: `"${FAI_NAME} | Boldfy" <${process.env.SMTP_EMAIL}>`,
+      replyTo: FAI_EMAIL,
       to,
       subject,
       html: wrapInTemplate(body),
@@ -98,12 +172,13 @@ export async function notifyMissionSubmitted({
   collaboratorName: string;
   missionName: string;
 }) {
-  // Find admin(s) for this company
   const admins = await adminDb
     .collection('users')
     .where('companyId', '==', companyId)
     .where('role', '==', 'admin')
     .get();
+
+  const baseUrl = getBaseUrl();
 
   for (const adminDoc of admins.docs) {
     const data = adminDoc.data();
@@ -113,22 +188,24 @@ export async function notifyMissionSubmitted({
     const email = data.profile?.email;
     if (!email) continue;
 
-    const adminName = data.profile?.name || 'Admin';
+    const adminName = data.profile?.name?.split(' ')[0] || 'Admin';
     await sendNotificationEmail(
       email,
       `Nova comprovação de missão — ${collaboratorName}`,
       `
-      <h2 style="color: #1F2937; font-size: 18px;">Olá, ${adminName}!</h2>
-      <p style="color: #4B5563; line-height: 1.6;">
-        <strong>${collaboratorName}</strong> enviou uma comprovação para a missão <strong>${missionName}</strong>.
+      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
+        Oi, ${adminName}!
       </p>
-      <p style="color: #4B5563; line-height: 1.6;">
-        Acesse a plataforma para revisar e aprovar ou rejeitar.
+      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 6px;">
+        <strong>${collaboratorName}</strong> acabou de enviar uma comprovação para a missão <strong>${missionName}</strong>.
       </p>
-      <div style="text-align: center; margin: 24px 0;">
-        <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br'}/admin/missoes"
-           style="background-color: #7C3AED; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-          Revisar Comprovação
+      <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
+        Quando puder, dá uma olhada e aprova ou rejeita.
+      </p>
+      <div style="text-align: center; margin: 24px 0 8px;">
+        <a href="${baseUrl}/admin/missoes"
+           style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
+          Revisar comprovação
         </a>
       </div>`,
     );
@@ -159,21 +236,28 @@ export async function notifyMissionReviewed({
   const email = data?.profile?.email;
   if (!email) return;
 
-  const name = data?.profile?.name || 'Colaborador';
+  const name = data?.profile?.name?.split(' ')[0] || 'Colaborador';
   const approved = action === 'approve';
+  const baseUrl = getBaseUrl();
 
   const statusText = approved ? 'aprovada' : 'rejeitada';
   const statusColor = approved ? '#059669' : '#DC2626';
+  const statusBg = approved ? '#ecfdf5' : '#fef2f2';
   const emoji = approved ? '✅' : '❌';
 
   let extraInfo = '';
   if (approved && pointsAwarded) {
-    extraInfo = `<p style="color: #059669; font-weight: 600; margin-top: 12px;">+${pointsAwarded} pontos adicionados ao seu saldo!</p>`;
+    extraInfo = `
+    <div style="margin: 16px 0; padding: 14px 16px; background-color: #ecfdf5; border-radius: 10px; text-align: center;">
+      <p style="color: #059669; font-weight: 700; font-size: 16px; margin: 0;">+${pointsAwarded} pontos</p>
+      <p style="color: #6B7280; font-size: 12px; margin: 4px 0 0;">adicionados ao seu saldo</p>
+    </div>`;
   }
   if (!approved && feedback) {
     extraInfo = `
-    <div style="margin-top: 12px; padding: 12px; background-color: #fef2f2; border-radius: 8px; border-left: 4px solid #DC2626;">
-      <p style="color: #4B5563; margin: 0; font-size: 14px;"><strong>Feedback:</strong> ${feedback}</p>
+    <div style="margin: 16px 0; padding: 14px 16px; background-color: #fef2f2; border-radius: 10px; border-left: 3px solid #DC2626;">
+      <p style="color: #374151; font-size: 13px; margin: 0 0 4px; font-weight: 600;">Feedback:</p>
+      <p style="color: #4B5563; font-size: 14px; margin: 0; line-height: 1.5;">${feedback}</p>
     </div>`;
   }
 
@@ -181,16 +265,20 @@ export async function notifyMissionReviewed({
     email,
     `${emoji} Missão ${statusText}: ${missionName}`,
     `
-    <h2 style="color: #1F2937; font-size: 18px;">Olá, ${name}!</h2>
-    <p style="color: #4B5563; line-height: 1.6;">
-      Sua comprovação da missão <strong>${missionName}</strong> foi
-      <span style="color: ${statusColor}; font-weight: 600;">${statusText}</span>.
+    <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
+      Oi, ${name}!
     </p>
+    <div style="background-color: ${statusBg}; border-radius: 10px; padding: 16px; margin: 0 0 8px;">
+      <p style="color: #374151; font-size: 15px; line-height: 1.6; margin: 0;">
+        Sua comprovação da missão <strong>${missionName}</strong> foi
+        <span style="color: ${statusColor}; font-weight: 700;">${statusText}</span>.
+      </p>
+    </div>
     ${extraInfo}
-    <div style="text-align: center; margin: 24px 0;">
-      <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br'}/colaborador/missoes"
-         style="background-color: #7C3AED; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-        Ver Minhas Missões
+    <div style="text-align: center; margin: 24px 0 8px;">
+      <a href="${baseUrl}/colaborador/missoes"
+         style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
+        Ver minhas missões
       </a>
     </div>`,
   );
@@ -216,6 +304,8 @@ export async function notifyRewardRedeemed({
     .where('role', '==', 'admin')
     .get();
 
+  const baseUrl = getBaseUrl();
+
   for (const adminDoc of admins.docs) {
     const data = adminDoc.data();
     const prefs = await getUserNotifPrefs(adminDoc.id);
@@ -224,23 +314,25 @@ export async function notifyRewardRedeemed({
     const email = data.profile?.email;
     if (!email) continue;
 
-    const adminName = data.profile?.name || 'Admin';
+    const adminName = data.profile?.name?.split(' ')[0] || 'Admin';
     await sendNotificationEmail(
       email,
       `Resgate de recompensa — ${collaboratorName}`,
       `
-      <h2 style="color: #1F2937; font-size: 18px;">Olá, ${adminName}!</h2>
-      <p style="color: #4B5563; line-height: 1.6;">
+      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
+        Oi, ${adminName}!
+      </p>
+      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 6px;">
         <strong>${collaboratorName}</strong> resgatou a recompensa <strong>${rewardName}</strong>
         por <strong>${pointsSpent} pontos</strong>.
       </p>
-      <p style="color: #4B5563; line-height: 1.6;">
-        Acesse a plataforma para marcar como entregue.
+      <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
+        Acesse a plataforma para marcar como entregue quando for o caso.
       </p>
-      <div style="text-align: center; margin: 24px 0;">
-        <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br'}/admin/recompensas"
-           style="background-color: #7C3AED; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-          Ver Resgates
+      <div style="text-align: center; margin: 24px 0 8px;">
+        <a href="${baseUrl}/admin/recompensas"
+           style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
+          Ver resgates
         </a>
       </div>`,
     );
@@ -265,22 +357,26 @@ export async function notifyPostReadyForReview({
   const email = data?.profile?.email;
   if (!email) return;
 
-  const name = data?.profile?.name || 'Thought Leader';
+  const name = data?.profile?.name?.split(' ')[0] || 'Thought Leader';
+  const baseUrl = getBaseUrl();
+
   await sendNotificationEmail(
     email,
     `Post pronto para revisão: ${postTitle || 'Sem título'}`,
     `
-    <h2 style="color: #1F2937; font-size: 18px;">Olá, ${name}!</h2>
-    <p style="color: #4B5563; line-height: 1.6;">
+    <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
+      Oi, ${name}!
+    </p>
+    <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 6px;">
       O post <strong>"${postTitle || 'Sem título'}"</strong> está pronto para sua revisão.
     </p>
-    <p style="color: #4B5563; line-height: 1.6;">
-      Acesse a plataforma para conferir e aprovar.
+    <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
+      Quando puder, confira e aprove na plataforma.
     </p>
-    <div style="text-align: center; margin: 24px 0;">
-      <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br'}/login"
-         style="background-color: #7C3AED; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; display: inline-block;">
-        Ver na Plataforma
+    <div style="text-align: center; margin: 24px 0 8px;">
+      <a href="${baseUrl}/login"
+         style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
+        Ver na plataforma
       </a>
     </div>`,
   );

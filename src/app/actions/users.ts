@@ -11,6 +11,15 @@ import { generateSlug } from '@/lib/slugify';
 
 // ---- Email Invitation Helper ----
 
+// FAI sender configuration — shared with notifications.ts
+const FAI_NAME = 'FAI';
+const FAI_ROLE = 'Gerente do Aplicativo';
+const FAI_EMAIL = 'admin@boldfy.com.br';
+
+function getInviteBaseUrl() {
+  return process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br';
+}
+
 async function sendInvitationEmail({ to, name, companyName, role, resetLink, locale = 'pt-BR' }: {
   to: string;
   name: string;
@@ -27,7 +36,9 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink, loc
     },
   });
 
-  const appUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br';
+  const appUrl = getInviteBaseUrl();
+  const faiPhoto = `${appUrl}/images/email/fai-avatar.png`;
+  const boldfyLogo = `${appUrl}/images/email/boldfy-logo.png`;
 
   const isEN = locale === 'en';
 
@@ -35,11 +46,7 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink, loc
     ? `You've been invited to ${companyName} on Boldfy!`
     : `Você foi convidado para a ${companyName} na Boldfy!`;
 
-  const subtitle = isEN
-    ? 'Employee Gamification Platform'
-    : 'Plataforma de Gamificação para Colaboradores';
-
-  const greeting = isEN ? `Hi, ${name}!` : `Olá, ${name}!`;
+  const greeting = isEN ? `Hi, ${name}!` : `Oi, ${name}!`;
 
   const inviteText = isEN
     ? `You've been invited as <strong>${role}</strong> at <strong>${companyName}</strong> on the Boldfy platform.`
@@ -49,7 +56,7 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink, loc
     ? 'To get started, click the button below to set your password and access your account:'
     : 'Para começar, clique no botão abaixo para criar sua senha e acessar sua conta:';
 
-  const buttonText = isEN ? 'Set My Password & Sign In' : 'Criar Minha Senha e Acessar';
+  const buttonText = isEN ? 'Set My Password & Sign In' : 'Criar minha senha e acessar';
 
   const afterLabel = isEN ? '<strong>After setting your password:</strong>' : '<strong>Depois de criar sua senha:</strong>';
   const afterText = isEN
@@ -61,29 +68,89 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink, loc
     : 'Se você não esperava este convite, pode ignorar este e-mail com segurança.';
 
   await transporter.sendMail({
-    from: `"Boldfy" <${process.env.SMTP_EMAIL}>`,
+    from: `"${FAI_NAME} | Boldfy" <${process.env.SMTP_EMAIL}>`,
+    replyTo: FAI_EMAIL,
     to,
     subject,
     html: `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h1 style="color: #7C3AED; margin: 0;">Boldfy</h1>
-        <p style="color: #6B7280; margin-top: 5px;">${subtitle}</p>
-      </div>
-      <h2 style="color: #1F2937;">${greeting}</h2>
-      <p style="color: #4B5563; line-height: 1.6;">${inviteText}</p>
-      <p style="color: #4B5563; line-height: 1.6;">${ctaText}</p>
-      <div style="text-align: center; margin: 30px 0;">
+<!DOCTYPE html>
+<html lang="${isEN ? 'en' : 'pt-BR'}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    @keyframes subtleGlow {
+      0%, 100% { opacity: 0.85; }
+      50% { opacity: 1; }
+    }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f0f8;">
+  <div style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 16px;">
+
+    <!-- Main Content Card -->
+    <div style="background-color: #ffffff; border-radius: 16px; padding: 32px 28px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 12px;">
+        ${greeting}
+      </p>
+      <p style="color: #4B5563; font-size: 15px; line-height: 1.7; margin: 0 0 6px;">
+        ${inviteText}
+      </p>
+      <p style="color: #6B7280; font-size: 14px; line-height: 1.6; margin: 0 0 20px;">
+        ${ctaText}
+      </p>
+      <div style="text-align: center; margin: 24px 0;">
         <a href="${resetLink}"
-           style="background-color: #7C3AED; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+           style="background-color: #bd58e7; color: white; padding: 12px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
           ${buttonText}
         </a>
       </div>
-      <p style="color: #666; font-size: 14px; margin-top: 20px; padding: 15px; background-color: #f3e8ff; border-radius: 8px;">
-        ${afterLabel}<br/>${afterText}
-      </p>
-      <p style="color: #9CA3AF; font-size: 12px; text-align: center; margin-top: 30px;">${footer}</p>
+      <div style="margin-top: 16px; padding: 14px 16px; background-color: #f9f5ff; border-radius: 10px;">
+        <p style="color: #4B5563; font-size: 13px; margin: 0; line-height: 1.6;">
+          ${afterLabel}<br/>${afterText}
+        </p>
+      </div>
     </div>
+
+    <!-- FAI Signature -->
+    <div style="margin-top: 24px; padding: 0 4px;">
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+        <tr>
+          <td style="width: 56px; vertical-align: top; padding-right: 14px;">
+            <img src="${faiPhoto}" alt="${FAI_NAME}" width="52" height="52"
+              style="border-radius: 50%; border: 2px solid #bd58e7; display: block;" />
+          </td>
+          <td style="vertical-align: top;">
+            <p style="margin: 0 0 2px; font-size: 15px; font-weight: 600; color: #1F2937;">
+              ${FAI_NAME}
+            </p>
+            <p style="margin: 0 0 4px; font-size: 13px; color: #6B7280;">
+              ${FAI_ROLE}
+            </p>
+            <a href="mailto:${FAI_EMAIL}" style="font-size: 12px; color: #bd58e7; text-decoration: none;">
+              ${FAI_EMAIL}
+            </a>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Divider -->
+    <div style="margin: 20px 0 16px; border-top: 1px solid #e5e0eb;"></div>
+
+    <!-- Footer with Boldfy Logo -->
+    <div style="text-align: center;">
+      <a href="${appUrl}" style="text-decoration: none; display: inline-block;">
+        <img src="${boldfyLogo}" alt="Boldfy" width="100" height="auto"
+          style="display: block; margin: 0 auto; animation: subtleGlow 3s ease-in-out infinite;" />
+      </a>
+      <p style="color: #A89BB5; font-size: 11px; margin: 12px 0 0; line-height: 1.5;">
+        ${footer}
+      </p>
+    </div>
+  </div>
+</body>
+</html>
     `,
   });
 }
