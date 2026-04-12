@@ -17,6 +17,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
+import { getPillarClasses } from '@/lib/pillar-colors';
+import { getContentStrategy } from '@/app/actions/content-strategy';
 import {
   format,
   startOfMonth,
@@ -67,6 +69,9 @@ export default function StrategistCalendarioPerfilPage() {
   const [statusFilter, setStatusFilter] = useState<PipelineStatus | 'all'>('all');
   const [isCreating, setIsCreating] = useState(false);
 
+  // Pillar color map: pillarName → colorKey
+  const [pillarColorMap, setPillarColorMap] = useState<Record<string, string>>({});
+
   // ─── Fetch posts for this TL ──────
   const fetchData = useCallback(async () => {
     if (!tlId) return;
@@ -90,6 +95,27 @@ export default function StrategistCalendarioPerfilPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Fetch pillar colors from content strategy
+  useEffect(() => {
+    if (!tlId) return;
+    const fetchPillarColors = async () => {
+      try {
+        const token = await getAuthToken();
+        const result = await getContentStrategy(token, tlId);
+        if (result.data?.pillars) {
+          const map: Record<string, string> = {};
+          result.data.pillars.forEach(p => {
+            if (p.name && p.color) map[p.name] = p.color;
+          });
+          setPillarColorMap(map);
+        }
+      } catch {
+        // silent — colors are a nice-to-have
+      }
+    };
+    fetchPillarColors();
+  }, [tlId]);
 
   // ─── Create post directly (no dialog) ──────
   const createPostDirect = useCallback(async () => {
@@ -300,47 +326,49 @@ export default function StrategistCalendarioPerfilPage() {
                               e.stopPropagation();
                               handlePostClick(post);
                             }}
-                            className="w-full text-left rounded-md border bg-card p-1.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-1"
+                            className="w-full text-left rounded-md border bg-card p-1.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-0.5"
                             title={post.title || 'Sem título'}
                           >
-                            {/* Title + status dot */}
-                            <div className="flex items-start gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 mt-[5px] ${cfg.dot}`} />
-                              <span className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
-                                {post.title || 'Sem título'}
-                              </span>
-                            </div>
+                            {/* Title */}
+                            <p className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
+                              {post.title || 'Sem título'}
+                            </p>
 
-                            {/* Tags: status + formato + etapa + pilar */}
-                            <div className="flex flex-wrap gap-0.5 pl-2.5">
+                            {/* Status */}
+                            <div className="flex items-center gap-1">
+                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cfg.dot}`} />
                               <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.badge}`}>
                                 {cfg.label}
                               </span>
-                              {post.formato && (
-                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                  {post.formato}
-                                </span>
-                              )}
-                              {post.etapa && (
-                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                  {post.etapa}
-                                </span>
-                              )}
-                              {post.contentPillar && (
-                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                                  {post.contentPillar}
-                                </span>
-                              )}
-                              {post.leadMagnet && (
-                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                                  Lead
-                                </span>
-                              )}
                             </div>
 
-                            {/* Time row */}
+                            {/* Tags: formato (gray) + etapa (gray) + pilar (dynamic color) */}
+                            {(post.formato || post.etapa || post.contentPillar) && (
+                              <div className="flex flex-wrap gap-0.5">
+                                {post.formato && (
+                                  <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                    {post.formato}
+                                  </span>
+                                )}
+                                {post.etapa && (
+                                  <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                    {post.etapa}
+                                  </span>
+                                )}
+                                {post.contentPillar && (() => {
+                                  const pillarColor = getPillarClasses(pillarColorMap[post.contentPillar]);
+                                  return (
+                                    <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium ${pillarColor.bg} ${pillarColor.text}`}>
+                                      {post.contentPillar}
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+                            )}
+
+                            {/* Time */}
                             {showTime && (
-                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground pl-2.5">
+                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
                                 <Clock className="h-2.5 w-2.5" />
                                 <span>{time}</span>
                               </div>

@@ -17,6 +17,7 @@ export type ContentStrategyData = {
   pillars: Array<{
     name: string;
     subtitle: string;
+    color?: string; // Tailwind color key (e.g. 'blue', 'amber', 'purple')
     series: Array<{ name: string; objective: string; inputs: string }>;
   }>;
   // Legacy fields (kept for backward compat, moved to BrandContext)

@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { getContentStrategy, saveContentStrategy, type ContentStrategyData } from '@/app/actions/content-strategy';
 import { Loader2, Plus, X, User } from 'lucide-react';
+import { PILLAR_COLORS } from '@/lib/pillar-colors';
 
 // ─── Helpers ──────
 
@@ -312,6 +313,30 @@ export default function StrategistEstrategiaPage() {
                             }))}
                             disabled={isSaving}
                           />
+                        </div>
+                      </div>
+
+                      {/* Color picker */}
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Cor do pilar</Label>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {PILLAR_COLORS.map(color => (
+                            <button
+                              key={color.key}
+                              type="button"
+                              disabled={isSaving}
+                              onClick={() => setData(prev => ({
+                                ...prev,
+                                pillars: updateItem(prev.pillars, pIdx, { color: color.key }),
+                              }))}
+                              className={`h-5 w-5 rounded-full transition-all ${color.swatch} ${
+                                pillar.color === color.key
+                                  ? 'ring-2 ring-offset-2 ring-primary scale-110'
+                                  : 'hover:scale-110 opacity-70 hover:opacity-100'
+                              }`}
+                              title={color.label}
+                            />
+                          ))}
                         </div>
                       </div>
 

@@ -354,61 +354,39 @@ export default function StrategistCalendarioPage() {
                               e.stopPropagation();
                               handlePostClick(post);
                             }}
-                            className="w-full text-left rounded-md border bg-card p-1.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-1"
+                            className="w-full text-left rounded-md border bg-card p-1.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-0.5"
                             title={`${post.title || 'Sem título'} — ${firstName} · ${post.companyName} — ${cfg.label}`}
                           >
-                            {/* Title row with status dot */}
-                            <div className="flex items-start gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 mt-[5px] ${cfg.dot}`} />
-                              <span className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
-                                {post.title || 'Sem título'}
-                              </span>
-                            </div>
+                            {/* Title */}
+                            <p className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
+                              {post.title || 'Sem título'}
+                            </p>
 
-                            {/* Tags row */}
-                            <div className="flex flex-wrap gap-0.5 pl-2.5">
-                              {/* Status tag — always shown */}
+                            {/* Status */}
+                            <div className="flex items-center gap-1">
+                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cfg.dot}`} />
                               <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.badge}`}>
                                 {cfg.label}
                               </span>
-                              {/* Formato — always shown */}
-                              {post.formato && (
-                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                  {post.formato}
-                                </span>
-                              )}
-                              {/* Etapa — always shown */}
-                              {post.etapa && (
-                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                  {post.etapa}
-                                </span>
-                              )}
-                              {/* Pilar — always shown */}
-                              {post.contentPillar && (
-                                <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                                  {post.contentPillar}
-                                </span>
-                              )}
                             </div>
 
-                            {/* Meta row: differs between profile view and general view */}
-                            <div className="flex items-center gap-1 text-[9px] text-muted-foreground pl-2.5">
-                              {showTime && (
-                                <>
-                                  <Clock className="h-2.5 w-2.5" />
-                                  <span>{time}</span>
-                                </>
-                              )}
-                              {/* General view: show profile + company */}
-                              {!isProfileView && (
-                                <>
-                                  {showTime && <span>·</span>}
-                                  <span className="truncate">{firstName}</span>
-                                  <span>·</span>
-                                  <span className="truncate">{post.companyName}</span>
-                                </>
-                              )}
-                            </div>
+                            {/* Time */}
+                            {showTime && (
+                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                                <Clock className="h-2.5 w-2.5" />
+                                <span>{time}</span>
+                              </div>
+                            )}
+
+                            {/* Profile + Company */}
+                            {!isProfileView && (
+                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                                <User className="h-2.5 w-2.5" />
+                                <span className="truncate">{firstName}</span>
+                                <span>·</span>
+                                <span className="truncate">{post.companyName}</span>
+                              </div>
+                            )}
                           </button>
                         );
                       })}
