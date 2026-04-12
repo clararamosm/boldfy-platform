@@ -177,18 +177,15 @@ export default function MasterEmpresasPage() {
                 const tlSnap = await getDocs(tlQuery);
                 tlMap[comp.id] = tlSnap.size;
 
-                // Check if admin user has ever logged in
-                const adminEmail = comp.adminProfile?.email;
-                if (adminEmail) {
-                    const adminQuery = query(
-                        collection(db, "users"),
-                        where("companyId", "==", comp.id),
-                        where("role", "==", "admin")
-                    );
-                    const adminSnap = await getDocs(adminQuery);
-                    if (adminSnap.empty) {
-                        comp.adminPending = true;
-                    }
+                // Check if admin user exists for this company
+                const adminQuery = query(
+                    collection(db, "users"),
+                    where("companyId", "==", comp.id),
+                    where("role", "==", "admin")
+                );
+                const adminSnap = await getDocs(adminQuery);
+                if (adminSnap.empty) {
+                    comp.adminPending = true;
                 }
             }
             // Fetch strategist info for all unique strategists across companies
