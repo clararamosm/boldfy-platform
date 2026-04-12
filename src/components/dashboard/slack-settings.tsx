@@ -324,17 +324,16 @@ function CompanyBlock({
     setTestingType(type);
     try {
       const token = await getAuthToken();
-      if (!token) return;
-
       const result = await testSlackNotification(token, channelId, NOTIFICATION_META[type].label);
-      if (result.success) {
-        toast({ title: 'Mensagem de teste enviada!' });
+      if (result?.success) {
+        toast({ title: '✅ Mensagem de teste enviada com sucesso!' });
       } else {
-        toast({ variant: 'destructive', title: result.error || 'Erro ao enviar teste.' });
+        toast({ variant: 'destructive', title: 'Erro no Slack', description: result?.error || 'Falha ao enviar mensagem de teste.' });
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido ao enviar teste.';
       console.error('Error testing Slack:', error);
-      toast({ variant: 'destructive', title: 'Erro ao enviar teste.' });
+      toast({ variant: 'destructive', title: 'Erro ao enviar teste', description: msg });
     } finally {
       setTestingType(null);
     }

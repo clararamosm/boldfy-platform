@@ -2,7 +2,7 @@
 'use server';
 
 import { db as adminDb } from '@/lib/firebase-admin';
-import { requireStrategist } from '@/lib/auth-guard';
+import { requireAuth, requireStrategist } from '@/lib/auth-guard';
 import { listSlackChannels, sendSlackMessage } from '@/lib/slack';
 import {
   type SlackNotificationConfig,
@@ -138,9 +138,18 @@ export async function testSlackNotification(
   notificationLabel: string
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    await requireStrategist(idToken);
+    const user = await requireAuth(idToken);
 
-    const message = `*Teste Boldfy* — ${notificationLabel}\n\nEsta e uma mensagem de teste. Se voce esta vendo isso, o canal esta configurado corretamente! ✅`;
+    // Allow strategist and master to test
+    if (user.role !== 'strategist' && user.role !== 'master') {
+      return { error: 'Acesso negado: permissão de estrategista necessária.' };
+    }
+
+    if (!channelId) {
+      return { error: 'Canal não especificado.' };
+    }
+
+    const message = `*Teste Boldfy* — ${notificationLabel}\n\nEsta é uma mensagem de teste. Se você está vendo isso, o canal está configurado corretamente! ✅`;
     const result = await sendSlackMessage(channelId, message);
 
     if (!result.ok) {
