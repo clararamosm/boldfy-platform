@@ -21,11 +21,9 @@ type Props = {
 export function CommentsSidebar({ comments, setComments, tlId, postId }: Props) {
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showResolved, setShowResolved] = useState(false);
 
   const unresolvedComments = comments.filter(c => !c.resolved);
   const resolvedComments = comments.filter(c => c.resolved);
-  const visibleComments = showResolved ? comments : unresolvedComments;
 
   const handleSubmit = useCallback(async () => {
     if (!newComment.trim()) return;
@@ -87,7 +85,7 @@ export function CommentsSidebar({ comments, setComments, tlId, postId }: Props) 
   return (
     <aside className="w-80 border-l bg-muted/30 hidden lg:flex flex-col h-[calc(100vh-3.5rem)] sticky top-14">
       {/* Header */}
-      <div className="px-4 py-3 border-b flex items-center justify-between">
+      <div className="px-4 py-3 border-b">
         <div className="flex items-center gap-2 text-sm font-medium">
           <MessageSquare className="h-4 w-4" />
           Comentários
@@ -97,25 +95,30 @@ export function CommentsSidebar({ comments, setComments, tlId, postId }: Props) 
             </span>
           )}
         </div>
-        {resolvedComments.length > 0 && (
-          <button
-            onClick={() => setShowResolved(!showResolved)}
-            className="text-[10px] text-muted-foreground hover:text-foreground"
-          >
-            {showResolved ? 'Ocultar resolvidos' : `${resolvedComments.length} resolvido(s)`}
-          </button>
-        )}
       </div>
 
-      {/* Comments list */}
+      {/* Comments list — active first, resolved below */}
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-2">
-          {visibleComments.length === 0 && (
+          {comments.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-8">
               Nenhum comentário ainda.
             </p>
           )}
-          {visibleComments.map(comment => (
+          {/* Active (unresolved) comments */}
+          {unresolvedComments.map(comment => (
+            <CommentItem
+              key={comment.id}
+              comment={comment}
+              onResolve={handleResolve}
+              onDelete={handleDelete}
+            />
+          ))}
+          {/* Resolved comments — always visible, muted */}
+          {resolvedComments.length > 0 && unresolvedComments.length > 0 && (
+            <div className="border-t my-2" />
+          )}
+          {resolvedComments.map(comment => (
             <CommentItem
               key={comment.id}
               comment={comment}

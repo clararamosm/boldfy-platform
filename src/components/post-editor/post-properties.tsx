@@ -18,9 +18,10 @@ type Props = {
   canEdit: boolean;
   tlId: string;
   onPropertyChange: (field: string, value: unknown) => void;
+  onForceSchedule?: () => void;
 };
 
-export function PostProperties({ post, canEdit, tlId, onPropertyChange }: Props) {
+export function PostProperties({ post, canEdit, tlId, onPropertyChange, onForceSchedule }: Props) {
   const [contentPillars, setContentPillars] = useState<string[]>([]);
 
   // Load content pillars from strategy
@@ -195,7 +196,7 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange }: Props)
             size="sm"
             variant="default"
             className="w-full sm:w-auto"
-            onClick={() => onPropertyChange('status', 'agendado')}
+            onClick={() => onForceSchedule?.()}
           >
             <CalendarCheck className="h-4 w-4 mr-1.5" />
             Forçar Agendamento

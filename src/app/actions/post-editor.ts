@@ -407,3 +407,47 @@ export async function deletePostComment(
     return { error: msg };
   }
 }
+
+// ---- Add Bot Comment (system-generated) ----
+
+export async function addBotComment(
+  idToken: string,
+  tlUserId: string,
+  postId: string,
+  content: string
+): Promise<{ success?: boolean; error?: string; comment?: PostComment }> {
+  try {
+    await requirePostAccess(idToken, tlUserId);
+
+    const postRef = adminDb
+      .collection('users')
+      .doc(tlUserId)
+      .collection('contentPipeline')
+      .doc(postId);
+
+    const postDoc = await postRef.get();
+    if (!postDoc.exists) return { error: 'Post não encontrado.' };
+
+    const now = new Date().toISOString();
+    const commentRef = postRef.collection('comments').doc();
+
+    const commentData: Omit<PostComment, 'id'> = {
+      authorId: 'system',
+      authorName: '🤖 Boldfy Bot',
+      authorRole: 'strategist',
+      content: content.trim(),
+      resolved: false,
+      createdAt: now,
+      updatedAt: now,
+      anchor: null,
+    };
+
+    await commentRef.set(commentData);
+
+    const comment: PostComment = { id: commentRef.id, ...commentData };
+    return { success: true, comment };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Erro ao adicionar comentário do bot.';
+    return { error: msg };
+  }
+}

@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuthToken } from '@/lib/auth-client';
 import { useAuth } from '@/contexts/auth-context';
-import { getPostWithAccess, savePostWithVersion, getPostComments, getPostVersions } from '@/app/actions/post-editor';
+import { getPostWithAccess, savePostWithVersion, getPostComments, getPostVersions, addBotComment } from '@/app/actions/post-editor';
 import { updatePipelinePost } from '@/app/actions/content-pipeline';
+import { useToast } from '@/hooks/use-toast';
 import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
 import type { PostComment, PostVersion } from '@/lib/post-editor-types';
 import { PostHeaderBar } from './post-header-bar';
@@ -28,6 +29,7 @@ type Props = {
 export function PostEditorShell({ companyId, tlId, postId }: Props) {
   const router = useRouter();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // Core state
   const [post, setPost] = useState<PipelinePost | null>(null);
@@ -215,6 +217,50 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     }
   }, [canEdit, post, tlId, postId]);
 
+  // ---- Handle force schedule ----
+  const handleForceSchedule = useCallback(async () => {
+    if (!canEdit || !post || !post.scheduledFor) return;
+
+    // Optimistic: update status to postado (scheduled for publishing)
+    const previousStatus = post.status;
+    setPost(prev => prev ? { ...prev, status: 'postado' as PipelineStatus } : prev);
+
+    try {
+      const token = await getAuthToken();
+
+      // Update status to postado
+      await updatePipelinePost(token, tlId, postId, { status: 'postado' });
+
+      // Format date for bot comment
+      const d = new Date(post.scheduledFor);
+      const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      const timeStr = `${hh}:${mm}` !== '00:00' ? ` às ${hh}:${mm}` : '';
+
+      const botMessage = `📅 Post agendado com sucesso para ${dateStr}${timeStr}.`;
+
+      // Add bot comment
+      const commentResult = await addBotComment(token, tlId, postId, botMessage);
+      if (commentResult.comment) {
+        setComments(prev => [...prev, commentResult.comment!]);
+      }
+
+      toast({
+        title: 'Agendamento confirmado',
+        description: `Post agendado para ${dateStr}${timeStr}.`,
+      });
+    } catch {
+      // Revert on error
+      setPost(prev => prev ? { ...prev, status: previousStatus } : prev);
+      toast({
+        title: 'Erro ao agendar',
+        description: 'Não foi possível forçar o agendamento. Tente novamente.',
+        variant: 'destructive',
+      });
+    }
+  }, [canEdit, post, tlId, postId, toast]);
+
   // ---- Handle version restore ----
   const handleRestore = useCallback(async (version: PostVersion) => {
     setTitle(version.title);
@@ -316,6 +362,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
             canEdit={canEdit}
             tlId={tlId}
             onPropertyChange={handlePropertyChange}
+            onForceSchedule={handleForceSchedule}
           />
 
           {/* Body (caption) */}
