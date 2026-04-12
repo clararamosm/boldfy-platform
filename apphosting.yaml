@@ -2,9 +2,13 @@
 # https://firebase.google.com/docs/app-hosting/configure
 
 runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
-  maxInstances: 1
+  # Auto-scale: min 1 instance always warm, up to 10 under load
+  minInstances: 1
+  maxInstances: 10
+  # Memory/CPU for Next.js with Genkit AI
+  memoryMiB: 1024
+  cpu: 1
+  concurrency: 80
 
 env:
   # --- Variaveis publicas (seguras no yaml) ---
@@ -46,6 +50,14 @@ env:
     secret: STRIPE_SECRET_KEY
   - variable: STRIPE_WEBHOOK_SECRET
     secret: STRIPE_WEBHOOK_SECRET
+
+  # --- Sentry (error monitoring) ---
+  - variable: NEXT_PUBLIC_SENTRY_DSN
+    secret: SENTRY_DSN
+  - variable: SENTRY_ORG
+    value: boldfy
+  - variable: SENTRY_PROJECT
+    value: boldfy-platform
 
   # --- Variáveis públicas do Notion ---
   - variable: NOTION_FEEDBACK_DB_ID

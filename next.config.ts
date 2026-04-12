@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+import { withSentryConfig } from '@sentry/nextjs';
 
 const nextConfig: NextConfig = {
   serverExternalPackages: [
@@ -46,4 +47,29 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Suppresses all Sentry source map upload logs during build
+  silent: true,
+
+  // Upload source maps for better stack traces
+  // Requires SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT env vars
+  // If not set, source maps won't be uploaded (still works, just less detailed traces)
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Routes browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers
+  tunnelRoute: '/monitoring',
+
+  // Hides source maps from generated client bundles
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
+
+  // Webpack-specific Sentry settings
+  webpack: {
+    // Tree-shake Sentry logger statements to reduce bundle size
+    treeshake: { removeDebugLogging: true },
+    // Automatically instrument Next.js data-fetching and API routes
+    autoInstrumentServerFunctions: true,
+    autoInstrumentMiddleware: true,
+    autoInstrumentAppDirectory: true,
+  },
+});
