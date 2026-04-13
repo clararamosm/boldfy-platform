@@ -139,7 +139,7 @@ export default function ThoughtLeaderEstrategiaPage() {
     <>
       <Header title={t.thoughtLeader.strategyTitle} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-[1200px] mx-auto space-y-6">
 
           {/* ═══ Content Types ═══ */}
           {strategy.contentTypes && (
@@ -188,11 +188,11 @@ export default function ThoughtLeaderEstrategiaPage() {
                       {hasFormats && (
                         <div className="mb-3">
                           <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Formatos</span>
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          <div className="flex flex-col gap-1.5 mt-1.5">
                             {ct.formats!.filter(f => f).map((fmt, i) => (
-                              <span key={i} className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.badgeBg}`}>
+                              <div key={i} className={`px-3 py-2 rounded-lg border text-xs leading-relaxed ${cfg.borderColor} ${cfg.bgColor}`}>
                                 {fmt}
-                              </span>
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -202,12 +202,12 @@ export default function ThoughtLeaderEstrategiaPage() {
                       {hasTriggers && (
                         <div>
                           <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">Gatilhos</span>
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          <div className="flex flex-col gap-1.5 mt-1.5">
                             {ct.triggers!.filter(t => t).map((trg, i) => (
-                              <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-muted/50 border border-border text-foreground">
-                                <Zap className="h-2.5 w-2.5 text-muted-foreground" />
-                                {trg}
-                              </span>
+                              <div key={i} className="flex items-start gap-2 px-3 py-2 rounded-lg border border-border bg-muted/30 text-xs leading-relaxed">
+                                <Zap className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
+                                <span>{trg}</span>
+                              </div>
                             ))}
                           </div>
                         </div>
