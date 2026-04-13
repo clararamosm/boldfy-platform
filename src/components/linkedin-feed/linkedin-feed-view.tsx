@@ -123,7 +123,7 @@ const FeedPostCard = memo(function FeedPostCard({
               <img
                 src={post.mediaUrl}
                 alt="Post media"
-                className="w-full max-h-[400px] object-cover"
+                className="w-full object-contain"
                 loading="lazy"
               />
             )}

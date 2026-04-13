@@ -77,7 +77,7 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
             <img
               src={post.mediaUrl}
               alt="Post media"
-              className="rounded-lg border max-h-80 object-contain w-full bg-muted"
+              className="rounded-lg border w-full object-contain bg-muted"
             />
           ) : (
             <a
