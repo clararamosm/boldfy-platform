@@ -518,7 +518,7 @@ export async function getStrategistSidebarData(
       // Single query for all TLs across assigned companies (avoids N+1)
       adminDb.collection('users')
         .where('companyId', 'in', assignedCompanies.slice(0, 30)) // Firestore 'in' limit: 30
-        .where('role', 'in', ['thoughtleader', 'colaborador'])
+        .where('role', '==', 'thoughtleader')
         .get(),
     ]);
 
@@ -663,7 +663,7 @@ export async function getAllPipelinePostsForStrategist(
       Promise.all(assignedCompanies.map(cId => adminDb.collection('companies').doc(cId).get())),
       adminDb.collection('users')
         .where('companyId', 'in', assignedCompanies.slice(0, 30))
-        .where('role', 'in', ['thoughtleader', 'colaborador'])
+        .where('role', '==', 'thoughtleader')
         .get(),
     ]);
 

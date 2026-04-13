@@ -103,7 +103,7 @@ export default function StrategistPipelinePage() {
           const tlQuery = query(
             collection(db, 'users'),
             where('companyId', '==', companyId),
-            where('role', 'in', ['thoughtleader', 'colaborador'])
+            where('role', '==', 'thoughtleader')
           );
           const tlSnap = await getDocs(tlQuery);
 
