@@ -662,7 +662,7 @@ export async function getAllPipelinePostsForStrategist(
       Promise.all(assignedCompanies.map(cId => adminDb.collection('companies').doc(cId).get())),
       adminDb.collection('users')
         .where('companyId', 'in', assignedCompanies.slice(0, 30))
-        .where('role', '==', 'thoughtleader')
+        .where('role', 'in', ['thoughtleader', 'colaborador'])
         .get(),
     ]);
 

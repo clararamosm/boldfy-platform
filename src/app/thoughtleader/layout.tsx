@@ -10,7 +10,7 @@ import Logo from "@/components/logo";
 import { ThoughtLeaderSidebarNav } from "@/components/dashboard/thoughtleader-sidebar-nav";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
-import { Loader2 } from "lucide-react";
+import { Loader2, Settings } from "lucide-react";
 import { AuthProvider } from "@/contexts/auth-context";
 import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { LinkedInSidebarBox } from "@/components/dashboard/linkedin-sidebar-box";
@@ -69,6 +69,9 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
                     fallbackInitials="TL"
                     avatarOverride={companyLogoUrl}
                     feedbackPage="TL Sidebar"
+                    menuItems={[
+                        { href: '/thoughtleader/configuracoes', label: t.nav.settings, icon: Settings },
+                    ]}
                     onLogout={handleLogout}
                     logoutLabel={t.nav.signOut}
                 />
