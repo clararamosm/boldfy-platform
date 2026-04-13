@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { getBrandManual, saveBrandManual, type BrandManualData } from '@/app/actions/content-strategy';
 import { Loader2, Plus, X, User } from 'lucide-react';
+import { BrandManualImporter } from '@/components/brand-manual-importer';
 
 // ─── Helpers ──────
 
@@ -94,6 +95,7 @@ export default function StrategistManualPage() {
     if (!tlId) return;
     setIsSaving(true);
     try {
+      // Force-refresh token to avoid expiry after long form editing
       const token = await getAuthToken();
       // Clean empty items
       const clean: BrandManualData = {
@@ -120,12 +122,74 @@ export default function StrategistManualPage() {
       } else {
         toast({ variant: 'destructive', title: 'Erro', description: result.error });
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error saving brand manual:', err);
-      toast({ variant: 'destructive', title: 'Erro ao salvar.' });
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido ao salvar.';
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: msg });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // ─── Import handler ──────
+
+  const handleImport = (imported: Partial<BrandManualData>) => {
+    setData(prev => {
+      const merged = { ...prev };
+      if (imported.personality) {
+        merged.personality = {
+          description: imported.personality.description || prev.personality.description,
+          attributes: imported.personality.attributes?.length
+            ? imported.personality.attributes
+            : prev.personality.attributes,
+        };
+      }
+      if (imported.mindset?.length) merged.mindset = imported.mindset;
+      if (imported.archetypes) {
+        merged.archetypes = {
+          primary: {
+            title: imported.archetypes.primary.title || prev.archetypes.primary.title,
+            description: imported.archetypes.primary.description || prev.archetypes.primary.description,
+          },
+          secondary: {
+            title: imported.archetypes.secondary.title || prev.archetypes.secondary.title,
+            description: imported.archetypes.secondary.description || prev.archetypes.secondary.description,
+          },
+        };
+      }
+      if (imported.toneOfVoice?.length) merged.toneOfVoice = imported.toneOfVoice;
+      if (imported.languageStyle?.length) merged.languageStyle = imported.languageStyle;
+      if (imported.bestPractices) {
+        merged.bestPractices = {
+          dos: imported.bestPractices.dos.length > 0 && imported.bestPractices.dos[0]
+            ? imported.bestPractices.dos
+            : prev.bestPractices.dos,
+          donts: imported.bestPractices.donts.length > 0 && imported.bestPractices.donts[0]
+            ? imported.bestPractices.donts
+            : prev.bestPractices.donts,
+        };
+      }
+      if (imported.vocabulary) {
+        merged.vocabulary = {
+          keywords: imported.vocabulary.keywords.length > 0 && imported.vocabulary.keywords[0]
+            ? imported.vocabulary.keywords
+            : prev.vocabulary.keywords,
+          expressions: imported.vocabulary.expressions.length > 0 && imported.vocabulary.expressions[0]
+            ? imported.vocabulary.expressions
+            : prev.vocabulary.expressions,
+        };
+      }
+      if (imported.summary) {
+        merged.summary = {
+          positioning: imported.summary.positioning || prev.summary.positioning,
+          valueProposition: imported.summary.valueProposition || prev.summary.valueProposition,
+          differential: imported.summary.differential || prev.summary.differential,
+          mission: imported.summary.mission || prev.summary.mission,
+        };
+      }
+      return merged;
+    });
+    toast({ title: 'Texto importado!', description: 'Os campos foram preenchidos. Revise antes de salvar.' });
   };
 
   // ─── Array helpers ──────
@@ -181,6 +245,14 @@ export default function StrategistManualPage() {
       <Header title={`Manual de Marca${tlName ? ` — ${tlName}` : ''}`} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="max-w-3xl mx-auto space-y-6">
+
+          {/* Import bar */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Preencha os campos abaixo ou importe o texto de um manual já pronto.
+            </p>
+            <BrandManualImporter onImport={handleImport} />
+          </div>
 
           {/* 1. Personalidade */}
           <Card>

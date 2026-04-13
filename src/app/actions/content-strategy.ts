@@ -196,7 +196,7 @@ export async function saveBrandManual(
     return { success: true };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
-    console.error('Error in saveBrandManual:', msg);
+    console.error('Error in saveBrandManual:', msg, error);
     return { error: msg };
   }
 }
