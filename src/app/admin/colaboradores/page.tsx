@@ -10,7 +10,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MoreHorizontal, PlusCircle, Loader2, Users, UserCheck, Linkedin } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Loader2, Users, UserCheck, Linkedin, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -18,7 +18,7 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
-import { inviteCollaborator, deleteCollaborator, inviteThoughtLeader, updateCollaboratorProfile, toggleCollaboratorStatus } from '@/app/actions';
+import { inviteCollaborator, deleteCollaborator, inviteThoughtLeader, invitePendingThoughtLeader, deleteThoughtLeader, updateCollaboratorProfile, toggleCollaboratorStatus } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
 import { useT } from '@/lib/i18n/context';
 import { useAuth } from '@/contexts/auth-context';
@@ -34,6 +34,7 @@ type Collaborator = {
   createdAt: { toDate?: () => Date } | string | null;
   avatarUrl?: string;
   linkedinStatus: 'connected' | 'expiring' | 'expired' | 'not_connected';
+  pendingSetup?: boolean;
 };
 
 function getLinkedinTokenStatus(data: Record<string, unknown>): Collaborator['linkedinStatus'] {
@@ -144,6 +145,17 @@ export default function AdminColaboradoresPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmDeleteName, setConfirmDeleteName] = useState("");
   const [cachedToken, setCachedToken] = useState('');
+  // TL management states
+  const [editingTL, setEditingTL] = useState<Collaborator | null>(null);
+  const [editTLName, setEditTLName] = useState("");
+  const [editTLEmail, setEditTLEmail] = useState("");
+  const [isEditTLDialogOpen, setIsEditTLDialogOpen] = useState(false);
+  const [confirmDeleteTLId, setConfirmDeleteTLId] = useState<string | null>(null);
+  const [confirmDeleteTLName, setConfirmDeleteTLName] = useState("");
+  const [invitingTL, setInvitingTL] = useState<Collaborator | null>(null);
+  const [isInviteTLDialogOpen, setIsInviteTLDialogOpen] = useState(false);
+  const [inviteTLEmail, setInviteTLEmail] = useState("");
+  const [isTLActionLoading, setIsTLActionLoading] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
   const t = useT();
@@ -180,13 +192,14 @@ export default function AdminColaboradoresPage() {
         const data = d.data();
         return {
           id: d.id,
-          name: data.profile?.name || '',
+          name: data.profile?.name || data.name || '',
           email: data.profile?.email || '',
           points: 0,
           status: data.status || 'Pendente',
           createdAt: data.createdAt?.toDate(),
           avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture,
           linkedinStatus: getLinkedinTokenStatus(data),
+          pendingSetup: data.pendingSetup || false,
         }
       }) as Collaborator[];
       setThoughtLeaders(fetchedTLs);
@@ -339,6 +352,129 @@ export default function AdminColaboradoresPage() {
       await refreshCollaborators();
     } catch (error) {
       toast({ title: t.adminCollaborators.toastRemoveError, variant: "destructive" });
+    }
+  };
+
+  // --- TL CRUD Handler Functions ---
+  const refreshThoughtLeaders = async () => {
+    if (!companyId) return;
+    const q = query(
+      collection(db, "users"),
+      where("companyId", "==", companyId),
+      where("role", "==", "thoughtleader")
+    );
+    const snapshot = await getDocs(q);
+    const tlList = snapshot.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        name: data.profile?.name || data.name || '',
+        email: data.profile?.email || '',
+        points: 0,
+        status: data.status || 'Pendente',
+        createdAt: data.createdAt?.toDate(),
+        avatarUrl: data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture,
+        linkedinStatus: getLinkedinTokenStatus(data),
+        pendingSetup: data.pendingSetup || false,
+      };
+    }) as Collaborator[];
+    setThoughtLeaders(tlList);
+  };
+
+  const handleTLInviteOpen = (tl: Collaborator) => {
+    setInvitingTL(tl);
+    setInviteTLEmail("");
+    setIsInviteTLDialogOpen(true);
+  };
+
+  const handleTLInvite = async () => {
+    if (!invitingTL || !inviteTLEmail) return;
+    setIsTLActionLoading(true);
+    try {
+      const token = await getAuthToken();
+      const result = await invitePendingThoughtLeader(token, invitingTL.id, inviteTLEmail);
+      if (result.error) {
+        toast({ title: t.adminTL.toastInvitePendingError, description: result.error, variant: "destructive" });
+      } else {
+        toast({ title: t.adminTL.toastInvitePendingSent, description: t.adminTL.toastInvitePendingSentDescription });
+        setIsInviteTLDialogOpen(false);
+        setInvitingTL(null);
+        await refreshThoughtLeaders();
+      }
+    } catch {
+      toast({ title: t.adminTL.toastInvitePendingError, variant: "destructive" });
+    } finally {
+      setIsTLActionLoading(false);
+    }
+  };
+
+  const handleTLEditOpen = (tl: Collaborator) => {
+    setEditingTL(tl);
+    setEditTLName(tl.name);
+    setEditTLEmail(tl.email);
+    setIsEditTLDialogOpen(true);
+  };
+
+  const handleTLSaveEdit = async () => {
+    if (!editingTL) return;
+    setIsTLActionLoading(true);
+    try {
+      const token = await getAuthToken();
+      const result = await updateCollaboratorProfile(token, companyId || '', editingTL.id, editTLName, editTLEmail);
+      if (result.error) {
+        toast({ title: t.adminTL.toastUpdateError, description: result.error, variant: "destructive" });
+      } else {
+        toast({ title: t.adminTL.toastUpdated });
+        setIsEditTLDialogOpen(false);
+        setEditingTL(null);
+        await refreshThoughtLeaders();
+      }
+    } catch {
+      toast({ title: t.adminTL.toastUpdateError, variant: "destructive" });
+    } finally {
+      setIsTLActionLoading(false);
+    }
+  };
+
+  const handleTLToggleStatus = async (tl: Collaborator) => {
+    const newStatus = tl.status === "Ativo" ? "Inativo" : "Ativo";
+    try {
+      const token = await getAuthToken();
+      const result = await toggleCollaboratorStatus(token, companyId || '', tl.id, newStatus);
+      if (result.error) {
+        toast({ title: t.adminTL.toastToggleError, description: result.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: newStatus === "Ativo" ? t.adminTL.toastActivated : t.adminTL.toastDeactivated });
+      await refreshThoughtLeaders();
+    } catch {
+      toast({ title: t.adminTL.toastToggleError, variant: "destructive" });
+    }
+  };
+
+  const handleTLRemoveConfirm = (tl: Collaborator) => {
+    setConfirmDeleteTLId(tl.id);
+    setConfirmDeleteTLName(tl.name);
+  };
+
+  const handleTLRemove = async () => {
+    if (!confirmDeleteTLId) return;
+    setIsTLActionLoading(true);
+    try {
+      const token = await getAuthToken();
+      const result = await deleteThoughtLeader(token, confirmDeleteTLId);
+      if (result.error) {
+        toast({ title: t.adminTL.toastRemoveError, description: result.error, variant: "destructive" });
+      } else {
+        toast({ title: t.adminTL.toastRemoved });
+      }
+      setConfirmDeleteTLId(null);
+      setConfirmDeleteTLName("");
+      await refreshThoughtLeaders();
+    } catch {
+      toast({ title: t.adminTL.toastRemoveError, variant: "destructive" });
+    } finally {
+      setIsTLActionLoading(false);
     }
   };
 
@@ -514,18 +650,19 @@ export default function AdminColaboradoresPage() {
                     <TableHead>{t.adminTL.tableStatus}</TableHead>
                     <TableHead>{t.adminTL.tableLinkedin}</TableHead>
                     <TableHead>{t.adminTL.tableJoinDate}</TableHead>
+                    <TableHead className="text-right">{t.common.actions}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-6">
+                      <TableCell colSpan={5} className="text-center py-6">
                         <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
                       </TableCell>
                     </TableRow>
                   ) : thoughtLeaders.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         {t.adminTL.empty}
                       </TableCell>
                     </TableRow>
@@ -540,7 +677,7 @@ export default function AdminColaboradoresPage() {
                             </Avatar>
                             <div>
                               <p className="font-medium">{tl.name}</p>
-                              <p className="text-sm text-muted-foreground">{tl.email}</p>
+                              <p className="text-sm text-muted-foreground">{tl.email ? tl.email : <span className="italic text-muted-foreground/60">{t.adminTL.statusPending}</span>}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -566,6 +703,28 @@ export default function AdminColaboradoresPage() {
                           )}
                         </TableCell>
                         <TableCell>{tl.createdAt && typeof tl.createdAt === 'object' && tl.createdAt !== null && 'toDate' in tl.createdAt && typeof tl.createdAt.toDate === 'function' ? tl.createdAt.toDate().toLocaleDateString() : tl.createdAt ? new Date(tl.createdAt as string).toLocaleDateString() : 'N/A'}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {tl.pendingSetup && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleTLInviteOpen(tl)}>
+                                    <Send className="h-4 w-4 mr-2" />
+                                    {t.adminTL.invitePendingButton}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+                              <DropdownMenuItem onClick={() => handleTLEditOpen(tl)}>{t.common.edit}</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleTLToggleStatus(tl)}>{tl.status === "Ativo" ? t.common.deactivate : t.common.activate}</DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => handleTLRemoveConfirm(tl)}>{t.common.remove}</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -606,6 +765,75 @@ export default function AdminColaboradoresPage() {
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={() => { setConfirmDeleteId(null); setConfirmDeleteName(""); }}>{t.common.cancel}</Button>
             <Button variant="destructive" onClick={handleRemoveCollaborator}>{t.common.remove}</Button>
+          </div>
+        </ActionDialog>
+
+        {/* TL: Invite Pending Dialog */}
+        <ActionDialog
+          open={isInviteTLDialogOpen}
+          onOpenChange={(open) => { if (!open) { setIsInviteTLDialogOpen(false); setInvitingTL(null); setInviteTLEmail(""); } }}
+          title={t.adminTL.invitePendingTitle}
+          description={t.adminTL.invitePendingDescription}
+        >
+          <div className="space-y-4">
+            <div>
+              <Label>{t.adminTL.nameLabel}</Label>
+              <Input value={invitingTL?.name || ''} disabled className="bg-muted" />
+            </div>
+            <div>
+              <Label htmlFor="inviteTLEmail">{t.adminTL.invitePendingEmailLabel}</Label>
+              <Input
+                id="inviteTLEmail"
+                type="email"
+                value={inviteTLEmail}
+                onChange={(e) => setInviteTLEmail(e.target.value)}
+                placeholder={t.adminTL.invitePendingEmailPlaceholder}
+                required
+              />
+            </div>
+            <Button onClick={handleTLInvite} className="w-full" disabled={!inviteTLEmail || isTLActionLoading}>
+              {isTLActionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+              {t.adminTL.invitePendingButton}
+            </Button>
+          </div>
+        </ActionDialog>
+
+        {/* TL: Edit Dialog */}
+        <ActionDialog
+          open={isEditTLDialogOpen}
+          onOpenChange={setIsEditTLDialogOpen}
+          title={t.adminTL.editTitle}
+          description={t.adminTL.editDescription}
+        >
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="editTLName">{t.adminTL.nameLabel}</Label>
+              <Input id="editTLName" value={editTLName} onChange={(e) => setEditTLName(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="editTLEmail">{t.adminTL.emailLabel}</Label>
+              <Input id="editTLEmail" type="email" value={editTLEmail} onChange={(e) => setEditTLEmail(e.target.value)} />
+            </div>
+            <Button onClick={handleTLSaveEdit} className="w-full" disabled={isTLActionLoading}>
+              {isTLActionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {t.common.save}
+            </Button>
+          </div>
+        </ActionDialog>
+
+        {/* TL: Confirm Delete Dialog */}
+        <ActionDialog
+          open={!!confirmDeleteTLId}
+          onOpenChange={(open) => { if (!open) { setConfirmDeleteTLId(null); setConfirmDeleteTLName(""); } }}
+          title={t.adminTL.removeTitle}
+          description={t.adminTL.removeConfirm.replace('{name}', confirmDeleteTLName)}
+        >
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => { setConfirmDeleteTLId(null); setConfirmDeleteTLName(""); }}>{t.common.cancel}</Button>
+            <Button variant="destructive" onClick={handleTLRemove} disabled={isTLActionLoading}>
+              {isTLActionLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {t.common.remove}
+            </Button>
           </div>
         </ActionDialog>
       </main>

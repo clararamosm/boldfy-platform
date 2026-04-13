@@ -859,6 +859,197 @@ export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, f
   }
 }
 
+// ---- Invite Pending Thought Leader (convert placeholder to real user) ----
+
+export async function invitePendingThoughtLeader(
+  idToken: string,
+  placeholderId: string,
+  email: string,
+): Promise<{ success?: boolean; error?: string }> {
+  if (!adminAuth) {
+    return { error: "O serviço de autenticação não está disponível." };
+  }
+
+  if (!email || !z.string().email().safeParse(email).success) {
+    return { error: 'E-mail inválido.' };
+  }
+
+  try {
+    // 1. Fetch placeholder doc and validate
+    const placeholderDoc = await adminDb.collection('users').doc(placeholderId).get();
+    if (!placeholderDoc.exists) return { error: 'Thought Leader não encontrado.' };
+    const placeholderData = placeholderDoc.data()!;
+
+    if (!placeholderData.pendingSetup) {
+      return { error: 'Este Thought Leader já foi convidado.' };
+    }
+
+    const companyId = placeholderData.companyId;
+    if (!companyId) return { error: 'Thought Leader sem empresa associada.' };
+
+    // Auth check
+    await requireAdminOrStrategist(idToken, companyId);
+
+    // Get company data for locale
+    const companyDoc = await adminDb.collection('companies').doc(companyId).get();
+    const companyData = companyDoc.data();
+    const companyName = placeholderData.companyName || companyData?.companyName || '';
+    const companyLocale = (companyData?.locale as 'pt-BR' | 'en') || 'pt-BR';
+
+    // 2. Create Firebase Auth user
+    let userRecord;
+    try {
+      userRecord = await adminAuth.createUser({
+        email,
+        displayName: placeholderData.name,
+        password: crypto.randomBytes(16).toString('base64url') + 'A1!',
+      });
+    } catch (authError: unknown) {
+      if ((authError as { code?: string })?.code === 'auth/email-already-exists') {
+        return { error: `Um usuário com o e-mail ${email} já existe.` };
+      }
+      throw authError;
+    }
+
+    const realUID = userRecord.uid;
+    const tlSlug = generateSlug(placeholderData.name, realUID);
+
+    // 3. Create new user doc with real UID
+    await adminDb.collection('users').doc(realUID).set({
+      role: 'thoughtleader',
+      name: placeholderData.name,
+      slug: tlSlug,
+      companyId,
+      companyName,
+      status: 'Pendente',
+      profile: { name: placeholderData.name, email },
+      createdAt: placeholderData.createdAt || FieldValue.serverTimestamp(),
+    });
+
+    // 4. Migrate subcollections from placeholder to real UID
+    // 4a. users/{placeholderId}/contentPipeline/* → users/{realUID}/contentPipeline/*
+    const pipelineDocs = await adminDb.collection(`users/${placeholderId}/contentPipeline`).listDocuments();
+    for (const docRef of pipelineDocs) {
+      const snap = await docRef.get();
+      if (snap.exists) {
+        await adminDb.collection(`users/${realUID}/contentPipeline`).doc(docRef.id).set(snap.data()!);
+        await docRef.delete();
+      }
+    }
+
+    // 4b. users/{placeholderId}/scheduledPosts/* → users/{realUID}/scheduledPosts/*
+    const scheduledDocs = await adminDb.collection(`users/${placeholderId}/scheduledPosts`).listDocuments();
+    for (const docRef of scheduledDocs) {
+      const snap = await docRef.get();
+      if (snap.exists) {
+        await adminDb.collection(`users/${realUID}/scheduledPosts`).doc(docRef.id).set(snap.data()!);
+        await docRef.delete();
+      }
+    }
+
+    // 4c. companies/{companyId}/thoughtLeaders/{placeholderId}/* → thoughtLeaders/{realUID}/*
+    const tlSubcollections = await adminDb.doc(`companies/${companyId}/thoughtLeaders/${placeholderId}`).listCollections();
+    for (const subcol of tlSubcollections) {
+      const subDocs = await subcol.listDocuments();
+      for (const docRef of subDocs) {
+        const snap = await docRef.get();
+        if (snap.exists) {
+          await adminDb.doc(`companies/${companyId}/thoughtLeaders/${realUID}/${subcol.id}/${docRef.id}`).set(snap.data()!);
+          await docRef.delete();
+        }
+      }
+    }
+
+    // 5. Delete old placeholder doc and its remaining subcollections
+    const oldUserRef = adminDb.collection('users').doc(placeholderId);
+    const oldSubcollections = await oldUserRef.listCollections();
+    for (const subcol of oldSubcollections) {
+      const docs = await subcol.listDocuments();
+      for (const d of docs) {
+        await d.delete();
+      }
+    }
+    await oldUserRef.delete();
+
+    // 6. Send invitation email
+    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
+    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    sendInvitationEmail({
+      to: email,
+      name: placeholderData.name,
+      companyName,
+      role: 'Thought Leader',
+      resetLink,
+      locale: companyLocale,
+    }).catch((emailError) => {
+      console.error("Error sending pending TL invitation email:", emailError);
+    });
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error("Error in invitePendingThoughtLeader:", errorMessage);
+    return { error: `Erro ao convidar Thought Leader: ${errorMessage}` };
+  }
+}
+
+// ---- Delete Thought Leader Action (by Admin or Strategist) ----
+
+export async function deleteThoughtLeader(idToken: string, userId: string): Promise<{ success?: boolean; error?: string }> {
+  if (!adminAuth) {
+    return { error: "O serviço de autenticação não está disponível." };
+  }
+  try {
+    const targetDoc = await adminDb.collection('users').doc(userId).get();
+    if (!targetDoc.exists) return { error: 'Thought Leader não encontrado.' };
+    const targetData = targetDoc.data();
+    if (!targetData?.companyId) return { error: 'Thought Leader sem empresa associada.' };
+    if (targetData?.role !== 'thoughtleader') return { error: 'Este usuário não é um Thought Leader.' };
+
+    // Admin or Strategist of the company can delete TLs
+    await requireAdminOrStrategist(idToken, targetData.companyId);
+
+    // Delete from Firebase Auth (may not exist for placeholder TLs)
+    try {
+      await adminAuth.deleteUser(userId);
+    } catch (authError: unknown) {
+      const authErr = authError as { code?: string; message?: string };
+      if (authErr?.code !== 'auth/user-not-found') {
+        console.error(`Error deleting Auth user ${userId}:`, authErr?.message);
+      }
+    }
+
+    // Delete user subcollections (contentPipeline, scheduledPosts, etc.)
+    const userRef = adminDb.collection('users').doc(userId);
+    const subcollections = await userRef.listCollections();
+    for (const subcol of subcollections) {
+      const docs = await subcol.listDocuments();
+      for (const d of docs) {
+        await d.delete();
+      }
+    }
+
+    // Delete company-level TL subcollections (contentStrategy, brandManual)
+    const companyTLRef = adminDb.doc(`companies/${targetData.companyId}/thoughtLeaders/${userId}`);
+    const companyTLSubcols = await companyTLRef.listCollections();
+    for (const subcol of companyTLSubcols) {
+      const docs = await subcol.listDocuments();
+      for (const d of docs) {
+        await d.delete();
+      }
+    }
+
+    // Delete user document
+    await userRef.delete();
+
+    return { success: true };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in deleteThoughtLeader:', errorMessage);
+    return { error: `Erro ao remover Thought Leader: ${errorMessage}` };
+  }
+}
+
 // ---- Update Collaborator Profile (server-side) ----
 
 export async function updateCollaboratorProfile(
