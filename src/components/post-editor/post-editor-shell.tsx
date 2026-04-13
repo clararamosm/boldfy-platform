@@ -53,6 +53,10 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
   const [comments, setComments] = useState<PostComment[]>([]);
   const [versions, setVersions] = useState<PostVersion[]>([]);
 
+  // Inline comment state (text selection → comment flow)
+  const [pendingAnchor, setPendingAnchor] = useState<PostComment['anchor'] | null>(null);
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+
   // Auto-save refs
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastVersionTimeRef = useRef<number>(0);
@@ -305,6 +309,26 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     }
   }, [tlId, postId]);
 
+  // ---- Handle inline comment (text selection → anchor → sidebar) ----
+  const handleAddInlineComment = useCallback((anchor: PostComment['anchor']) => {
+    setPendingAnchor(anchor);
+    setShowComments(true); // Open sidebar on mobile too
+  }, []);
+
+  const handleHighlightClick = useCallback((commentId: string) => {
+    setActiveCommentId(commentId);
+    setShowComments(true);
+    // Scroll to the comment in the sidebar
+    setTimeout(() => {
+      const el = document.getElementById(`comment-${commentId}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }, []);
+
+  const handleClearAnchor = useCallback(() => {
+    setPendingAnchor(null);
+  }, []);
+
   // ---- Handle media update ----
   const handleMediaUpdate = useCallback((mediaUrl: string | undefined, mediaType: string | undefined) => {
     setPost(prev => prev ? { ...prev, mediaUrl, mediaType } : prev);
@@ -412,6 +436,10 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
             value={caption}
             onChange={handleCaptionChange}
             canEdit={canEdit}
+            comments={comments}
+            onAddInlineComment={handleAddInlineComment}
+            onHighlightClick={handleHighlightClick}
+            activeCommentId={activeCommentId}
           />
 
           {/* Media */}
@@ -442,6 +470,9 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
           tlId={tlId}
           postId={postId}
           canEdit={canEdit}
+          pendingAnchor={pendingAnchor}
+          onClearAnchor={handleClearAnchor}
+          activeCommentId={activeCommentId}
         />
         </div>
       </div>

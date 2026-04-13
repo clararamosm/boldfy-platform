@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { getAuthToken } from '@/lib/auth-client';
 import { addPostComment, resolvePostComment, deletePostComment } from '@/app/actions/post-editor';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquare, Send, Trash2, Loader2 } from 'lucide-react';
+import { MessageSquare, Send, Trash2, Loader2, X, MessageSquareQuote } from 'lucide-react';
 import { BoldfyIcon } from '@/components/icons/boldfy-icon';
 import type { PostComment } from '@/lib/post-editor-types';
 
@@ -17,14 +17,36 @@ type Props = {
   tlId: string;
   postId: string;
   canEdit: boolean;
+  /** Pre-filled anchor from text selection — user is about to comment on a text snippet */
+  pendingAnchor?: PostComment['anchor'] | null;
+  /** Clear the pending anchor */
+  onClearAnchor?: () => void;
+  /** Currently active comment (highlight clicked in text) */
+  activeCommentId?: string | null;
 };
 
-export function CommentsSidebar({ comments, setComments, tlId, postId }: Props) {
+export function CommentsSidebar({
+  comments,
+  setComments,
+  tlId,
+  postId,
+  pendingAnchor,
+  onClearAnchor,
+  activeCommentId,
+}: Props) {
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const unresolvedComments = comments.filter(c => !c.resolved);
   const resolvedComments = comments.filter(c => c.resolved);
+
+  // Auto-focus textarea when a pending anchor arrives
+  useEffect(() => {
+    if (pendingAnchor) {
+      setTimeout(() => textareaRef.current?.focus(), 150);
+    }
+  }, [pendingAnchor]);
 
   const handleSubmit = useCallback(async () => {
     if (!newComment.trim()) return;
@@ -32,17 +54,24 @@ export function CommentsSidebar({ comments, setComments, tlId, postId }: Props) 
     setIsSubmitting(true);
     try {
       const token = await getAuthToken();
-      const result = await addPostComment(token, tlId, postId, newComment.trim());
+      const result = await addPostComment(
+        token,
+        tlId,
+        postId,
+        newComment.trim(),
+        pendingAnchor ?? undefined
+      );
       if (result.comment) {
         setComments(prev => [...prev, result.comment!]);
         setNewComment('');
+        onClearAnchor?.();
       }
     } catch {
       // silent
     } finally {
       setIsSubmitting(false);
     }
-  }, [newComment, tlId, postId, setComments]);
+  }, [newComment, tlId, postId, setComments, pendingAnchor, onClearAnchor]);
 
   const handleResolve = useCallback(async (commentId: string) => {
     // Optimistic
@@ -101,7 +130,7 @@ export function CommentsSidebar({ comments, setComments, tlId, postId }: Props) 
       {/* Comments list — active first, resolved below */}
       <ScrollArea className="flex-1">
         <div className="p-3 space-y-2">
-          {comments.length === 0 && (
+          {comments.length === 0 && !pendingAnchor && (
             <p className="text-xs text-muted-foreground text-center py-8">
               Nenhum comentário ainda.
             </p>
@@ -113,6 +142,7 @@ export function CommentsSidebar({ comments, setComments, tlId, postId }: Props) 
               comment={comment}
               onResolve={handleResolve}
               onDelete={handleDelete}
+              isActive={activeCommentId === comment.id}
             />
           ))}
           {/* Resolved comments — always visible, muted */}
@@ -125,6 +155,7 @@ export function CommentsSidebar({ comments, setComments, tlId, postId }: Props) 
               comment={comment}
               onResolve={handleResolve}
               onDelete={handleDelete}
+              isActive={false}
             />
           ))}
         </div>
@@ -132,11 +163,32 @@ export function CommentsSidebar({ comments, setComments, tlId, postId }: Props) 
 
       {/* New comment input */}
       <div className="border-t p-3 space-y-2">
+        {/* Pending anchor — show quoted text snippet */}
+        {pendingAnchor && (
+          <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded-md p-2">
+            <MessageSquareQuote className="h-3.5 w-3.5 text-purple-500 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-purple-600 font-medium mb-0.5">Comentando sobre:</p>
+              <p className="text-xs text-purple-800 line-clamp-3 italic">
+                &ldquo;{pendingAnchor.selectedText}&rdquo;
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClearAnchor}
+              className="text-purple-400 hover:text-purple-600 shrink-0"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         <Textarea
+          ref={textareaRef}
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Escreva um comentário... (Ctrl+Enter para enviar)"
+          placeholder={pendingAnchor ? 'Escreva seu feedback...' : 'Escreva um comentário... (Ctrl+Enter para enviar)'}
           className="text-xs min-h-[60px] resize-none"
           rows={2}
         />
@@ -164,17 +216,36 @@ function CommentItem({
   comment,
   onResolve,
   onDelete,
+  isActive,
 }: {
   comment: PostComment;
   onResolve: (id: string) => void;
   onDelete: (id: string) => void;
+  isActive: boolean;
 }) {
   const timeAgo = getRelativeTime(comment.createdAt);
-
   const isBot = comment.authorId === 'system';
 
   return (
-    <div className={`rounded-md border p-2.5 space-y-1.5 ${comment.resolved ? 'opacity-60 bg-muted/50' : 'bg-background'}`}>
+    <div
+      id={`comment-${comment.id}`}
+      className={`group rounded-md border p-2.5 space-y-1.5 transition-colors ${
+        comment.resolved
+          ? 'opacity-60 bg-muted/50'
+          : isActive
+            ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-200'
+            : 'bg-background'
+      }`}
+    >
+      {/* Anchor quote — the highlighted text this comment refers to */}
+      {comment.anchor && comment.anchor.selectedText && (
+        <div className="bg-purple-50 border-l-2 border-purple-300 px-2 py-1 rounded-r-sm">
+          <p className="text-[10px] text-purple-700 italic line-clamp-2">
+            &ldquo;{comment.anchor.selectedText}&rdquo;
+          </p>
+        </div>
+      )}
+
       {/* Author + time */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
