@@ -491,9 +491,9 @@ export async function validateForceSchedule(
       return { valid: false, error: '🕐 Defina um horário para o agendamento (não pode ser 00:00).' };
     }
 
-    // 3. Check scheduled date is in the future
+    // 3. Check scheduled date is not too far in the past (5 min tolerance for "now")
     const scheduledDate = new Date(scheduledFor);
-    if (scheduledDate.getTime() < Date.now()) {
+    if (scheduledDate.getTime() < Date.now() - 5 * 60 * 1000) {
       return { valid: false, error: '📅 A data/horário de agendamento já passou. Escolha uma data futura.' };
     }
 
