@@ -55,9 +55,64 @@ const DAY_LABELS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'];
 
 // ─── Skeleton ─────────────────────────────────────────
 
+function getActivityDescription(activity: Activity): JSX.Element {
+  const firstName = activity.authorName.split(' ')[0];
+  switch (activity.type) {
+    case 'comment':
+      return (
+        <>
+          <span className="font-medium">{firstName}</span>
+          {' '}comentou em{' '}
+          <span className="font-medium">{activity.postTitle}</span>
+        </>
+      );
+    case 'approval':
+      return (
+        <>
+          <span className="font-medium">{firstName}</span>
+          {' '}aprovou{' '}
+          <span className="font-medium">{activity.postTitle}</span>
+        </>
+      );
+    case 'published':
+      return (
+        <>
+          <span className="font-medium">{activity.postTitle}</span>
+          {' '}foi publicado
+        </>
+      );
+    case 'status_change':
+      return (
+        <>
+          <span className="font-medium">{activity.postTitle}</span>
+          {' '}movido para{' '}
+          <span className="font-medium">{activity.content.replace('Status: ', '')}</span>
+        </>
+      );
+    default:
+      return (
+        <>
+          <span className="font-medium">{firstName}</span>
+          {' '}{activity.content}{' '}
+          <span className="font-medium">{activity.postTitle}</span>
+        </>
+      );
+  }
+}
+
+function getActivityIcon(type: Activity['type']): string {
+  switch (type) {
+    case 'comment': return '💬';
+    case 'approval': return '✅';
+    case 'published': return '🚀';
+    case 'status_change': return '🔄';
+    default: return '📌';
+  }
+}
+
 function DashboardSkeleton() {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <Card>
         <CardHeader><Skeleton className="h-6 w-40" /></CardHeader>
         <CardContent className="space-y-3">
@@ -72,7 +127,7 @@ function DashboardSkeleton() {
           ))}
         </CardContent>
       </Card>
-      <Card>
+      <Card className="lg:col-span-2">
         <CardHeader><Skeleton className="h-6 w-40" /></CardHeader>
         <CardContent>
           <div className="grid grid-cols-5 gap-2">
@@ -176,10 +231,10 @@ export default function StrategistDashboardPage() {
           <DashboardSkeleton />
         ) : (
           <>
-            {/* Top row: Activities + Weekly Pipeline */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Top row: Activities (1/3) + Weekly Pipeline (2/3) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-              {/* ── Activities Feed ── */}
+              {/* ── Activities Feed (1/3) ── */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
@@ -196,31 +251,27 @@ export default function StrategistDashboardPage() {
                       </p>
                     </div>
                   ) : (
-                    <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                    <div className="space-y-0.5 max-h-[400px] overflow-y-auto">
                       {activities.map((activity, idx) => (
                         <button
                           key={`${activity.postId}-${activity.createdAt}-${idx}`}
                           type="button"
                           onClick={() => handleActivityClick(activity)}
-                          className="w-full text-left flex items-start gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors"
+                          className="w-full text-left flex items-start gap-2.5 p-2 rounded-md hover:bg-muted/50 transition-colors"
                         >
-                          {/* Avatar with initial */}
-                          <div className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 ${
-                            activity.authorRole === 'thoughtleader'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-purple-100 text-purple-700'
-                          }`}>
-                            {activity.authorName.charAt(0).toUpperCase()}
-                          </div>
+                          {/* Activity icon */}
+                          <span className="text-sm shrink-0 mt-0.5">
+                            {getActivityIcon(activity.type)}
+                          </span>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs leading-snug">
-                              <span className="font-medium">{activity.authorName.split(' ')[0]}</span>
-                              {' '}comentou em{' '}
-                              <span className="font-medium">{activity.postTitle}</span>
+                              {getActivityDescription(activity)}
                             </p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
-                              {activity.content}
-                            </p>
+                            {activity.type === 'comment' && activity.content && (
+                              <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
+                                {activity.content}
+                              </p>
+                            )}
                             <p className="text-[10px] text-muted-foreground mt-0.5">
                               {getRelativeTime(activity.createdAt)}
                             </p>
@@ -232,8 +283,8 @@ export default function StrategistDashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* ── Weekly Pipeline ── */}
-              <Card>
+              {/* ── Weekly Pipeline (2/3) ── */}
+              <Card className="lg:col-span-2">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />

@@ -732,7 +732,7 @@ export async function getAllPipelinePostsForStrategist(
 // ---- Dashboard: Recent activities for a Strategist ----
 
 export type Activity = {
-  type: 'comment';
+  type: 'comment' | 'status_change' | 'approval' | 'published';
   authorName: string;
   authorRole: 'strategist' | 'thoughtleader';
   content: string;
@@ -742,6 +742,8 @@ export type Activity = {
   companySlug: string;
   tlSlug: string;
   createdAt: string;
+  /** For status_change activities */
+  status?: string;
 };
 
 export async function getRecentActivitiesForStrategist(
@@ -804,7 +806,19 @@ export async function getRecentActivitiesForStrategist(
       )
     );
 
-    // For each TL's posts, fetch comments in parallel
+    // Status labels for activity descriptions
+    const statusLabels: Record<string, string> = {
+      aprovar_ideia: 'Aprovar Ideia',
+      em_producao: 'Em Produção',
+      aprovar_post: 'Aprovar Post',
+      post_aprovado: 'Aprovado',
+      pronto_pra_postar: 'Pronto pra Postar',
+      agendado: 'Agendado',
+      postado: 'Postado',
+      ajuste: 'Ajuste',
+    };
+
+    // For each TL's posts, fetch comments + track status changes
     const commentFetches: Promise<void>[] = [];
 
     for (const { tl, snap } of postSnapshots) {
@@ -814,7 +828,64 @@ export async function getRecentActivitiesForStrategist(
       for (const postDoc of snap.docs) {
         const postData = postDoc.data();
         const postTitle = postData.title || (postData.caption?.slice(0, 40) as string) || 'Sem titulo';
+        const updatedAt = (postData.updatedAt as string) || '';
+        const status = (postData.status as string) || '';
 
+        // Track notable status changes as activities (updated in last 7 days)
+        if (updatedAt >= sevenDaysAgo && status !== 'backlog' && status !== 'arquivado') {
+          // Post approved by TL
+          if (postData.tlApprovedAt && (postData.tlApprovedAt as string) >= sevenDaysAgo) {
+            allActivities.push({
+              type: 'approval',
+              authorName: tl.name,
+              authorRole: 'thoughtleader',
+              content: `Aprovou o post`,
+              postTitle,
+              postId: postDoc.id,
+              tlUserId: tl.id,
+              companySlug: company.slug,
+              tlSlug: tl.slug,
+              createdAt: postData.tlApprovedAt as string,
+              status,
+            });
+          }
+
+          // Post published
+          if (status === 'postado' && postData.publishedAt && (postData.publishedAt as string) >= sevenDaysAgo) {
+            allActivities.push({
+              type: 'published',
+              authorName: tl.name,
+              authorRole: 'thoughtleader',
+              content: `Post publicado no LinkedIn`,
+              postTitle,
+              postId: postDoc.id,
+              tlUserId: tl.id,
+              companySlug: company.slug,
+              tlSlug: tl.slug,
+              createdAt: postData.publishedAt as string,
+              status,
+            });
+          }
+
+          // Status changes (agendado, pronto_pra_postar, em_producao, etc)
+          if (!postData.tlApprovedAt && !postData.publishedAt && ['agendado', 'pronto_pra_postar', 'em_producao', 'aprovar_post', 'aprovar_ideia', 'ajuste'].includes(status)) {
+            allActivities.push({
+              type: 'status_change',
+              authorName: tl.name,
+              authorRole: 'strategist',
+              content: `Status: ${statusLabels[status] || status}`,
+              postTitle,
+              postId: postDoc.id,
+              tlUserId: tl.id,
+              companySlug: company.slug,
+              tlSlug: tl.slug,
+              createdAt: updatedAt,
+              status,
+            });
+          }
+        }
+
+        // Fetch comments
         commentFetches.push(
           adminDb.collection(getPipelinePath(tl.id))
             .doc(postDoc.id)
