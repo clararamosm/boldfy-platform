@@ -27,8 +27,10 @@ function emptyStrategy(): ContentStrategyData {
     },
     pillars: [{
       name: '',
-      subtitle: '',
-      series: [{ name: '', objective: '', inputs: '' }],
+      purpose: '',
+      audienceObjective: '',
+      businessObjective: '',
+      contentExamples: ['', '', ''],
     }],
   };
 }
@@ -98,10 +100,10 @@ export default function StrategistEstrategiaPage() {
       const clean: ContentStrategyData = {
         ...data,
         pillars: data.pillars
-          .filter(p => p.name || p.subtitle || p.series.some(s => s.name))
+          .filter(p => p.name || p.purpose || p.audienceObjective || p.businessObjective)
           .map(p => ({
             ...p,
-            series: p.series.filter(s => s.name || s.objective || s.inputs),
+            contentExamples: (p.contentExamples || []).filter(ex => ex.trim()),
           })),
       };
       const result = await saveContentStrategy(token, tlId, clean);
@@ -295,38 +297,97 @@ export default function StrategistEstrategiaPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Pilares de Conteúdo</CardTitle>
-              <CardDescription>Os pilares temáticos e suas séries de conteúdo.</CardDescription>
+              <CardDescription>Os pilares temáticos da estratégia de conteúdo.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {data.pillars.map((pillar, pIdx) => (
                 <div key={pIdx} className="rounded-lg border p-4 space-y-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 space-y-3">
-                      <div className="grid grid-cols-[1fr_2fr] gap-2">
+                      {/* Nome + Cor */}
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Nome do Pilar</Label>
+                        <Input
+                          placeholder="Ex: Liderança"
+                          value={pillar.name}
+                          onChange={(e) => setData(prev => ({
+                            ...prev,
+                            pillars: updateItem(prev.pillars, pIdx, { name: e.target.value }),
+                          }))}
+                          disabled={isSaving}
+                        />
+                      </div>
+
+                      {/* Propósito */}
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Propósito</Label>
+                        <Textarea
+                          placeholder="Qual é o propósito desse pilar? Por que ele existe na estratégia?"
+                          value={pillar.purpose || ''}
+                          onChange={(e) => setData(prev => ({
+                            ...prev,
+                            pillars: updateItem(prev.pillars, pIdx, { purpose: e.target.value }),
+                          }))}
+                          rows={2}
+                          disabled={isSaving}
+                        />
+                      </div>
+
+                      {/* Objetivos */}
+                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Nome do Pilar</Label>
-                          <Input
-                            placeholder="Ex: Liderança"
-                            value={pillar.name}
+                          <Label className="text-xs text-muted-foreground">Objetivo da Audiência</Label>
+                          <Textarea
+                            placeholder="O que a audiência ganha com esse pilar?"
+                            value={pillar.audienceObjective || ''}
                             onChange={(e) => setData(prev => ({
                               ...prev,
-                              pillars: updateItem(prev.pillars, pIdx, { name: e.target.value }),
+                              pillars: updateItem(prev.pillars, pIdx, { audienceObjective: e.target.value }),
                             }))}
+                            rows={2}
                             disabled={isSaving}
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Subtítulo</Label>
-                          <Input
-                            placeholder="Ex: Decisões que transformam equipes"
-                            value={pillar.subtitle}
+                          <Label className="text-xs text-muted-foreground">Objetivo de Negócio</Label>
+                          <Textarea
+                            placeholder="Como esse pilar contribui para os objetivos do negócio?"
+                            value={pillar.businessObjective || ''}
                             onChange={(e) => setData(prev => ({
                               ...prev,
-                              pillars: updateItem(prev.pillars, pIdx, { subtitle: e.target.value }),
+                              pillars: updateItem(prev.pillars, pIdx, { businessObjective: e.target.value }),
                             }))}
+                            rows={2}
                             disabled={isSaving}
                           />
                         </div>
+                      </div>
+
+                      {/* Tipos de conteúdo de exemplo */}
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground">Tipos de Conteúdo de Exemplo</Label>
+                        {(pillar.contentExamples || ['', '', '']).map((example, eIdx) => (
+                          <div key={eIdx} className="flex gap-2 items-center">
+                            <span className="text-xs text-muted-foreground w-4">{eIdx + 1}.</span>
+                            <Input
+                              placeholder={
+                                eIdx === 0 ? 'Ex: Bastidores de decisão' :
+                                eIdx === 1 ? 'Ex: Lições aprendidas' :
+                                'Ex: Frameworks práticos'
+                              }
+                              value={example}
+                              onChange={(e) => {
+                                const newExamples = [...(pillar.contentExamples || ['', '', ''])];
+                                newExamples[eIdx] = e.target.value;
+                                setData(prev => ({
+                                  ...prev,
+                                  pillars: updateItem(prev.pillars, pIdx, { contentExamples: newExamples }),
+                                }));
+                              }}
+                              disabled={isSaving}
+                            />
+                          </div>
+                        ))}
                       </div>
 
                       {/* Color picker */}
@@ -352,82 +413,6 @@ export default function StrategistEstrategiaPage() {
                           ))}
                         </div>
                       </div>
-
-                      {/* Series */}
-                      <div className="space-y-2">
-                        <Label className="text-xs text-muted-foreground">Séries</Label>
-                        {pillar.series.map((serie, sIdx) => (
-                          <div key={sIdx} className="flex gap-2 items-start">
-                            <div className="flex-1 grid grid-cols-3 gap-2">
-                              <Input
-                                placeholder="Nome da série"
-                                value={serie.name}
-                                onChange={(e) => {
-                                  const newSeries = [...pillar.series];
-                                  newSeries[sIdx] = { ...newSeries[sIdx], name: e.target.value };
-                                  setData(prev => ({
-                                    ...prev,
-                                    pillars: updateItem(prev.pillars, pIdx, { series: newSeries }),
-                                  }));
-                                }}
-                                disabled={isSaving}
-                              />
-                              <Input
-                                placeholder="Objetivo"
-                                value={serie.objective}
-                                onChange={(e) => {
-                                  const newSeries = [...pillar.series];
-                                  newSeries[sIdx] = { ...newSeries[sIdx], objective: e.target.value };
-                                  setData(prev => ({
-                                    ...prev,
-                                    pillars: updateItem(prev.pillars, pIdx, { series: newSeries }),
-                                  }));
-                                }}
-                                disabled={isSaving}
-                              />
-                              <Input
-                                placeholder="Inputs / Fontes"
-                                value={serie.inputs}
-                                onChange={(e) => {
-                                  const newSeries = [...pillar.series];
-                                  newSeries[sIdx] = { ...newSeries[sIdx], inputs: e.target.value };
-                                  setData(prev => ({
-                                    ...prev,
-                                    pillars: updateItem(prev.pillars, pIdx, { series: newSeries }),
-                                  }));
-                                }}
-                                disabled={isSaving}
-                              />
-                            </div>
-                            <Button
-                              variant="ghost" size="icon"
-                              onClick={() => {
-                                const newSeries = removeItem(pillar.series, sIdx);
-                                setData(prev => ({
-                                  ...prev,
-                                  pillars: updateItem(prev.pillars, pIdx, { series: newSeries }),
-                                }));
-                              }}
-                              disabled={isSaving || pillar.series.length <= 1}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                        <Button
-                          variant="outline" size="sm"
-                          onClick={() => {
-                            const newSeries = [...pillar.series, { name: '', objective: '', inputs: '' }];
-                            setData(prev => ({
-                              ...prev,
-                              pillars: updateItem(prev.pillars, pIdx, { series: newSeries }),
-                            }));
-                          }}
-                          disabled={isSaving}
-                        >
-                          <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Série
-                        </Button>
-                      </div>
                     </div>
 
                     <Button
@@ -447,8 +432,10 @@ export default function StrategistEstrategiaPage() {
                   ...prev,
                   pillars: [...prev.pillars, {
                     name: '',
-                    subtitle: '',
-                    series: [{ name: '', objective: '', inputs: '' }],
+                    purpose: '',
+                    audienceObjective: '',
+                    businessObjective: '',
+                    contentExamples: ['', '', ''],
                   }],
                 }))}
                 disabled={isSaving}

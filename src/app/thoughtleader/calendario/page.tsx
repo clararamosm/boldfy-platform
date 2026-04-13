@@ -14,6 +14,7 @@ import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipelin
 import { getStatusConfig, buildGetStatusLabel } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
+import { PostListTable } from '@/components/calendar/post-list-table';
 import { cn } from '@/lib/utils';
 import {
   ChevronLeft,
@@ -427,6 +428,13 @@ export default function ThoughtLeaderCalendarioPage() {
             )}
           </div>
         </div>
+
+        {/* Post list table — all posts with filters */}
+        <PostListTable
+          posts={posts}
+          getStatusLabel={getStatusLabel}
+          onPostClick={navigateToPost}
+        />
       </main>
     </>
   );

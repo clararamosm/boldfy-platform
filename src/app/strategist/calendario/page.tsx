@@ -24,6 +24,7 @@ import {
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardPost, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
+import { PostListTable } from '@/components/calendar/post-list-table';
 import {
   format,
   startOfMonth,
@@ -442,6 +443,16 @@ export default function StrategistCalendarioPage() {
               })}
             </div>
           </div>
+
+          {/* Post list table — all posts with filters */}
+          <PostListTable
+            posts={allPosts}
+            getStatusLabel={(status) => STATUS_CONFIG[status]?.label || status}
+            onPostClick={(postId) => {
+              const post = allPosts.find(p => p.id === postId);
+              if (post) handlePostClick(post);
+            }}
+          />
         </div>
       </main>
     </>

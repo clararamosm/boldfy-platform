@@ -567,8 +567,10 @@ export async function resolveSlugs(
   try {
     const user = await requireAuth(idToken);
 
-    // Only strategist, master, and admin can resolve slugs
-    if (user.role !== 'strategist' && user.role !== 'master' && user.role !== 'admin') {
+    // TL/colaborador can only resolve slugs for their own company
+    if (user.role === 'thoughtleader' || user.role === 'colaborador') {
+      // They can only access their own company's slugs — validated below after resolving
+    } else if (user.role !== 'strategist' && user.role !== 'master' && user.role !== 'admin') {
       return { error: 'Acesso negado.' };
     }
 
@@ -590,6 +592,11 @@ export async function resolveSlugs(
     }
 
     if (!companyId) return { error: 'Empresa não encontrada.' };
+
+    // TL/colaborador can only resolve their own company
+    if ((user.role === 'thoughtleader' || user.role === 'colaborador') && user.companyId !== companyId) {
+      return { error: 'Acesso negado.' };
+    }
 
     // Resolve TL slug (if provided)
     let tlId: string | undefined;

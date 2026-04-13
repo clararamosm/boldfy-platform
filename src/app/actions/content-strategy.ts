@@ -16,9 +16,14 @@ export type ContentStrategyData = {
   // Content Pillars
   pillars: Array<{
     name: string;
-    subtitle: string;
+    purpose: string;            // Propósito desse pilar
+    audienceObjective: string;  // Objetivo da audiência
+    businessObjective: string;  // Objetivo de negócio
+    contentExamples: string[];  // 3 tipos de conteúdo de exemplo
     color?: string; // Tailwind color key (e.g. 'blue', 'amber', 'purple')
-    series: Array<{ name: string; objective: string; inputs: string }>;
+    // Legacy (kept for backward compat with existing data)
+    subtitle?: string;
+    series?: Array<{ name: string; objective: string; inputs: string }>;
   }>;
   // Legacy fields (kept for backward compat, moved to BrandContext)
   messaging?: {

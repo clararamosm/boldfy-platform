@@ -186,15 +186,48 @@ export default function ThoughtLeaderEstrategiaPage() {
         {strategy.pillars && strategy.pillars.length > 0 && (
           <div>
             <h3 className="text-lg font-semibold mb-3">Pilares de Conteúdo</h3>
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {strategy.pillars.map((pillar, i) => (
                 <Card key={i}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm">{pillar.name}</CardTitle>
-                    <CardDescription>{pillar.subtitle}</CardDescription>
+                    {pillar.purpose && (
+                      <CardDescription>{pillar.purpose}</CardDescription>
+                    )}
+                    {/* Legacy subtitle fallback */}
+                    {!pillar.purpose && pillar.subtitle && (
+                      <CardDescription>{pillar.subtitle}</CardDescription>
+                    )}
                   </CardHeader>
-                  <CardContent>
-                    {pillar.series && pillar.series.length > 0 && (
+                  <CardContent className="space-y-3">
+                    {pillar.audienceObjective && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Objetivo da Audiência</p>
+                        <p className="text-sm">{pillar.audienceObjective}</p>
+                      </div>
+                    )}
+                    {pillar.businessObjective && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Objetivo de Negócio</p>
+                        <p className="text-sm">{pillar.businessObjective}</p>
+                      </div>
+                    )}
+                    {pillar.contentExamples && pillar.contentExamples.filter(e => e).length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Tipos de Conteúdo</p>
+                        <ul className="mt-1 space-y-1">
+                          {pillar.contentExamples.filter(e => e).map((ex, j) => (
+                            <li key={j} className="text-sm flex items-start gap-1.5">
+                              <span className="text-muted-foreground">•</span>
+                              <span>{ex}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {/* Legacy series fallback */}
+                    {(!pillar.contentExamples || pillar.contentExamples.filter(e => e).length === 0) &&
+                      pillar.series && pillar.series.length > 0 && (
                       <div className="space-y-2">
                         {pillar.series.map((serie, j) => (
                           <div key={j} className="border-l-2 border-primary/20 pl-2">
