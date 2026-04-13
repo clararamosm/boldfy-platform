@@ -16,11 +16,11 @@ import {
 } from '@/app/actions/content-pipeline';
 import { STATUS_CONFIG } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
+import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
 import {
   Activity as ActivityIcon,
   MessageSquare,
   Calendar,
-  BarChart3,
 } from 'lucide-react';
 import {
   startOfWeek,
@@ -215,6 +215,17 @@ export default function StrategistDashboardPage() {
     return map;
   }, [allPosts, weekDays]);
 
+  // Extract unique TL profiles for LinkedIn performance filter
+  const tlProfiles = useMemo(() => {
+    const seen = new Map<string, { id: string; name: string }>();
+    for (const post of allPosts) {
+      if (post.tlUserId && !seen.has(post.tlUserId)) {
+        seen.set(post.tlUserId, { id: post.tlUserId, name: post.tlName || 'Sem nome' });
+      }
+    }
+    return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allPosts]);
+
   const handlePostClick = (post: CalendarPipelinePost) => {
     router.push(`/post/${post.companySlug}/${post.tlSlug}/${post.id}`);
   };
@@ -345,19 +356,15 @@ export default function StrategistDashboardPage() {
               </Card>
             </div>
 
-            {/* Bottom: KPI placeholder */}
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="rounded-full bg-muted p-3 mb-3">
-                  <BarChart3 className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <h2 className="text-sm font-semibold mb-1">Em breve: metricas de todos os perfis</h2>
-                <p className="text-xs text-muted-foreground max-w-md">
-                  Aqui voce podera visualizar metricas consolidadas de todos os Thought Leaders
-                  e empresas atribuidas a sua conta.
-                </p>
-              </CardContent>
-            </Card>
+            {/* LinkedIn Performance — all TL profiles */}
+            {tlProfiles.length > 0 && (
+              <LinkedInPerformance
+                userId={tlProfiles[0].id}
+                showProfileFilter
+                profiles={tlProfiles}
+                callerRole="strategist"
+              />
+            )}
           </>
         )}
       </main>

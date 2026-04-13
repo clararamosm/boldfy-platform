@@ -1,187 +1,158 @@
-# PLANO: Produção-Ready + Créditos de IA + Ranking Fix
+# Plano: LinkedIn Performance Metrics em Todos os Dashboards
 
-## RESUMO
-Este plano cobre 2 blocos: (A) Infra de produção (5 itens técnicos) e (B) Feature de créditos de IA + ranking fixes.
+## Visao Geral
 
----
-
-## BLOCO A — INFRAESTRUTURA DE PRODUÇÃO
-
-### A1. Rate Limiting nas rotas de IA
-**Arquivos:** `src/app/api/ai/generate/route.ts`, `src/app/api/ai/missions/route.ts`
-- Implementar rate limiter in-memory usando Map com janela deslizante por userId
-- Limites: 10 requests/minuto por user nas rotas de IA
-- Sem dependências externas (Map + TTL limpo por intervalo)
-- Retorna 429 Too Many Requests quando excede
-
-### A2. Firestore Indexes
-**Arquivo:** `firestore.indexes.json`
-- Adicionar índices compostos para:
-  - `users`: companyId + role (já existe)
-  - `scheduledPosts` (collectionGroup): status + scheduledFor (cron)
-  - `pointsHistory`: type + source (recalculatePoints query)
-  - `missionSubmissions`: missionId + status (review queries)
-
-### A3. Paginação no Rankings
-**Arquivos:** `src/app/actions/points.ts`, `src/app/colaborador/dashboard/page.tsx`, `src/app/admin/dashboard/page.tsx`
-- `getCompanyRanking`: Adicionar `.orderBy('points', 'desc').limit(10)` no Firestore query em vez de carregar todos e ordenar em memória
-- Dashboard colaborador: Mudar grid de `[1fr_1fr_280px]` para `[1fr_1fr_1fr]` (3 colunas iguais)
-- Limitar ranking visual a 10 pessoas
-- Admin dashboard: manter top 5 como está
-
-### A4. Security Headers
-**Arquivo:** `next.config.ts`
-- Adicionar `headers()` com:
-  - `X-Content-Type-Options: nosniff`
-  - `X-Frame-Options: DENY`
-  - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
-  - `Referrer-Policy: strict-origin-when-cross-origin`
-  - `X-DNS-Prefetch-Control: on`
-  - `Permissions-Policy: camera=(), microphone=(), geolocation=()`
-
-### A5. Input Validation (Zod em rotas faltantes)
-**Arquivos:** `src/app/api/ai/generate/route.ts`, `src/app/api/ai/missions/route.ts`, `src/app/actions/missions.ts`, `src/app/actions/posts.ts`
-- Adicionar schemas Zod para validar payloads das rotas de IA
-- Adicionar validação de tamanho em captions (max 3000 chars)
-- Adicionar validação de URLs em proofUrl de missões
+Criar um componente reutilizavel `<LinkedInPerformance />` com graficos visuais (Recharts, ja instalado) e filtro de periodo, e integra-lo em 5 pontos da plataforma. Alem disso, exibir metricas inline (reacoes + comentarios) nos cards do calendario e no feed do LinkedIn.
 
 ---
 
-## BLOCO B — CRÉDITOS DE IA
+## Componente Principal: `<LinkedInPerformance />`
 
-### B1. Modelo de dados
-**Campo novo no user doc (Firestore):**
-```
-users/{uid}:
-  aiCredits: {
-    remaining: 40,        // créditos restantes
-    monthlyLimit: 40,     // limite mensal
-    renewsAt: Timestamp,  // data de renovação (1º do próximo mês)
-    totalUsed: 0          // total histórico de usos
-  }
-```
+**Arquivo:** `src/components/linkedin-performance/linkedin-performance.tsx`
 
-**Recompensa default nas companies:**
-```
-companies/{companyId}/rewards/:
-  {
-    name: "10 Créditos de IA",
-    points: 150,           // sugestão: 150 pontos = 10 créditos
-    type: "ai_credits",    // tipo especial
-    creditsAmount: 10,     // quantos créditos entrega
-    stock: "Ilimitado",
-    status: "Disponível",
-    imageUrl: null,        // usa ícone de Sparkles
-    isDefault: true        // flag pra não poder deletar
-  }
+### Props
+```typescript
+type LinkedInPerformanceProps = {
+  userId: string;
+  hideIfNotConnected?: boolean;
+  showProfileFilter?: boolean;
+  profiles?: Array<{ id: string; name: string; picture?: string }>;
+};
 ```
 
-### Sugestão de valores de conversão:
-- **1 geração de conteúdo = 1 crédito de IA**
-- **10 créditos extras = 150 pontos do app** (equivale a ~completar 1 trilha média)
-- **20 créditos extras = 250 pontos** (desconto por volume)
-- Cada colaborador começa com **40 créditos/mês** (renova no 1º de cada mês)
-- Créditos comprados NÃO expiram (acumulam com os mensais)
+### Conteudo Visual
 
-### B2. Hook useAiCredits
-**Arquivo novo:** `src/hooks/use-ai-credits.ts`
-- Busca `aiCredits` do user doc via Firestore listener
-- Retorna: `{ remaining, monthlyLimit, renewsAt, daysUntilRenewal, loading }`
-- Mesmo padrão do `useUnreadFeed`
+**Filtro de Periodo** (topo, a direita do titulo):
+- Select com opcoes: "Esta semana", "Este mes", "Ultimo mes", "Ultimos 3 meses"
+- Filtro de perfil (apenas estrategista): dropdown com TLs
 
-### B3. Badge no sidebar
-**Arquivo:** `src/components/dashboard/colaborador-sidebar-nav.tsx`
-- No item "Assistente", adicionar badge com créditos restantes: `"23/40"`
-- Usa o hook `useAiCredits`
-- Quando remaining === 0: badge fica vermelho em vez de purple
+**KPI Cards** (grid 2x2 mobile, 4 colunas desktop):
+1. Posts Publicados (icone Send, fundo azul LinkedIn)
+2. Total de Reacoes (icone Heart, fundo rose)
+3. Total de Comentarios (icone MessageCircle, fundo blue)
+4. Media de Reacoes/Post (icone TrendingUp, fundo green)
 
-### B4. Banner na página do Assistente
-**Arquivo:** `src/app/colaborador/assistente/page.tsx`
-- Adicionar card de status acima do HotTopicsBox:
-  - Mostra: "X créditos restantes de Y"
-  - Progress bar visual
-  - Quando 0: mensagem "Seus créditos renovam em X dias" + botão "Comprar mais créditos" → link para recompensas
-- Quando remaining === 0: bloqueia o form de geração com overlay
+**Grafico de Area** (Recharts `AreaChart`):
+- Eixo X: datas dos posts (agrupados por semana conforme periodo)
+- Duas areas: Reacoes (rose) e Comentarios (azul)
+- Tooltip com data + valores
+- Responsivo via `ResponsiveContainer`
+- Usa o wrapper `ChartContainer` do shadcn/ui que ja existe em `src/components/ui/chart.tsx`
 
-### B5. Consumo de crédito na geração
-**Arquivo:** `src/app/api/ai/generate/route.ts`
-- Antes de gerar: verificar `aiCredits.remaining > 0`
-- Se 0: retornar 403 com `{ error: "credits_exhausted", renewsAt, daysUntilRenewal }`
-- Após gerar com sucesso: decrementar `aiCredits.remaining` e incrementar `aiCredits.totalUsed` via Admin SDK
-
-### B6. Resgate de créditos via recompensas
-**Arquivo:** `src/app/actions/rewards.ts`
-- Na função `redeemReward`: se reward.type === 'ai_credits', além do fluxo normal, adicionar `creditsAmount` ao `aiCredits.remaining` do user
-- Créditos comprados não resetam no ciclo mensal (acumulam)
-
-### B7. Seed da recompensa default
-**Arquivo:** `src/app/actions/users.ts` (no inviteAdmin quando cria empresa)
-- Ao criar uma nova empresa, auto-criar a recompensa "Créditos de IA" com `isDefault: true`
-- Para empresas existentes: criar um script ou server action que adiciona se não existir
-
-### B8. Renovação mensal (cron ou check lazy)
-**Abordagem: lazy check** (sem cron extra)
-- No `ai/generate/route.ts`: antes de verificar remaining, checar se `renewsAt` já passou
-- Se `Date.now() > renewsAt`: resetar remaining para monthlyLimit, atualizar renewsAt para 1º do próximo mês
-- Créditos extras comprados via loja: NÃO são resetados (precisa campo `bonusCredits` separado)
-
-**Ajuste no modelo:**
-```
-aiCredits: {
-  remaining: 40,          // mensais restantes (reseta)
-  bonusCredits: 0,        // comprados na loja (não reseta)
-  monthlyLimit: 40,
-  renewsAt: Timestamp,
-  totalUsed: 0
-}
-```
-- Consumo: primeiro gasta `remaining`, depois `bonusCredits`
-- Renovação: só reseta `remaining` para `monthlyLimit`
-
-### B9. Firestore Rules para aiCredits
-**Arquivo:** `firestore.rules`
-- Client NÃO pode escrever em `aiCredits` diretamente
-- Só Admin SDK (server actions e API routes) modifica créditos
-- Adicionar `aiCredits` à lista de campos protegidos no update do user
+**Lista dos 5 Posts Recentes** (abaixo do grafico):
+- Caption preview (120 chars)
+- Data de publicacao
+- Coracao + total reacoes | Comentario + total comentarios
+- Link externo para o post no LinkedIn
 
 ---
 
-## ORDEM DE IMPLEMENTAÇÃO
+## Mudancas no Backend (Server Action)
 
-1. **A2** — Firestore indexes (deploy first, takes time to build)
-2. **A4** — Security headers (quick win)
-3. **A1** — Rate limiting
-4. **A5** — Zod validation
-5. **A3** — Ranking: paginação + 3 colunas iguais + limit 10
-6. **B1** — Modelo de dados aiCredits
-7. **B9** — Firestore rules (proteger aiCredits)
-8. **B2** — Hook useAiCredits
-9. **B5** — Consumo de crédito + renovação lazy (B8)
-10. **B3** — Badge no sidebar
-11. **B4** — Banner + bloqueio na página do assistente
-12. **B6** — Resgate de créditos na loja
-13. **B7** — Seed da recompensa default
-14. Build + test + commit
+**Arquivo:** `src/app/actions/linkedin.ts`
+
+### Modificar `getLinkedInDashboardMetrics()`
+
+Adicionar parametro opcional de periodo:
+```typescript
+export async function getLinkedInDashboardMetrics(
+  idToken: string,
+  userId: string,
+  dateRange?: { start: string; end: string }
+): Promise<DashboardMetrics>
+```
+
+- Se `dateRange` fornecido: filtrar posts publicados cujo `publishedAt` cai dentro do range
+- Se nao fornecido: comportamento atual (ultimos 50 posts, sem filtro de data)
 
 ---
 
-## ARQUIVOS MODIFICADOS (estimativa)
+## Onde o componente sera usado (5 pontos)
 
-| Arquivo | Tipo |
-|---------|------|
-| `firestore.indexes.json` | Modificar |
-| `next.config.ts` | Modificar |
-| `src/app/api/ai/generate/route.ts` | Modificar (rate limit + credits + zod) |
-| `src/app/api/ai/missions/route.ts` | Modificar (rate limit + zod) |
-| `src/app/actions/points.ts` | Modificar (ranking limit 10) |
-| `src/app/actions/rewards.ts` | Modificar (ai_credits type) |
-| `src/app/actions/missions.ts` | Modificar (zod) |
-| `src/app/actions/posts.ts` | Modificar (zod) |
-| `src/app/actions/users.ts` | Modificar (seed reward) |
-| `src/app/colaborador/dashboard/page.tsx` | Modificar (3 cols iguais + limit 10) |
-| `src/app/colaborador/assistente/page.tsx` | Modificar (credits banner + bloqueio) |
-| `src/components/dashboard/colaborador-sidebar-nav.tsx` | Modificar (badge) |
-| `src/hooks/use-ai-credits.ts` | Criar |
-| `src/lib/rate-limit.ts` | Criar |
-| `firestore.rules` | Modificar |
-| `PROJECT_STATUS.md` | Atualizar |
+### 1. Dashboard do Colaborador
+**Arquivo:** `src/app/colaborador/dashboard/page.tsx`
+- **Acao:** Substituir o bloco atual de LinkedIn Performance (linhas 352-470) + `LinkedInPostCard` inline pelo novo `<LinkedInPerformance userId={uid} />`
+- Remove ~120 linhas de codigo inline, substitui por 1 import + uso
+
+### 2. Dashboard do Thought Leader
+**Arquivo:** `src/app/thoughtleader/dashboard/page.tsx`
+- **Acao:** Substituir o card "Backlog de conteudo" (linhas 131-174) pelo `<LinkedInPerformance userId={uid} />`
+- Os 4 KPI cards do pipeline permanecem no topo (publicados, agendados, pendentes, total)
+- O bloco de LinkedIn Performance fica abaixo, no lugar do backlog
+
+### 3. Calendario do Thought Leader
+**Arquivo:** `src/app/thoughtleader/calendario/page.tsx`
+- **Acao:** Adicionar `<LinkedInPerformance userId={userId} />` APOS o `<PostListTable />`
+- Secao extra no final da pagina, abaixo da tabela de posts
+
+### 4. Calendario do Estrategista
+**Arquivo:** `src/app/strategist/calendario/page.tsx`
+- **Acao:** Adicionar o bloco APOS o `<PostListTable />`
+- **Props especiais:** `showProfileFilter={true}` + `profiles={tlProfiles}`
+- O filtro de perfil permite ao estrategista ver metricas de cada TL individualmente
+
+### 5. Dashboard do Estrategista
+**Arquivo:** `src/app/strategist/dashboard/page.tsx`
+- **Acao:** Substituir o Card "Em breve: metricas de todos os perfis" (linhas 349-360) pelo `<LinkedInPerformance />` com filtro de perfil
+- Usa o primeiro TL da lista como default
+
+---
+
+## Metricas Inline nos Cards do Calendario
+
+**Arquivo:** `src/components/calendar/calendar-post-card.tsx`
+
+### Mudanca
+- Adicionar props opcionais: `reactions?: number` e `comments?: number`
+- Quando `post.status === 'postado'` E metricas existirem: exibir na mesma linha do horario, no lado direito:
+  - Heart icon (h-3 w-3, rose-500) + numero
+  - MessageCircle icon (h-3 w-3, blue-500) + numero
+- Se metricas nao disponiveis para aquele post: nao mostra nada
+
+### Dados para os cards
+- Nas paginas de calendario (TL e Estrategista): usar as metricas ja carregadas pelo `<LinkedInPerformance />`
+- Criar um estado compartilhado ou prop callback que passa o Map de `postId -> { reactions, comments }` para o calendario
+- Abordagem: o componente `<LinkedInPerformance />` expoe as metricas via callback `onMetricsLoaded` que o calendario usa para alimentar os cards
+
+---
+
+## Metricas no Feed do LinkedIn
+
+**Arquivo:** `src/components/linkedin-feed/linkedin-feed-view.tsx`
+
+### Mudanca
+- Apos a midia do post e antes do footer, adicionar barra de engajamento:
+  - Heart icon + "42 reacoes" · MessageCircle icon + "5 comentarios"
+  - Texto muted, tamanho pequeno (text-xs text-muted-foreground)
+
+### Dados
+- Fetch separado e assincrono das metricas apos carregar os posts do feed
+- Mostra skeleton enquanto carrega as metricas
+- Nao bloqueia o carregamento do feed em si
+
+---
+
+## Estrutura de Arquivos Novos
+
+```
+src/components/linkedin-performance/
+  linkedin-performance.tsx     -- Componente principal reutilizavel
+  metrics-chart.tsx            -- Grafico de area com Recharts
+  metrics-kpi-cards.tsx        -- Grid de 4 KPI cards
+  period-filter.tsx            -- Select de periodo + filtro de perfil
+```
+
+---
+
+## Ordem de Implementacao
+
+1. Backend: Modificar `getLinkedInDashboardMetrics()` com suporte a `dateRange`
+2. Componente `<LinkedInPerformance />` com subcomponentes (KPI, grafico, lista, filtro)
+3. Dashboard Colaborador: Substituir bloco inline pelo componente
+4. Dashboard TL: Substituir backlog pelo componente
+5. Calendario TL: Adicionar componente apos tabela
+6. Calendario Estrategista: Adicionar componente com filtro de perfil
+7. Dashboard Estrategista: Substituir placeholder
+8. Calendar post cards: Adicionar metricas inline nos cards de posts postados
+9. Feed do LinkedIn: Adicionar barra de engajamento
+10. TypeScript check + commit

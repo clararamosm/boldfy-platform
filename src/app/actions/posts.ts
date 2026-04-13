@@ -4,6 +4,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireSelf, requireAuth, requireActiveSubscription } from '@/lib/auth-guard';
+import { fetchPostMetricsBatch, isTokenExpired, refreshAccessToken, buildConnectionData, type LinkedInConnection } from '@/lib/linkedin';
 
 export type ScheduledPost = {
   id: string;
@@ -144,6 +145,7 @@ export type FeedPost = {
   caption: string;
   mediaUrl?: string;
   mediaType?: string;
+  linkedinPostId?: string;
   linkedinPostUrl?: string;
   publishedAt: string;
 };
@@ -219,6 +221,7 @@ export async function getCompanyFeed(
             caption: data.caption || '',
             mediaUrl: data.mediaUrl || undefined,
             mediaType: data.mediaType || undefined,
+            linkedinPostId: data.linkedinPostId || undefined,
             linkedinPostUrl: data.linkedinPostUrl || undefined,
             publishedAt: data.publishedAt || data.updatedAt || data.createdAt || '',
           });
@@ -252,6 +255,7 @@ export async function getCompanyFeed(
             caption: data.caption || '',
             mediaUrl: data.mediaUrl || undefined,
             mediaType: data.mediaType || undefined,
+            linkedinPostId: data.linkedinPostId || undefined,
             linkedinPostUrl: data.linkedinPostUrl || undefined,
             publishedAt: data.publishedAt || data.updatedAt || data.createdAt || '',
           });
@@ -354,5 +358,98 @@ export async function markFeedAsRead(
   } catch (error) {
     console.error('Error marking feed as read:', error);
     return { success: false, error: 'Erro ao marcar feed como lido.' };
+  }
+}
+
+// ─── Feed Post Metrics (batch) ──────────────────────────────────
+/**
+ * Fetch LinkedIn engagement metrics for a list of feed posts.
+ * Groups posts by userId, fetches each user's token, and batch-fetches
+ * metrics from the LinkedIn socialMetadata API.
+ *
+ * Returns a map of postId -> { reactions, comments }.
+ */
+export async function getFeedPostMetrics(
+  idToken: string,
+  posts: Array<{ id: string; userId: string; linkedinPostId?: string }>,
+): Promise<{ metrics: Record<string, { reactions: number; comments: number }>; error?: string }> {
+  try {
+    await requireAuth(idToken);
+
+    // Only include posts that have a linkedinPostId
+    const postsWithIds = posts.filter((p) => p.linkedinPostId);
+    if (postsWithIds.length === 0) return { metrics: {} };
+
+    // Group by userId so we can use each user's own token
+    const byUser = new Map<string, Array<{ id: string; linkedinPostId: string }>>();
+    for (const p of postsWithIds) {
+      const arr = byUser.get(p.userId) || [];
+      arr.push({ id: p.id, linkedinPostId: p.linkedinPostId! });
+      byUser.set(p.userId, arr);
+    }
+
+    const result: Record<string, { reactions: number; comments: number }> = {};
+
+    // Process each user's posts in parallel
+    const userPromises = Array.from(byUser.entries()).map(async ([userId, userPosts]) => {
+      try {
+        const userDoc = await adminDb.collection('users').doc(userId).get();
+        if (!userDoc.exists) return;
+
+        const userData = userDoc.data();
+        const connection = userData?.linkedinConnection as LinkedInConnection | undefined;
+        if (!connection) return;
+
+        // Check token validity
+        let accessToken = connection.accessToken;
+        if (isTokenExpired(connection.tokenExpiresAt)) {
+          if (connection.refreshToken && connection.refreshTokenExpiresAt && !isTokenExpired(connection.refreshTokenExpiresAt)) {
+            try {
+              const newTokens = await refreshAccessToken(connection.refreshToken);
+              const profile = {
+                sub: connection.linkedinId,
+                name: connection.name,
+                given_name: '',
+                family_name: '',
+                picture: connection.picture,
+                email: connection.email,
+              };
+              const updatedConnection = buildConnectionData(newTokens, profile);
+              await adminDb.collection('users').doc(userId).update({ linkedinConnection: updatedConnection });
+              accessToken = newTokens.access_token;
+            } catch {
+              return; // Skip this user — can't refresh token
+            }
+          } else {
+            return; // Token expired, no refresh available
+          }
+        }
+
+        // Batch fetch metrics
+        const linkedinIds = userPosts.map((p) => p.linkedinPostId);
+        const metrics = await fetchPostMetricsBatch(accessToken, linkedinIds);
+
+        // Map linkedin post IDs back to our post IDs
+        const metricsById = new Map(metrics.map((m) => [m.postId, m]));
+        for (const post of userPosts) {
+          const m = metricsById.get(post.linkedinPostId);
+          if (m) {
+            result[post.id] = {
+              reactions: m.totalReactions || 0,
+              comments: m.comments || 0,
+            };
+          }
+        }
+      } catch (e) {
+        console.error(`[FeedMetrics] Error fetching metrics for user ${userId}:`, e);
+      }
+    });
+
+    await Promise.all(userPromises);
+
+    return { metrics: result };
+  } catch (error) {
+    console.error('Error fetching feed post metrics:', error);
+    return { metrics: {}, error: 'Erro ao buscar metricas.' };
   }
 }

@@ -12,9 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
   Linkedin, ExternalLink, Video,
-  Newspaper, Users,
+  Newspaper, Users, Heart, MessageCircle,
 } from "lucide-react";
-import { getCompanyFeed, markFeedAsRead, type FeedPost } from '@/app/actions/posts';
+import { getCompanyFeed, markFeedAsRead, getFeedPostMetrics, type FeedPost } from '@/app/actions/posts';
 import { getAuthToken } from '@/lib/auth-client';
 import { useT, useLocale } from '@/lib/i18n/context';
 import { interpolate } from '@/lib/i18n/interpolate';
@@ -40,10 +40,14 @@ const FeedPostCard = memo(function FeedPostCard({
   post,
   currentUserId,
   showYouBadge,
+  reactions,
+  comments,
 }: {
   post: FeedPost;
   currentUserId: string;
   showYouBadge: boolean;
+  reactions?: number;
+  comments?: number;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -126,6 +130,25 @@ const FeedPostCard = memo(function FeedPostCard({
                 className="w-full object-contain"
                 loading="lazy"
               />
+            )}
+          </div>
+        )}
+
+        {/* Engagement metrics */}
+        {(reactions != null || comments != null) && (
+          <div className="flex items-center gap-3 px-4 py-2 text-xs text-muted-foreground">
+            {reactions != null && (
+              <span className="flex items-center gap-1">
+                <Heart className="h-3.5 w-3.5 text-rose-500" />
+                {reactions} {reactions === 1 ? 'reacao' : 'reacoes'}
+              </span>
+            )}
+            {reactions != null && comments != null && <span>·</span>}
+            {comments != null && (
+              <span className="flex items-center gap-1">
+                <MessageCircle className="h-3.5 w-3.5 text-blue-500" />
+                {comments} {comments === 1 ? 'comentario' : 'comentarios'}
+              </span>
             )}
           </div>
         )}
@@ -223,6 +246,7 @@ export default function LinkedInFeedView({
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [metricsMap, setMetricsMap] = useState<Record<string, { reactions: number; comments: number }>>({});
   const { toast } = useToast();
 
   const fetchFeed = useCallback(async () => {
@@ -234,8 +258,22 @@ export default function LinkedInFeedView({
         setError(result.error);
         toast({ variant: 'destructive', title: t.common.error, description: result.error });
       } else {
-        setPosts(result.posts || []);
+        const feedPosts = result.posts || [];
+        setPosts(feedPosts);
         markFeedAsRead(token).catch(() => {});
+
+        // Async fetch metrics for posts that have linkedinPostId
+        const postsForMetrics = feedPosts
+          .filter((p) => p.linkedinPostId)
+          .map((p) => ({ id: p.id, userId: p.userId, linkedinPostId: p.linkedinPostId }));
+
+        if (postsForMetrics.length > 0) {
+          getFeedPostMetrics(token, postsForMetrics)
+            .then((res) => {
+              if (res.metrics) setMetricsMap(res.metrics);
+            })
+            .catch(() => {}); // Silently fail — metrics are optional
+        }
       }
     } catch (err) {
       console.error('Feed error:', err);
@@ -292,6 +330,8 @@ export default function LinkedInFeedView({
                 post={post}
                 currentUserId={authUser?.uid || ''}
                 showYouBadge={showYouBadge}
+                reactions={metricsMap[post.id]?.reactions}
+                comments={metricsMap[post.id]?.comments}
               />
             ))}
           </div>

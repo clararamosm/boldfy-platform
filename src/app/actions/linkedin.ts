@@ -4,7 +4,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { generateAuthUrl, publishLinkedInPost, refreshAccessToken, buildConnectionData, isTokenExpired, fetchPostMetricsBatch, type LinkedInConnection, type LinkedInPostMetrics } from '@/lib/linkedin';
-import { requireSelf } from '@/lib/auth-guard';
+import { requireSelf, requireStrategistForTL, requireAuth } from '@/lib/auth-guard';
 import crypto from 'crypto';
 
 type LinkedInAuthResult = {
@@ -261,15 +261,28 @@ export type DashboardMetrics = {
  * Fetch LinkedIn metrics for all published posts of a user.
  * Reads posts from Firestore (scheduledPosts with status=published),
  * then batch-fetches engagement from LinkedIn socialMetadata API.
+ *
+ * @param dateRange - Optional date range filter { start: ISO, end: ISO }
+ * @param callerRole - When 'strategist', uses requireStrategistForTL instead of requireSelf
  */
-export async function getLinkedInDashboardMetrics(idToken: string, userId: string): Promise<DashboardMetrics> {
+export async function getLinkedInDashboardMetrics(
+  idToken: string,
+  userId: string,
+  dateRange?: { start: string; end: string },
+  callerRole?: 'self' | 'strategist',
+): Promise<DashboardMetrics> {
   const empty: DashboardMetrics = {
     posts: [],
     totals: { totalPosts: 0, totalReactions: 0, totalComments: 0, avgReactionsPerPost: 0, avgCommentsPerPost: 0 },
   };
 
   try {
-    await requireSelf(idToken, userId);
+    // Auth: strategist can view TL metrics, otherwise self-only
+    if (callerRole === 'strategist') {
+      await requireStrategistForTL(idToken, userId);
+    } else {
+      await requireSelf(idToken, userId);
+    }
 
     // 1. Get user's LinkedIn connection
     const userDoc = await adminDb.collection('users').doc(userId).get();
@@ -309,22 +322,38 @@ export async function getLinkedInDashboardMetrics(idToken: string, userId: strin
     }
 
     // 3. Get all published posts from Firestore
-    const postsSnap = await adminDb
+    let postsQuery = adminDb
       .collection('users')
       .doc(userId)
       .collection('scheduledPosts')
       .where('status', '==', 'published')
       .orderBy('updatedAt', 'desc')
-      .limit(50)
-      .get();
+      .limit(50);
 
-    if (postsSnap.empty) {
+    const postsSnap = await postsQuery.get();
+
+    // Apply client-side date filtering (Firestore can't filter on two fields efficiently)
+    let filteredDocs = postsSnap.docs;
+    if (dateRange) {
+      const rangeStart = new Date(dateRange.start).getTime();
+      const rangeEnd = new Date(dateRange.end).getTime();
+      filteredDocs = filteredDocs.filter((d) => {
+        const data = d.data();
+        const publishedAt = data.updatedAt || data.createdAt || '';
+        const ts = typeof publishedAt === 'string'
+          ? new Date(publishedAt).getTime()
+          : publishedAt?.toDate?.() ? publishedAt.toDate().getTime() : 0;
+        return ts >= rangeStart && ts <= rangeEnd;
+      });
+    }
+
+    if (filteredDocs.length === 0) {
       return { ...empty };
     }
 
     // 4. Collect posts that have linkedinPostId
     const postsWithIds: { doc: FirebaseFirestore.QueryDocumentSnapshot; linkedinPostId: string }[] = [];
-    for (const d of postsSnap.docs) {
+    for (const d of filteredDocs) {
       const data = d.data();
       if (data.linkedinPostId) {
         postsWithIds.push({ doc: d, linkedinPostId: data.linkedinPostId });
@@ -333,7 +362,7 @@ export async function getLinkedInDashboardMetrics(idToken: string, userId: strin
 
     if (postsWithIds.length === 0) {
       // Posts exist but none have linkedinPostId — return post data without API metrics
-      const posts: PostWithMetrics[] = postsSnap.docs.map(d => {
+      const posts: PostWithMetrics[] = filteredDocs.map(d => {
         const data = d.data();
         return {
           id: d.id,
@@ -369,7 +398,7 @@ export async function getLinkedInDashboardMetrics(idToken: string, userId: strin
     let totalReactions = 0;
     let totalComments = 0;
 
-    const posts: PostWithMetrics[] = postsSnap.docs.map(d => {
+    const posts: PostWithMetrics[] = filteredDocs.map(d => {
       const data = d.data();
       const liId = data.linkedinPostId || '';
       const m = metricsMap[liId];

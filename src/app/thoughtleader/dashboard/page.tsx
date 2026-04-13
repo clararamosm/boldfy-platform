@@ -5,16 +5,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, CalendarDays, Clock, TrendingUp, Loader2, ArrowRight } from "lucide-react";
+import { FileText, CalendarDays, Clock, TrendingUp, Loader2 } from "lucide-react";
 import { useT } from '@/lib/i18n/context';
 import { interpolate } from '@/lib/i18n/interpolate';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { completeOnboardingItem } from '@/hooks/use-onboarding';
-import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
-import { buildGetStatusLabel, getStatusConfig } from '@/lib/pipeline-config';
-import { cn } from '@/lib/utils';
+import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
+import type { PipelinePost } from '@/app/actions/content-pipeline';
 
 export default function ThoughtLeaderDashboardPage() {
   const t = useT();
@@ -65,13 +64,6 @@ export default function ThoughtLeaderDashboardPage() {
   const scheduled = posts.filter(p => p.status === 'agendado').length;
   const pendingApproval = posts.filter(p => p.status === 'aprovar_post' || p.status === 'aprovar_ideia').length;
   const totalPosts = posts.length;
-
-  // Recent posts needing attention (pending approval + adjustments)
-  const actionNeeded = posts.filter(p =>
-    p.status === 'aprovar_post' || p.status === 'aprovar_ideia' || p.status === 'ajuste'
-  ).slice(0, 5);
-
-  const getStatusLabel = buildGetStatusLabel(t);
 
   return (
     <>
@@ -127,51 +119,10 @@ export default function ThoughtLeaderDashboardPage() {
               </Card>
             </div>
 
-            {/* Action-needed posts */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>{t.thoughtLeader.backlogTitle}</CardTitle>
-                {actionNeeded.length > 0 && (
-                  <button
-                    onClick={() => router.push('/thoughtleader/backlog')}
-                    className="text-sm text-primary hover:underline flex items-center gap-1"
-                  >
-                    {t.common.viewAll} <ArrowRight className="h-3 w-3" />
-                  </button>
-                )}
-              </CardHeader>
-              <CardContent>
-                {actionNeeded.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">{t.contentPipeline.noPostsInStatus}</p>
-                ) : (
-                  <div className="space-y-3">
-                    {actionNeeded.map(post => {
-                      const config = getStatusConfig(post.status);
-                      return (
-                        <div
-                          key={post.id}
-                          className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 cursor-pointer transition-colors"
-                          onClick={() => router.push('/thoughtleader/backlog')}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{post.title || 'Sem título'}</p>
-                            <p className="text-xs text-muted-foreground truncate mt-0.5">
-                              {post.formato || ''}
-                            </p>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className={cn('ml-2 shrink-0 text-xs', config.badge)}
-                          >
-                            {getStatusLabel(post.status)}
-                          </Badge>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* LinkedIn Performance */}
+            {user?.uid && (
+              <LinkedInPerformance userId={user.uid} hideIfNotConnected={false} />
+            )}
           </>
         )}
       </main>

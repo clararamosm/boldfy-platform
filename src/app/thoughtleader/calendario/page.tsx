@@ -15,6 +15,7 @@ import { getStatusConfig, buildGetStatusLabel } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 import { PostListTable } from '@/components/calendar/post-list-table';
+import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
 import { cn } from '@/lib/utils';
 import {
   ChevronLeft,
@@ -416,6 +417,13 @@ export default function ThoughtLeaderCalendarioPage() {
           getStatusLabel={getStatusLabel}
           onPostClick={navigateToPost}
         />
+
+        {/* LinkedIn Performance */}
+        {userId && (
+          <div className="mt-6">
+            <LinkedInPerformance userId={userId} />
+          </div>
+        )}
       </main>
     </>
   );

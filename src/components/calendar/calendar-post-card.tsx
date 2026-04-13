@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import { Clock, User } from 'lucide-react';
+import { Clock, User, Heart, MessageCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +42,9 @@ interface CalendarPostCardProps {
   onDragEnd?: (e: React.DragEvent) => void;
   isDragging?: boolean;
   className?: string;
+  /** LinkedIn engagement — shown only when post is published (status=postado) */
+  reactions?: number;
+  comments?: number;
 }
 
 export const CalendarPostCard = React.memo(function CalendarPostCard({
@@ -54,6 +57,8 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
   onDragEnd,
   isDragging = false,
   className,
+  reactions,
+  comments,
 }: CalendarPostCardProps) {
   const time = post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : '';
   const showTime = !!time && time !== '00:00';
@@ -113,11 +118,29 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
         </div>
       )}
 
-      {/* Time */}
-      {showTime && (
+      {/* Time + Engagement (for published posts) */}
+      {(showTime || (post.status === 'postado' && reactions != null)) && (
         <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-          <Clock className="h-2.5 w-2.5" />
-          <span>{time}</span>
+          {showTime && (
+            <>
+              <Clock className="h-2.5 w-2.5" />
+              <span>{time}</span>
+            </>
+          )}
+          {post.status === 'postado' && reactions != null && (
+            <span className="ml-auto flex items-center gap-1.5">
+              <span className="flex items-center gap-0.5 text-rose-500">
+                <Heart className="h-2.5 w-2.5" />
+                {reactions}
+              </span>
+              {comments != null && (
+                <span className="flex items-center gap-0.5 text-blue-500">
+                  <MessageCircle className="h-2.5 w-2.5" />
+                  {comments}
+                </span>
+              )}
+            </span>
+          )}
         </div>
       )}
 
