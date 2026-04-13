@@ -48,6 +48,7 @@ const ptBR = {
     changePhoto: 'Mudar foto',
     viewProfile: 'Ver Perfil',
     allRightsReserved: 'Todos os direitos reservados.',
+    viewAll: 'Ver todos',
   },
 
   // ══════════════════════════════════════════════

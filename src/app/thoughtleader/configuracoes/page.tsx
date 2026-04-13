@@ -53,16 +53,30 @@ function TLSettingsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileData>({ name: '', email: '', company: '' });
 
-  const fetchData = useCallback(async (userId: string) => {
+  const fetchData = useCallback(async (userId: string, companyId?: string) => {
     try {
       setIsLoading(true);
       const userDoc = await getDoc(doc(db, 'users', userId));
       if (userDoc.exists()) {
         const data = userDoc.data();
+
+        // Fetch company name from companies collection (user doc may not have it)
+        let companyName = data.companyName || '';
+        if (!companyName && companyId) {
+          try {
+            const companyDoc = await getDoc(doc(db, 'companies', companyId));
+            if (companyDoc.exists()) {
+              companyName = companyDoc.data()?.companyName || companyDoc.data()?.name || '';
+            }
+          } catch {
+            // Fallback — company name stays empty
+          }
+        }
+
         setProfile({
           name: data.profile?.name || data.name || '',
           email: data.profile?.email || data.email || '',
-          company: data.companyName || '',
+          company: companyName,
           photoURL: data.photoURL || '',
         });
       }
@@ -79,12 +93,12 @@ function TLSettingsContent() {
   }, [toast]);
 
   useEffect(() => {
-    if (currentUserId) fetchData(currentUserId);
-  }, [currentUserId, fetchData]);
+    if (currentUserId) fetchData(currentUserId, authUser?.companyId);
+  }, [currentUserId, authUser?.companyId, fetchData]);
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <Header title={t.adminSettings.title} />
       <main className="flex-1 p-6 md:p-10">
         <div className="mx-auto max-w-4xl space-y-8">
           <div>
@@ -153,7 +167,7 @@ function TLSettingsContent() {
 
 export default function TLSettingsPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen flex-col"><Header /><main className="flex-1 p-6 md:p-10"><div className="mx-auto max-w-4xl"><SettingsSkeleton /></div></main></div>}>
+    <Suspense fallback={<div className="flex min-h-screen flex-col"><Header title="Configurações" /><main className="flex-1 p-6 md:p-10"><div className="mx-auto max-w-4xl"><SettingsSkeleton /></div></main></div>}>
       <TLSettingsContent />
     </Suspense>
   );

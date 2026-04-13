@@ -50,6 +50,7 @@ const en: Dictionary = {
     changePhoto: 'Change photo',
     viewProfile: 'View Profile',
     allRightsReserved: 'All rights reserved.',
+    viewAll: 'View all',
   },
 
   // ══════════════════════════════════════════════
