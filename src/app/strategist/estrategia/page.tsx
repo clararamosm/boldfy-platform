@@ -75,7 +75,18 @@ export default function StrategistEstrategiaPage() {
 
       const result = await getContentStrategy(token, tlId);
       if (result.data) {
-        setData({ ...emptyStrategy(), ...result.data });
+        // Normalize pillars: ensure new fields exist (migrate from legacy subtitle/series)
+        const loaded = { ...emptyStrategy(), ...result.data };
+        if (loaded.pillars) {
+          loaded.pillars = loaded.pillars.map(p => ({
+            ...p,
+            purpose: p.purpose || '',
+            audienceObjective: p.audienceObjective || '',
+            businessObjective: p.businessObjective || '',
+            contentExamples: p.contentExamples?.length ? p.contentExamples : ['', '', ''],
+          }));
+        }
+        setData(loaded);
       } else if (result.error) {
         toast({ variant: 'destructive', title: 'Erro', description: result.error });
       }
@@ -114,7 +125,8 @@ export default function StrategistEstrategiaPage() {
       }
     } catch (err) {
       console.error('Error saving strategy:', err);
-      toast({ variant: 'destructive', title: 'Erro ao salvar.' });
+      const errMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      toast({ variant: 'destructive', title: 'Erro ao salvar', description: errMsg });
     } finally {
       setIsSaving(false);
     }
