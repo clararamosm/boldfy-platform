@@ -139,7 +139,10 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange, onForceS
         <Label className="text-xs text-muted-foreground">Data</Label>
         <Input
           type="date"
-          value={post.scheduledFor ? post.scheduledFor.split('T')[0] : ''}
+          value={post.scheduledFor ? (() => {
+            const d = new Date(post.scheduledFor);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          })() : ''}
           onChange={(e) => {
             const dateVal = e.target.value;
             if (dateVal) {
@@ -148,7 +151,9 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange, onForceS
                 ? post.scheduledFor.split('T')[1]?.replace(/Z$/, '').substring(0, 5)
                 : null;
               const time = existingTime || '09:00';
-              onPropertyChange('scheduledFor', `${dateVal}T${time}:00.000`);
+              // Build as local date → convert to UTC ISO string
+              const localDate = new Date(`${dateVal}T${time}:00`);
+              onPropertyChange('scheduledFor', localDate.toISOString());
             } else {
               onPropertyChange('scheduledFor', null);
             }
@@ -164,17 +169,27 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange, onForceS
           type="time"
           value={
             post.scheduledFor?.includes('T')
-              ? post.scheduledFor.split('T')[1]?.replace(/Z$/, '').substring(0, 5) || ''
+              ? (() => {
+                  // Convert stored UTC ISO back to local time for display
+                  const d = new Date(post.scheduledFor!);
+                  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                })()
               : ''
           }
           onChange={(e) => {
             const timeVal = e.target.value;
             const dateVal = post.scheduledFor ? post.scheduledFor.split('T')[0] : '';
             if (dateVal && timeVal) {
-              onPropertyChange('scheduledFor', `${dateVal}T${timeVal}:00.000`);
+              // Build as local date → convert to UTC ISO string
+              // Use the displayed local date, not the raw ISO date part
+              const existingDate = new Date(post.scheduledFor!);
+              const [hh, mm] = timeVal.split(':').map(Number);
+              existingDate.setHours(hh, mm, 0, 0);
+              onPropertyChange('scheduledFor', existingDate.toISOString());
             } else if (dateVal && !timeVal) {
-              // User cleared the time — keep date with no time
-              onPropertyChange('scheduledFor', `${dateVal}T00:00:00.000`);
+              const existingDate = new Date(post.scheduledFor!);
+              existingDate.setHours(0, 0, 0, 0);
+              onPropertyChange('scheduledFor', existingDate.toISOString());
             }
           }}
           disabled={!post.scheduledFor}
