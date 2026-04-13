@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ClipboardPaste, Loader2 } from 'lucide-react';
+import { ClipboardPaste, HelpCircle, Loader2, Copy, Check } from 'lucide-react';
 import type { BrandManualData } from '@/app/actions/content-strategy';
 
 // ────────────────────────────────────────────
@@ -267,14 +267,78 @@ export function parseBrandManualText(rawText: string): Partial<BrandManualData> 
 // Component
 // ────────────────────────────────────────────
 
+const TEMPLATE_TEXT = `## Personalidade da Marca
+[Descrição geral de quem é a pessoa no mercado — 2-3 parágrafos]
+
+### Atributos
+1. Nome do Atributo — Descrição de como esse atributo se manifesta
+2. Nome do Atributo — Descrição de como esse atributo se manifesta
+3. Nome do Atributo — Descrição de como esse atributo se manifesta
+
+## Mindset
+1. Nome do Princípio — Explicação do princípio e por que importa
+2. Nome do Princípio — Explicação do princípio e por que importa
+3. Nome do Princípio — Explicação do princípio e por que importa
+4. Nome do Princípio — Explicação do princípio e por que importa
+5. Nome do Princípio — Explicação do princípio e por que importa
+
+## Arquétipos
+Primário: Nome do Arquétipo
+Como se manifesta no conteúdo e comunicação da marca.
+
+Secundário: Nome do Arquétipo
+Como complementa o primário e quando aparece.
+
+## Tom de Voz
+1. Nome do Tom — Quando e como aparece na comunicação
+2. Nome do Tom — Quando e como aparece na comunicação
+3. Nome do Tom — Quando e como aparece na comunicação
+4. Nome do Tom — Quando e como aparece na comunicação
+
+## Estilo de Escrita
+1. Estrutura — Como organiza os textos
+2. Complexidade — Nível de linguagem e uso de jargões
+3. Foco do Conteúdo — Ponto focal principal
+4. Abordagem — Como os tópicos são tratados
+
+## Do's & Don'ts
+✅ Primeira boa prática a seguir
+✅ Segunda boa prática a seguir
+✅ Terceira boa prática a seguir
+✅ Quarta boa prática a seguir
+✅ Quinta boa prática a seguir
+🚫 Primeira coisa a evitar
+🚫 Segunda coisa a evitar
+🚫 Terceira coisa a evitar
+🚫 Quarta coisa a evitar
+🚫 Quinta coisa a evitar
+
+## Vocabulário
+### Palavras-chave
+- Palavra 1
+- Palavra 2
+- Palavra 3
+
+### Expressões
+- Expressão ou frase assinatura 1
+- Expressão ou frase assinatura 2
+
+## Resumo
+Posicionamento: Como essa pessoa se posiciona no mercado
+Proposta de Valor: O valor único que entrega à audiência
+Diferencial: O que diferencia das demais vozes
+Missão: A missão que guia a comunicação`;
+
 type BrandManualImporterProps = {
   onImport: (data: Partial<BrandManualData>) => void;
 };
 
 export function BrandManualImporter({ onImport }: BrandManualImporterProps) {
   const [open, setOpen] = useState(false);
+  const [showTemplate, setShowTemplate] = useState(false);
   const [text, setText] = useState('');
   const [isParsing, setIsParsing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleImport = () => {
     if (!text.trim()) return;
@@ -287,42 +351,103 @@ export function BrandManualImporter({ onImport }: BrandManualImporterProps) {
       setIsParsing(false);
       setText('');
       setOpen(false);
+      setShowTemplate(false);
     }, 100);
   };
 
+  const handleCopyTemplate = async () => {
+    await navigator.clipboard.writeText(TEMPLATE_TEXT);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <ClipboardPaste className="h-4 w-4" />
-          Importar Texto
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Importar Manual de Marca</DialogTitle>
-          <DialogDescription>
-            Cole o texto completo do manual de marca abaixo. As seções serão
-            identificadas automaticamente e os campos preenchidos.
-          </DialogDescription>
-        </DialogHeader>
-        <Textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={`Cole aqui o texto completo do Manual de Marca...\n\nExemplo de formato esperado:\n\n## Personalidade da Marca\nQuem é [nome] no mercado...\n\n## Mindset\n1. Princípio — Descrição...\n\n## Arquétipos\nPrimário: Nome — Descrição...\n\n## Tom de Voz\n1. Tom — Descrição...\n\n## Estilo de Escrita\n...\n\n## Do's & Don'ts\n✅ Fazer...\n🚫 Evitar...\n\n## Vocabulário\nPalavras-chave...\n\n## Resumo\nPosicionamento: ...\nProposta de Valor: ...`}
-          className="flex-1 min-h-[300px] font-mono text-sm"
-          disabled={isParsing}
-        />
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)} disabled={isParsing}>
-            Cancelar
+    <div className="flex items-center gap-1.5">
+      {/* Template info button */}
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Ver template de formatação">
+            <HelpCircle className="h-4 w-4" />
           </Button>
-          <Button onClick={handleImport} disabled={isParsing || !text.trim()}>
-            {isParsing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Preencher Campos
+        </DialogTrigger>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Template de Formatação</DialogTitle>
+            <DialogDescription>
+              Use este template para formatar o manual de marca antes de importar.
+              Copie, preencha as seções e cole no botão &quot;Importar Texto&quot;.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            <pre className="bg-muted/50 border rounded-lg p-4 text-xs font-mono whitespace-pre-wrap leading-relaxed">{TEMPLATE_TEXT}</pre>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyTemplate}>
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? 'Copiado!' : 'Copiar Template'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import dialog */}
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setShowTemplate(false); }}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2">
+            <ClipboardPaste className="h-4 w-4" />
+            Importar Texto
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogTrigger>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Importar Manual de Marca</DialogTitle>
+            <DialogDescription>
+              Cole o texto completo do manual de marca abaixo. As seções serão
+              identificadas automaticamente e os campos preenchidos.
+            </DialogDescription>
+          </DialogHeader>
+
+          {showTemplate && (
+            <div className="border rounded-lg bg-muted/30 p-3 max-h-[200px] overflow-auto">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground">Template de referência</span>
+                <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={handleCopyTemplate}>
+                  {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                  {copied ? 'Copiado' : 'Copiar'}
+                </Button>
+              </div>
+              <pre className="text-[10px] font-mono whitespace-pre-wrap leading-relaxed text-muted-foreground">{TEMPLATE_TEXT}</pre>
+            </div>
+          )}
+
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Cole aqui o texto completo do Manual de Marca..."
+            className="flex-1 min-h-[300px] font-mono text-sm"
+            disabled={isParsing}
+          />
+          <DialogFooter className="flex-row justify-between sm:justify-between">
+            <Button
+              variant="link"
+              size="sm"
+              className="text-xs text-muted-foreground px-0"
+              onClick={() => setShowTemplate(!showTemplate)}
+            >
+              {showTemplate ? 'Ocultar template' : 'Ver template de formatação'}
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setOpen(false)} disabled={isParsing}>
+                Cancelar
+              </Button>
+              <Button onClick={handleImport} disabled={isParsing || !text.trim()}>
+                {isParsing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Preencher Campos
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
