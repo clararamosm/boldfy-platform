@@ -24,32 +24,6 @@ type Props = {
 
 // ─── Utilities ──────────────────────────────────────────
 
-/** Strip HTML tags to get plain text (preserving line breaks as \n) */
-function htmlToPlainText(html: string): string {
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || '';
-}
-
-/**
- * Walk DOM tree to compute text offset of a given node+offset pair
- * relative to a container element.
- */
-function getTextOffset(container: Node, targetNode: Node, targetOffset: number): number {
-  let offset = 0;
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-
-  let node = walker.nextNode();
-  while (node) {
-    if (node === targetNode) {
-      return offset + targetOffset;
-    }
-    offset += (node.textContent || '').length;
-    node = walker.nextNode();
-  }
-  return offset + targetOffset;
-}
-
 type HighlightAnchor = {
   commentId: string;
   startOffset: number;
@@ -57,57 +31,129 @@ type HighlightAnchor = {
 };
 
 /**
- * Insert <mark> tags into HTML based on text offsets from anchors.
- * Works on plain text positions and re-wraps into the HTML structure.
+ * Walk DOM text nodes to compute the absolute text offset
+ * of a given (node, offset) pair relative to a container.
  */
-function applyHighlights(
-  html: string,
-  anchors: HighlightAnchor[],
-  activeCommentId?: string | null
-): string {
-  if (anchors.length === 0) return html;
+function getTextOffset(container: Node, targetNode: Node, targetOffset: number): number {
+  let total = 0;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
 
-  const plainText = htmlToPlainText(html);
-
-  // Sort anchors by startOffset (handle overlaps by processing from end)
-  const sorted = [...anchors].sort((a, b) => a.startOffset - b.startOffset);
-
-  // Build highlighted plain text with mark tags
-  let result = '';
-  let cursor = 0;
-
-  for (const anchor of sorted) {
-    const start = Math.max(anchor.startOffset, cursor);
-    const end = Math.min(anchor.endOffset, plainText.length);
-    if (start >= end) continue;
-
-    // Text before this highlight
-    result += escapeHtml(plainText.slice(cursor, start));
-
-    // The highlighted portion
-    const isActive = activeCommentId === anchor.commentId;
-    const cls = isActive
-      ? 'inline-highlight inline-highlight--active'
-      : 'inline-highlight';
-    result += `<mark class="${cls}" data-comment-id="${anchor.commentId}">${escapeHtml(plainText.slice(start, end))}</mark>`;
-    cursor = end;
+  let node = walker.nextNode();
+  while (node) {
+    if (node === targetNode) {
+      return total + targetOffset;
+    }
+    total += (node.textContent || '').length;
+    node = walker.nextNode();
   }
-
-  // Remaining text
-  result += escapeHtml(plainText.slice(cursor));
-
-  // Convert newlines to <br>
-  result = result.replace(/\n/g, '<br>');
-
-  return result;
+  // Fallback: targetNode not found (e.g. element node with child offset)
+  // Walk children up to targetOffset
+  if (targetNode.nodeType === Node.ELEMENT_NODE) {
+    const children = targetNode.childNodes;
+    let counted = 0;
+    for (let i = 0; i < Math.min(targetOffset, children.length); i++) {
+      counted += (children[i].textContent || '').length;
+    }
+    // Now find this position relative to container
+    let containerOffset = 0;
+    const containerWalker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    let n = containerWalker.nextNode();
+    while (n) {
+      if (targetNode.contains(n)) {
+        // Found the start of targetNode's text in container
+        return containerOffset + counted;
+      }
+      containerOffset += (n.textContent || '').length;
+      n = containerWalker.nextNode();
+    }
+    return containerOffset + counted;
+  }
+  return total + targetOffset;
 }
 
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+/**
+ * Apply <mark> highlights to a DOM container using text offsets.
+ * This mutates the DOM directly instead of string manipulation,
+ * which preserves all HTML structure (<br>, <p>, <div>, etc).
+ */
+function applyHighlightsToDOM(
+  container: HTMLElement,
+  anchors: HighlightAnchor[],
+  activeCommentId?: string | null
+) {
+  if (anchors.length === 0) return;
+
+  // Sort by startOffset descending so we process from end → start
+  // This prevents earlier insertions from shifting later offsets
+  const sorted = [...anchors].sort((a, b) => b.startOffset - a.startOffset);
+
+  for (const anchor of sorted) {
+    wrapTextRange(container, anchor.startOffset, anchor.endOffset, anchor.commentId, activeCommentId === anchor.commentId);
+  }
+}
+
+/**
+ * Wrap a text range [start, end) in a <mark> element within a DOM tree.
+ * Walks text nodes and splits/wraps as needed.
+ */
+function wrapTextRange(
+  container: HTMLElement,
+  start: number,
+  end: number,
+  commentId: string,
+  isActive: boolean,
+) {
+  if (start >= end) return;
+
+  // Collect text nodes with their absolute offsets
+  const textNodes: { node: Text; start: number; end: number }[] = [];
+  let offset = 0;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    const len = (node.textContent || '').length;
+    textNodes.push({ node: node as Text, start: offset, end: offset + len });
+    offset += len;
+    node = walker.nextNode();
+  }
+
+  // Find text nodes that overlap with [start, end)
+  const overlapping = textNodes.filter(
+    tn => tn.end > start && tn.start < end
+  );
+
+  if (overlapping.length === 0) return;
+
+  const cls = isActive ? 'inline-highlight inline-highlight--active' : 'inline-highlight';
+
+  // Process in reverse to avoid offset shifting
+  for (let i = overlapping.length - 1; i >= 0; i--) {
+    const tn = overlapping[i];
+    const wrapStart = Math.max(start - tn.start, 0);
+    const wrapEnd = Math.min(end - tn.start, tn.node.length);
+
+    if (wrapStart >= wrapEnd) continue;
+
+    // Split the text node if we don't wrap the whole thing
+    let targetNode = tn.node;
+
+    // Split off the "after" part
+    if (wrapEnd < targetNode.length) {
+      targetNode.splitText(wrapEnd);
+    }
+
+    // Split off the "before" part
+    if (wrapStart > 0) {
+      targetNode = targetNode.splitText(wrapStart);
+    }
+
+    // Wrap targetNode in <mark>
+    const mark = document.createElement('mark');
+    mark.className = cls;
+    mark.setAttribute('data-comment-id', commentId);
+    targetNode.parentNode?.replaceChild(mark, targetNode);
+    mark.appendChild(targetNode);
+  }
 }
 
 // ─── Component ──────────────────────────────────────────
@@ -128,16 +174,34 @@ export function PostBodyEditor({
     anchor: AnchorData;
   } | null>(null);
 
-  // Close popup when clicking outside or scrolling
+  // Apply highlights via DOM manipulation after render
+  useEffect(() => {
+    if (canEdit || !containerRef.current) return;
+
+    const highlightAnchors: HighlightAnchor[] = comments
+      .filter(c => !c.resolved && c.anchor && c.anchor.field === 'caption')
+      .map(c => ({
+        commentId: c.id,
+        startOffset: c.anchor!.startOffset,
+        endOffset: c.anchor!.endOffset,
+      }));
+
+    if (highlightAnchors.length > 0) {
+      applyHighlightsToDOM(containerRef.current, highlightAnchors, activeCommentId);
+    }
+  // Re-apply when comments or value changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit, comments, activeCommentId, value]);
+
+  // Close popup when scrolling
   useEffect(() => {
     if (!selectionPopup) return;
-
     const handleDismiss = () => setSelectionPopup(null);
     window.addEventListener('scroll', handleDismiss, true);
     return () => window.removeEventListener('scroll', handleDismiss, true);
   }, [selectionPopup]);
 
-  // Close popup on any click outside the popup itself
+  // Close popup on mousedown outside popup
   useEffect(() => {
     if (!selectionPopup) return;
 
@@ -148,7 +212,6 @@ export function PostBodyEditor({
       }
     };
 
-    // Delay to avoid immediately closing from the mouseup that opened it
     const timeout = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
     }, 100);
@@ -163,39 +226,43 @@ export function PostBodyEditor({
   const handleMouseUp = useCallback(() => {
     if (!containerRef.current || !onAddInlineComment) return;
 
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !selection.rangeCount) {
-      return;
-    }
+    // Small delay so the browser finalizes the selection
+    setTimeout(() => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || !selection.rangeCount) {
+        return;
+      }
 
-    const range = selection.getRangeAt(0);
+      const range = selection.getRangeAt(0);
 
-    // Make sure selection is within our container
-    if (!containerRef.current.contains(range.commonAncestorContainer)) {
-      return;
-    }
+      // Make sure selection is within our container
+      if (!containerRef.current!.contains(range.commonAncestorContainer)) {
+        return;
+      }
 
-    const selectedText = selection.toString().trim();
-    if (!selectedText || selectedText.length < 2) return;
+      const selectedText = selection.toString().trim();
+      if (!selectedText || selectedText.length < 2) return;
 
-    // Calculate text offsets relative to plain text
-    const startOffset = getTextOffset(containerRef.current, range.startContainer, range.startOffset);
-    const endOffset = getTextOffset(containerRef.current, range.endContainer, range.endOffset);
+      // Calculate text offsets relative to container's text content
+      const startOffset = getTextOffset(containerRef.current!, range.startContainer, range.startOffset);
+      const endOffset = startOffset + selectedText.length;
 
-    // Get popup position from selection rect
-    const rect = range.getBoundingClientRect();
-    const containerRect = containerRef.current.getBoundingClientRect();
+      // Get popup position from selection rect
+      const rect = range.getBoundingClientRect();
+      const containerRect = containerRef.current!.getBoundingClientRect();
 
-    setSelectionPopup({
-      x: rect.left - containerRect.left + rect.width / 2,
-      y: rect.top - containerRect.top - 8,
-      anchor: {
-        field: 'caption',
-        startOffset,
-        endOffset,
-        selectedText,
-      },
-    });
+      setSelectionPopup({
+        x: rect.left - containerRect.left + rect.width / 2,
+        y: rect.top - containerRect.top - 8,
+        anchor: {
+          field: 'caption',
+          startOffset,
+          endOffset,
+          selectedText,
+        },
+      });
+      // Do NOT clear selection — let it remain visible
+    }, 10);
   }, [onAddInlineComment]);
 
   // Handle click on existing highlight
@@ -206,6 +273,7 @@ export function PostBodyEditor({
       const commentId = mark.getAttribute('data-comment-id');
       if (commentId) {
         onHighlightClick(commentId);
+        e.preventDefault();
       }
     }
   }, [onHighlightClick]);
@@ -235,17 +303,6 @@ export function PostBodyEditor({
       );
     }
 
-    // Build highlight anchors from unresolved comments
-    const highlightAnchors: HighlightAnchor[] = comments
-      .filter(c => !c.resolved && c.anchor && c.anchor.field === 'caption')
-      .map(c => ({
-        commentId: c.id,
-        startOffset: c.anchor!.startOffset,
-        endOffset: c.anchor!.endOffset,
-      }));
-
-    const htmlWithHighlights = applyHighlights(sanitized, highlightAnchors, activeCommentId);
-
     return (
       <div className="relative py-4">
         {/* Inline highlight styles */}
@@ -269,7 +326,7 @@ export function PostBodyEditor({
         <div
           ref={containerRef}
           className="prose prose-sm max-w-none select-text"
-          dangerouslySetInnerHTML={{ __html: htmlWithHighlights }}
+          dangerouslySetInnerHTML={{ __html: sanitized }}
           onMouseUp={handleMouseUp}
           onClick={handleClick}
         />
@@ -282,6 +339,7 @@ export function PostBodyEditor({
           >
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()} // Prevent stealing focus/selection
               onClick={handleCommentClick}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium shadow-lg hover:opacity-90 transition-opacity whitespace-nowrap"
             >
@@ -300,8 +358,6 @@ export function PostBodyEditor({
 
   // ─── Edit mode (strategist) ──────────────────────────
 
-  // In edit mode, show highlights overlay is complex with contentEditable.
-  // For now, strategist sees comments in the sidebar with anchor quotes.
   return (
     <div className="py-2">
       <SimpleRichEditor
