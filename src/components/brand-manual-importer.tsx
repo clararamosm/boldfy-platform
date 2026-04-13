@@ -48,7 +48,11 @@ function splitSections(text: string, pattern: RegExp): Array<{ heading: string; 
 
 /**
  * Extract numbered or bulleted list items from text.
- * Supports: "1. Title — Description", "- Title: Description", "• Title - Description"
+ * Supports many formats:
+ *   "1. Title — Description"
+ *   "- Title: Description"
+ *   "1. Title, description continues here"
+ *   "• Title – Description"
  * Returns [{ title, description }].
  */
 function extractTitleDescPairs(text: string): Array<{ title: string; description: string }> {
@@ -59,22 +63,42 @@ function extractTitleDescPairs(text: string): Array<{ title: string; description
   let currentDesc = '';
 
   for (const line of lines) {
-    // Match patterns like: "1. Title — Desc", "- Title: Desc", "• Title – Desc", "**Title** — Desc"
-    const match = line.match(
-      /^(?:\d+[\.\)]\s*|\-\s*|\•\s*|\*\s*)?(?:\*\*)?([^:—–\-\n*]+?)(?:\*\*)?\s*(?:[:—–\-])\s*(.+)/
+    // Strip markdown bold
+    const clean = line.replace(/\*\*/g, '');
+
+    // Try: "1. Title — Desc", "- Title: Desc", "• Title – Desc"
+    const matchSep = clean.match(
+      /^(?:\d+[\.\)]\s*|\-\s*|\•\s*|\*\s*)?([^:—–\n]+?)\s*(?:[:—–])\s*(.+)/
     );
-    if (match) {
+    if (matchSep) {
       if (currentTitle) pairs.push({ title: currentTitle.trim(), description: currentDesc.trim() });
-      currentTitle = match[1];
-      currentDesc = match[2];
-    } else if (/^(?:\d+[\.\)]\s*|\-\s*|\•\s*|\*\s*)/.test(line)) {
-      // Numbered/bulleted line without separator — use whole line as title
+      currentTitle = matchSep[1].trim();
+      currentDesc = matchSep[2].trim();
+      continue;
+    }
+
+    // Try: "1. Title, description continues" (comma as separator, first part <= 40 chars)
+    const matchComma = clean.match(
+      /^(?:\d+[\.\)]\s*|\-\s*|\•\s*|\*\s*)([^,\n]{2,40}),\s*(.+)/
+    );
+    if (matchComma) {
       if (currentTitle) pairs.push({ title: currentTitle.trim(), description: currentDesc.trim() });
-      currentTitle = line.replace(/^(?:\d+[\.\)]\s*|\-\s*|\•\s*|\*\s*)/, '').replace(/^\*\*|\*\*$/g, '');
+      currentTitle = matchComma[1].trim();
+      currentDesc = matchComma[2].trim();
+      continue;
+    }
+
+    // Numbered/bulleted line without any separator — use whole line as title
+    if (/^(?:\d+[\.\)]\s*|\-\s*|\•\s*|\*\s*)/.test(clean)) {
+      if (currentTitle) pairs.push({ title: currentTitle.trim(), description: currentDesc.trim() });
+      currentTitle = clean.replace(/^(?:\d+[\.\)]\s*|\-\s*|\•\s*|\*\s*)/, '').trim();
       currentDesc = '';
-    } else if (currentTitle) {
-      // Continuation line
-      currentDesc += ' ' + line;
+      continue;
+    }
+
+    // Continuation line (no bullet/number prefix)
+    if (currentTitle) {
+      currentDesc += (currentDesc ? ' ' : '') + clean;
     }
   }
   if (currentTitle) pairs.push({ title: currentTitle.trim(), description: currentDesc.trim() });
@@ -116,26 +140,74 @@ function headingMatches(heading: string, keywords: string[]): boolean {
 // Main parser
 // ────────────────────────────────────────────
 
+// Known section names to search for (order matters — first match wins).
+// Each entry: [keywords to match, canonical key].
+const KNOWN_SECTIONS: Array<[string[], string]> = [
+  [['personalidade da marca', 'personalidade', 'personality'], 'personalidade'],
+  [['mindset', 'mentalidade'], 'mindset'],
+  [['arquetipos', 'arquétipos', 'archetypes', 'arquetipo'], 'arquetipos'],
+  [['tom de voz', 'tone of voice'], 'tom'],
+  [['estilo de escrita', 'estilo', 'linguagem e estilo', 'language style'], 'estilo'],
+  [['do\'s & don\'ts', 'dos & don\'ts', 'dos e don\'ts', 'do\'s & don\'ts', 'boas praticas', 'boas práticas', 'do s don t'], 'dos_donts'],
+  [['vocabulario', 'vocabulário', 'vocabulary', 'palavras-chave'], 'vocabulario'],
+  [['resumo', 'summary'], 'resumo'],
+];
+
+/**
+ * Find section boundaries in the text by looking for known headings.
+ * Works with any format: "## Heading", "**Heading**", or plain "Heading" on its own line.
+ */
+function findSections(text: string): Array<{ key: string; heading: string; body: string }> {
+  const lines = text.split('\n');
+  const found: Array<{ key: string; heading: string; lineIndex: number }> = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    // Strip markdown formatting from the line for matching
+    const raw = lines[i]
+      .replace(/^#{1,4}\s*/, '')    // remove ## prefixes
+      .replace(/\*\*/g, '')         // remove bold markers
+      .trim();
+
+    if (!raw || raw.length > 60) continue; // Skip long lines (body text, not headings)
+
+    const normalised = norm(raw);
+
+    for (const [keywords, key] of KNOWN_SECTIONS) {
+      // Check if already found (first match wins)
+      if (found.some(f => f.key === key)) continue;
+
+      const matches = keywords.some(kw => {
+        const nkw = norm(kw);
+        return normalised === nkw || normalised.startsWith(nkw);
+      });
+
+      if (matches) {
+        found.push({ key, heading: raw, lineIndex: i });
+        break;
+      }
+    }
+  }
+
+  // Sort by line index and extract bodies (text between headings)
+  found.sort((a, b) => a.lineIndex - b.lineIndex);
+
+  return found.map((sec, idx) => {
+    const startLine = sec.lineIndex + 1;
+    const endLine = idx < found.length - 1 ? found[idx + 1].lineIndex : lines.length;
+    const body = lines.slice(startLine, endLine).join('\n').trim();
+    return { key: sec.key, heading: sec.heading, body };
+  });
+}
+
 export function parseBrandManualText(rawText: string): Partial<BrandManualData> {
   const result: Partial<BrandManualData> = {};
+  const sections = findSections(rawText);
 
-  // Split into top-level sections by markdown headings (##, ###) or **bold headings**
-  const headingPattern = /\n(?:#{1,3}\s+(.+?)(?:\n|$)|\*\*\s*(\d+[\.\)]\s*)?(.+?)\s*\*\*\s*(?:\n|$))/;
-  const sections = splitSections('\n' + rawText, headingPattern);
-
-  // Merge heading captures (either from # or **)
-  const normalised = sections.map(s => ({
-    heading: s.heading,
-    body: s.body,
-  }));
-
-  for (const { heading, body } of normalised) {
-    const h = norm(heading);
-
+  for (const { key, body } of sections) {
     // ── Personalidade ──
-    if (headingMatches(heading, ['personalidade', 'personality'])) {
+    if (key === 'personalidade') {
       // Body may contain "Atributos" subsection
-      const attrSplit = body.split(/(?:atributos|attributes|top\s*3)/i);
+      const attrSplit = body.split(/\n\s*(?:#{1,3}\s*)?(?:\*\*)?(?:atributos|attributes|top\s*3\s*atributos?)(?:\*\*)?\s*\n?/i);
       const description = trimLines(attrSplit[0] || '');
       const attrText = attrSplit[1] || '';
       const attributes = extractTitleDescPairs(attrText);
@@ -147,39 +219,49 @@ export function parseBrandManualText(rawText: string): Partial<BrandManualData> 
     }
 
     // ── Mindset ──
-    else if (headingMatches(heading, ['mindset', 'mentalidade', 'principio'])) {
+    else if (key === 'mindset') {
       const items = extractTitleDescPairs(body);
       if (items.length > 0) result.mindset = items;
     }
 
     // ── Arquétipos ──
-    else if (headingMatches(heading, ['arquetipo', 'archetype'])) {
-      const primaryMatch = body.match(/(?:prim[aá]rio|primary)\s*[:\-—–]?\s*\*?\*?([^*\n]+)/i);
-      const secondaryMatch = body.match(/(?:secund[aá]rio|secondary)\s*[:\-—–]?\s*\*?\*?([^*\n]+)/i);
-
-      // Try to extract descriptions after the titles
+    else if (key === 'arquetipos') {
       const lines = body.split('\n').map(l => l.trim()).filter(Boolean);
-      let primaryTitle = primaryMatch?.[1]?.trim() || '';
+      let primaryTitle = '';
       let primaryDesc = '';
-      let secondaryTitle = secondaryMatch?.[1]?.trim() || '';
+      let secondaryTitle = '';
       let secondaryDesc = '';
 
       let phase: 'none' | 'primary' | 'secondary' = 'none';
       for (const line of lines) {
-        if (/prim[aá]rio|primary/i.test(line)) {
+        const cleanLine = line.replace(/\*\*/g, '');
+        if (/prim[aá]rio/i.test(cleanLine)) {
           phase = 'primary';
-          const titleMatch = line.match(/[:\-—–]\s*(.+)/);
-          if (titleMatch) primaryTitle = titleMatch[1].replace(/\*\*/g, '').trim();
+          // Extract title: "Primário: Sábio" or "Primário — Sábio"
+          const titleMatch = cleanLine.match(/prim[aá]rio\s*[:\-—–]\s*(.+)/i);
+          if (titleMatch) primaryTitle = titleMatch[1].trim();
+          else {
+            // Title might be the rest of the line after "Primário"
+            const rest = cleanLine.replace(/.*prim[aá]rio\s*/i, '').trim();
+            if (rest) primaryTitle = rest;
+          }
           continue;
         }
-        if (/secund[aá]rio|secondary/i.test(line)) {
+        if (/secund[aá]rio/i.test(cleanLine)) {
           phase = 'secondary';
-          const titleMatch = line.match(/[:\-—–]\s*(.+)/);
-          if (titleMatch) secondaryTitle = titleMatch[1].replace(/\*\*/g, '').trim();
+          const titleMatch = cleanLine.match(/secund[aá]rio\s*[:\-—–]\s*(.+)/i);
+          if (titleMatch) secondaryTitle = titleMatch[1].trim();
+          else {
+            const rest = cleanLine.replace(/.*secund[aá]rio\s*/i, '').trim();
+            if (rest) secondaryTitle = rest;
+          }
           continue;
         }
-        if (phase === 'primary') primaryDesc += line + ' ';
-        else if (phase === 'secondary') secondaryDesc += line + ' ';
+        // Skip "Arquétipo em Ação" sub-header and table rows
+        if (/em a[cç][aã]o/i.test(cleanLine)) break;
+
+        if (phase === 'primary') primaryDesc += cleanLine + ' ';
+        else if (phase === 'secondary') secondaryDesc += cleanLine + ' ';
       }
 
       result.archetypes = {
@@ -189,22 +271,38 @@ export function parseBrandManualText(rawText: string): Partial<BrandManualData> 
     }
 
     // ── Tom de Voz ──
-    else if (headingMatches(heading, ['tom de voz', 'tone of voice', 'tom'])) {
+    else if (key === 'tom') {
       const items = extractTitleDescPairs(body);
       if (items.length > 0) result.toneOfVoice = items;
     }
 
     // ── Estilo de Escrita / Linguagem ──
-    else if (headingMatches(heading, ['estilo', 'linguagem', 'language', 'style', 'escrita'])) {
+    else if (key === 'estilo') {
       const items = extractTitleDescPairs(body);
       if (items.length > 0) result.languageStyle = items;
     }
 
-    // ── Do's & Don'ts / Boas Práticas ──
-    else if (headingMatches(heading, ['do s', 'don t', 'boas praticas', 'best practice', 'dos donts'])) {
-      const dosSection = body.split(/(?:don'?t|evitar|nao fazer|🚫)/i);
-      const dosText = dosSection[0] || '';
-      const dontsText = dosSection.slice(1).join('\n') || '';
+    // ── Do's & Don'ts ──
+    else if (key === 'dos_donts') {
+      // Split by 🚫 emoji — everything before is Do's, after is Don'ts
+      const firstProhibit = body.indexOf('🚫');
+      let dosText: string;
+      let dontsText: string;
+
+      if (firstProhibit >= 0) {
+        dosText = body.slice(0, firstProhibit);
+        dontsText = body.slice(firstProhibit);
+      } else {
+        // Try splitting by "Don't" or "Evitar" header
+        const splitMatch = body.match(/\n\s*(?:#{1,3}\s*)?(?:\*\*)?(?:don'?t|evitar|nao fazer)s?(?:\*\*)?\s*(?:\(.*?\))?\s*\n/i);
+        if (splitMatch && splitMatch.index !== undefined) {
+          dosText = body.slice(0, splitMatch.index);
+          dontsText = body.slice(splitMatch.index);
+        } else {
+          dosText = body;
+          dontsText = '';
+        }
+      }
 
       const dos = extractListItems(dosText);
       const donts = extractListItems(dontsText);
@@ -216,30 +314,37 @@ export function parseBrandManualText(rawText: string): Partial<BrandManualData> 
     }
 
     // ── Vocabulário ──
-    else if (headingMatches(heading, ['vocabulario', 'vocabulary', 'keyword', 'palavra'])) {
-      const evitarSplit = body.split(/(?:evitar|avoid|palavras?\s+(?:a\s+)?evitar)/i);
-      const keywordsText = evitarSplit[0] || '';
-      const expressionsText = evitarSplit[1] || body;
+    else if (key === 'vocabulario') {
+      // Split by "Expressões" or "Expressoes" sub-header
+      const exprSplit = body.split(/\n\s*(?:#{1,3}\s*)?(?:\*\*)?(?:express[oõ]es|expressions|frase\s+assinatura)(?:\*\*)?\s*\n?/i);
+      const keywordsText = exprSplit[0] || '';
+      const expressionsText = exprSplit.slice(1).join('\n') || '';
 
-      // Extract keywords from first section, expressions from "Frase Assinatura" or second part
-      const signatureSplit = keywordsText.split(/(?:frase\s+assinatura|signature)/i);
-      const rawKeywords = extractListItems(signatureSplit[0] || '');
-      const rawExpressions = extractListItems(expressionsText || '');
-      const signature = signatureSplit[1] ? extractListItems(signatureSplit[1]) : [];
+      // Remove sub-headers like "Palavras-chave" from keyword text
+      const cleanKeywordsText = keywordsText.replace(/(?:#{1,3}\s*)?(?:\*\*)?(?:palavras?[\s-]*chave)(?:\*\*)?\s*/gi, '');
+
+      const rawKeywords = extractListItems(cleanKeywordsText);
+      const rawExpressions = extractListItems(expressionsText);
 
       result.vocabulary = {
         keywords: rawKeywords.length > 0 ? rawKeywords : [''],
-        expressions: [...rawExpressions, ...signature].length > 0 ? [...rawExpressions, ...signature] : [''],
+        expressions: rawExpressions.length > 0 ? rawExpressions : [''],
       };
     }
 
-    // ── Resumo / Posicionamento ──
-    else if (headingMatches(heading, ['resumo', 'summary', 'posicionamento', 'positioning', 'proposta de valor', 'value proposition'])) {
-      // Try to find sub-fields
-      const posMatch = body.match(/(?:posicionamento|positioning)\s*[:\-—–]\s*(.+?)(?:\n|$)/i);
-      const valMatch = body.match(/(?:proposta de valor|value proposition)\s*[:\-—–]\s*(.+?)(?:\n|$)/i);
-      const difMatch = body.match(/(?:diferencial|differential|differentiator)\s*[:\-—–]\s*(.+?)(?:\n|$)/i);
-      const misMatch = body.match(/(?:miss[aã]o|mission)\s*[:\-—–]\s*(.+?)(?:\n|$)/i);
+    // ── Resumo ──
+    else if (key === 'resumo') {
+      // Multi-line field values: "Posicionamento: text that may span\nmultiple lines"
+      // Use greedy match up to next field label or end
+      const fieldPattern = (label: string) => {
+        const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`${escaped}\\s*[:\\-—–]\\s*([\\s\\S]*?)(?=\\n\\s*(?:Proposta de Valor|Diferencial|Miss[aã]o|Posicionamento)\\s*[:\\-—–]|$)`, 'i');
+      };
+
+      const posMatch = body.match(fieldPattern('Posicionamento'));
+      const valMatch = body.match(fieldPattern('Proposta de Valor'));
+      const difMatch = body.match(fieldPattern('Diferencial'));
+      const misMatch = body.match(fieldPattern('Miss[aã]o'));
 
       result.summary = {
         positioning: posMatch?.[1]?.trim() || '',
