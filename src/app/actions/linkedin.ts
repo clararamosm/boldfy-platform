@@ -323,19 +323,39 @@ export async function getLinkedInDashboardMetrics(
       }
     }
 
-    // 3. Get all published posts from Firestore
-    let postsQuery = adminDb
-      .collection('users')
-      .doc(userId)
-      .collection('scheduledPosts')
-      .where('status', '==', 'published')
-      .orderBy('updatedAt', 'desc')
-      .limit(50);
+    // 3. Get all published posts from both collections:
+    //    - scheduledPosts (colaboradores): status === 'published'
+    //    - contentPipeline (TLs):         status === 'postado'
+    const [scheduledSnap, pipelineSnap] = await Promise.all([
+      adminDb
+        .collection('users')
+        .doc(userId)
+        .collection('scheduledPosts')
+        .where('status', '==', 'published')
+        .orderBy('updatedAt', 'desc')
+        .limit(50)
+        .get(),
+      adminDb
+        .collection('users')
+        .doc(userId)
+        .collection('contentPipeline')
+        .where('status', '==', 'postado')
+        .orderBy('updatedAt', 'desc')
+        .limit(50)
+        .get(),
+    ]);
 
-    const postsSnap = await postsQuery.get();
+    // Merge both collections' docs, sort by updatedAt desc, and take top 50
+    const allDocs = [...scheduledSnap.docs, ...pipelineSnap.docs]
+      .sort((a, b) => {
+        const aDate = a.data().updatedAt || a.data().createdAt || '';
+        const bDate = b.data().updatedAt || b.data().createdAt || '';
+        return String(bDate).localeCompare(String(aDate));
+      })
+      .slice(0, 50);
 
     // Apply client-side date filtering (Firestore can't filter on two fields efficiently)
-    let filteredDocs = postsSnap.docs;
+    let filteredDocs = allDocs;
     if (dateRange) {
       const rangeStart = new Date(dateRange.start).getTime();
       const rangeEnd = new Date(dateRange.end).getTime();
