@@ -12,6 +12,7 @@ import { getAuthToken } from '@/lib/auth-client';
 import {
   getAllPipelinePostsForStrategist,
   updatePipelinePost,
+  deletePipelinePost,
   type CalendarPipelinePost,
   type PipelineStatus,
 } from '@/app/actions/content-pipeline';
@@ -220,6 +221,29 @@ export default function StrategistCalendarioPage() {
   // ─── Navigate to post editor ──────
   const handlePostClick = (post: CalendarPipelinePost) => {
     router.push(`/post/${post.companySlug}/${post.tlSlug}/${post.id}`);
+  };
+
+  // ─── Delete post ──────
+  const handleDeletePost = async (postId: string) => {
+    const post = allPosts.find(p => p.id === postId);
+    if (!post) return;
+    // Optimistic removal
+    setAllPosts(prev => prev.filter(p => p.id !== postId));
+    try {
+      const token = await getAuthToken();
+      const result = await deletePipelinePost(token, post.tlUserId, postId);
+      if (result.error) {
+        toast({ title: 'Erro ao excluir', description: result.error, variant: 'destructive' });
+        // Reload all posts on error
+        const reloadToken = await getAuthToken();
+        const reload = await getAllPipelinePostsForStrategist(reloadToken);
+        if (reload.posts) setAllPosts(reload.posts);
+      } else {
+        toast({ title: 'Post excluído' });
+      }
+    } catch {
+      toast({ title: 'Erro ao excluir', description: 'Tente novamente.', variant: 'destructive' });
+    }
   };
 
   // ─── Drag & drop handlers ──────
@@ -458,6 +482,7 @@ export default function StrategistCalendarioPage() {
               const post = allPosts.find(p => p.id === postId);
               if (post) handlePostClick(post);
             }}
+            onDeletePost={handleDeletePost}
           />
         </div>
       </main>

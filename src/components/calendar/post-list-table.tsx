@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { ExternalLink, Search, ListFilter, Calendar as CalIcon, FileText } from 'lucide-react';
+import { Trash2, Search, ListFilter, Calendar as CalIcon, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { getStatusConfig, PIPELINE_STATUSES, FORMATO_OPTIONS } from '@/lib/pipeline-config';
 import type { PipelineStatus } from '@/app/actions/content-pipeline';
@@ -32,6 +32,8 @@ type PostListTableProps = {
   posts: PostItem[];
   getStatusLabel: (status: PipelineStatus) => string;
   onPostClick: (postId: string) => void;
+  /** If provided, enables delete button on each row */
+  onDeletePost?: (postId: string) => void;
   /** If provided, shows a TL/profile filter dropdown and TL name column */
   tlProfiles?: Array<{ id: string; name: string }>;
 };
@@ -48,6 +50,7 @@ export function PostListTable({
   posts,
   getStatusLabel,
   onPostClick,
+  onDeletePost,
   tlProfiles,
 }: PostListTableProps) {
   const [search, setSearch] = useState('');
@@ -56,6 +59,7 @@ export function PostListTable({
   const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilter>('all');
   const [pillarFilter, setPillarFilter] = useState<string>('all');
   const [tlFilter, setTlFilter] = useState<string>('all');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const showTlColumn = !!tlProfiles && tlProfiles.length > 0;
 
@@ -266,16 +270,19 @@ export function PostListTable({
             <div className="divide-y">
               {sorted.map(post => {
                 const cfg = getStatusConfig(post.status);
+                const isConfirming = confirmDeleteId === post.id;
                 return (
-                  <button
+                  <div
                     key={post.id}
-                    type="button"
-                    onClick={() => onPostClick(post.id)}
                     className={cn('w-full grid gap-2 px-3 py-2.5 text-left hover:bg-muted/30 transition-colors items-center', gridCols)}
                   >
-                    <span className="text-sm font-medium line-clamp-1">
+                    <button
+                      type="button"
+                      onClick={() => onPostClick(post.id)}
+                      className="text-sm font-medium line-clamp-1 text-left hover:underline"
+                    >
                       {post.title || 'Sem título'}
-                    </span>
+                    </button>
                     {showTlColumn && (
                       <span className="text-xs text-muted-foreground line-clamp-1">
                         {tlNameMap.get(post._tlId || '') || '—'}
@@ -303,9 +310,49 @@ export function PostListTable({
                       )}
                     </span>
                     <span className="flex justify-center">
-                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                      {onDeletePost && (
+                        isConfirming ? (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeletePost(post.id);
+                                setConfirmDeleteId(null);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setConfirmDeleteId(null);
+                              }}
+                            >
+                              ✕
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDeleteId(post.id);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )
+                      )}
                     </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>

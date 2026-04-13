@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
-import { getPipelinePosts, resolveSlugs, updatePipelinePost, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
+import { getPipelinePosts, resolveSlugs, updatePipelinePost, deletePipelinePost, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
 import {
   ChevronLeft,
   ChevronRight,
@@ -208,6 +208,28 @@ export default function StrategistCalendarioPerfilPage() {
   // ─── Navigate to dedicated post page ──────
   const handlePostClick = (post: PipelinePost) => {
     router.push(`/post/${companySlug}/${tlSlug}/${post.id}`);
+  };
+
+  // ─── Delete post ──────
+  const handleDeletePost = async (postId: string) => {
+    if (!tlId) return;
+    // Optimistic removal
+    setPosts(prev => prev.filter(p => p.id !== postId));
+    try {
+      const token = await getAuthToken();
+      const result = await deletePipelinePost(token, tlId, postId);
+      if (result.error) {
+        toast({ title: 'Erro ao excluir', description: result.error, variant: 'destructive' });
+        // Reload posts on error
+        const reloadToken = await getAuthToken();
+        const reload = await getPipelinePosts(reloadToken, tlId);
+        if (reload.posts) setPosts(reload.posts);
+      } else {
+        toast({ title: 'Post excluído' });
+      }
+    } catch {
+      toast({ title: 'Erro ao excluir', description: 'Tente novamente.', variant: 'destructive' });
+    }
   };
 
   // ─── Status counts ──────
@@ -437,6 +459,7 @@ export default function StrategistCalendarioPerfilPage() {
             const post = posts.find(p => p.id === postId);
             if (post) handlePostClick(post);
           }}
+          onDeletePost={handleDeletePost}
         />
 
       </main>
