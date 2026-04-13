@@ -8,7 +8,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from '@/components/ui/skeleton';
+import { CalendarSkeleton } from '@/components/calendar/calendar-skeleton';
 import { getAuthToken } from '@/lib/auth-client';
 import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
 import { getStatusConfig, buildGetStatusLabel } from '@/lib/pipeline-config';
@@ -47,25 +47,6 @@ const FILTER_STATUSES: PipelineStatus[] = [
   'backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post',
   'pronto_pra_postar', 'agendado', 'postado',
 ];
-
-function CalendarSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-10 w-32" />
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {[...Array(7)].map((_, i) => (
-          <Skeleton key={`h-${i}`} className="h-8" />
-        ))}
-        {[...Array(35)].map((_, i) => (
-          <Skeleton key={`d-${i}`} className="h-24" />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function ThoughtLeaderCalendarioPage() {
   const t = useT();

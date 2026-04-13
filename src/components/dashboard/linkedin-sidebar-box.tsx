@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Linkedin, Loader2, AlertTriangle, ExternalLink, Unlink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,6 +24,7 @@ type Props = {
 export function LinkedInSidebarBox({ tokenStatus }: Props) {
   const { user } = useAuth();
   const t = useT();
+  const router = useRouter();
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -65,7 +67,7 @@ export function LinkedInSidebarBox({ tokenStatus }: Props) {
         toast({ variant: 'destructive', title: 'Erro', description: result.error });
       } else {
         toast({ title: 'LinkedIn desconectado' });
-        window.location.reload();
+        router.refresh();
       }
     } catch {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível desconectar.' });

@@ -9,7 +9,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from '@/components/ui/skeleton';
+import { CalendarSkeleton } from '@/components/calendar/calendar-skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getAuthToken } from '@/lib/auth-client';
@@ -117,25 +117,6 @@ const toDate = (d: { toDate?: () => Date } | string | null | undefined): Date | 
   if (typeof d === 'object' && d !== null && 'toDate' in d && typeof d.toDate === 'function') return d.toDate();
   return new Date(d as string);
 };
-
-function CalendarSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-10 w-32" />
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {[...Array(7)].map((_, i) => (
-          <Skeleton key={`h-${i}`} className="h-8" />
-        ))}
-        {[...Array(35)].map((_, i) => (
-          <Skeleton key={`d-${i}`} className="h-24" />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 type StatusFilter = 'all' | 'missions' | 'published' | 'scheduled' | 'in_progress' | 'draft' | 'failed';
 

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from '@/components/ui/skeleton';
+import { CalendarSkeleton } from '@/components/calendar/calendar-skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { getPipelinePosts, resolveSlugs, updatePipelinePost, deletePipelinePost, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
@@ -34,24 +34,6 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-
-function CalendarSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-48" />
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {[...Array(7)].map((_, i) => (
-          <Skeleton key={`h-${i}`} className="h-8" />
-        ))}
-        {[...Array(35)].map((_, i) => (
-          <Skeleton key={`d-${i}`} className="h-40" />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 const WEEK_DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -324,7 +306,7 @@ export default function StrategistCalendarioPerfilPage() {
       <>
         <Header title={`Calendário — ${tlName}`} />
         <main className="flex-1 overflow-auto p-4 md:p-6">
-          <CalendarSkeleton />
+          <CalendarSkeleton cellHeight="h-40" showHeaderAction={false} />
         </main>
       </>
     );

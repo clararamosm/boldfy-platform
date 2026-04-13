@@ -52,13 +52,13 @@ export default function ThoughtLeaderDashboardPage() {
     if (linkedinStatus === 'success') {
       toast({ title: 'LinkedIn conectado!', description: 'Sua conta do LinkedIn foi vinculada com sucesso.' });
       completeOnboardingItem(user?.uid, 'connect-linkedin');
-      window.history.replaceState({}, '', window.location.pathname);
+      router.replace(window.location.pathname);
     } else if (linkedinStatus === 'error') {
       const message = searchParams.get('message') || 'Erro ao conectar com LinkedIn.';
       toast({ variant: 'destructive', title: 'Erro no LinkedIn', description: message });
-      window.history.replaceState({}, '', window.location.pathname);
+      router.replace(window.location.pathname);
     }
-  }, [searchParams, user?.uid, toast]);
+  }, [searchParams, user?.uid, toast, router]);
 
   // Compute KPIs
   const published = posts.filter(p => p.status === 'postado').length;

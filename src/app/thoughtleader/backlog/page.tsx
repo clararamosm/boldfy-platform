@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,8 +55,8 @@ export default function ThoughtLeaderBacklogPage() {
   const [tlSlug, setTlSlug] = useState('');
 
   // Support strategist viewing TL backlog via ?userId=
-  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const targetUserId = searchParams?.get('userId') || user?.uid;
+  const searchParams = useSearchParams();
+  const targetUserId = searchParams.get('userId') || user?.uid;
 
   const getStatusLabel = buildGetStatusLabel(t);
 

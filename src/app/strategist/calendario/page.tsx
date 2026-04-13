@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from '@/components/ui/skeleton';
+import { CalendarSkeleton } from '@/components/calendar/calendar-skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
@@ -40,26 +40,6 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-
-// ─── Skeleton ──────
-function CalendarSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-10 w-32" />
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {[...Array(7)].map((_, i) => (
-          <Skeleton key={`h-${i}`} className="h-8" />
-        ))}
-        {[...Array(35)].map((_, i) => (
-          <Skeleton key={`d-${i}`} className="h-36" />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 type StatusFilter = PipelineStatus | 'all';
 
@@ -320,7 +300,7 @@ export default function StrategistCalendarioPage() {
       <>
         <Header title="Calendario" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
-          <CalendarSkeleton />
+          <CalendarSkeleton cellHeight="h-36" />
         </main>
       </>
     );
