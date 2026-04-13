@@ -360,6 +360,7 @@ export default function StrategistDashboardPage() {
             {tlProfiles.length > 0 && (
               <LinkedInPerformance
                 userId={tlProfiles[0].id}
+                hideIfNotConnected={false}
                 showProfileFilter
                 profiles={tlProfiles}
                 callerRole="strategist"

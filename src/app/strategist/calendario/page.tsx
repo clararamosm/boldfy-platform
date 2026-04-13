@@ -471,6 +471,7 @@ export default function StrategistCalendarioPage() {
             <div className="mt-6">
               <LinkedInPerformance
                 userId={filteredTlOptions[0].id}
+                hideIfNotConnected={false}
                 showProfileFilter
                 profiles={filteredTlOptions.map(tl => ({ id: tl.id, name: tl.name }))}
                 callerRole="strategist"
