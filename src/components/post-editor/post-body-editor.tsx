@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { SimpleRichEditor } from '@/components/ui/simple-rich-editor';
-import { MessageSquareQuote } from 'lucide-react';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { MessageSquareQuote, ChevronDown } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import type { PostComment } from '@/lib/post-editor-types';
 
@@ -168,11 +169,20 @@ export function PostBodyEditor({
   activeCommentId,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [showHighlightPreview, setShowHighlightPreview] = useState(true);
   const [selectionPopup, setSelectionPopup] = useState<{
     x: number;
     y: number;
     anchor: AnchorData;
   } | null>(null);
+
+  // Compute unresolved caption anchors (used in both modes)
+  const unresolvedAnchors = useMemo(() => {
+    return comments.filter(
+      c => !c.resolved && c.anchor && c.anchor.field === 'caption'
+    );
+  }, [comments]);
 
   // Apply highlights via DOM manipulation after render
   useEffect(() => {
@@ -192,6 +202,22 @@ export function PostBodyEditor({
   // Re-apply when comments or value changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit, comments, activeCommentId, value]);
+
+  // Apply highlights to the edit-mode preview section
+  useEffect(() => {
+    if (!canEdit || !previewRef.current) return;
+
+    const highlightAnchors: HighlightAnchor[] = unresolvedAnchors.map(c => ({
+      commentId: c.id,
+      startOffset: c.anchor!.startOffset,
+      endOffset: c.anchor!.endOffset,
+    }));
+
+    if (highlightAnchors.length > 0) {
+      applyHighlightsToDOM(previewRef.current, highlightAnchors, activeCommentId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit, unresolvedAnchors, activeCommentId, value]);
 
   // Close popup when scrolling
   useEffect(() => {
@@ -358,14 +384,67 @@ export function PostBodyEditor({
 
   // ─── Edit mode (strategist) ──────────────────────────
 
+  const hasHighlights = unresolvedAnchors.length > 0;
+
   return (
-    <div className="py-2">
+    <div className="py-2 space-y-3">
+      {/* Editor */}
       <SimpleRichEditor
         value={value}
         onChange={onChange}
         placeholder="Escreva o conteúdo do post aqui..."
         className="min-h-[300px]"
       />
+
+      {/* Highlight preview — only when there are unresolved inline comments */}
+      {hasHighlights && (
+        <Collapsible open={showHighlightPreview} onOpenChange={setShowHighlightPreview}>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+            >
+              <MessageSquareQuote className="h-3.5 w-3.5" />
+              <span>Comentários no texto ({unresolvedAnchors.length})</span>
+              <ChevronDown
+                className={`h-3.5 w-3.5 transition-transform ${showHighlightPreview ? 'rotate-180' : ''}`}
+              />
+            </button>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            {/* Inline highlight styles */}
+            <style>{`
+              .inline-highlight {
+                background-color: rgb(243 232 255);
+                border-radius: 2px;
+                cursor: pointer;
+                transition: background-color 0.15s;
+                padding: 1px 0;
+              }
+              .inline-highlight:hover {
+                background-color: rgb(233 213 255);
+              }
+              .inline-highlight--active {
+                background-color: rgb(233 213 255);
+                box-shadow: 0 0 0 1px rgb(216 180 254);
+              }
+            `}</style>
+
+            <div
+              ref={previewRef}
+              className="prose prose-sm max-w-none mt-2 p-3 rounded-md border border-dashed border-purple-200 bg-purple-50/30 select-text text-sm"
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(value || '', {
+                  ALLOWED_TAGS: ['b', 'i', 'u', 'strong', 'em', 'span', 'br', 'p', 'div', 'mark', 'font'],
+                  ALLOWED_ATTR: ['style', 'color', 'class', 'data-comment-id'],
+                }),
+              }}
+              onClick={handleClick}
+            />
+          </CollapsibleContent>
+        </Collapsible>
+      )}
     </div>
   );
 }

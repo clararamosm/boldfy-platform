@@ -728,3 +728,130 @@ export async function getAllPipelinePostsForStrategist(
     return { error: msg };
   }
 }
+
+// ---- Dashboard: Recent activities for a Strategist ----
+
+export type Activity = {
+  type: 'comment';
+  authorName: string;
+  authorRole: 'strategist' | 'thoughtleader';
+  content: string;
+  postTitle: string;
+  postId: string;
+  tlUserId: string;
+  companySlug: string;
+  tlSlug: string;
+  createdAt: string;
+};
+
+export async function getRecentActivitiesForStrategist(
+  idToken: string
+): Promise<{ activities?: Activity[]; error?: string }> {
+  try {
+    const user = await requireAuth(idToken);
+    if (user.role !== 'strategist' && user.role !== 'master') {
+      return { error: 'Acesso negado.' };
+    }
+
+    const userDoc = await adminDb.collection('users').doc(user.uid).get();
+    const assignedCompanies = (userDoc.data()?.assignedCompanies as string[]) || [];
+
+    if (assignedCompanies.length === 0) return { activities: [] };
+
+    // Parallel fetch companies + TLs
+    const [companyDocs, allTlSnap] = await Promise.all([
+      Promise.all(assignedCompanies.map(cId => adminDb.collection('companies').doc(cId).get())),
+      adminDb.collection('users')
+        .where('companyId', 'in', assignedCompanies.slice(0, 30))
+        .where('role', '==', 'thoughtleader')
+        .get(),
+    ]);
+
+    // Build company info map
+    const companyMap = new Map<string, { name: string; slug: string }>();
+    for (const compDoc of companyDocs) {
+      if (!compDoc.exists) continue;
+      const compData = compDoc.data();
+      const name = compData?.companyName || '';
+      companyMap.set(compDoc.id, {
+        name,
+        slug: (compData?.slug as string) || generateSlug(name, compDoc.id),
+      });
+    }
+
+    const tlInfoList = allTlSnap.docs.map(d => {
+      const tlData = d.data();
+      const tlName = tlData.profile?.name || tlData.name || '';
+      return {
+        id: d.id,
+        name: tlName,
+        slug: (tlData.slug as string) || generateSlug(tlName, d.id),
+        companyId: tlData.companyId as string,
+      };
+    });
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const allActivities: Activity[] = [];
+
+    // Fetch recent posts for each TL
+    const postSnapshots = await Promise.all(
+      tlInfoList.map(tl =>
+        adminDb.collection(getPipelinePath(tl.id))
+          .orderBy('updatedAt', 'desc')
+          .limit(20)
+          .get()
+          .then(snap => ({ tl, snap }))
+      )
+    );
+
+    // For each TL's posts, fetch comments in parallel
+    const commentFetches: Promise<void>[] = [];
+
+    for (const { tl, snap } of postSnapshots) {
+      const company = companyMap.get(tl.companyId);
+      if (!company) continue;
+
+      for (const postDoc of snap.docs) {
+        const postData = postDoc.data();
+        const postTitle = postData.title || (postData.caption?.slice(0, 40) as string) || 'Sem titulo';
+
+        commentFetches.push(
+          adminDb.collection(getPipelinePath(tl.id))
+            .doc(postDoc.id)
+            .collection('comments')
+            .where('createdAt', '>=', sevenDaysAgo)
+            .orderBy('createdAt', 'desc')
+            .limit(5)
+            .get()
+            .then(commentSnap => {
+              for (const commentDoc of commentSnap.docs) {
+                const c = commentDoc.data();
+                allActivities.push({
+                  type: 'comment',
+                  authorName: (c.authorName as string) || 'Usuario',
+                  authorRole: (c.authorRole as 'strategist' | 'thoughtleader') || 'strategist',
+                  content: (c.content as string) || '',
+                  postTitle,
+                  postId: postDoc.id,
+                  tlUserId: tl.id,
+                  companySlug: company.slug,
+                  tlSlug: tl.slug,
+                  createdAt: (c.createdAt as string) || '',
+                });
+              }
+            })
+        );
+      }
+    }
+
+    await Promise.all(commentFetches);
+
+    // Sort by createdAt desc, limit 15
+    allActivities.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return { activities: allActivities.slice(0, 15) };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in getRecentActivitiesForStrategist:', msg);
+    return { error: msg };
+  }
+}
