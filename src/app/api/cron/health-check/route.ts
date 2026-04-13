@@ -157,14 +157,21 @@ export async function GET(request: NextRequest) {
   const fullMessage = `${header}\n\n${checkLines}\n\n---\n${manualChecklist}`;
 
   // Send to Slack
-  const channelId = process.env.HEALTH_CHECK_SLACK_CHANNEL_ID || await findChannelId('atualizações-produto');
+  let slackSent = false;
+  try {
+    const channelId = process.env.HEALTH_CHECK_SLACK_CHANNEL_ID || await findChannelId('atualizações-produto');
 
-  if (channelId) {
-    const result = await sendSlackMessage(channelId, fullMessage);
-    if (!result.ok) {
-      return NextResponse.json({ error: `Slack send failed: ${result.error}`, checks }, { status: 500 });
+    if (channelId) {
+      const result = await sendSlackMessage(channelId, fullMessage);
+      if (!result.ok) {
+        console.error('Health check Slack send failed:', result.error);
+      } else {
+        slackSent = true;
+      }
     }
+  } catch (slackError) {
+    console.error('Health check Slack error:', slackError);
   }
 
-  return NextResponse.json({ success: true, checks, slackSent: !!channelId });
+  return NextResponse.json({ success: true, checks, slackSent });
 }

@@ -204,19 +204,33 @@ export async function GET(request: NextRequest) {
   const now = new Date().toISOString();
   const counters = { published: 0, failed: 0, skipped: 0 };
 
-  try {
-    // Process both collections in parallel
-    await Promise.all([
-      processScheduledPosts(now, counters),
-      processPipelinePosts(now, counters),
-    ]);
+  // Process both collections in parallel — use allSettled so one failure
+  // doesn't prevent the other from running.
+  const results = await Promise.allSettled([
+    processScheduledPosts(now, counters),
+    processPipelinePosts(now, counters),
+  ]);
 
-    return NextResponse.json({
-      message: `Cron complete. Published: ${counters.published}, Failed: ${counters.failed}, Skipped: ${counters.skipped}.`,
-      ...counters,
-    });
-  } catch (error) {
-    console.error('Cron job error:', error);
-    return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
+  const errors: string[] = [];
+  for (const r of results) {
+    if (r.status === 'rejected') {
+      const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      console.error('Cron job partial error:', r.reason);
+      errors.push(msg);
+    }
   }
+
+  if (errors.length > 0 && counters.published === 0) {
+    // Both failed and nothing was published — return 500
+    return NextResponse.json({
+      error: `Cron failed: ${errors.join('; ')}`,
+      ...counters,
+    }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    message: `Cron complete. Published: ${counters.published}, Failed: ${counters.failed}, Skipped: ${counters.skipped}.${errors.length > 0 ? ` Errors: ${errors.join('; ')}` : ''}`,
+    ...counters,
+    errors: errors.length > 0 ? errors : undefined,
+  });
 }
