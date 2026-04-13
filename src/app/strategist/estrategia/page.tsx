@@ -13,17 +13,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { getContentStrategy, saveContentStrategy, type ContentStrategyData } from '@/app/actions/content-strategy';
-import { Loader2, Plus, X, User } from 'lucide-react';
+import { Loader2, Plus, X, User, Trash2 } from 'lucide-react';
 import { PILLAR_COLORS } from '@/lib/pillar-colors';
 
 // ─── Helpers ──────
 
+function emptyContentType() {
+  return { percentage: 0, description: '', formats: [''], triggers: [''] };
+}
+
 function emptyStrategy(): ContentStrategyData {
   return {
     contentTypes: {
-      visibility: { percentage: 40, description: '' },
-      authority: { percentage: 40, description: '' },
-      conversion: { percentage: 20, description: '' },
+      visibility: { ...emptyContentType(), percentage: 40 },
+      authority: { ...emptyContentType(), percentage: 40 },
+      conversion: { ...emptyContentType(), percentage: 20 },
     },
     pillars: [{
       name: '',
@@ -32,6 +36,15 @@ function emptyStrategy(): ContentStrategyData {
       businessObjective: '',
       contentExamples: ['', '', ''],
     }],
+  };
+}
+
+/** Ensure legacy contentType entries have formats/triggers arrays */
+function normalizeContentType(ct: { percentage: number; description: string; formats?: string[]; triggers?: string[] }) {
+  return {
+    ...ct,
+    formats: ct.formats?.length ? ct.formats : [''],
+    triggers: ct.triggers?.length ? ct.triggers : [''],
   };
 }
 
@@ -75,8 +88,15 @@ export default function StrategistEstrategiaPage() {
 
       const result = await getContentStrategy(token, tlId);
       if (result.data) {
-        // Normalize pillars: ensure new fields exist (migrate from legacy subtitle/series)
+        // Normalize: ensure new fields exist (migrate from legacy data)
         const loaded = { ...emptyStrategy(), ...result.data };
+        // Normalize content types (formats + triggers)
+        loaded.contentTypes = {
+          visibility: normalizeContentType(loaded.contentTypes.visibility),
+          authority: normalizeContentType(loaded.contentTypes.authority),
+          conversion: normalizeContentType(loaded.contentTypes.conversion),
+        };
+        // Normalize pillars
         if (loaded.pillars) {
           loaded.pillars = loaded.pillars.map(p => ({
             ...p,
@@ -108,8 +128,19 @@ export default function StrategistEstrategiaPage() {
     try {
       const token = await getAuthToken();
       // Clean empty items
+      // Clean empty entries before saving
+      const cleanCT = (ct: typeof data.contentTypes.visibility) => ({
+        ...ct,
+        formats: (ct.formats || []).filter(f => f.trim()),
+        triggers: (ct.triggers || []).filter(t => t.trim()),
+      });
       const clean: ContentStrategyData = {
         ...data,
+        contentTypes: {
+          visibility: cleanCT(data.contentTypes.visibility),
+          authority: cleanCT(data.contentTypes.authority),
+          conversion: cleanCT(data.contentTypes.conversion),
+        },
         pillars: data.pillars
           .filter(p => p.name || p.purpose || p.audienceObjective || p.businessObjective)
           .map(p => ({
@@ -189,119 +220,117 @@ export default function StrategistEstrategiaPage() {
               <CardDescription>Distribuição entre Visibilidade (ToFu), Autoridade (MoFu) e Conversão (BoFu).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Visibilidade */}
-              <div className="rounded-lg border p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-blue-600 font-medium">Visibilidade (ToFu)</Label>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="w-16 h-8 text-center text-sm"
-                      value={data.contentTypes.visibility.percentage}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        contentTypes: {
-                          ...prev.contentTypes,
-                          visibility: { ...prev.contentTypes.visibility, percentage: Number(e.target.value) },
-                        },
-                      }))}
-                      disabled={isSaving}
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
-                </div>
-                <Textarea
-                  placeholder="Que tipo de conteúdo gera visibilidade? Temas amplos, trending..."
-                  value={data.contentTypes.visibility.description}
-                  onChange={(e) => setData(prev => ({
+              {([
+                { key: 'visibility' as const, label: 'Visibilidade (ToFu)', color: 'text-blue-600 border-blue-200 dark:border-blue-900', placeholder: 'Que tipo de conteúdo gera visibilidade? Temas amplos, trending...' },
+                { key: 'authority' as const, label: 'Autoridade (MoFu)', color: 'text-purple-600 border-purple-200 dark:border-purple-900', placeholder: 'Conteúdos que constroem autoridade e expertise no tema...' },
+                { key: 'conversion' as const, label: 'Conversão (BoFu)', color: 'text-green-600 border-green-200 dark:border-green-900', placeholder: 'Conteúdos que levam à ação — CTAs, cases, ofertas...' },
+              ]).map(({ key, label, color, placeholder }) => {
+                const ct = data.contentTypes[key];
+                const updateCT = (field: string, value: string | number | string[]) => {
+                  setData(prev => ({
                     ...prev,
                     contentTypes: {
                       ...prev.contentTypes,
-                      visibility: { ...prev.contentTypes.visibility, description: e.target.value },
+                      [key]: { ...prev.contentTypes[key], [field]: value },
                     },
-                  }))}
-                  rows={2}
-                  disabled={isSaving}
-                />
-              </div>
+                  }));
+                };
+                return (
+                  <div key={key} className={`rounded-lg border ${color.split(' ').slice(1).join(' ')} p-4 space-y-3`}>
+                    <div className="flex items-center justify-between">
+                      <Label className={`font-medium ${color.split(' ')[0]}`}>{label}</Label>
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number" min={0} max={100}
+                          className="w-16 h-8 text-center text-sm"
+                          value={ct.percentage}
+                          onChange={(e) => updateCT('percentage', Number(e.target.value))}
+                          disabled={isSaving}
+                        />
+                        <span className="text-sm text-muted-foreground">%</span>
+                      </div>
+                    </div>
 
-              {/* Autoridade */}
-              <div className="rounded-lg border p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-purple-600 font-medium">Autoridade (MoFu)</Label>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="w-16 h-8 text-center text-sm"
-                      value={data.contentTypes.authority.percentage}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        contentTypes: {
-                          ...prev.contentTypes,
-                          authority: { ...prev.contentTypes.authority, percentage: Number(e.target.value) },
-                        },
-                      }))}
-                      disabled={isSaving}
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
-                </div>
-                <Textarea
-                  placeholder="Conteúdos que constroem autoridade e expertise no tema..."
-                  value={data.contentTypes.authority.description}
-                  onChange={(e) => setData(prev => ({
-                    ...prev,
-                    contentTypes: {
-                      ...prev.contentTypes,
-                      authority: { ...prev.contentTypes.authority, description: e.target.value },
-                    },
-                  }))}
-                  rows={2}
-                  disabled={isSaving}
-                />
-              </div>
+                    {/* Descrição */}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Descrição</Label>
+                      <Textarea
+                        placeholder={placeholder}
+                        value={ct.description}
+                        onChange={(e) => updateCT('description', e.target.value)}
+                        rows={2}
+                        disabled={isSaving}
+                      />
+                    </div>
 
-              {/* Conversão */}
-              <div className="rounded-lg border p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label className="text-green-600 font-medium">Conversão (BoFu)</Label>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="w-16 h-8 text-center text-sm"
-                      value={data.contentTypes.conversion.percentage}
-                      onChange={(e) => setData(prev => ({
-                        ...prev,
-                        contentTypes: {
-                          ...prev.contentTypes,
-                          conversion: { ...prev.contentTypes.conversion, percentage: Number(e.target.value) },
-                        },
-                      }))}
-                      disabled={isSaving}
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
+                    {/* Formatos */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Formatos</Label>
+                      {(ct.formats || ['']).map((fmt, fIdx) => (
+                        <div key={fIdx} className="flex gap-2 items-center">
+                          <Input
+                            placeholder="Ex: Carousel, Vídeo curto, Infográfico..."
+                            value={fmt}
+                            onChange={(e) => {
+                              const newFormats = [...(ct.formats || [''])];
+                              newFormats[fIdx] = e.target.value;
+                              updateCT('formats', newFormats);
+                            }}
+                            disabled={isSaving}
+                          />
+                          {(ct.formats || []).length > 1 && (
+                            <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8"
+                              onClick={() => updateCT('formats', (ct.formats || []).filter((_, i) => i !== fIdx))}
+                              disabled={isSaving}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <Button variant="ghost" size="sm" className="text-xs"
+                        onClick={() => updateCT('formats', [...(ct.formats || []), ''])}
+                        disabled={isSaving}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Adicionar formato
+                      </Button>
+                    </div>
+
+                    {/* Gatilhos */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Gatilhos</Label>
+                      {(ct.triggers || ['']).map((trg, tIdx) => (
+                        <div key={tIdx} className="flex gap-2 items-center">
+                          <Input
+                            placeholder="Ex: Dor do ICP, Trending topic, Novidade do mercado..."
+                            value={trg}
+                            onChange={(e) => {
+                              const newTriggers = [...(ct.triggers || [''])];
+                              newTriggers[tIdx] = e.target.value;
+                              updateCT('triggers', newTriggers);
+                            }}
+                            disabled={isSaving}
+                          />
+                          {(ct.triggers || []).length > 1 && (
+                            <Button variant="ghost" size="icon" className="shrink-0 h-8 w-8"
+                              onClick={() => updateCT('triggers', (ct.triggers || []).filter((_, i) => i !== tIdx))}
+                              disabled={isSaving}
+                            >
+                              <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      <Button variant="ghost" size="sm" className="text-xs"
+                        onClick={() => updateCT('triggers', [...(ct.triggers || []), ''])}
+                        disabled={isSaving}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Adicionar gatilho
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <Textarea
-                  placeholder="Conteúdos que levam à ação — CTAs, cases, ofertas..."
-                  value={data.contentTypes.conversion.description}
-                  onChange={(e) => setData(prev => ({
-                    ...prev,
-                    contentTypes: {
-                      ...prev.contentTypes,
-                      conversion: { ...prev.contentTypes.conversion, description: e.target.value },
-                    },
-                  }))}
-                  rows={2}
-                  disabled={isSaving}
-                />
-              </div>
+                );
+              })}
             </CardContent>
           </Card>
 

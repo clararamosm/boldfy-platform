@@ -9,9 +9,9 @@ import { requireStrategistForTL, requireAuth } from '@/lib/auth-guard';
 export type ContentStrategyData = {
   // Content Types — 3 buckets
   contentTypes: {
-    visibility: { percentage: number; description: string }; // ToFu
-    authority: { percentage: number; description: string }; // MoFu
-    conversion: { percentage: number; description: string }; // BoFu
+    visibility: { percentage: number; description: string; formats: string[]; triggers: string[] }; // ToFu
+    authority: { percentage: number; description: string; formats: string[]; triggers: string[] }; // MoFu
+    conversion: { percentage: number; description: string; formats: string[]; triggers: string[] }; // BoFu
   };
   // Content Pillars
   pillars: Array<{
