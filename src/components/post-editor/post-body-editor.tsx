@@ -219,13 +219,29 @@ export function PostBodyEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit, unresolvedAnchors, activeCommentId, value]);
 
+  // Remove any temporary selection highlight marks from the container
+  const clearTempHighlight = useCallback(() => {
+    if (!containerRef.current) return;
+    const marks = containerRef.current.querySelectorAll('mark.inline-highlight--temp');
+    marks.forEach(mark => {
+      const parent = mark.parentNode;
+      if (!parent) return;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+      parent.normalize(); // merge adjacent text nodes back together
+    });
+  }, []);
+
   // Close popup when scrolling
   useEffect(() => {
     if (!selectionPopup) return;
-    const handleDismiss = () => setSelectionPopup(null);
+    const handleDismiss = () => {
+      clearTempHighlight();
+      setSelectionPopup(null);
+    };
     window.addEventListener('scroll', handleDismiss, true);
     return () => window.removeEventListener('scroll', handleDismiss, true);
-  }, [selectionPopup]);
+  }, [selectionPopup, clearTempHighlight]);
 
   // Close popup on mousedown outside popup
   useEffect(() => {
@@ -234,6 +250,7 @@ export function PostBodyEditor({
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('.selection-popup')) {
+        clearTempHighlight();
         setSelectionPopup(null);
       }
     };
@@ -246,7 +263,7 @@ export function PostBodyEditor({
       clearTimeout(timeout);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [selectionPopup]);
+  }, [selectionPopup, clearTempHighlight]);
 
   // Handle text selection in read-only mode
   const handleMouseUp = useCallback(() => {
@@ -277,6 +294,17 @@ export function PostBodyEditor({
       const rect = range.getBoundingClientRect();
       const containerRect = containerRef.current!.getBoundingClientRect();
 
+      // Clear browser selection — we'll show our own highlight instead
+      selection.removeAllRanges();
+
+      // Apply a temporary visual highlight so the user sees their selection
+      clearTempHighlight();
+      wrapTextRange(containerRef.current!, startOffset, endOffset, '__temp__', false);
+      // Swap class to temp style
+      containerRef.current!.querySelectorAll('mark[data-comment-id="__temp__"]').forEach(m => {
+        m.className = 'inline-highlight inline-highlight--temp';
+      });
+
       setSelectionPopup({
         x: rect.left - containerRect.left + rect.width / 2,
         y: rect.top - containerRect.top - 8,
@@ -287,9 +315,8 @@ export function PostBodyEditor({
           selectedText,
         },
       });
-      // Do NOT clear selection — let it remain visible
     }, 10);
-  }, [onAddInlineComment]);
+  }, [onAddInlineComment, clearTempHighlight]);
 
   // Handle click on existing highlight
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -308,10 +335,10 @@ export function PostBodyEditor({
   const handleCommentClick = useCallback(() => {
     if (selectionPopup && onAddInlineComment) {
       onAddInlineComment(selectionPopup.anchor);
-      window.getSelection()?.removeAllRanges();
+      clearTempHighlight();
       setSelectionPopup(null);
     }
-  }, [selectionPopup, onAddInlineComment]);
+  }, [selectionPopup, onAddInlineComment, clearTempHighlight]);
 
   // ─── Read-only mode ──────────────────────────────────
 
@@ -346,6 +373,11 @@ export function PostBodyEditor({
           .inline-highlight--active {
             background-color: rgb(233 213 255); /* purple-200 */
             box-shadow: 0 0 0 1px rgb(216 180 254); /* purple-300 */
+          }
+          .inline-highlight--temp {
+            background-color: rgb(219 234 254); /* blue-100 */
+            border-radius: 2px;
+            padding: 1px 0;
           }
         `}</style>
 
