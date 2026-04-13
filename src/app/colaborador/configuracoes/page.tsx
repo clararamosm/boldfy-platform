@@ -18,6 +18,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Linkedin, ExternalLink, Unlink, CheckCircle2, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 import { Badge } from "@/components/ui/badge";
 import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInAuthUrl, disconnectLinkedIn } from "@/app/actions/linkedin";
@@ -140,6 +141,7 @@ function SettingsPageContent() {
         const linkedinStatus = searchParams.get('linkedin');
         if (linkedinStatus === 'success') {
             toast({ title: "LinkedIn conectado!", description: "Sua conta do LinkedIn foi vinculada com sucesso." });
+            completeOnboardingItem(currentUserId ?? undefined, 'connect-linkedin');
             if (currentUserId) fetchData(currentUserId);
             window.history.replaceState({}, '', window.location.pathname);
         } else if (linkedinStatus === 'error') {

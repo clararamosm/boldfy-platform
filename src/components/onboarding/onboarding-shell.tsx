@@ -22,39 +22,39 @@ type OnboardingShellProps = {
 };
 
 // ─── Tooltip definitions per route ────────────────────────────
-// Maps pathname patterns to tooltip messages.
+// Maps pathname patterns to tooltip messages + the checklist item they relate to.
 
 type TooltipDef = {
   pathPattern: string;     // Pathname to match (startsWith)
   message: React.ReactNode;
-  step: number;            // Which tooltip step this is
+  checklistItemId: string; // The checklist item ID this tooltip relates to
 };
 
 const ADMIN_TOOLTIPS: TooltipDef[] = [
   {
     pathPattern: '/admin/brand-context',
     message: <><strong>Este é o Brand Context.</strong> Preencha com a identidade da marca — tom de voz, público, valores. A IA usa isso pra gerar conteúdo.</>,
-    step: 1,
+    checklistItemId: 'brand-context',
   },
   {
     pathPattern: '/admin/colaboradores',
     message: <><strong>Aqui você gerencia o time.</strong> Convide colaboradores e thought leaders pro programa.</>,
-    step: 2,
+    checklistItemId: 'invite-collaborator',
   },
   {
     pathPattern: '/admin/missoes',
     message: <><strong>Missões motivam o time.</strong> Crie desafios que geram pontos e engajamento!</>,
-    step: 3,
+    checklistItemId: 'create-mission',
   },
   {
     pathPattern: '/admin/recompensas',
     message: <><strong>A loja de recompensas.</strong> Cadastre prêmios que o time pode trocar por pontos.</>,
-    step: 4,
+    checklistItemId: 'add-reward',
   },
   {
     pathPattern: '/admin/trilhas',
     message: <><strong>Trilhas de aprendizado.</strong> Ative conteúdos educativos pro time evoluir.</>,
-    step: 5,
+    checklistItemId: 'activate-trails',
   },
 ];
 
@@ -62,22 +62,27 @@ const COLAB_TOOLTIPS: TooltipDef[] = [
   {
     pathPattern: '/colaborador/configuracoes',
     message: <><strong>Suas configurações.</strong> Conecte seu LinkedIn aqui pra poder publicar posts!</>,
-    step: 1,
+    checklistItemId: 'connect-linkedin',
   },
   {
     pathPattern: '/colaborador/trilhas',
     message: <><strong>Trilhas de aprendizado.</strong> Explore conteúdos pra melhorar seu posicionamento no LinkedIn.</>,
-    step: 2,
+    checklistItemId: 'view-trail',
   },
   {
     pathPattern: '/colaborador/posts',
     message: <><strong>Seus posts.</strong> Crie conteúdo com ajuda da IA e publique direto no LinkedIn!</>,
-    step: 3,
+    checklistItemId: 'create-post',
+  },
+  {
+    pathPattern: '/colaborador/calendario',
+    message: <><strong>Seus posts.</strong> Crie conteúdo com ajuda da IA e publique direto no LinkedIn!</>,
+    checklistItemId: 'create-post',
   },
   {
     pathPattern: '/colaborador/missoes',
     message: <><strong>Missões do programa.</strong> Complete desafios pra ganhar pontos e recompensas!</>,
-    step: 4,
+    checklistItemId: 'complete-mission',
   },
 ];
 
@@ -85,7 +90,7 @@ const TL_TOOLTIPS: TooltipDef[] = [
   {
     pathPattern: '/thoughtleader/configuracoes',
     message: <><strong>Conecte seu LinkedIn.</strong> Isso permite que a equipe publique posts no seu perfil.</>,
-    step: 1,
+    checklistItemId: 'connect-linkedin',
   },
 ];
 
@@ -121,17 +126,30 @@ export function OnboardingShell({
   const tooltipDefs = useMemo(() => getTooltipsForRole(role), [role]);
   const settingsHref = getSettingsHref(role);
 
-  // Find current tooltip based on path and step
+  // Find tooltip for current page — only if its checklist item isn't completed yet
   const currentTooltip = useMemo(() => {
-    if (ob.state.tooltipStep <= 0) return null; // Not started or dismissed
+    if (ob.state.tooltipStep < 0) return null;  // Dismissed
     if (ob.state.checklistCompleted) return null; // All done
 
-    return tooltipDefs.find(
-      (t) => pathname.startsWith(t.pathPattern) && t.step === ob.state.tooltipStep
-    ) || null;
-  }, [ob.state.tooltipStep, ob.state.checklistCompleted, tooltipDefs, pathname]);
+    const match = tooltipDefs.find((t) => pathname.startsWith(t.pathPattern));
+    if (!match) return null;
 
-  const totalTooltipSteps = tooltipDefs.length;
+    // Only show if the related checklist item is NOT completed
+    const itemCompleted = ob.state.completedItems.includes(match.checklistItemId);
+    if (itemCompleted) return null;
+
+    return match;
+  }, [ob.state.tooltipStep, ob.state.checklistCompleted, ob.state.completedItems, tooltipDefs, pathname]);
+
+  // Find the single checklist item for this page
+  const currentChecklistItem = useMemo(() => {
+    if (!currentTooltip) return undefined;
+    return ob.checklist.find(c => c.id === currentTooltip.checklistItemId);
+  }, [currentTooltip, ob.checklist]);
+
+  // Current step is the index+1 of completed items (for progress display)
+  const completedStepCount = ob.completedCount;
+  const totalTooltipSteps = ob.totalCount;
 
   // Don't show anything while loading
   if (ob.loading) return <>{children}</>;
@@ -171,12 +189,12 @@ export function OnboardingShell({
         settingsHref={settingsHref}
       />
 
-      {/* Page Tooltip — shows contextual help per page */}
+      {/* Page Tooltip — shows contextual help per page (only the relevant item) */}
       {currentTooltip && (
         <PageTooltip
           message={currentTooltip.message}
-          checklist={ob.checklist}
-          currentStep={currentTooltip.step}
+          checklistItem={currentChecklistItem}
+          currentStep={completedStepCount + 1}
           totalSteps={totalTooltipSteps}
           onDismiss={ob.advanceTooltip}
           visible={ob.state.welcomeSeen && !ob.state.checklistCompleted}

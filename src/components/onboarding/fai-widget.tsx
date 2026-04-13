@@ -107,24 +107,26 @@ export function FaiWidget({
       )}
 
       {/* FAB Button */}
-      <button
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="relative w-14 h-14 rounded-full bg-gradient-to-br from-primary to-[#E875FF] shadow-[0_4px_16px_rgba(205,80,241,.4)] border-[3px] border-white flex items-center justify-center cursor-pointer hover:scale-105 transition-transform overflow-hidden"
-      >
-        <Image
-          src="/images/email/fai-avatar.png"
-          alt="Fai"
-          width={56}
-          height={56}
-          className="rounded-full object-cover"
-        />
-        {/* Badge */}
+      <div className="relative">
+        <button
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-[#E875FF] shadow-[0_4px_16px_rgba(205,80,241,.4)] border-[3px] border-white flex items-center justify-center cursor-pointer hover:scale-105 transition-transform overflow-hidden"
+        >
+          <Image
+            src="/images/email/fai-avatar.png"
+            alt="Fai"
+            width={56}
+            height={56}
+            className="rounded-full object-cover"
+          />
+        </button>
+        {/* Badge — outside the button so it's not clipped */}
         {pendingCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white">
+          <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white pointer-events-none">
             {pendingCount}
           </span>
         )}
-      </button>
+      </div>
     </div>
   );
 }

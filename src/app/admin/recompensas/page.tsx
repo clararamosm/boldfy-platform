@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useT } from '@/lib/i18n/context';
 import { useAuth } from '@/contexts/auth-context';
 import { useCompanyData } from '@/hooks/use-company-data';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 
 type Reward = {
     id: string;
@@ -148,6 +149,7 @@ export default function AdminRecompensasPage() {
             } else {
                 await addDoc(collection(db, "companies", companyId, "rewards"), rewardData);
                 toast({ title: t.adminRewards.toastCreated });
+                completeOnboardingItem(user?.uid, 'add-reward');
             }
             fetchRewards(companyId);
             setIsDialogOpen(false); // Close dialog on success

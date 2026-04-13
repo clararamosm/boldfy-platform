@@ -257,3 +257,44 @@ export function useOnboarding(
 
 // ─── Exported checklist definitions (for server-side or static use) ──
 export { ADMIN_CHECKLIST, COLABORADOR_CHECKLIST, THOUGHTLEADER_CHECKLIST, getChecklistForRole };
+
+// ─── Standalone helper (no hook needed) ─────────────────────
+// Call this from any component after a successful action to auto-complete a checklist item.
+// It reads the current onboarding state, checks if the item needs completing,
+// and updates Firestore directly. Safe to call multiple times (idempotent).
+
+export async function completeOnboardingItem(uid: string | undefined, itemId: string) {
+  if (!uid) return;
+  try {
+    const userRef = doc(db, 'users', uid);
+    const snap = await getDoc(userRef);
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+    const ob = (data.onboarding as Partial<OnboardingState>) || {};
+    const completedItems = ob.completedItems ?? [];
+
+    // Already completed
+    if (completedItems.includes(itemId)) return;
+
+    // Determine total items for this user's role
+    const role = data.role as string;
+    let totalItems = 0;
+    if (role === 'admin') totalItems = ADMIN_CHECKLIST.length;
+    else if (role === 'colaborador') totalItems = COLABORADOR_CHECKLIST.length;
+    else if (role === 'thoughtleader') totalItems = THOUGHTLEADER_CHECKLIST.length;
+    else return; // Unknown role
+
+    const newCompleted = [...completedItems, itemId];
+    const allDone = newCompleted.length >= totalItems;
+
+    await updateDoc(userRef, {
+      'onboarding.completedItems': newCompleted,
+      'onboarding.checklistCompleted': allDone,
+      ...(allDone ? { 'onboarding.completedAt': Date.now() } : {}),
+    });
+  } catch (err) {
+    // Silent fail — onboarding is non-critical
+    console.error('Failed to complete onboarding item:', err);
+  }
+}

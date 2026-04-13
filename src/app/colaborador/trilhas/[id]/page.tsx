@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,8 @@ import { TrailConclusionScreen } from '@/components/trilhas/player/trail-conclus
 import { TrailTopBar } from '@/components/trilhas/player/trail-top-bar';
 import { ModuleRenderer } from '@/components/trilhas/player/module-renderer';
 import { TrailBottomBar } from '@/components/trilhas/player/trail-bottom-bar';
+import { auth } from '@/lib/firebase';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 
 export default function TrilhaFullscreenPage() {
   const { id } = useParams();
@@ -17,6 +20,15 @@ export default function TrilhaFullscreenPage() {
   const tp = useT().trailPlayer;
 
   const player = useTrailPlayer(id as string);
+
+  // Mark onboarding item when trail is viewed
+  const markedRef = useRef(false);
+  useEffect(() => {
+    if (!player.loading && player.trail && !markedRef.current) {
+      markedRef.current = true;
+      completeOnboardingItem(auth.currentUser?.uid, 'view-trail');
+    }
+  }, [player.loading, player.trail]);
 
   // Loading
   if (player.loading) {

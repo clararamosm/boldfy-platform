@@ -23,6 +23,7 @@ import { getAuthToken } from '@/lib/auth-client';
 import { useT } from '@/lib/i18n/context';
 import { useAuth } from '@/contexts/auth-context';
 import { useCompanyData } from '@/hooks/use-company-data';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 
 type Collaborator = {
   id: string;
@@ -209,6 +210,7 @@ export default function AdminColaboradoresPage() {
       toast({ title: t.adminCollaborators.toastInviteSent, description: t.adminCollaborators.toastInviteDescription });
       setIsDialogOpen(false);
       if (companyId) fetchCollaborators(companyId);
+      completeOnboardingItem(user?.uid, 'invite-collaborator');
     }
     if (inviteState.error) {
       toast({ variant: "destructive", title: t.adminCollaborators.toastInviteError, description: inviteState.error });

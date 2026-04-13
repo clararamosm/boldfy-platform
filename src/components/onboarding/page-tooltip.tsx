@@ -12,7 +12,7 @@ import type { OnboardingChecklistItem } from '@/hooks/use-onboarding';
 
 type PageTooltipProps = {
   message: React.ReactNode;            // The tooltip message (can include <strong>)
-  checklist: OnboardingChecklistItem[]; // Current checklist for mini-display
+  checklistItem?: OnboardingChecklistItem; // Only the single item for this page
   currentStep: number;                 // Current step number
   totalSteps: number;                  // Total steps
   onDismiss: () => void;               // When user clicks "Entendi!"
@@ -21,7 +21,7 @@ type PageTooltipProps = {
 
 export function PageTooltip({
   message,
-  checklist,
+  checklistItem,
   currentStep,
   totalSteps,
   onDismiss,
@@ -39,9 +39,6 @@ export function PageTooltip({
   }, [visible]);
 
   if (!visible || !show) return null;
-
-  // Show max 3 most relevant checklist items
-  const displayItems = checklist.slice(0, 4);
 
   return (
     <div
@@ -63,24 +60,19 @@ export function PageTooltip({
           {message}
         </div>
 
-        {/* Mini checklist */}
-        <div className="flex flex-col gap-1.5 mb-2.5">
-          {displayItems.map((item) => (
-            <div key={item.id} className="flex items-center gap-2 text-[11px] font-medium text-foreground">
-              <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                item.completed ? 'bg-primary border-primary' : 'border-border'
-              }`}>
-                {item.completed && <Check className="h-2 w-2 text-white" />}
-              </div>
-              <span className={item.completed ? 'text-muted-foreground' : ''}>
-                {!item.completed && checklist.findIndex(c => !c.completed) === checklist.indexOf(item)
-                  ? <strong>{item.label}</strong>
-                  : item.label
-                }
-              </span>
+        {/* Single checklist item for this page */}
+        {checklistItem && (
+          <div className="flex items-center gap-2 text-[11px] font-medium text-foreground mb-2.5 bg-secondary/50 rounded-lg px-2.5 py-2">
+            <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
+              checklistItem.completed ? 'bg-primary border-primary' : 'border-border'
+            }`}>
+              {checklistItem.completed && <Check className="h-2 w-2 text-white" />}
             </div>
-          ))}
-        </div>
+            <span className={checklistItem.completed ? 'text-muted-foreground' : ''}>
+              {checklistItem.completed ? checklistItem.label : <strong>{checklistItem.label}</strong>}
+            </span>
+          </div>
+        )}
 
         {/* Footer: step counter + dismiss */}
         <div className="flex items-center justify-between pt-2.5 border-t border-border/50">

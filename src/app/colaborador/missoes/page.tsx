@@ -22,6 +22,7 @@ import { submitMissionProof, completeMissionSelf } from "@/app/actions";
 import { useT } from '@/lib/i18n/context';
 import { useFormat } from '@/hooks/use-format-date';
 import { useAuth } from '@/contexts/auth-context';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 
 // ─── Types ──────────────────────────────────────
 type MissionStatus = 'completa' | 'pendente' | 'aguardando' | 'rejeitada' | 'agendada' | 'expirada';
@@ -441,6 +442,7 @@ export default function ColaboradorMissoesPage() {
             const result = await submitMissionProof(token, userInfo.uid, missionId, userInfo.companyId, userInfo.name, downloadUrl, file.name);
             if (result.error) { toast({ variant: 'destructive', title: 'Erro', description: result.error }); return; }
             toast({ title: t.colabMissions.toastProofSent, description: t.colabMissions.toastProofSentDescription });
+            completeOnboardingItem(userInfo.uid, 'complete-mission');
             fetchMissions(userInfo.uid);
         } catch (error) {
             console.error("Error submitting proof:", error);
@@ -456,6 +458,7 @@ export default function ColaboradorMissoesPage() {
             const result = await completeMissionSelf(token, userInfo.uid, missionId, userInfo.companyId, userInfo.name);
             if (result.error) { toast({ variant: 'destructive', title: 'Erro', description: result.error }); return; }
             toast({ title: t.colabMissions.toastCompleted, description: t.colabMissions.toastCompletedDescription });
+            completeOnboardingItem(userInfo.uid, 'complete-mission');
             fetchMissions(userInfo.uid);
         } catch (error) {
             console.error("Error auto-completing mission:", error);

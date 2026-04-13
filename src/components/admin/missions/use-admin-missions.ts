@@ -12,6 +12,7 @@ import { useT } from '@/lib/i18n/context';
 import { useFormat } from '@/hooks/use-format-date';
 import { useAuth } from '@/contexts/auth-context';
 import { useCompanyData } from '@/hooks/use-company-data';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 
 // ─── Types ────────────────────────────────────
 type FirestoreDate = { toDate?: () => Date } | string | null;
@@ -187,6 +188,7 @@ export function useAdminMissions() {
         missionData.createdAt = serverTimestamp();
         await addDoc(collection(db, 'companies', companyId, 'missions'), missionData);
         toast({ title: t.adminMissions.toastCreated });
+        completeOnboardingItem(user?.uid, 'create-mission');
       }
       setCreateDialogOpen(false);
       setCreateFixedDialogOpen(false);

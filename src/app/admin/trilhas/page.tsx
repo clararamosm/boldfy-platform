@@ -22,6 +22,7 @@ import { Plus, Pencil, Globe, Building2, FolderOpen, Loader2 } from 'lucide-reac
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import type { Sessao, Trilha, Modulo } from '@/types/trilhas';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 import { MODO_CONFIG } from '@/types/trilhas';
 import { TrailBuilder, TrailCard, AnalyticsDialog, calcPontuacao, type TrailFormData } from '@/components/trilhas';
 import type { TrilhaAnalytics } from '@/types/trilhas';
@@ -150,6 +151,7 @@ export default function AdminTrilhasPage() {
           ativadaEm: Timestamp.now(), ativadaPor: user.uid,
         });
         setActivatedTrailIds(prev => { const next = new Set(prev); next.add(trail.id); return next; });
+        completeOnboardingItem(user?.uid, 'activate-trails');
       }
       toast({ title: t.adminTrails.toastTrailToggled });
     } catch (err) {

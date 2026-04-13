@@ -12,6 +12,8 @@ import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { getCompanyBrandContext, saveCompanyBrandContext, type BrandContextData } from '@/app/actions/content-strategy';
 import { Loader2, Plus, X } from 'lucide-react';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
+import { auth } from '@/lib/firebase';
 
 // ─── Tag Input Component ──────
 function TagInput({
@@ -196,6 +198,7 @@ export function BrandContextShell({ companyId }: Props) {
       const result = await saveCompanyBrandContext(token, companyId, data);
       if (result.success) {
         toast({ title: 'Brand Context salvo com sucesso!' });
+        completeOnboardingItem(auth.currentUser?.uid, 'brand-context');
       } else {
         toast({ variant: 'destructive', title: 'Erro', description: result.error });
       }

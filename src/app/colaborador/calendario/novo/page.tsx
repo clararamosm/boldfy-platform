@@ -20,6 +20,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuthToken } from '@/lib/auth-client';
 import { createScheduledPost, updateScheduledPost } from '@/app/actions/posts';
 import { publishToLinkedIn, getLinkedInStatus } from '@/app/actions/linkedin';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 import {
   CalendarDays,
   Clock,
@@ -157,6 +158,7 @@ function EditorContent() {
 
       if (result.success) {
         toast({ title: t.colabNewPost.postScheduled, description: t.colabNewPost.postScheduledDescription });
+        completeOnboardingItem(userId ?? undefined, 'create-post');
         router.push('/colaborador/calendario');
       } else {
         toast({ variant: 'destructive', title: t.common.error, description: result.error });
@@ -211,6 +213,7 @@ function EditorContent() {
       if (result.success) {
         setPublishedUrl(result.postUrl || null);
         toast({ title: t.colabNewPost.publishedOnLinkedin, description: t.colabNewPost.publishedDescription });
+        completeOnboardingItem(userId ?? undefined, 'create-post');
       } else {
         toast({ variant: 'destructive', title: t.colabNewPost.publishError, description: result.error });
         if (result.needsReconnect) {
