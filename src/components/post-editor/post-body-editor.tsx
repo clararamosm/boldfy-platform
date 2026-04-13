@@ -2,8 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { SimpleRichEditor } from '@/components/ui/simple-rich-editor';
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { MessageSquareQuote, ChevronDown } from 'lucide-react';
+import { MessageSquareQuote } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import type { PostComment } from '@/lib/post-editor-types';
 
@@ -169,8 +168,7 @@ export function PostBodyEditor({
   activeCommentId,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
-  const [showHighlightPreview, setShowHighlightPreview] = useState(true);
+  const editorElRef = useRef<HTMLDivElement>(null);
   const [selectionPopup, setSelectionPopup] = useState<{
     x: number;
     y: number;
@@ -219,21 +217,31 @@ export function PostBodyEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit, comments, activeCommentId, value, selectionPopup]);
 
-  // Apply highlights to the edit-mode preview section
+  // Apply highlights directly in the strategist's contentEditable editor
   useEffect(() => {
-    if (!canEdit || !previewRef.current) return;
+    if (!canEdit || !editorElRef.current || unresolvedAnchors.length === 0) return;
 
+    // Remove any existing highlight marks first (from previous apply)
+    const existingMarks = editorElRef.current.querySelectorAll('mark.inline-highlight');
+    existingMarks.forEach(mark => {
+      const parent = mark.parentNode;
+      if (!parent) return;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+    });
+    editorElRef.current.normalize();
+
+    // Now apply fresh highlights
     const highlightAnchors: HighlightAnchor[] = unresolvedAnchors.map(c => ({
       commentId: c.id,
       startOffset: c.anchor!.startOffset,
       endOffset: c.anchor!.endOffset,
     }));
 
-    if (highlightAnchors.length > 0) {
-      applyHighlightsToDOM(previewRef.current, highlightAnchors, activeCommentId);
-    }
+    applyHighlightsToDOM(editorElRef.current, highlightAnchors, activeCommentId);
+  // Only re-apply when comments change, NOT on every keystroke (value)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canEdit, unresolvedAnchors, activeCommentId, value]);
+  }, [canEdit, unresolvedAnchors, activeCommentId]);
 
   // Close popup when scrolling
   useEffect(() => {
@@ -407,67 +415,34 @@ export function PostBodyEditor({
 
   // ─── Edit mode (strategist) ──────────────────────────
 
-  const hasHighlights = unresolvedAnchors.length > 0;
-
   return (
-    <div className="py-2 space-y-3">
-      {/* Editor */}
+    <div className="py-2">
+      {/* Inline highlight styles for edit mode */}
+      {unresolvedAnchors.length > 0 && (
+        <style>{`
+          .inline-highlight {
+            background-color: rgb(243 232 255);
+            border-radius: 2px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+            padding: 1px 0;
+          }
+          .inline-highlight:hover {
+            background-color: rgb(233 213 255);
+          }
+          .inline-highlight--active {
+            background-color: rgb(233 213 255);
+            box-shadow: 0 0 0 1px rgb(216 180 254);
+          }
+        `}</style>
+      )}
       <SimpleRichEditor
         value={value}
         onChange={onChange}
         placeholder="Escreva o conteúdo do post aqui..."
         className="min-h-[300px]"
+        editorRef={editorElRef}
       />
-
-      {/* Highlight preview — only when there are unresolved inline comments */}
-      {hasHighlights && (
-        <Collapsible open={showHighlightPreview} onOpenChange={setShowHighlightPreview}>
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-            >
-              <MessageSquareQuote className="h-3.5 w-3.5" />
-              <span>Comentários no texto ({unresolvedAnchors.length})</span>
-              <ChevronDown
-                className={`h-3.5 w-3.5 transition-transform ${showHighlightPreview ? 'rotate-180' : ''}`}
-              />
-            </button>
-          </CollapsibleTrigger>
-
-          <CollapsibleContent>
-            {/* Inline highlight styles */}
-            <style>{`
-              .inline-highlight {
-                background-color: rgb(243 232 255);
-                border-radius: 2px;
-                cursor: pointer;
-                transition: background-color 0.15s;
-                padding: 1px 0;
-              }
-              .inline-highlight:hover {
-                background-color: rgb(233 213 255);
-              }
-              .inline-highlight--active {
-                background-color: rgb(233 213 255);
-                box-shadow: 0 0 0 1px rgb(216 180 254);
-              }
-            `}</style>
-
-            <div
-              ref={previewRef}
-              className="prose prose-sm max-w-none mt-2 p-3 rounded-md border border-dashed border-purple-200 bg-purple-50/30 select-text text-sm"
-              dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(value || '', {
-                  ALLOWED_TAGS: ['b', 'i', 'u', 'strong', 'em', 'span', 'br', 'p', 'div', 'mark', 'font'],
-                  ALLOWED_ATTR: ['style', 'color', 'class', 'data-comment-id'],
-                }),
-              }}
-              onClick={handleClick}
-            />
-          </CollapsibleContent>
-        </Collapsible>
-      )}
     </div>
   );
 }

@@ -10,15 +10,19 @@ interface SimpleRichEditorProps {
   onChange: (html: string) => void;
   placeholder?: string;
   className?: string;
+  /** Expose the contentEditable element ref to parent */
+  editorRef?: React.RefObject<HTMLDivElement>;
 }
 
 export function SimpleRichEditor({
   value,
   onChange,
   placeholder = 'Digite o conteudo aqui...',
-  className
+  className,
+  editorRef: externalRef,
 }: SimpleRichEditorProps) {
-  const editorRef = useRef<HTMLDivElement>(null);
+  const internalRef = useRef<HTMLDivElement>(null);
+  const editorRef = externalRef || internalRef;
   const isInternalChange = useRef(false);
   const [showTip, setShowTip] = useState(false);
 
