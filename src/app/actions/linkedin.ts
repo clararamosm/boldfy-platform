@@ -4,7 +4,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { generateAuthUrl, publishLinkedInPost, refreshAccessToken, buildConnectionData, isTokenExpired, fetchPostMetricsBatch, type LinkedInConnection, type LinkedInPostMetrics } from '@/lib/linkedin';
-import { requireSelf, requireStrategistForTL, requireAuth } from '@/lib/auth-guard';
+import { requireSelf, requireStrategistForTL, requireAdmin, requireAuth } from '@/lib/auth-guard';
 import crypto from 'crypto';
 
 type LinkedInAuthResult = {
@@ -263,13 +263,13 @@ export type DashboardMetrics = {
  * then batch-fetches engagement from LinkedIn socialMetadata API.
  *
  * @param dateRange - Optional date range filter { start: ISO, end: ISO }
- * @param callerRole - When 'strategist', uses requireStrategistForTL instead of requireSelf
+ * @param callerRole - When 'strategist', uses requireStrategistForTL; when 'admin', uses requireAdmin; otherwise requireSelf
  */
 export async function getLinkedInDashboardMetrics(
   idToken: string,
   userId: string,
   dateRange?: { start: string; end: string },
-  callerRole?: 'self' | 'strategist',
+  callerRole?: 'self' | 'strategist' | 'admin',
 ): Promise<DashboardMetrics> {
   const empty: DashboardMetrics = {
     posts: [],
@@ -277,9 +277,11 @@ export async function getLinkedInDashboardMetrics(
   };
 
   try {
-    // Auth: strategist can view TL metrics, otherwise self-only
+    // Auth: strategist can view TL metrics, admin can view any user, otherwise self-only
     if (callerRole === 'strategist') {
       await requireStrategistForTL(idToken, userId);
+    } else if (callerRole === 'admin') {
+      await requireAdmin(idToken);
     } else {
       await requireSelf(idToken, userId);
     }
@@ -439,5 +441,61 @@ export async function getLinkedInDashboardMetrics(
     console.error('Error fetching LinkedIn dashboard metrics:', error);
     const message = error instanceof Error ? error.message : 'Erro desconhecido.';
     return { ...empty, error: `Erro ao buscar metricas: ${message}` };
+  }
+}
+
+// ─── Company LinkedIn Profiles ──────────────────────────────────
+
+export type CompanyLinkedInProfile = {
+  id: string;
+  name: string;
+  role: string;
+  hasLinkedin: boolean;
+};
+
+/**
+ * Get all users (colaboradores + thought leaders) from a company
+ * that have LinkedIn connected. Used by admin dashboard to populate
+ * the profile filter for LinkedIn Performance.
+ */
+export async function getCompanyLinkedInProfiles(
+  idToken: string,
+  companyId: string,
+): Promise<{ profiles: CompanyLinkedInProfile[]; error?: string }> {
+  try {
+    await requireAdmin(idToken, companyId);
+
+    const usersSnap = await adminDb
+      .collection('users')
+      .where('companyId', '==', companyId)
+      .where('status', '==', 'Ativo')
+      .get();
+
+    const profiles: CompanyLinkedInProfile[] = [];
+    for (const doc of usersSnap.docs) {
+      const data = doc.data();
+      const role = data.role as string;
+      // Only include colaboradores and thought leaders
+      if (role !== 'colaborador' && role !== 'thoughtleader') continue;
+
+      const connection = data.linkedinConnection as LinkedInConnection | undefined;
+      profiles.push({
+        id: doc.id,
+        name: data.name || data.email || doc.id,
+        role,
+        hasLinkedin: !!connection,
+      });
+    }
+
+    // Sort: LinkedIn connected first, then by name
+    profiles.sort((a, b) => {
+      if (a.hasLinkedin !== b.hasLinkedin) return a.hasLinkedin ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return { profiles };
+  } catch (error) {
+    console.error('Error fetching company LinkedIn profiles:', error);
+    return { profiles: [], error: 'Erro ao buscar perfis.' };
   }
 }

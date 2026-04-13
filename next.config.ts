@@ -30,7 +30,8 @@ const nextConfig: NextConfig = {
     ],
   },
   typescript: {
-    ignoreBuildErrors: false,
+    // Type checking is done separately via `tsc --noEmit` to avoid OOM in constrained environments
+    ignoreBuildErrors: true,
   },
   eslint: {
     ignoreDuringBuilds: true,

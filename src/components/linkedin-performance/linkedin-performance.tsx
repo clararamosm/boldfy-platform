@@ -30,8 +30,8 @@ type LinkedInPerformanceProps = {
   profiles?: ProfileOption[];
   /** Callback with loaded metrics so parent can use them (e.g., calendar cards) */
   onMetricsLoaded?: (metricsMap: Map<string, { reactions: number; comments: number }>) => void;
-  /** Caller role for auth — 'strategist' bypasses requireSelf */
-  callerRole?: 'self' | 'strategist';
+  /** Caller role for auth — 'strategist' or 'admin' bypasses requireSelf */
+  callerRole?: 'self' | 'strategist' | 'admin';
 };
 
 // ─── Skeleton ────────────────────────────────────────────────

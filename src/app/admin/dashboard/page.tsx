@@ -28,6 +28,8 @@ import { getAuthToken } from '@/lib/auth-client';
 import { getAdminDashboardData, type DashboardData } from '@/app/actions/dashboard';
 import { useAuth } from '@/contexts/auth-context';
 import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
+import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
+import { getCompanyLinkedInProfiles, type CompanyLinkedInProfile } from '@/app/actions/linkedin';
 
 // ─── Period Filter ──────────────────────────────────────────────────
 type PeriodKey = 'this_week' | 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months';
@@ -200,6 +202,7 @@ export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [period, setPeriod] = useState<PeriodKey>('this_month');
+  const [linkedInProfiles, setLinkedInProfiles] = useState<CompanyLinkedInProfile[]>([]);
   const { user } = useAuth();
   const { toast } = useToast();
   const t = useT();
@@ -209,13 +212,20 @@ export default function AdminDashboardPage() {
     setFetchError(null);
     try {
       const token = await getAuthToken();
-      const result = await getAdminDashboardData(token, companyId, getPeriodRange(period));
+      const [result, profilesResult] = await Promise.all([
+        getAdminDashboardData(token, companyId, getPeriodRange(period)),
+        getCompanyLinkedInProfiles(token, companyId),
+      ]);
 
       if (result.error) {
         setFetchError(result.error);
         toast({ variant: 'destructive', title: t.adminDashboard.loadingError, description: result.error });
       } else if (result.data) {
         setData(result.data);
+      }
+
+      if (profilesResult.profiles) {
+        setLinkedInProfiles(profilesResult.profiles.filter((p) => p.hasLinkedin));
       }
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -517,7 +527,17 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
 
-        {/* ─── BLOCO 4: Leaderboard + Saúde ──────────────────────────── */}
+        {/* ─── BLOCO 4: LinkedIn Performance ──────────────────────────── */}
+        {linkedInProfiles.length > 0 && (
+          <LinkedInPerformance
+            userId={linkedInProfiles[0].id}
+            showProfileFilter
+            profiles={linkedInProfiles.map((p) => ({ id: p.id, name: p.name }))}
+            callerRole="admin"
+          />
+        )}
+
+        {/* ─── BLOCO 5: Leaderboard + Saúde ──────────────────────────── */}
         <div className="grid gap-6 md:grid-cols-2">
           {/* Top 5 */}
           <Card>
