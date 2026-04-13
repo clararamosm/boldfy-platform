@@ -21,6 +21,27 @@ import { Button } from '@/components/ui/button';
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error';
 
+/**
+ * Convert HTML content to plain text (for captions saved by the old rich-text editor).
+ * Preserves line breaks and strips tags so the textarea displays clean text.
+ */
+function htmlToPlainText(html: string): string {
+  if (!/<[a-z][\s\S]*>/i.test(html)) return html;
+  let text = html;
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<\/(?:div|p|li|h[1-6])>/gi, '\n');
+  text = text.replace(/<[^>]+>/g, '');
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&amp;/g, '&');
+  text = text.replace(/&lt;/g, '<');
+  text = text.replace(/&gt;/g, '>');
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&apos;/g, "'");
+  text = text.replace(/\n{3,}/g, '\n\n');
+  return text.trim();
+}
+
 type Props = {
   companyId: string;
   tlId: string;
@@ -92,7 +113,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
         setCompanyName(result.companyName ?? '');
         setTlName(result.tlName ?? '');
         setTitle(result.post.title);
-        setCaption(result.post.caption);
+        setCaption(htmlToPlainText(result.post.caption));
         setIsLoading(false);
 
         // Load comments
@@ -293,7 +314,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
   // ---- Handle version restore ----
   const handleRestore = useCallback(async (version: PostVersion) => {
     setTitle(version.title);
-    setCaption(version.caption);
+    setCaption(htmlToPlainText(version.caption));
     setPost(prev => prev ? { ...prev, title: version.title, caption: version.caption } : prev);
     setSaveStatus('saved');
 

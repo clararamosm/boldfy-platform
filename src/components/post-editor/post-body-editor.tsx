@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { SimpleRichEditor } from '@/components/ui/simple-rich-editor';
-import { MessageSquareQuote } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { MessageSquareQuote, Info } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import type { PostComment } from '@/lib/post-editor-types';
 
@@ -168,7 +168,7 @@ export function PostBodyEditor({
   activeCommentId,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const editorElRef = useRef<HTMLDivElement>(null);
+  const editorElRef = useRef<HTMLTextAreaElement>(null);
   const [selectionPopup, setSelectionPopup] = useState<{
     x: number;
     y: number;
@@ -217,31 +217,8 @@ export function PostBodyEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit, comments, activeCommentId, value, selectionPopup]);
 
-  // Apply highlights directly in the strategist's contentEditable editor
-  useEffect(() => {
-    if (!canEdit || !editorElRef.current || unresolvedAnchors.length === 0) return;
-
-    // Remove any existing highlight marks first (from previous apply)
-    const existingMarks = editorElRef.current.querySelectorAll('mark.inline-highlight');
-    existingMarks.forEach(mark => {
-      const parent = mark.parentNode;
-      if (!parent) return;
-      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-      parent.removeChild(mark);
-    });
-    editorElRef.current.normalize();
-
-    // Now apply fresh highlights
-    const highlightAnchors: HighlightAnchor[] = unresolvedAnchors.map(c => ({
-      commentId: c.id,
-      startOffset: c.anchor!.startOffset,
-      endOffset: c.anchor!.endOffset,
-    }));
-
-    applyHighlightsToDOM(editorElRef.current, highlightAnchors, activeCommentId);
-  // Only re-apply when comments change, NOT on every keystroke (value)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canEdit, unresolvedAnchors, activeCommentId]);
+  // Note: Inline highlights in edit mode are not supported with textarea.
+  // Comments are still visible in the sidebar and in read-only mode.
 
   // Close popup when scrolling
   useEffect(() => {
@@ -342,7 +319,9 @@ export function PostBodyEditor({
   // ─── Read-only mode ──────────────────────────────────
 
   if (!canEdit) {
-    const sanitized = DOMPurify.sanitize(value || '', {
+    // Convert plain text \n to <br> for display, then sanitize
+    const displayValue = (value || '').includes('<') ? value : (value || '').replace(/\n/g, '<br>');
+    const sanitized = DOMPurify.sanitize(displayValue, {
       ALLOWED_TAGS: ['b', 'i', 'u', 'strong', 'em', 'span', 'br', 'p', 'div', 'mark', 'font'],
       ALLOWED_ATTR: ['style', 'color', 'class', 'data-comment-id'],
     });
@@ -415,34 +394,55 @@ export function PostBodyEditor({
 
   // ─── Edit mode (strategist) ──────────────────────────
 
+  const [showTip, setShowTip] = useState(false);
+
+  // Auto-replace -> with → in textarea
+  const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    let newValue = e.target.value;
+    const cursorPos = e.target.selectionStart;
+
+    // Replace -> with → at cursor position
+    if (cursorPos >= 2 && newValue.slice(cursorPos - 2, cursorPos) === '->') {
+      newValue = newValue.slice(0, cursorPos - 2) + '\u2192' + newValue.slice(cursorPos);
+      onChange(newValue);
+      // Restore cursor position (→ is 1 char instead of 2)
+      requestAnimationFrame(() => {
+        e.target.setSelectionRange(cursorPos - 1, cursorPos - 1);
+      });
+      return;
+    }
+
+    onChange(newValue);
+  }, [onChange]);
+
   return (
     <div className="py-2">
-      {/* Inline highlight styles for edit mode */}
-      {unresolvedAnchors.length > 0 && (
-        <style>{`
-          .inline-highlight {
-            background-color: rgb(243 232 255);
-            border-radius: 2px;
-            cursor: pointer;
-            transition: background-color 0.15s;
-            padding: 1px 0;
-          }
-          .inline-highlight:hover {
-            background-color: rgb(233 213 255);
-          }
-          .inline-highlight--active {
-            background-color: rgb(233 213 255);
-            box-shadow: 0 0 0 1px rgb(216 180 254);
-          }
-        `}</style>
-      )}
-      <SimpleRichEditor
-        value={value}
-        onChange={onChange}
-        placeholder="Escreva o conteúdo do post aqui..."
-        className="min-h-[300px]"
-        editorRef={editorElRef}
-      />
+      <div className="border rounded-md overflow-hidden">
+        {/* Info bar */}
+        <div className="flex items-center gap-1.5 px-2 py-1.5 border-b bg-gray-50">
+          <button
+            type="button"
+            onClick={() => setShowTip(!showTip)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Info className="w-3.5 h-3.5" />
+            <span>Atalhos</span>
+          </button>
+          {showTip && (
+            <span className="text-xs text-muted-foreground">
+              Digite <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">-&gt;</kbd> para inserir uma seta →
+            </span>
+          )}
+        </div>
+        {/* Textarea editor */}
+        <Textarea
+          value={value}
+          onChange={handleTextareaChange}
+          placeholder="Escreva o conteúdo do post aqui..."
+          className="min-h-[300px] border-0 rounded-none focus-visible:ring-0 resize-y text-sm"
+          ref={editorElRef}
+        />
+      </div>
     </div>
   );
 }

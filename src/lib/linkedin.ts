@@ -266,6 +266,46 @@ export async function uploadImageToLinkedIn(
 }
 
 /**
+ * Convert HTML content to LinkedIn-compatible plain text.
+ * Handles content saved by the rich-text editor (contentEditable innerHTML).
+ */
+function htmlToLinkedInText(html: string): string {
+  // If it doesn't contain any HTML tags, return as-is (already plain text)
+  if (!/<[a-z][\s\S]*>/i.test(html)) return html;
+
+  let text = html;
+
+  // Replace <br> and <br/> with newline
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+
+  // Replace closing block tags with newline (these represent line breaks)
+  text = text.replace(/<\/(?:div|p|li|h[1-6])>/gi, '\n');
+
+  // Replace opening block tags (remove them)
+  text = text.replace(/<(?:div|p|li|h[1-6]|ul|ol)(?:\s[^>]*)?>/gi, '');
+
+  // Strip all remaining HTML tags
+  text = text.replace(/<[^>]+>/g, '');
+
+  // Decode common HTML entities
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&amp;/g, '&');
+  text = text.replace(/&lt;/g, '<');
+  text = text.replace(/&gt;/g, '>');
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&apos;/g, "'");
+
+  // Collapse 3+ consecutive newlines down to 2
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  // Remove leading/trailing whitespace
+  text = text.trim();
+
+  return text;
+}
+
+/**
  * Publish a post to LinkedIn using the Posts API v2.
  * Supports text-only or text + image.
  */
@@ -277,6 +317,9 @@ export async function publishLinkedInPost(
 ): Promise<LinkedInPostResult> {
   const authorUrn = `urn:li:person:${linkedinId}`;
 
+  // Sanitize: convert any HTML to plain text for LinkedIn API
+  const cleanText = htmlToLinkedInText(text);
+
   // Upload image first if provided
   let imageUrn: string | undefined;
   if (imageUrl) {
@@ -286,7 +329,7 @@ export async function publishLinkedInPost(
   // Build post body (Posts API v2 format)
   const body: Record<string, unknown> = {
     author: authorUrn,
-    commentary: text,
+    commentary: cleanText,
     visibility: 'PUBLIC',
     lifecycleState: 'PUBLISHED',
     distribution: {
