@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,9 @@ import { FileText, CalendarDays, Clock, TrendingUp, Loader2, ArrowRight } from "
 import { useT } from '@/lib/i18n/context';
 import { interpolate } from '@/lib/i18n/interpolate';
 import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
 import { buildGetStatusLabel, getStatusConfig } from '@/lib/pipeline-config';
 import { cn } from '@/lib/utils';
@@ -18,6 +20,8 @@ export default function ThoughtLeaderDashboardPage() {
   const t = useT();
   const { user } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
   const [posts, setPosts] = useState<PipelinePost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -41,6 +45,20 @@ export default function ThoughtLeaderDashboardPage() {
   useEffect(() => {
     fetchPosts();
   }, [fetchPosts]);
+
+  // Handle LinkedIn OAuth redirect (?linkedin=success)
+  useEffect(() => {
+    const linkedinStatus = searchParams.get('linkedin');
+    if (linkedinStatus === 'success') {
+      toast({ title: 'LinkedIn conectado!', description: 'Sua conta do LinkedIn foi vinculada com sucesso.' });
+      completeOnboardingItem(user?.uid, 'connect-linkedin');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (linkedinStatus === 'error') {
+      const message = searchParams.get('message') || 'Erro ao conectar com LinkedIn.';
+      toast({ variant: 'destructive', title: 'Erro no LinkedIn', description: message });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [searchParams, user?.uid, toast]);
 
   // Compute KPIs
   const published = posts.filter(p => p.status === 'postado').length;
