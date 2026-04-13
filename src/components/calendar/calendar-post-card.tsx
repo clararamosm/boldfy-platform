@@ -12,6 +12,10 @@ export type CalendarCardPost = {
   caption?: string;
   scheduledFor: string | null;
   status: string;
+  // Post properties
+  etapa?: string;
+  formato?: string;
+  contentPillar?: string;
   // Strategist-specific
   tlUserId?: string;
   tlName?: string;
@@ -83,6 +87,27 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
           {statusConfig.label}
         </span>
       </div>
+
+      {/* Property tags: etapa, formato, pilar */}
+      {(post.etapa || post.formato || post.contentPillar) && (
+        <div className="flex flex-wrap items-center gap-0.5">
+          {post.etapa && (
+            <span className="inline-flex items-center px-1 py-px rounded text-[7px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400">
+              {post.etapa}
+            </span>
+          )}
+          {post.formato && (
+            <span className="inline-flex items-center px-1 py-px rounded text-[7px] font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              {post.formato}
+            </span>
+          )}
+          {post.contentPillar && (
+            <span className="inline-flex items-center px-1 py-px rounded text-[7px] font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 truncate max-w-[80px]">
+              {post.contentPillar}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Time */}
       {showTime && (
