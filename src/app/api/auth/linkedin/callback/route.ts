@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   function getRedirectBase(role?: string): string {
     switch (role) {
       case 'thoughtleader':
-        return `${baseUrl}/thoughtleader/dashboard`;
+        return `${baseUrl}/thoughtleader/configuracoes`;
       case 'colaborador':
       default:
         return `${baseUrl}/colaborador/configuracoes`;

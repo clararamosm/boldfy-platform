@@ -10,7 +10,7 @@ import Logo from "@/components/logo";
 import { ColaboradorSidebarNav } from "@/components/dashboard/colaborador-sidebar-nav";
 import { useRouter } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
-import { User as UserIcon, Loader2, HelpCircle } from "lucide-react";
+import { User as UserIcon, Loader2, HelpCircle, Sparkles } from "lucide-react";
 const SuspenseFallback = () => <div className="flex h-screen items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-purple-600" /></div>;
 import { AuthProvider } from "@/contexts/auth-context";
 import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
@@ -74,6 +74,7 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
                     avatarOverride={companyLogoUrl}
                     feedbackPage="Sidebar"
                     menuItems={[
+                        { href: '/colaborador/marca-pessoal', label: 'Marca Pessoal', icon: Sparkles },
                         { href: '/colaborador/configuracoes', label: t.nav.settings, icon: UserIcon },
                         { href: '/colaborador/suporte', label: t.nav.support, icon: HelpCircle },
                     ]}
