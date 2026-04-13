@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 import { getPillarClasses } from '@/lib/pillar-colors';
+import { PostListTable } from '@/components/calendar/post-list-table';
 import { getContentStrategy } from '@/app/actions/content-strategy';
 import {
   format,
@@ -409,6 +410,20 @@ export default function StrategistCalendarioPerfilPage() {
             </div>
           </div>
         </div>
+
+        {/* Post list table — all posts for this TL */}
+        <PostListTable
+          posts={posts.map(p => ({
+            ...p,
+            contentPillar: p.contentPillar || '',
+            formato: p.formato || '',
+          }))}
+          getStatusLabel={(status) => STATUS_CONFIG[status]?.label || status}
+          onPostClick={(postId) => {
+            const post = posts.find(p => p.id === postId);
+            if (post) handlePostClick(post);
+          }}
+        />
 
       </main>
     </>

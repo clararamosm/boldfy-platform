@@ -138,12 +138,12 @@ export default function ThoughtLeaderDashboardPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{post.title || 'Sem título'}</p>
                             <p className="text-xs text-muted-foreground truncate mt-0.5">
-                              {post.format || ''}
+                              {post.formato || ''}
                             </p>
                           </div>
                           <Badge
                             variant="outline"
-                            className={cn('ml-2 shrink-0 text-xs', config.badgeClass)}
+                            className={cn('ml-2 shrink-0 text-xs', config.badge)}
                           >
                             {getStatusLabel(post.status)}
                           </Badge>

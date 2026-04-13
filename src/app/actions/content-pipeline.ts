@@ -518,7 +518,7 @@ export async function getStrategistSidebarData(
       // Single query for all TLs across assigned companies (avoids N+1)
       adminDb.collection('users')
         .where('companyId', 'in', assignedCompanies.slice(0, 30)) // Firestore 'in' limit: 30
-        .where('role', '==', 'thoughtleader')
+        .where('role', 'in', ['thoughtleader', 'colaborador'])
         .get(),
     ]);
 
@@ -605,7 +605,7 @@ export async function resolveSlugs(
       const tlSnap = await adminDb.collection('users')
         .where('slug', '==', tlSlug)
         .where('companyId', '==', companyId)
-        .where('role', '==', 'thoughtleader')
+        .where('role', 'in', ['thoughtleader', 'colaborador'])
         .limit(1)
         .get();
 
@@ -615,7 +615,8 @@ export async function resolveSlugs(
       } else {
         // Fallback: check if slug is actually a raw ID
         const directDoc = await adminDb.collection('users').doc(tlSlug).get();
-        if (directDoc.exists && directDoc.data()?.role === 'thoughtleader') {
+        const directRole = directDoc.data()?.role;
+        if (directDoc.exists && (directRole === 'thoughtleader' || directRole === 'colaborador')) {
           tlId = tlSlug;
           tlName = directDoc.data()?.profile?.name || directDoc.data()?.name || '';
         }
