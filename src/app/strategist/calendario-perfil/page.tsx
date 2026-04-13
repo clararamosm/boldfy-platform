@@ -8,16 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
-import { getPipelinePosts, resolveSlugs, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
+import { getPipelinePosts, resolveSlugs, updatePipelinePost, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
 import {
   ChevronLeft,
   ChevronRight,
-  Clock,
   Plus,
   Loader2,
 } from 'lucide-react';
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
-import { getPillarClasses } from '@/lib/pillar-colors';
+import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
+import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 import { PostListTable } from '@/components/calendar/post-list-table';
 import { getContentStrategy } from '@/app/actions/content-strategy';
 import {
@@ -31,7 +31,6 @@ import {
   addMonths,
   subMonths,
   isToday,
-  parseISO,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -76,6 +75,10 @@ export default function StrategistCalendarioPerfilPage() {
 
   // Pillar color map: pillarName → colorKey
   const [pillarColorMap, setPillarColorMap] = useState<Record<string, string>>({});
+
+  // ─── Drag & drop state ──────
+  const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null);
 
   // ─── Resolve slugs to IDs ──────
   useEffect(() => {
@@ -216,6 +219,73 @@ export default function StrategistCalendarioPerfilPage() {
     return counts;
   }, [scheduledPosts]);
 
+  // ─── Status config helper ──────
+  const getCardConfig = (status: string): CalendarCardConfig => {
+    const cfg = STATUS_CONFIG[status as PipelineStatus] || STATUS_CONFIG.backlog;
+    return { label: cfg.label, badge: cfg.badge, dot: cfg.dot };
+  };
+
+  // ─── Drag & Drop handlers ──────
+  const handleDragStart = (post: PipelinePost, e: React.DragEvent) => {
+    setDraggedPostId(post.id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', post.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPostId(null);
+    setDragOverDay(null);
+  };
+
+  const handleDrop = async (dayKey: string) => {
+    if (!draggedPostId || !tlId) return;
+
+    const post = posts.find(p => p.id === draggedPostId);
+    if (!post || !post.scheduledFor) return;
+
+    // Keep the original time, change only the date
+    const originalTime = post.scheduledFor.substring(10); // "T12:00:00..." part
+    const newScheduledFor = dayKey + originalTime;
+
+    if (newScheduledFor === post.scheduledFor) {
+      handleDragEnd();
+      return;
+    }
+
+    // Optimistic update
+    setPosts(prev => prev.map(p =>
+      p.id === draggedPostId
+        ? { ...p, scheduledFor: newScheduledFor }
+        : p
+    ));
+
+    handleDragEnd();
+
+    try {
+      const token = await getAuthToken();
+      const result = await updatePipelinePost(token, tlId, post.id, {
+        scheduledFor: newScheduledFor,
+      });
+      if (result.error) {
+        // Revert
+        setPosts(prev => prev.map(p =>
+          p.id === post.id
+            ? { ...p, scheduledFor: post.scheduledFor }
+            : p
+        ));
+        toast({ variant: 'destructive', title: 'Erro ao mover post', description: result.error });
+      }
+    } catch {
+      // Revert
+      setPosts(prev => prev.map(p =>
+        p.id === post.id
+          ? { ...p, scheduledFor: post.scheduledFor }
+          : p
+      ));
+      toast({ variant: 'destructive', title: 'Erro ao mover post' });
+    }
+  };
+
   if (!tlSlug) {
     return (
       <>
@@ -312,99 +382,43 @@ export default function StrategistCalendarioPerfilPage() {
               {calendarDays.map((day, idx) => {
                 const dayKey = format(day, 'yyyy-MM-dd');
                 const dayPosts = postsByDay.get(dayKey) || [];
-                const inMonth = isSameMonth(day, currentMonth);
-                const today = isToday(day);
 
                 return (
-                  <div
+                  <CalendarDayCell
                     key={idx}
-                    className={`
-                      min-h-[150px] p-1.5 border-b border-r text-left
-                      ${!inMonth ? 'bg-muted/10' : ''}
-                    `}
+                    day={day}
+                    inMonth={isSameMonth(day, currentMonth)}
+                    isToday={isToday(day)}
+                    droppable={!!draggedPostId}
+                    isDragOver={dragOverDay === dayKey}
+                    onDragOver={() => setDragOverDay(dayKey)}
+                    onDragLeave={() => { if (dragOverDay === dayKey) setDragOverDay(null); }}
+                    onDrop={() => handleDrop(dayKey)}
                   >
-                    <span
-                      className={`
-                        inline-flex items-center justify-center h-6 w-6 rounded-full text-xs font-medium
-                        ${today ? 'bg-primary text-primary-foreground' : ''}
-                        ${!inMonth ? 'text-muted-foreground/50' : 'text-foreground'}
-                      `}
-                    >
-                      {format(day, 'd')}
-                    </span>
-
-                    {/* Post cards — detailed for profile view */}
-                    <div className="mt-1 space-y-1">
-                      {dayPosts.slice(0, 3).map(post => {
-                        const cfg = STATUS_CONFIG[post.status] || STATUS_CONFIG.backlog;
-                        const time = post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : '';
-                        const showTime = time && time !== '00:00';
-
-                        return (
-                          <button
-                            key={post.id}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handlePostClick(post);
-                            }}
-                            className="w-full text-left rounded-md border bg-card p-1.5 transition-all hover:ring-1 hover:ring-primary/40 hover:shadow-sm cursor-pointer space-y-0.5"
-                            title={post.title || 'Sem título'}
-                          >
-                            {/* Title */}
-                            <p className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
-                              {post.title || 'Sem título'}
-                            </p>
-
-                            {/* Status */}
-                            <div className="flex items-center gap-1">
-                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cfg.dot}`} />
-                              <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-semibold ${cfg.badge}`}>
-                                {cfg.label}
-                              </span>
-                            </div>
-
-                            {/* Tags: formato (gray) + etapa (gray) + pilar (dynamic color) */}
-                            {(post.formato || post.etapa || post.contentPillar) && (
-                              <div className="flex flex-wrap gap-0.5">
-                                {post.formato && (
-                                  <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                                    {post.formato}
-                                  </span>
-                                )}
-                                {post.etapa && (
-                                  <span className="inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                                    {post.etapa}
-                                  </span>
-                                )}
-                                {post.contentPillar && (() => {
-                                  const pillarColor = getPillarClasses(pillarColorMap[post.contentPillar]);
-                                  return (
-                                    <span className={`inline-flex items-center px-1.5 py-px rounded text-[8px] font-medium ${pillarColor.bg} ${pillarColor.text}`}>
-                                      {post.contentPillar}
-                                    </span>
-                                  );
-                                })()}
-                              </div>
-                            )}
-
-                            {/* Time */}
-                            {showTime && (
-                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                                <Clock className="h-2.5 w-2.5" />
-                                <span>{time}</span>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
-                      {dayPosts.length > 3 && (
-                        <div className="text-[10px] text-muted-foreground px-1 font-medium">
-                          +{dayPosts.length - 3} mais
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    {dayPosts.slice(0, 3).map(post => (
+                      <CalendarPostCard
+                        key={post.id}
+                        post={{
+                          ...post,
+                          title: post.title || 'Sem título',
+                          tlUserId: tlId || undefined,
+                          tlName,
+                        }}
+                        statusConfig={getCardConfig(post.status)}
+                        onClick={() => handlePostClick(post)}
+                        showProfile={false}
+                        draggable
+                        onDragStart={(e) => handleDragStart(post, e)}
+                        onDragEnd={handleDragEnd}
+                        isDragging={draggedPostId === post.id}
+                      />
+                    ))}
+                    {dayPosts.length > 3 && (
+                      <div className="text-[10px] text-muted-foreground px-1 font-medium">
+                        +{dayPosts.length - 3} mais
+                      </div>
+                    )}
+                  </CalendarDayCell>
                 );
               })}
             </div>
