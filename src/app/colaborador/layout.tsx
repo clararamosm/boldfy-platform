@@ -19,6 +19,7 @@ import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useSubscription } from "@/hooks/use-subscription";
 import { SubscriptionGate } from "@/components/subscription-gate";
+import { OnboardingShell } from "@/components/onboarding";
 
 function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
@@ -29,11 +30,14 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
     const subscription = useSubscription(companyId);
     const router = useRouter();
     const [companyLogoUrl, setCompanyLogoUrl] = useState<string | undefined>();
+    const [companyName, setCompanyName] = useState('');
 
     useEffect(() => {
         if (!companyId) return;
         getDoc(doc(db, 'companies', companyId)).then(snap => {
-            setCompanyLogoUrl(snap.data()?.logoUrl || undefined);
+            const data = snap.data();
+            setCompanyLogoUrl(data?.logoUrl || undefined);
+            setCompanyName(data?.companyName || '');
         }).catch(() => {});
     }, [companyId]);
 
@@ -91,7 +95,9 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
             ) : subscription.isBlocked ? (
                 <SubscriptionGate role="colaborador" plan={subscription.plan} />
             ) : (
-                children
+                <OnboardingShell role="colaborador" companyName={companyName}>
+                    {children}
+                </OnboardingShell>
             )}
         </DashboardLayout>
         </LocaleProvider>

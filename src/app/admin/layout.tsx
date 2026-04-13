@@ -19,6 +19,7 @@ import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useSubscription } from "@/hooks/use-subscription";
 import { SubscriptionGate } from "@/components/subscription-gate";
+import { OnboardingShell } from "@/components/onboarding";
 
 const TrialBanner = ({ daysLeft, plan }: { daysLeft: number; plan: string }) => {
     if (plan !== 'trial' || daysLeft > 7) return null;
@@ -53,11 +54,16 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
     const [companyLogoUrl, setCompanyLogoUrl] = useState<string | undefined>();
+    const [companyName, setCompanyName] = useState('');
+    const [licensesCount, setLicensesCount] = useState(5);
 
     useEffect(() => {
         if (!companyId) return;
         getDoc(doc(db, 'companies', companyId)).then(snap => {
-            setCompanyLogoUrl(snap.data()?.logoUrl || undefined);
+            const data = snap.data();
+            setCompanyLogoUrl(data?.logoUrl || undefined);
+            setCompanyName(data?.companyName || '');
+            setLicensesCount(data?.subscription?.totalLicenses || 5);
         }).catch(() => {});
     }, [companyId]);
 
@@ -130,7 +136,14 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                 ) : subscription.isBlocked && !isMasterMode && pathname !== '/admin/configuracoes' ? (
                     <SubscriptionGate role="admin" plan={subscription.plan} />
                 ) : (
-                    children
+                    <OnboardingShell
+                        role="admin"
+                        companyName={companyName}
+                        licensesCount={licensesCount}
+                        trialDays={subscription.daysLeft}
+                    >
+                        {children}
+                    </OnboardingShell>
                 )}
             </DashboardLayout>
         </LocaleProvider>

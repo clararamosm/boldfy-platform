@@ -18,6 +18,7 @@ import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useSubscription } from "@/hooks/use-subscription";
 import { SubscriptionGate } from "@/components/subscription-gate";
+import { OnboardingShell } from "@/components/onboarding";
 
 function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
@@ -85,7 +86,9 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
             ) : subscription.isBlocked ? (
                 <SubscriptionGate role="colaborador" plan={subscription.plan} />
             ) : (
-                children
+                <OnboardingShell role="thoughtleader">
+                    {children}
+                </OnboardingShell>
             )}
         </DashboardLayout>
         </LocaleProvider>
