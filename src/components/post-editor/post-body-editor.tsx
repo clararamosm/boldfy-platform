@@ -196,12 +196,28 @@ export function PostBodyEditor({
         endOffset: c.anchor!.endOffset,
       }));
 
+    // Include temporary selection highlight if popup is active
+    if (selectionPopup) {
+      highlightAnchors.push({
+        commentId: '__temp__',
+        startOffset: selectionPopup.anchor.startOffset,
+        endOffset: selectionPopup.anchor.endOffset,
+      });
+    }
+
     if (highlightAnchors.length > 0) {
       applyHighlightsToDOM(containerRef.current, highlightAnchors, activeCommentId);
+
+      // Restyle temp marks to use the temp class (blue instead of purple)
+      if (selectionPopup) {
+        containerRef.current.querySelectorAll('mark[data-comment-id="__temp__"]').forEach(m => {
+          m.className = 'inline-highlight inline-highlight--temp';
+        });
+      }
     }
-  // Re-apply when comments or value changes
+  // Re-apply when comments, value, or selection popup changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canEdit, comments, activeCommentId, value]);
+  }, [canEdit, comments, activeCommentId, value, selectionPopup]);
 
   // Apply highlights to the edit-mode preview section
   useEffect(() => {
@@ -219,29 +235,13 @@ export function PostBodyEditor({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit, unresolvedAnchors, activeCommentId, value]);
 
-  // Remove any temporary selection highlight marks from the container
-  const clearTempHighlight = useCallback(() => {
-    if (!containerRef.current) return;
-    const marks = containerRef.current.querySelectorAll('mark.inline-highlight--temp');
-    marks.forEach(mark => {
-      const parent = mark.parentNode;
-      if (!parent) return;
-      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-      parent.removeChild(mark);
-      parent.normalize(); // merge adjacent text nodes back together
-    });
-  }, []);
-
   // Close popup when scrolling
   useEffect(() => {
     if (!selectionPopup) return;
-    const handleDismiss = () => {
-      clearTempHighlight();
-      setSelectionPopup(null);
-    };
+    const handleDismiss = () => setSelectionPopup(null);
     window.addEventListener('scroll', handleDismiss, true);
     return () => window.removeEventListener('scroll', handleDismiss, true);
-  }, [selectionPopup, clearTempHighlight]);
+  }, [selectionPopup]);
 
   // Close popup on mousedown outside popup
   useEffect(() => {
@@ -250,7 +250,6 @@ export function PostBodyEditor({
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('.selection-popup')) {
-        clearTempHighlight();
         setSelectionPopup(null);
       }
     };
@@ -263,7 +262,7 @@ export function PostBodyEditor({
       clearTimeout(timeout);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [selectionPopup, clearTempHighlight]);
+  }, [selectionPopup]);
 
   // Handle text selection in read-only mode
   const handleMouseUp = useCallback(() => {
@@ -294,16 +293,9 @@ export function PostBodyEditor({
       const rect = range.getBoundingClientRect();
       const containerRect = containerRef.current!.getBoundingClientRect();
 
-      // Clear browser selection — we'll show our own highlight instead
+      // Clear browser selection — the useEffect will apply a temp highlight
+      // after the re-render caused by setSelectionPopup
       selection.removeAllRanges();
-
-      // Apply a temporary visual highlight so the user sees their selection
-      clearTempHighlight();
-      wrapTextRange(containerRef.current!, startOffset, endOffset, '__temp__', false);
-      // Swap class to temp style
-      containerRef.current!.querySelectorAll('mark[data-comment-id="__temp__"]').forEach(m => {
-        m.className = 'inline-highlight inline-highlight--temp';
-      });
 
       setSelectionPopup({
         x: rect.left - containerRect.left + rect.width / 2,
@@ -316,7 +308,7 @@ export function PostBodyEditor({
         },
       });
     }, 10);
-  }, [onAddInlineComment, clearTempHighlight]);
+  }, [onAddInlineComment]);
 
   // Handle click on existing highlight
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -335,10 +327,9 @@ export function PostBodyEditor({
   const handleCommentClick = useCallback(() => {
     if (selectionPopup && onAddInlineComment) {
       onAddInlineComment(selectionPopup.anchor);
-      clearTempHighlight();
       setSelectionPopup(null);
     }
-  }, [selectionPopup, onAddInlineComment, clearTempHighlight]);
+  }, [selectionPopup, onAddInlineComment]);
 
   // ─── Read-only mode ──────────────────────────────────
 
