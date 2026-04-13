@@ -25,6 +25,7 @@ export type OnboardingState = {
   welcomeSeen: boolean;           // Has the user seen the welcome popup?
   checklistCompleted: boolean;    // All items done?
   completedItems: string[];       // IDs of completed items
+  dismissedTooltips: string[];    // IDs of tooltips the user clicked "Entendi!" on
   tooltipStep: number;            // Current tooltip step (0 = not started)
   completedAt?: number;           // Timestamp when all items were completed
 };
@@ -39,6 +40,7 @@ export type OnboardingData = {
   // Actions
   markWelcomeSeen: () => Promise<void>;
   markItemCompleted: (itemId: string) => Promise<void>;
+  dismissTooltipForItem: (itemId: string) => Promise<void>;
   advanceTooltip: () => Promise<void>;
   dismissTooltips: () => Promise<void>;
 };
@@ -128,6 +130,7 @@ const DEFAULT_STATE: OnboardingState = {
   welcomeSeen: false,
   checklistCompleted: false,
   completedItems: [],
+  dismissedTooltips: [],
   tooltipStep: 0,
 };
 
@@ -164,6 +167,7 @@ export function useOnboarding(
         welcomeSeen: ob.welcomeSeen ?? false,
         checklistCompleted: ob.checklistCompleted ?? false,
         completedItems: ob.completedItems ?? [],
+        dismissedTooltips: (ob.dismissedTooltips as string[]) ?? [],
         tooltipStep: ob.tooltipStep ?? 0,
         completedAt: ob.completedAt as number | undefined,
       });
@@ -218,6 +222,21 @@ export function useOnboarding(
     }
   }, [uid, checklistDef.length]);
 
+  const dismissTooltipForItem = useCallback(async (itemId: string) => {
+    if (!uid) return;
+    const current = stateRef.current;
+    if (current.dismissedTooltips.includes(itemId)) return; // Already dismissed
+
+    const newDismissed = [...current.dismissedTooltips, itemId];
+    try {
+      await updateDoc(doc(db, 'users', uid), {
+        'onboarding.dismissedTooltips': newDismissed,
+      });
+    } catch (err) {
+      console.error('Failed to dismiss tooltip:', err);
+    }
+  }, [uid]);
+
   const advanceTooltip = useCallback(async () => {
     if (!uid) return;
     const next = stateRef.current.tooltipStep + 1;
@@ -250,6 +269,7 @@ export function useOnboarding(
     loading,
     markWelcomeSeen,
     markItemCompleted,
+    dismissTooltipForItem,
     advanceTooltip,
     dismissTooltips,
   };

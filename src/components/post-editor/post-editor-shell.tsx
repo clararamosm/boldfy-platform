@@ -16,8 +16,13 @@ import { PostBodyEditor } from './post-body-editor';
 import { PostMediaSection } from './post-media-section';
 import { CommentsSidebar } from './comments-sidebar';
 import { VersionHistory } from './version-history';
-import { Loader2, MessageSquare } from 'lucide-react';
+import { Loader2, MessageSquare, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog, DialogContent, DialogDescription,
+  DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error';
 
@@ -77,6 +82,11 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
   // Inline comment state (text selection → comment flow)
   const [pendingAnchor, setPendingAnchor] = useState<PostComment['anchor'] | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+
+  // TL approval state
+  const [approvalLoading, setApprovalLoading] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectFeedback, setRejectFeedback] = useState('');
 
   // Auto-save refs
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -355,6 +365,59 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     setPost(prev => prev ? { ...prev, mediaUrl, mediaType } : prev);
   }, []);
 
+  // ---- TL Approve / Request Adjustment ----
+  const isTL = user?.role === 'thoughtleader';
+  const canApproveIdea = isTL && post?.status === 'aprovar_ideia';
+  const canApprovePost = isTL && post?.status === 'aprovar_post';
+  const showApproveActions = canApproveIdea || canApprovePost;
+
+  const handleApprove = useCallback(async () => {
+    if (!post) return;
+    setApprovalLoading(true);
+    try {
+      const token = await getAuthToken();
+      if (post.status === 'aprovar_ideia') {
+        const { approvePipelineIdea } = await import('@/app/actions/content-pipeline');
+        const result = await approvePipelineIdea(token, postId);
+        if (result.success) {
+          setPost(prev => prev ? { ...prev, status: 'em_producao' as PipelineStatus, tlApprovedAt: new Date().toISOString() } : prev);
+          toast({ title: 'Ideia aprovada!', description: 'A ideia foi enviada para produção.' });
+        }
+      } else if (post.status === 'aprovar_post') {
+        const { approvePipelinePost } = await import('@/app/actions/content-pipeline');
+        const result = await approvePipelinePost(token, postId);
+        if (result.success) {
+          setPost(prev => prev ? { ...prev, status: 'pronto_pra_postar' as PipelineStatus, tlApprovedAt: new Date().toISOString() } : prev);
+          toast({ title: 'Post aprovado!', description: 'O post está pronto para publicação.' });
+        }
+      }
+    } catch {
+      toast({ title: 'Erro ao aprovar', description: 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setApprovalLoading(false);
+    }
+  }, [post, postId, toast]);
+
+  const handleRequestAdjustment = useCallback(async () => {
+    if (!post || !rejectFeedback.trim()) return;
+    setApprovalLoading(true);
+    try {
+      const token = await getAuthToken();
+      const { requestPipelineAdjustment } = await import('@/app/actions/content-pipeline');
+      const result = await requestPipelineAdjustment(token, postId, rejectFeedback.trim());
+      if (result.success) {
+        setPost(prev => prev ? { ...prev, status: 'ajuste' as PipelineStatus, tlFeedback: rejectFeedback.trim() } : prev);
+        setRejectDialogOpen(false);
+        setRejectFeedback('');
+        toast({ title: 'Ajuste solicitado', description: 'O estrategista será notificado.' });
+      }
+    } catch {
+      toast({ title: 'Erro ao solicitar ajuste', description: 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setApprovalLoading(false);
+    }
+  }, [post, postId, rejectFeedback, toast]);
+
   // ---- Navigation back ----
   const handleBack = useCallback(() => {
     if (window.history.length > 1) {
@@ -452,6 +515,36 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
             onForceSchedule={handleForceSchedule}
           />
 
+          {/* TL Approve / Reject actions */}
+          {showApproveActions && (
+            <div className="flex items-center gap-3 p-4 rounded-lg border bg-primary/5 border-primary/20">
+              <div className="flex-1 text-sm text-foreground">
+                {canApproveIdea
+                  ? 'Esta ideia está aguardando sua aprovação.'
+                  : 'Este post está aguardando sua aprovação.'}
+              </div>
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={handleApprove}
+                disabled={approvalLoading}
+              >
+                {approvalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                Aprovar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                onClick={() => setRejectDialogOpen(true)}
+                disabled={approvalLoading}
+              >
+                <XCircle className="h-4 w-4" />
+                Pedir Ajuste
+              </Button>
+            </div>
+          )}
+
           {/* Body (caption) */}
           <PostBodyEditor
             value={caption}
@@ -497,6 +590,36 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
         />
         </div>
       </div>
+
+      {/* TL Rejection / Adjustment Dialog */}
+      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Solicitar Ajuste</DialogTitle>
+            <DialogDescription>
+              Descreva o que precisa ser alterado. O estrategista receberá seu feedback.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={rejectFeedback}
+            onChange={e => setRejectFeedback(e.target.value)}
+            placeholder="Descreva o ajuste necessário..."
+            rows={4}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleRequestAdjustment}
+              disabled={!rejectFeedback.trim() || approvalLoading}
+            >
+              {approvalLoading && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Enviar Feedback
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

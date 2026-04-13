@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useOnboarding, type OnboardingRole } from '@/hooks/use-onboarding';
@@ -126,20 +126,28 @@ export function OnboardingShell({
   const tooltipDefs = useMemo(() => getTooltipsForRole(role), [role]);
   const settingsHref = getSettingsHref(role);
 
-  // Find tooltip for current page — only if its checklist item isn't completed yet
+  // Find tooltip for current page — only if not already dismissed and not completed
   const currentTooltip = useMemo(() => {
-    if (ob.state.tooltipStep < 0) return null;  // Dismissed
     if (ob.state.checklistCompleted) return null; // All done
 
     const match = tooltipDefs.find((t) => pathname.startsWith(t.pathPattern));
     if (!match) return null;
 
-    // Only show if the related checklist item is NOT completed
-    const itemCompleted = ob.state.completedItems.includes(match.checklistItemId);
-    if (itemCompleted) return null;
+    // Don't show if the user already clicked "Entendi!" for this tooltip
+    if (ob.state.dismissedTooltips.includes(match.checklistItemId)) return null;
+
+    // Don't show if the checklist item is already completed (action was done)
+    if (ob.state.completedItems.includes(match.checklistItemId)) return null;
 
     return match;
-  }, [ob.state.tooltipStep, ob.state.checklistCompleted, ob.state.completedItems, tooltipDefs, pathname]);
+  }, [ob.state.checklistCompleted, ob.state.dismissedTooltips, ob.state.completedItems, tooltipDefs, pathname]);
+
+  // Handler for "Entendi!" — dismisses the tooltip (does NOT complete checklist item)
+  const handleTooltipDismiss = useCallback(async () => {
+    if (currentTooltip) {
+      await ob.dismissTooltipForItem(currentTooltip.checklistItemId);
+    }
+  }, [currentTooltip, ob]);
 
   // Find the single checklist item for this page
   const currentChecklistItem = useMemo(() => {
@@ -196,7 +204,7 @@ export function OnboardingShell({
           checklistItem={currentChecklistItem}
           currentStep={completedStepCount + 1}
           totalSteps={totalTooltipSteps}
-          onDismiss={ob.advanceTooltip}
+          onDismiss={handleTooltipDismiss}
           visible={ob.state.welcomeSeen && !ob.state.checklistCompleted}
         />
       )}

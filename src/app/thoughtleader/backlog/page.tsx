@@ -487,11 +487,6 @@ function BacklogCard({
         )}
       </div>
 
-      {/* Caption preview */}
-      {post.caption && (
-        <p className="text-xs text-muted-foreground line-clamp-2">{post.caption}</p>
-      )}
-
       {/* Feedback banner */}
       {post.tlFeedback && (
         <div className="p-2 bg-destructive/10 rounded text-xs text-destructive">
