@@ -143,11 +143,12 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange, onForceS
           onChange={(e) => {
             const dateVal = e.target.value;
             if (dateVal) {
-              // Preserve existing time if any (strip Z/offset for local time)
-              const raw = post.scheduledFor?.includes('T')
-                ? post.scheduledFor.split('T')[1]?.replace(/Z$/, '').substring(0, 5) || '00:00'
-                : '00:00';
-              onPropertyChange('scheduledFor', `${dateVal}T${raw}:00.000`);
+              // Preserve existing time if any
+              const existingTime = post.scheduledFor?.includes('T')
+                ? post.scheduledFor.split('T')[1]?.replace(/Z$/, '').substring(0, 5)
+                : null;
+              const time = existingTime || '09:00';
+              onPropertyChange('scheduledFor', `${dateVal}T${time}:00.000`);
             } else {
               onPropertyChange('scheduledFor', null);
             }
@@ -171,6 +172,9 @@ export function PostProperties({ post, canEdit, tlId, onPropertyChange, onForceS
             const dateVal = post.scheduledFor ? post.scheduledFor.split('T')[0] : '';
             if (dateVal && timeVal) {
               onPropertyChange('scheduledFor', `${dateVal}T${timeVal}:00.000`);
+            } else if (dateVal && !timeVal) {
+              // User cleared the time — keep date with no time
+              onPropertyChange('scheduledFor', `${dateVal}T00:00:00.000`);
             }
           }}
           disabled={!post.scheduledFor}

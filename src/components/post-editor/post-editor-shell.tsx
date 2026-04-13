@@ -58,10 +58,12 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
   const lastVersionTimeRef = useRef<number>(0);
   const titleRef = useRef(title);
   const captionRef = useRef(caption);
+  const postRef = useRef(post);
 
   // Keep refs in sync
   titleRef.current = title;
   captionRef.current = caption;
+  postRef.current = post;
 
   // ---- Load post data ----
   useEffect(() => {
@@ -120,9 +122,10 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
 
     const currentTitle = titleRef.current;
     const currentCaption = captionRef.current;
+    const currentPost = postRef.current;
 
     // Check if content actually changed from what's in the post
-    if (currentTitle === post?.title && currentCaption === post?.caption) {
+    if (currentTitle === currentPost?.title && currentCaption === currentPost?.caption) {
       setSaveStatus('saved');
       return;
     }
@@ -162,7 +165,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     } catch {
       setSaveStatus('error');
     }
-  }, [canEdit, post, tlId, postId]);
+  }, [canEdit, tlId, postId]);
 
   const scheduleSave = useCallback(() => {
     if (!canEdit) return;
@@ -205,7 +208,10 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
 
   // ---- Handle property changes (immediate save) ----
   const handlePropertyChange = useCallback(async (field: string, value: unknown) => {
-    if (!canEdit || !post) return;
+    if (!canEdit || !postRef.current) return;
+
+    // Capture the current value BEFORE the optimistic update for rollback
+    const previousValue = postRef.current[field as keyof PipelinePost];
 
     // Optimistic update
     setPost(prev => prev ? { ...prev, [field]: value } : prev);
@@ -214,14 +220,15 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
       const token = await getAuthToken();
       await updatePipelinePost(token, tlId, postId, { [field]: value });
     } catch {
-      // Revert on error
-      setPost(prev => prev ? { ...prev, [field]: post[field as keyof PipelinePost] } : prev);
+      // Revert on error using the captured previous value (not stale closure)
+      setPost(prev => prev ? { ...prev, [field]: previousValue } : prev);
     }
-  }, [canEdit, post, tlId, postId]);
+  }, [canEdit, tlId, postId]);
 
   // ---- Handle force schedule ----
   const handleForceSchedule = useCallback(async () => {
-    if (!canEdit || !post) return;
+    const currentPost = postRef.current;
+    if (!canEdit || !currentPost) return;
 
     try {
       const token = await getAuthToken();
@@ -246,14 +253,13 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
       }
 
       // 2. Validation passed — proceed with scheduling
-      const previousStatus = post.status;
       setPost(prev => prev ? { ...prev, status: 'agendado' as PipelineStatus } : prev);
 
       // Update status to agendado
       await updatePipelinePost(token, tlId, postId, { status: 'agendado' });
 
       // Format date for bot success comment
-      const d = new Date(post.scheduledFor!);
+      const d = new Date(currentPost.scheduledFor!);
       const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const hh = String(d.getHours()).padStart(2, '0');
       const mm = String(d.getMinutes()).padStart(2, '0');
@@ -278,7 +284,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
         variant: 'destructive',
       });
     }
-  }, [canEdit, post, tlId, postId, toast]);
+  }, [canEdit, tlId, postId, toast]);
 
   // ---- Handle version restore ----
   const handleRestore = useCallback(async (version: PostVersion) => {
