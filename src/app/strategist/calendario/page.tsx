@@ -444,13 +444,15 @@ export default function StrategistCalendarioPage() {
             </div>
           </div>
 
-          {/* Post list table — filtered by company/TL selection */}
+          {/* Post list table — filtered by company selection, with profile filter */}
           <PostListTable
-            posts={allPosts.filter(p => {
-              if (companyFilter !== 'all' && p.companyId !== companyFilter) return false;
-              if (tlFilter !== 'all' && p.tlUserId !== tlFilter) return false;
-              return true;
-            })}
+            posts={allPosts
+              .filter(p => {
+                if (companyFilter !== 'all' && p.companyId !== companyFilter) return false;
+                return true;
+              })
+              .map(p => ({ ...p, _tlId: p.tlUserId }))}
+            tlProfiles={filteredTlOptions.map(tl => ({ id: tl.id, name: tl.name }))}
             getStatusLabel={(status) => STATUS_CONFIG[status]?.label || status}
             onPostClick={(postId) => {
               const post = allPosts.find(p => p.id === postId);

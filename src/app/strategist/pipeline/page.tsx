@@ -109,7 +109,7 @@ export default function StrategistPipelinePage() {
 
           for (const tlDoc of tlSnap.docs) {
             const data = tlDoc.data();
-            if (data.pendingSetup) continue; // Skip placeholder TLs not yet invited
+            // pendingSetup TLs may already have content — include them
             const tlName = data.name || data.profile?.name || '';
             allTLs.push({
               id: tlDoc.id,

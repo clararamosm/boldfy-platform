@@ -24,15 +24,16 @@ type PostItem = {
   etapa: string;
   contentPillar?: string;
   createdAt: string;
+  /** Optional: TL user ID for profile filtering */
+  _tlId?: string;
 };
 
 type PostListTableProps = {
   posts: PostItem[];
   getStatusLabel: (status: PipelineStatus) => string;
   onPostClick: (postId: string) => void;
-  /** If provided, shows TL name column */
-  showTlName?: boolean;
-  getTlName?: (post: PostItem) => string;
+  /** If provided, shows a TL/profile filter dropdown and TL name column */
+  tlProfiles?: Array<{ id: string; name: string }>;
 };
 
 // ─── Filter types ──────────────────────────────────────
@@ -47,11 +48,24 @@ export function PostListTable({
   posts,
   getStatusLabel,
   onPostClick,
+  tlProfiles,
 }: PostListTableProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<PipelineStatus | 'all'>('all');
   const [formatFilter, setFormatFilter] = useState<string>('all');
   const [scheduleFilter, setScheduleFilter] = useState<ScheduleFilter>('all');
+  const [pillarFilter, setPillarFilter] = useState<string>('all');
+  const [tlFilter, setTlFilter] = useState<string>('all');
+
+  const showTlColumn = !!tlProfiles && tlProfiles.length > 0;
+
+  // Build TL name lookup
+  const tlNameMap = useMemo(() => {
+    if (!tlProfiles) return new Map<string, string>();
+    const map = new Map<string, string>();
+    tlProfiles.forEach(tl => map.set(tl.id, tl.name));
+    return map;
+  }, [tlProfiles]);
 
   // ─── Derived data ──────────────────────────────────────
 
@@ -67,12 +81,12 @@ export function PostListTable({
     return Array.from(pls).sort();
   }, [posts]);
 
-  const [pillarFilter, setPillarFilter] = useState<string>('all');
-
   const filtered = useMemo(() => {
     return posts.filter(p => {
       // Exclude archived
       if (p.status === 'arquivado') return false;
+      // TL/profile
+      if (tlFilter !== 'all' && p._tlId !== tlFilter) return false;
       // Status
       if (statusFilter !== 'all' && p.status !== statusFilter) return false;
       // Format
@@ -92,7 +106,7 @@ export function PostListTable({
       }
       return true;
     });
-  }, [posts, statusFilter, formatFilter, pillarFilter, scheduleFilter, search]);
+  }, [posts, tlFilter, statusFilter, formatFilter, pillarFilter, scheduleFilter, search]);
 
   // Sort: unscheduled first, then by scheduledFor or createdAt
   const sorted = useMemo(() => {
@@ -108,12 +122,18 @@ export function PostListTable({
   }, [filtered]);
 
   const activeFilters = [
+    tlFilter !== 'all',
     statusFilter !== 'all',
     formatFilter !== 'all',
     pillarFilter !== 'all',
     scheduleFilter !== 'all',
     search.trim().length > 0,
   ].filter(Boolean).length;
+
+  // Grid columns: with or without TL name column
+  const gridCols = showTlColumn
+    ? 'grid-cols-[1fr_100px_110px_100px_100px_120px_36px]'
+    : 'grid-cols-[1fr_110px_100px_100px_120px_36px]';
 
   return (
     <Card>
@@ -129,6 +149,7 @@ export function PostListTable({
               size="sm"
               className="text-xs h-7"
               onClick={() => {
+                setTlFilter('all');
                 setStatusFilter('all');
                 setFormatFilter('all');
                 setPillarFilter('all');
@@ -153,6 +174,20 @@ export function PostListTable({
               className="pl-8 h-9 text-sm"
             />
           </div>
+
+          {/* TL/Profile filter (only when multiple profiles) */}
+          {showTlColumn && (
+            <select
+              value={tlFilter}
+              onChange={e => setTlFilter(e.target.value)}
+              className="h-9 px-3 rounded-md border bg-background text-sm"
+            >
+              <option value="all">Todos perfis</option>
+              {tlProfiles!.map(tl => (
+                <option key={tl.id} value={tl.id}>{tl.name}</option>
+              ))}
+            </select>
+          )}
 
           {/* Status filter */}
           <select
@@ -217,8 +252,9 @@ export function PostListTable({
         ) : (
           <div className="border rounded-lg overflow-hidden">
             {/* Header */}
-            <div className="grid grid-cols-[1fr_110px_100px_100px_120px_36px] gap-2 px-3 py-2 bg-muted/50 text-xs font-medium text-muted-foreground">
+            <div className={cn('grid gap-2 px-3 py-2 bg-muted/50 text-xs font-medium text-muted-foreground', gridCols)}>
               <span>Título</span>
+              {showTlColumn && <span>Perfil</span>}
               <span>Status</span>
               <span>Formato</span>
               <span>Pilar</span>
@@ -235,11 +271,16 @@ export function PostListTable({
                     key={post.id}
                     type="button"
                     onClick={() => onPostClick(post.id)}
-                    className="w-full grid grid-cols-[1fr_110px_100px_100px_120px_36px] gap-2 px-3 py-2.5 text-left hover:bg-muted/30 transition-colors items-center"
+                    className={cn('w-full grid gap-2 px-3 py-2.5 text-left hover:bg-muted/30 transition-colors items-center', gridCols)}
                   >
                     <span className="text-sm font-medium line-clamp-1">
                       {post.title || 'Sem título'}
                     </span>
+                    {showTlColumn && (
+                      <span className="text-xs text-muted-foreground line-clamp-1">
+                        {tlNameMap.get(post._tlId || '') || '—'}
+                      </span>
+                    )}
                     <span>
                       <Badge className={cn('text-[10px] h-5 font-medium', cfg.badge)}>
                         {getStatusLabel(post.status)}
