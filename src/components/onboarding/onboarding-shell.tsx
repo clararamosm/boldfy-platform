@@ -38,7 +38,7 @@ const ADMIN_TOOLTIPS: TooltipDef[] = [
   },
   {
     pathPattern: '/admin/colaboradores',
-    message: <><strong>Aqui você gerencia o time.</strong> Convide colaboradores e thought leaders pro programa.</>,
+    message: <><strong>Aqui você gerencia o time.</strong> Existem dois tipos: <strong>Colaboradores</strong> escrevem posts com ajuda da IA; <strong>Thought Leaders</strong> recebem conteúdo pronto da equipe de estratégia. Pra liberar seats de TL, fale com o time Boldfy.</>,
     checklistItemId: 'invite-collaborator',
   },
   {

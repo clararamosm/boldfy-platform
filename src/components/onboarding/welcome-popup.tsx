@@ -179,7 +179,25 @@ function getAdminMessages(name: string, licenses: number, trialDays: number): Ch
     },
     {
       type: 'fai',
-      content: <>Você tem <span className="text-primary font-bold">{licenses} licenças de colaborador</span> e <span className="text-primary font-bold">{trialDays} dias de trial</span>. Missões geram pontos, pontos viram recompensas, e o time cresce junto!</>,
+      content: (
+        <>
+          Na plataforma, você pode adicionar <strong>dois tipos de usuário</strong>:
+          <div className="mt-2 flex flex-col gap-2">
+            <div className="bg-white/70 border border-primary/10 rounded-[10px] px-3 py-2">
+              <div className="text-xs font-bold text-foreground">👥 Colaboradores</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Escrevem seus próprios posts com ajuda da IA, completam missões e ganham pontos. Ideais pra escalar o Employee Advocacy do time.</div>
+            </div>
+            <div className="bg-white/70 border border-primary/10 rounded-[10px] px-3 py-2">
+              <div className="text-xs font-bold text-foreground">🎯 Thought Leaders</div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">Executivos ou porta-vozes que recebem conteúdo pronto da equipe de estratégia. Eles só revisam, aprovam e publicam.</div>
+            </div>
+          </div>
+        </>
+      ),
+    },
+    {
+      type: 'fai',
+      content: <>Você tem <span className="text-primary font-bold">{licenses} licenças de colaborador</span> e <span className="text-primary font-bold">{trialDays} dias de trial</span>. Pra adicionar Thought Leaders, fale com o time Boldfy. Missões geram pontos, pontos viram recompensas, e o time cresce junto!</>,
     },
     {
       type: 'fai',
