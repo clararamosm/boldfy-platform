@@ -1132,6 +1132,86 @@ export async function saveNotificationPrefs(
   }
 }
 
+// ---- Resend Invite ----
+
+/**
+ * Resend invitation email to a user with status 'Pendente'.
+ * Generates a fresh Firebase password reset link and sends the invite email again.
+ */
+export async function resendInvite(
+  idToken: string,
+  userId: string,
+): Promise<{ success?: boolean; error?: string }> {
+  if (!adminAuth) {
+    return { error: 'O servico de autenticacao nao esta disponivel.' };
+  }
+  try {
+    const caller = await requireAuth(idToken);
+
+    // Only admin, strategist, or master can resend invites
+    if (!caller.role || !['admin', 'strategist', 'master'].includes(caller.role)) {
+      return { error: 'Acesso negado.' };
+    }
+
+    // Get user data
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) return { error: 'Usuario nao encontrado.' };
+
+    const userData = userDoc.data()!;
+    const email = userData.profile?.email || userData.email;
+    const name = userData.profile?.name || userData.name || '';
+    const role = userData.role as string;
+    const companyId = userData.companyId as string;
+
+    if (!email) return { error: 'Usuario sem e-mail cadastrado.' };
+
+    // Verify admin belongs to same company (unless master)
+    if (caller.role === 'admin') {
+      if (caller.companyId !== companyId) {
+        return { error: 'Acesso negado: usuario de outra empresa.' };
+      }
+    }
+
+    // Get company info for email
+    let companyName = userData.companyName || '';
+    let companyLocale: 'pt-BR' | 'en' = 'pt-BR';
+    if (companyId) {
+      const companyDoc = await adminDb.collection('companies').doc(companyId).get();
+      if (companyDoc.exists) {
+        const companyData = companyDoc.data()!;
+        companyName = companyData.companyName || companyName;
+        companyLocale = (companyData.locale === 'en' ? 'en' : 'pt-BR');
+      }
+    }
+
+    // Map role to display label
+    const roleLabels: Record<string, Record<string, string>> = {
+      'pt-BR': { colaborador: 'Colaborador', thoughtleader: 'Thought Leader', strategist: 'Estrategista', admin: 'Administrador' },
+      en: { colaborador: 'Collaborator', thoughtleader: 'Thought Leader', strategist: 'Strategist', admin: 'Administrator' },
+    };
+    const roleLabel = roleLabels[companyLocale]?.[role] || roleLabels['pt-BR']?.[role] || role;
+
+    // Generate fresh password reset link and send email
+    const loginUrl = getInviteBaseUrl() + '/login';
+    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+
+    await sendInvitationEmail({
+      to: email,
+      name,
+      companyName,
+      role: roleLabel,
+      resetLink,
+      locale: companyLocale,
+    });
+
+    return { success: true };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in resendInvite:', msg);
+    return { error: `Erro ao reenviar convite: ${msg}` };
+  }
+}
+
 // ---- Get Notification Preferences ----
 
 export async function getNotificationPrefs(

@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
 import { inviteCollaborator, deleteCollaborator, inviteThoughtLeader, invitePendingThoughtLeader, deleteThoughtLeader, updateCollaboratorProfile, toggleCollaboratorStatus } from '@/app/actions';
+import { resendInvite } from '@/app/actions/users';
 import { getAuthToken } from '@/lib/auth-client';
 import { useT } from '@/lib/i18n/context';
 import { useAuth } from '@/contexts/auth-context';
@@ -337,6 +338,25 @@ export default function AdminColaboradoresPage() {
     setConfirmDeleteName(collab.name);
   };
 
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const handleResendInvite = async (userId: string) => {
+    setResendingId(userId);
+    try {
+      const token = await getAuthToken();
+      const result = await resendInvite(token, userId);
+      if (result.error) {
+        toast({ title: 'Erro ao reenviar convite', description: result.error, variant: 'destructive' });
+      } else {
+        toast({ title: 'Convite reenviado!', description: 'Um novo link de acesso foi enviado por e-mail.' });
+      }
+    } catch {
+      toast({ title: 'Erro ao reenviar convite', variant: 'destructive' });
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   const handleRemoveCollaborator = async () => {
     if (!confirmDeleteId) return;
     try {
@@ -588,11 +608,20 @@ export default function AdminColaboradoresPage() {
                             <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {user.status === 'Pendente' && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleResendInvite(user.id)} disabled={resendingId === user.id}>
+                                  {resendingId === user.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                                  Reenviar Convite
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
                             <DropdownMenuItem onClick={() => handleEditOpen(user)}>{t.common.edit}</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleToggleStatus(user)}>{user.status === "Ativo" ? t.common.deactivate : t.common.activate}</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive" onClick={() => handleRemoveConfirm(user)}>{t.common.remove}</DropdownMenuItem>
-                    </DropdownMenuContent>
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleRemoveConfirm(user)}>{t.common.remove}</DropdownMenuItem>
+                          </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
@@ -714,6 +743,15 @@ export default function AdminColaboradoresPage() {
                                   <DropdownMenuItem onClick={() => handleTLInviteOpen(tl)}>
                                     <Send className="h-4 w-4 mr-2" />
                                     {t.adminTL.invitePendingButton}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                </>
+                              )}
+                              {tl.status === 'Pendente' && !tl.pendingSetup && (
+                                <>
+                                  <DropdownMenuItem onClick={() => handleResendInvite(tl.id)} disabled={resendingId === tl.id}>
+                                    {resendingId === tl.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                                    Reenviar Convite
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                 </>
