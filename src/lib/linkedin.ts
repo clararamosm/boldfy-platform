@@ -389,20 +389,35 @@ export type LinkedInPostMetrics = {
 };
 
 /**
+ * Normalise a LinkedIn post ID to a valid URN for the socialMetadata API.
+ * The socialMetadata endpoint accepts urn:li:share or urn:li:ugcPost — NOT urn:li:activity.
+ * The Posts API v2 returns urn:li:share:{id} in the x-restli-id header.
+ */
+function toSocialMetadataUrn(postId: string): string {
+  if (postId.startsWith('urn:li:share:') || postId.startsWith('urn:li:ugcPost:')) {
+    return postId;
+  }
+  if (postId.startsWith('urn:li:activity:')) {
+    // activity URNs share the same numeric ID as share URNs
+    const numericId = postId.replace('urn:li:activity:', '');
+    return `urn:li:share:${numericId}`;
+  }
+  // Bare numeric ID — default to share URN (Posts API v2 creates shares)
+  return `urn:li:share:${postId}`;
+}
+
+/**
  * Fetch engagement metrics (reactions + comments) for a single post.
  * Uses the socialMetadata endpoint (available with w_member_social).
- * The postId should be the activity URN returned when publishing.
+ * The postId should be the share/ugcPost URN returned when publishing.
  */
 export async function fetchPostMetrics(
   accessToken: string,
   postId: string
 ): Promise<LinkedInPostMetrics> {
-  // Ensure we have an activity URN format
-  const activityUrn = postId.startsWith('urn:li:')
-    ? postId
-    : `urn:li:activity:${postId}`;
+  const urn = toSocialMetadataUrn(postId);
 
-  const url = `https://api.linkedin.com/rest/socialMetadata/${encodeURIComponent(activityUrn)}`;
+  const url = `https://api.linkedin.com/rest/socialMetadata/${encodeURIComponent(urn)}`;
 
   const response = await fetch(url, {
     headers: linkedInApiHeaders(accessToken),
@@ -410,7 +425,7 @@ export async function fetchPostMetrics(
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    console.error('LinkedIn socialMetadata failed:', err);
+    console.error('LinkedIn socialMetadata failed:', { urn, status: response.status, err });
     // Return zeros instead of throwing — post may not have metrics yet
     return {
       postId,
@@ -457,11 +472,13 @@ export async function fetchPostMetricsBatch(
 ): Promise<LinkedInPostMetrics[]> {
   if (postIds.length === 0) return [];
 
-  // Build URN list
-  const urns = postIds.map(id =>
-    id.startsWith('urn:li:') ? id : `urn:li:activity:${id}`
-  );
+  // Build URN list using share/ugcPost format (NOT activity)
+  const urnMap = new Map<string, string>(); // original id → socialMetadata URN
+  for (const id of postIds) {
+    urnMap.set(id, toSocialMetadataUrn(id));
+  }
 
+  const urns = Array.from(urnMap.values());
   const urnList = urns.map(u => encodeURIComponent(u)).join(',');
   const url = `https://api.linkedin.com/rest/socialMetadata?ids=List(${urnList})`;
 
@@ -474,7 +491,7 @@ export async function fetchPostMetricsBatch(
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    console.error('LinkedIn socialMetadata batch failed:', err);
+    console.error('LinkedIn socialMetadata batch failed:', { urns, status: response.status, err });
     // Return empty metrics for all posts
     return postIds.map(id => ({
       postId: id,
@@ -489,7 +506,7 @@ export async function fetchPostMetricsBatch(
   const results: LinkedInPostMetrics[] = [];
 
   for (const id of postIds) {
-    const urn = id.startsWith('urn:li:') ? id : `urn:li:activity:${id}`;
+    const urn = urnMap.get(id)!;
     const entry = data.results?.[urn];
 
     if (!entry) {
