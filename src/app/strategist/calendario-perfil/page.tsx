@@ -9,6 +9,7 @@ import { CalendarSkeleton } from '@/components/calendar/calendar-skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { getPipelinePosts, resolveSlugs, updatePipelinePost, deletePipelinePost, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
+import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
 import {
   ChevronLeft,
   ChevronRight,
@@ -443,6 +444,17 @@ export default function StrategistCalendarioPerfilPage() {
           }}
           onDeletePost={handleDeletePost}
         />
+
+        {/* LinkedIn Performance — dedicated to this TL */}
+        {tlId && (
+          <div className="mt-6">
+            <LinkedInPerformance
+              userId={tlId}
+              hideIfNotConnected={false}
+              callerRole="strategist"
+            />
+          </div>
+        )}
 
       </main>
     </>

@@ -16,7 +16,7 @@ import {
 } from '@/app/actions/content-pipeline';
 import { STATUS_CONFIG } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
-import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
+
 import {
   Activity as ActivityIcon,
   MessageSquare,
@@ -215,16 +215,6 @@ export default function StrategistDashboardPage() {
     return map;
   }, [allPosts, weekDays]);
 
-  // Extract unique TL profiles for LinkedIn performance filter
-  const tlProfiles = useMemo(() => {
-    const seen = new Map<string, { id: string; name: string }>();
-    for (const post of allPosts) {
-      if (post.tlUserId && !seen.has(post.tlUserId)) {
-        seen.set(post.tlUserId, { id: post.tlUserId, name: post.tlName || 'Sem nome' });
-      }
-    }
-    return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [allPosts]);
 
   const handlePostClick = (post: CalendarPipelinePost) => {
     router.push(`/post/${post.companySlug}/${post.tlSlug}/${post.id}`);
@@ -356,16 +346,7 @@ export default function StrategistDashboardPage() {
               </Card>
             </div>
 
-            {/* LinkedIn Performance — all TL profiles */}
-            {tlProfiles.length > 0 && (
-              <LinkedInPerformance
-                userId={tlProfiles[0].id}
-                hideIfNotConnected={false}
-                showProfileFilter
-                profiles={tlProfiles}
-                callerRole="strategist"
-              />
-            )}
+
           </>
         )}
       </main>

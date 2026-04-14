@@ -7,7 +7,7 @@ import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { CalendarSkeleton } from '@/components/calendar/calendar-skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
+
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import {
@@ -466,18 +466,7 @@ export default function StrategistCalendarioPage() {
             onDeletePost={handleDeletePost}
           />
 
-          {/* LinkedIn Performance — with profile filter for strategist */}
-          {filteredTlOptions.length > 0 && (
-            <div className="mt-6">
-              <LinkedInPerformance
-                userId={filteredTlOptions[0].id}
-                hideIfNotConnected={false}
-                showProfileFilter
-                profiles={filteredTlOptions.map(tl => ({ id: tl.id, name: tl.name }))}
-                callerRole="strategist"
-              />
-            </div>
-          )}
+
         </div>
       </main>
     </>
