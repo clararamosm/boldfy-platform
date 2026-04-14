@@ -654,7 +654,7 @@ export default function CalendarioPage() {
                           onDragStart={(e) => handleDragStart(item.data, e)}
                           onDragEnd={handleDragEnd}
                           isDragging={draggedPostId === item.data.id}
-                          onClick={() => setSelectedDay(day)}
+                          onClick={() => router.push(`/colaborador/calendario/novo?edit=${item.data.id}`)}
                         />
                       ))}
                       {/* Mission indicators (not draggable) */}

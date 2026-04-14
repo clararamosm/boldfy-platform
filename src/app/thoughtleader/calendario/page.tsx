@@ -23,6 +23,7 @@ import {
   FileText,
   Calendar as CalIcon,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import {
   format,
@@ -66,6 +67,13 @@ export default function ThoughtLeaderCalendarioPage() {
   // Slugs for post navigation
   const [companySlug, setCompanySlug] = useState('');
   const [tlSlug, setTlSlug] = useState('');
+
+  // Drag & drop state
+  const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null);
+
+  // LinkedIn metrics map: postId → { reactions, comments }
+  const [metricsMap, setMetricsMap] = useState<Map<string, { reactions: number; comments: number }>>(new Map());
 
   const getStatusLabel = buildGetStatusLabel(t);
 
@@ -177,6 +185,57 @@ export default function ThoughtLeaderCalendarioPage() {
     router.push(`/post/${companySlug || authUser?.companyId}/${tlSlug || userId}/${postId}`);
   };
 
+  // ─── Drag & drop handlers ─────────────────────────────────
+  const handleDragStart = (post: PipelinePost, e: React.DragEvent) => {
+    setDraggedPostId(post.id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', post.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedPostId(null);
+    setDragOverDay(null);
+  };
+
+  const handleDrop = async (dayKey: string) => {
+    if (!draggedPostId || !userId) return;
+
+    const post = posts.find(p => p.id === draggedPostId);
+    if (!post || !post.scheduledFor) return;
+
+    // Keep original time, change only the date
+    const originalTime = post.scheduledFor.substring(10);
+    const newScheduledFor = dayKey + originalTime;
+
+    if (newScheduledFor === post.scheduledFor) {
+      handleDragEnd();
+      return;
+    }
+
+    // Optimistic update
+    setPosts(prev => prev.map(p =>
+      p.id === draggedPostId ? { ...p, scheduledFor: newScheduledFor } : p
+    ));
+    handleDragEnd();
+
+    try {
+      const token = await getAuthToken();
+      const { updatePipelinePost } = await import('@/app/actions/content-pipeline');
+      const result = await updatePipelinePost(token, userId, post.id, {
+        scheduledFor: newScheduledFor,
+      });
+      if (result.error) {
+        setPosts(prev => prev.map(p =>
+          p.id === post.id ? { ...p, scheduledFor: post.scheduledFor } : p
+        ));
+      }
+    } catch {
+      setPosts(prev => prev.map(p =>
+        p.id === post.id ? { ...p, scheduledFor: post.scheduledFor } : p
+      ));
+    }
+  };
+
   const weekDays = t.colabCalendar.dayNames;
 
   if (isLoading) {
@@ -276,24 +335,39 @@ export default function ThoughtLeaderCalendarioPage() {
                     isToday={dateIsToday(day)}
                     isSelected={isSelected}
                     onClick={() => setSelectedDay(day)}
-                    droppable={false}
+                    droppable={!!draggedPostId}
+                    isDragOver={dragOverDay === dayKey}
+                    onDragOver={() => setDragOverDay(dayKey)}
+                    onDragLeave={() => { if (dragOverDay === dayKey) setDragOverDay(null); }}
+                    onDrop={() => handleDrop(dayKey)}
                     minHeight="min-h-[100px]"
                   >
-                    {dayPosts.slice(0, 3).map(post => (
-                      <CalendarPostCard
-                        key={post.id}
-                        post={{
-                          id: post.id,
-                          title: post.title,
-                          caption: post.caption,
-                          scheduledFor: post.scheduledFor,
-                          status: post.status,
-                        }}
-                        statusConfig={getCardConfig(post.status)}
-                        draggable={false}
-                        onClick={() => navigateToPost(post.id)}
-                      />
-                    ))}
+                    {dayPosts.slice(0, 3).map(post => {
+                      const m = metricsMap.get(post.id);
+                      return (
+                        <CalendarPostCard
+                          key={post.id}
+                          post={{
+                            id: post.id,
+                            title: post.title,
+                            caption: post.caption,
+                            scheduledFor: post.scheduledFor,
+                            status: post.status,
+                            etapa: post.etapa,
+                            formato: post.formato,
+                            contentPillar: post.contentPillar,
+                          }}
+                          statusConfig={getCardConfig(post.status)}
+                          draggable={post.status !== 'postado'}
+                          onDragStart={(e) => handleDragStart(post, e)}
+                          onDragEnd={handleDragEnd}
+                          isDragging={draggedPostId === post.id}
+                          onClick={() => navigateToPost(post.id)}
+                          reactions={m?.reactions}
+                          comments={m?.comments}
+                        />
+                      );
+                    })}
                     {dayPosts.length > 3 && (
                       <div className="text-[10px] text-muted-foreground px-1">
                         +{dayPosts.length - 3}
@@ -421,7 +495,7 @@ export default function ThoughtLeaderCalendarioPage() {
         {/* LinkedIn Performance */}
         {userId && (
           <div className="mt-6">
-            <LinkedInPerformance userId={userId} />
+            <LinkedInPerformance userId={userId} onMetricsLoaded={setMetricsMap} />
           </div>
         )}
       </main>

@@ -119,7 +119,7 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
       )}
 
       {/* Time + Engagement (for published posts) */}
-      {(showTime || (post.status === 'postado' && reactions != null)) && (
+      {(showTime || ((post.status === 'postado' || post.status === 'published') && reactions != null)) && (
         <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
           {showTime && (
             <>
@@ -127,7 +127,7 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
               <span>{time}</span>
             </>
           )}
-          {post.status === 'postado' && reactions != null && (
+          {(post.status === 'postado' || post.status === 'published') && reactions != null && (
             <span className="ml-auto flex items-center gap-1.5">
               <span className="flex items-center gap-0.5 text-rose-500">
                 <Heart className="h-2.5 w-2.5" />
