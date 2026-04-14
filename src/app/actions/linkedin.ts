@@ -129,7 +129,8 @@ export async function publishToLinkedIn(
   userId: string,
   content: string,
   mediaUrl?: string,
-  postId?: string
+  postId?: string,
+  mediaType?: string
 ): Promise<PublishResult> {
   try {
     await requireSelf(idToken, userId);
@@ -189,8 +190,8 @@ export async function publishToLinkedIn(
       }
     }
 
-    // 3. Publish the post (with optional image)
-    const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim(), mediaUrl);
+    // 3. Publish the post (with optional image/video)
+    const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim(), mediaUrl, mediaType);
 
     // 4. Update the post document in Firestore with published status
     const now = new Date().toISOString();

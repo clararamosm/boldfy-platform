@@ -102,19 +102,34 @@ function EditorContent() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ variant: 'destructive', title: t.colabNewPost.fileTooLarge, description: t.colabNewPost.fileTooLargeDescription });
+    // Size limits: 200MB for video, 10MB for image/gif
+    const isVideo = file.type.startsWith('video/');
+    const maxSize = isVideo ? 200 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        variant: 'destructive',
+        title: t.colabNewPost.fileTooLarge,
+        description: isVideo ? 'Vídeo muito grande. Máximo: 200MB.' : t.colabNewPost.fileTooLargeDescription,
+      });
       return;
     }
 
     setMediaFile(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setMediaPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    if (isVideo) {
+      // For video, create object URL instead of data URL (more efficient)
+      setMediaPreview(URL.createObjectURL(file));
+    } else {
+      const reader = new FileReader();
+      reader.onloadend = () => setMediaPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
   };
 
   const removeMedia = () => {
+    // Revoke object URL if it was created for video
+    if (mediaPreview && mediaPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(mediaPreview);
+    }
     setMediaFile(null);
     setMediaPreview(null);
   };
@@ -208,7 +223,7 @@ function EditorContent() {
       }
 
       // 2. Publish to LinkedIn and update the post status to 'published' in Firestore
-      const result = await publishToLinkedIn(token, userId, caption, mediaUrl, createResult.postId);
+      const result = await publishToLinkedIn(token, userId, caption, mediaUrl, createResult.postId, mediaFile?.type);
 
       if (result.success) {
         setPublishedUrl(result.postUrl || null);
@@ -289,13 +304,21 @@ function EditorContent() {
               <Label>{t.colabNewPost.media}</Label>
               {mediaPreview ? (
                 <div className="relative rounded-lg overflow-hidden border">
-                  <Image
-                    src={mediaPreview}
-                    alt="Preview"
-                    width={600}
-                    height={400}
-                    className="w-full h-48 object-cover"
-                  />
+                  {mediaFile?.type.startsWith('video/') ? (
+                    <video
+                      src={mediaPreview}
+                      controls
+                      className="w-full h-48 object-cover"
+                    />
+                  ) : (
+                    <Image
+                      src={mediaPreview}
+                      alt="Preview"
+                      width={600}
+                      height={400}
+                      className="w-full h-48 object-cover"
+                    />
+                  )}
                   <Button
                     type="button"
                     variant="destructive"
@@ -313,7 +336,7 @@ function EditorContent() {
                   <span className="text-xs text-muted-foreground mt-0.5">{t.colabNewPost.maxFileSize}</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/mp4,video/quicktime"
                     className="hidden"
                     onChange={handleMediaChange}
                   />
@@ -472,7 +495,13 @@ function EditorContent() {
           </div>
 
           {/* Media */}
-          {mediaPreview ? (
+          {mediaPreview && mediaFile?.type.startsWith('video/') ? (
+            <video
+              src={mediaPreview}
+              controls
+              className="w-full aspect-video object-cover border-y"
+            />
+          ) : mediaPreview ? (
             <Image
               src={mediaPreview}
               alt="Preview"

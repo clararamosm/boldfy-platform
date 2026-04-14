@@ -306,25 +306,145 @@ function htmlToLinkedInText(html: string): string {
 }
 
 /**
+ * Upload a video to LinkedIn and return its video URN.
+ * 3-step flow: initializeUpload → PUT binary (single chunk) → finalizeUpload.
+ * LinkedIn Videos API supports up to 200MB; we upload in a single chunk for simplicity
+ * (LinkedIn handles chunking internally for files under ~200MB via single uploadUrl).
+ */
+export async function uploadVideoToLinkedIn(
+  accessToken: string,
+  linkedinId: string,
+  videoUrl: string
+): Promise<string> {
+  const ownerUrn = `urn:li:person:${linkedinId}`;
+
+  // Download the video from Firebase Storage first to know the size
+  const videoRes = await fetch(videoUrl);
+  if (!videoRes.ok) throw new Error('Não foi possível baixar o vídeo para upload.');
+  const videoBuffer = await videoRes.arrayBuffer();
+  const fileSizeBytes = videoBuffer.byteLength;
+
+  // Step 1: Initialize upload
+  const initRes = await fetch('https://api.linkedin.com/rest/videos?action=initializeUpload', {
+    method: 'POST',
+    headers: linkedInApiHeaders(accessToken),
+    body: JSON.stringify({
+      initializeUploadRequest: {
+        owner: ownerUrn,
+        fileSizeBytes,
+        uploadCaptions: false,
+        uploadThumbnail: false,
+      },
+    }),
+  });
+
+  if (!initRes.ok) {
+    const err = await initRes.json().catch(() => ({}));
+    console.error('LinkedIn video init failed:', err);
+    throw new Error(`Falha ao iniciar upload de vídeo: ${err.message || initRes.statusText}`);
+  }
+
+  const initData = await initRes.json();
+  const uploadInstructions = initData.value?.uploadInstructions;
+  const videoUrn = initData.value?.video;
+
+  if (!uploadInstructions || !videoUrn) {
+    throw new Error('LinkedIn não retornou instruções de upload de vídeo.');
+  }
+
+  // Step 2: Upload binary chunks
+  // Each instruction has an uploadUrl and a range (firstByte, lastByte)
+  const etags: string[] = [];
+  for (const instruction of uploadInstructions) {
+    const { uploadUrl, firstByte, lastByte } = instruction;
+    const chunk = videoBuffer.slice(firstByte, lastByte + 1);
+
+    const uploadRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: chunk,
+    });
+
+    if (!uploadRes.ok) {
+      console.error('LinkedIn video chunk upload failed:', uploadRes.statusText);
+      throw new Error(`Falha no upload do vídeo (chunk): ${uploadRes.statusText}`);
+    }
+
+    const etag = uploadRes.headers.get('etag') || '';
+    etags.push(etag);
+  }
+
+  // Step 3: Finalize upload
+  const finalizeRes = await fetch('https://api.linkedin.com/rest/videos?action=finalizeUpload', {
+    method: 'POST',
+    headers: linkedInApiHeaders(accessToken),
+    body: JSON.stringify({
+      finalizeUploadRequest: {
+        video: videoUrn,
+        uploadToken: '',
+        uploadedPartIds: etags,
+      },
+    }),
+  });
+
+  if (!finalizeRes.ok) {
+    const err = await finalizeRes.json().catch(() => ({}));
+    console.error('LinkedIn video finalize failed:', err);
+    throw new Error(`Falha ao finalizar upload de vídeo: ${err.message || finalizeRes.statusText}`);
+  }
+
+  return videoUrn;
+}
+
+/**
+ * Determine media category from MIME type or explicit mediaType label.
+ * Returns: 'image' | 'gif' | 'video' | 'pdf' | undefined
+ */
+export function classifyMediaType(mediaType?: string): 'image' | 'gif' | 'video' | 'pdf' | undefined {
+  if (!mediaType) return undefined;
+  const mt = mediaType.toLowerCase();
+  if (mt === 'video' || mt.startsWith('video/')) return 'video';
+  if (mt === 'gif' || mt === 'image/gif') return 'gif';
+  if (mt === 'pdf' || mt === 'application/pdf') return 'pdf';
+  if (mt === 'image' || mt.startsWith('image/')) return 'image';
+  return undefined;
+}
+
+/**
  * Publish a post to LinkedIn using the Posts API v2.
- * Supports text-only or text + image.
+ * Supports text-only, text + image/GIF, or text + video.
+ *
+ * @param mediaType - MIME type or category: 'image', 'gif', 'video', 'pdf', or full MIME like 'video/mp4'
  */
 export async function publishLinkedInPost(
   accessToken: string,
   linkedinId: string,
   text: string,
-  imageUrl?: string
+  mediaUrl?: string,
+  mediaType?: string
 ): Promise<LinkedInPostResult> {
   const authorUrn = `urn:li:person:${linkedinId}`;
 
   // Sanitize: convert any HTML to plain text for LinkedIn API
   const cleanText = htmlToLinkedInText(text);
 
-  // Upload image first if provided
-  let imageUrn: string | undefined;
-  if (imageUrl) {
-    imageUrn = await uploadImageToLinkedIn(accessToken, linkedinId, imageUrl);
+  const category = classifyMediaType(mediaType);
+
+  // Upload media if provided
+  let mediaUrn: string | undefined;
+  if (mediaUrl && category === 'video') {
+    mediaUrn = await uploadVideoToLinkedIn(accessToken, linkedinId, mediaUrl);
+  } else if (mediaUrl && (category === 'image' || category === 'gif')) {
+    // GIF uses the same Images API as regular images
+    mediaUrn = await uploadImageToLinkedIn(accessToken, linkedinId, mediaUrl);
+  } else if (mediaUrl && !category) {
+    // Fallback: if mediaType is unknown but URL is provided, try image upload
+    mediaUrn = await uploadImageToLinkedIn(accessToken, linkedinId, mediaUrl);
   }
+  // If category === 'pdf', we skip media upload (LinkedIn doesn't support PDF via API)
 
   // Build post body (Posts API v2 format)
   const body: Record<string, unknown> = {
@@ -339,9 +459,9 @@ export async function publishLinkedInPost(
     },
   };
 
-  if (imageUrn) {
+  if (mediaUrn) {
     body.content = {
-      media: { title: 'Post image', id: imageUrn },
+      media: { title: category === 'video' ? 'Post video' : 'Post image', id: mediaUrn },
     };
   }
 

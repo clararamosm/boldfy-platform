@@ -96,6 +96,7 @@ async function processScheduledPosts(
         connResult.linkedinId,
         post.caption,
         post.mediaUrl || undefined,
+        post.mediaType || undefined,
       );
 
       await postDoc.ref.update({
@@ -167,6 +168,7 @@ async function processPipelinePosts(
         connResult.linkedinId,
         post.caption,
         post.mediaUrl || undefined,
+        post.mediaType || undefined,
       );
 
       await postDoc.ref.update({
