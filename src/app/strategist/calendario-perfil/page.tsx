@@ -282,6 +282,17 @@ export default function StrategistCalendarioPerfilPage() {
             : p
         ));
         toast({ variant: 'destructive', title: 'Erro ao mover post', description: result.error });
+      } else {
+        // Add bot comment about the reschedule
+        const { addBotComment } = await import('@/app/actions/post-editor');
+        const newDate = new Date(newScheduledFor);
+        const dateStr = newDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const hh = String(newDate.getHours()).padStart(2, '0');
+        const mm = String(newDate.getMinutes()).padStart(2, '0');
+        const timeStr = `${hh}:${mm}` !== '00:00' ? ` às ${hh}:${mm}` : '';
+        const userName = tlName?.split(' ')[0] || 'Thought Leader';
+        const botMessage = `📅 ${userName} ajustou o conteúdo para ${dateStr}${timeStr}.`;
+        addBotComment(token, tlId, post.id, botMessage).catch(() => {});
       }
     } catch {
       // Revert
