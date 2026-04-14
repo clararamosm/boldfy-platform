@@ -153,6 +153,9 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
               <><Upload className="h-3.5 w-3.5" /> Upload de mídia</>
             )}
           </Button>
+          <p className="text-xs text-muted-foreground">
+            JPG, PNG, GIF (até 10MB) · MP4, MOV (até 200MB) · PDF (até 10MB)
+          </p>
           <input
             ref={fileRef}
             type="file"

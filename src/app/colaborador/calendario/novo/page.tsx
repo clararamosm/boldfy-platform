@@ -333,7 +333,7 @@ function EditorContent() {
                 <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/30 transition-colors">
                   <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                   <span className="text-sm text-muted-foreground">{t.colabNewPost.clickToAdd}</span>
-                  <span className="text-xs text-muted-foreground mt-0.5">{t.colabNewPost.maxFileSize}</span>
+                  <span className="text-xs text-muted-foreground mt-0.5">JPG, PNG, GIF (até 10MB) · MP4, MOV (até 200MB)</span>
                   <input
                     type="file"
                     accept="image/*,video/mp4,video/quicktime"
