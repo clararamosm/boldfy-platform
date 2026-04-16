@@ -3,7 +3,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import * as Sentry from '@sentry/nextjs';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,7 +14,7 @@ type Props = {
 
 export function SharedErrorBoundary({ error, reset }: Props) {
   useEffect(() => {
-    Sentry.captureException(error);
+    console.error('Unhandled error:', error);
   }, [error]);
 
   return (

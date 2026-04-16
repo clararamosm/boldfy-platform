@@ -51,16 +51,6 @@ env:
   - variable: STRIPE_WEBHOOK_SECRET
     secret: STRIPE_WEBHOOK_SECRET
 
-  # --- Sentry (error monitoring) ---
-  - variable: NEXT_PUBLIC_SENTRY_DSN
-    value: https://a2e7f575ee31e1da49ad2d905e70f8f3@o4511207197573120.ingest.us.sentry.io/4511207201832960
-  - variable: SENTRY_ORG
-    value: boldfy
-  - variable: SENTRY_PROJECT
-    value: javascript-nextjs
-  # SENTRY_AUTH_TOKEN — add after creating secret:
-  # firebase apphosting:secrets:set SENTRY_AUTH_TOKEN
-
   # --- Variáveis públicas do Notion ---
   - variable: NOTION_FEEDBACK_DB_ID
     value: 33994982dee4807eb456e291ca3f6dc4

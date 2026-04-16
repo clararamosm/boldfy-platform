@@ -110,32 +110,6 @@ export async function GET(request: NextRequest) {
     checks.push({ label: 'Cron Posts', status: 'warn', detail: `Nao conseguiu checar: ${e instanceof Error ? e.message : 'desconhecido'}` });
   }
 
-  // 5. Check Sentry (via API if token available)
-  const sentryToken = process.env.SENTRY_AUTH_TOKEN;
-  if (sentryToken) {
-    try {
-      const res = await fetch(
-        'https://sentry.io/api/0/projects/boldfy/javascript-nextjs/issues/?query=is:unresolved&statsPeriod=7d&limit=5',
-        { headers: { Authorization: `Bearer ${sentryToken}` } }
-      );
-      if (res.ok) {
-        const issues = await res.json();
-        if (issues.length === 0) {
-          checks.push({ label: 'Sentry', status: 'ok', detail: '0 erros novos na semana' });
-        } else {
-          const titles = issues.slice(0, 3).map((i: { title: string }) => i.title).join(', ');
-          checks.push({ label: 'Sentry', status: 'warn', detail: `${issues.length} erros: ${titles}` });
-        }
-      } else {
-        checks.push({ label: 'Sentry', status: 'warn', detail: `API retornou ${res.status}` });
-      }
-    } catch (e) {
-      checks.push({ label: 'Sentry', status: 'warn', detail: `Erro na API: ${e instanceof Error ? e.message : 'desconhecido'}` });
-    }
-  } else {
-    checks.push({ label: 'Sentry', status: 'warn', detail: 'SENTRY_AUTH_TOKEN nao configurado — checar manualmente' });
-  }
-
   // Build Slack message
   const statusEmoji = (s: string) => s === 'ok' ? ':white_check_mark:' : s === 'warn' ? ':warning:' : ':x:';
   const hasIssues = checks.some(c => c.status !== 'ok');
@@ -148,7 +122,6 @@ export async function GET(request: NextRequest) {
 
   const manualChecklist = `
 :clipboard: *Checklist manual da semana:*
-• [ ] Revisar erros no Sentry (sentry.io)
 • [ ] Checar pagamentos falhando no Stripe Dashboard
 • [ ] Verificar custo no Firebase Console → Billing
 • [ ] Rodar \`npm audit\` no repo local
