@@ -1309,6 +1309,9 @@ const ptBR = {
     send: 'Enviar',
     scheduledFor: 'Agendado para',
     nowLabel: 'Agora',
+    editTitle: 'Editar Post',
+    postUpdated: 'Post atualizado!',
+    postUpdatedDescription: 'Suas alterações foram salvas.',
   },
 
   // ══════════════════════════════════════════════
@@ -1419,6 +1422,15 @@ const ptBR = {
     toastPostCreateError: 'Erro ao criar post.',
     toastPostUpdated: 'Post atualizado com sucesso!',
     toastPostUpdateError: 'Erro ao atualizar post.',
+    completedPosts: 'Postados & Arquivados',
+    showCompleted: 'Mostrar postados e arquivados',
+    hideCompleted: 'Ocultar postados e arquivados',
+    tabEmProducao: 'Em produção',
+    tabPostados: 'Já postados',
+    perPage: 'Por página',
+    previous: 'Anterior',
+    next: 'Próxima',
+    pageOf: 'de',
   },
 
   // ══════════════════════════════════════════════

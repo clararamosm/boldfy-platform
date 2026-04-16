@@ -64,6 +64,13 @@ export default function ThoughtLeaderCalendarioPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
+  // Tab state: "em_producao" vs "postados"
+  const [activeTab, setActiveTab] = useState<'em_producao' | 'postados'>('em_producao');
+
+  // Pagination state
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+
   // Slugs for post navigation
   const [companySlug, setCompanySlug] = useState('');
   const [tlSlug, setTlSlug] = useState('');
@@ -125,11 +132,22 @@ export default function ThoughtLeaderCalendarioPage() {
     fetchPosts();
   }, [fetchPosts]);
 
+  // ─── Posts by tab ────────────────────────────────────────
+  const emProducaoPosts = useMemo(() =>
+    posts.filter(p => p.status !== 'postado' && p.status !== 'arquivado'),
+    [posts]
+  );
+  const postadosPosts = useMemo(() =>
+    posts.filter(p => p.status === 'postado'),
+    [posts]
+  );
+  const activeTabPosts = activeTab === 'em_producao' ? emProducaoPosts : postadosPosts;
+
   // ─── Filter posts ────────────────────────────────────────
   const filteredPosts = useMemo(() => {
-    if (statusFilter === 'all') return posts;
-    return posts.filter(p => p.status === statusFilter);
-  }, [posts, statusFilter]);
+    if (statusFilter === 'all') return activeTabPosts;
+    return activeTabPosts.filter(p => p.status === statusFilter);
+  }, [activeTabPosts, statusFilter]);
 
   // ─── Posts only with scheduledFor — grouped by day ───────
   const postsByDay = useMemo(() => {
@@ -146,13 +164,13 @@ export default function ThoughtLeaderCalendarioPage() {
 
   // ─── Status counts ──────────────────────────────────────
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: posts.length };
+    const counts: Record<string, number> = { all: activeTabPosts.length };
     for (const s of FILTER_STATUSES) counts[s] = 0;
-    posts.forEach(p => {
+    activeTabPosts.forEach(p => {
       if (p.status in counts) counts[p.status]++;
     });
     return counts;
-  }, [posts]);
+  }, [activeTabPosts]);
 
   // ─── Calendar days ──────────────────────────────────────
   const calendarDays = useMemo(() => {
@@ -174,6 +192,13 @@ export default function ThoughtLeaderCalendarioPage() {
   const unscheduledPosts = useMemo(() => {
     return filteredPosts.filter(p => !p.scheduledFor);
   }, [filteredPosts]);
+
+  // ─── Pagination for PostListTable ─────────────────────
+  const paginatedTablePosts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredPosts.slice(start, start + pageSize);
+  }, [filteredPosts, currentPage, pageSize]);
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / pageSize));
 
   // ─── Card config adapter ────────────────────────────────
   const getCardConfig = (status: PipelineStatus): CalendarCardConfig => {
@@ -281,6 +306,24 @@ export default function ThoughtLeaderCalendarioPage() {
           </div>
         </div>
 
+        {/* Tabs: Em produção / Já postados */}
+        <div className="flex gap-2">
+          <Button
+            variant={activeTab === 'em_producao' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setActiveTab('em_producao'); setStatusFilter('all'); setCurrentPage(1); }}
+          >
+            {t.contentPipeline.tabEmProducao} ({emProducaoPosts.length})
+          </Button>
+          <Button
+            variant={activeTab === 'postados' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setActiveTab('postados'); setStatusFilter('all'); setCurrentPage(1); }}
+          >
+            {t.contentPipeline.tabPostados} ({postadosPosts.length})
+          </Button>
+        </div>
+
         {/* Status filters */}
         <div className="flex flex-wrap items-center gap-2">
           {[
@@ -298,7 +341,7 @@ export default function ThoughtLeaderCalendarioPage() {
               <button
                 key={f.key}
                 type="button"
-                onClick={() => setStatusFilter(f.key)}
+                onClick={() => { setStatusFilter(f.key); setCurrentPage(1); }}
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
                   statusFilter === f.key
@@ -496,12 +539,55 @@ export default function ThoughtLeaderCalendarioPage() {
           </div>
         </div>
 
-        {/* Post list table — all posts with filters */}
+        {/* Post list table — paginated */}
         <PostListTable
-          posts={posts}
+          posts={paginatedTablePosts}
           getStatusLabel={getStatusLabel}
           onPostClick={navigateToPost}
         />
+
+        {/* Pagination controls */}
+        {filteredPosts.length > 20 && (
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">{t.contentPipeline.perPage}:</span>
+              {[20, 50, 100].map(size => (
+                <Button
+                  key={size}
+                  variant={pageSize === size ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => { setPageSize(size); setCurrentPage(1); }}
+                >
+                  {size}
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+              >
+                {t.contentPipeline.previous}
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {currentPage} {t.contentPipeline.pageOf} {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+              >
+                {t.contentPipeline.next}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* LinkedIn Performance */}
         {userId && (

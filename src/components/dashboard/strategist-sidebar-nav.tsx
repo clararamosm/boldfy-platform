@@ -30,6 +30,7 @@ import {
     FileText,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { LinkedInBadge } from '@/components/ui/linkedin-badge';
 
 export function StrategistSidebarNav() {
     const { user } = useAuth();
@@ -186,8 +187,18 @@ export function StrategistSidebarNav() {
                                                 <Collapsible className="group/tl w-full">
                                                     <SidebarMenuButton asChild size="sm">
                                                         <CollapsibleTrigger className="flex w-full items-center gap-2 cursor-pointer">
-                                                            <User className="h-3.5 w-3.5 shrink-0" />
+                                                            {tl.photoUrl ? (
+                                                                <Avatar className="h-5 w-5 shrink-0">
+                                                                    <AvatarImage src={tl.photoUrl} alt={tl.name} />
+                                                                    <AvatarFallback className="text-[8px]">
+                                                                        {tl.name.substring(0, 2).toUpperCase()}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                            ) : (
+                                                                <User className="h-3.5 w-3.5 shrink-0" />
+                                                            )}
                                                             <span className="truncate">{tl.name.split(' ')[0]}</span>
+                                                            {tl.linkedinConnected && <LinkedInBadge />}
                                                             <ChevronRight className="ml-auto h-3 w-3 shrink-0 transition-transform group-data-[state=open]/tl:rotate-90" />
                                                         </CollapsibleTrigger>
                                                     </SidebarMenuButton>

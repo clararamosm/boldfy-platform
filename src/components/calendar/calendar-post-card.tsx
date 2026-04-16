@@ -19,6 +19,8 @@ export type CalendarCardPost = {
   // Strategist-specific
   tlUserId?: string;
   tlName?: string;
+  tlPhotoUrl?: string;
+  tlLinkedinConnected?: boolean;
   companyName?: string;
   companySlug?: string;
   tlSlug?: string;
@@ -147,7 +149,11 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
       {/* Profile + Company (strategist only) */}
       {showProfile && post.tlName && (
         <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-          <User className="h-2.5 w-2.5" />
+          {post.tlPhotoUrl ? (
+            <img src={post.tlPhotoUrl} alt="" className="h-3.5 w-3.5 rounded-full object-cover shrink-0" />
+          ) : (
+            <User className="h-2.5 w-2.5" />
+          )}
           <span className="truncate">{post.tlName.split(' ')[0]}</span>
           {post.companyName && (
             <>

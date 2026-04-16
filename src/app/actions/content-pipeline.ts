@@ -495,7 +495,7 @@ export type StrategistSidebarCompany = {
   slug: string;
   name: string;
   logoUrl?: string;
-  tls: { id: string; slug: string; name: string }[];
+  tls: { id: string; slug: string; name: string; photoUrl?: string; linkedinConnected?: boolean }[];
 };
 
 export async function getStrategistSidebarData(
@@ -523,14 +523,16 @@ export async function getStrategistSidebarData(
     ]);
 
     // Group TLs by companyId
-    const tlsByCompany = new Map<string, { id: string; slug: string; name: string }[]>();
+    const tlsByCompany = new Map<string, { id: string; slug: string; name: string; photoUrl?: string; linkedinConnected?: boolean }[]>();
     allTlSnap.docs.forEach(d => {
       const tlData = d.data();
       const cId = tlData.companyId as string;
       const tlName = tlData.profile?.name || tlData.name || 'TL';
       const tlSlug = (tlData.slug as string) || generateSlug(tlName, d.id);
+      const photoUrl = (tlData.photoURL as string) || (tlData.profile?.avatarUrl as string) || undefined;
+      const linkedinConnected = !!(tlData.linkedinConnection as Record<string, unknown>)?.accessToken;
       if (!tlsByCompany.has(cId)) tlsByCompany.set(cId, []);
-      tlsByCompany.get(cId)!.push({ id: d.id, slug: tlSlug, name: tlName });
+      tlsByCompany.get(cId)!.push({ id: d.id, slug: tlSlug, name: tlName, photoUrl, linkedinConnected });
     });
 
     const result: StrategistSidebarCompany[] = [];
@@ -638,6 +640,8 @@ export type CalendarPipelinePost = PipelinePost & {
   tlUserId: string;
   tlSlug: string;
   tlName: string;
+  tlPhotoUrl?: string;
+  tlLinkedinConnected?: boolean;
   companyName: string;
   companyId: string;
   companySlug: string;
@@ -688,6 +692,8 @@ export async function getAllPipelinePostsForStrategist(
         name: tlName,
         slug: (tlData.slug as string) || generateSlug(tlName, d.id),
         companyId: tlData.companyId as string,
+        photoUrl: (tlData.photoURL as string) || (tlData.profile?.avatarUrl as string) || undefined,
+        linkedinConnected: !!(tlData.linkedinConnection as Record<string, unknown>)?.accessToken,
       };
     });
 
@@ -714,6 +720,8 @@ export async function getAllPipelinePostsForStrategist(
           tlUserId: tl.id,
           tlSlug: tl.slug,
           tlName: tl.name,
+          tlPhotoUrl: tl.photoUrl,
+          tlLinkedinConnected: tl.linkedinConnected,
           companyName: company.name,
           companyId: tl.companyId,
           companySlug: company.slug,

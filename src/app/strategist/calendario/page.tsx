@@ -24,6 +24,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
+import { LinkedInBadge } from '@/components/ui/linkedin-badge';
 import { CalendarPostCard, type CalendarCardPost, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 import { PostListTable } from '@/components/calendar/post-list-table';
@@ -59,6 +60,13 @@ export default function StrategistCalendarioPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [tlFilter, setTlFilter] = useState<string>('all');
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'em_producao' | 'postados'>('em_producao');
+
+  // Pagination state
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // ─── Drag & drop state ──────
   const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
@@ -106,11 +114,16 @@ export default function StrategistCalendarioPage() {
   // ─── Derive companies and TLs for filters ──────
   const { companies, tls } = useMemo(() => {
     const compMap = new Map<string, string>();
-    const tlMap = new Map<string, { name: string; companyId: string }>();
+    const tlMap = new Map<string, { name: string; companyId: string; photoUrl?: string; linkedinConnected?: boolean }>();
 
     allPosts.forEach(p => {
       if (!compMap.has(p.companyId)) compMap.set(p.companyId, p.companyName);
-      if (!tlMap.has(p.tlUserId)) tlMap.set(p.tlUserId, { name: p.tlName, companyId: p.companyId });
+      if (!tlMap.has(p.tlUserId)) tlMap.set(p.tlUserId, {
+        name: p.tlName,
+        companyId: p.companyId,
+        photoUrl: p.tlPhotoUrl,
+        linkedinConnected: p.tlLinkedinConnected,
+      });
     });
 
     const companies = Array.from(compMap.entries())
@@ -118,7 +131,7 @@ export default function StrategistCalendarioPage() {
       .sort((a, b) => a.name.localeCompare(b.name));
 
     const tls = Array.from(tlMap.entries())
-      .map(([id, info]) => ({ id, name: info.name, companyId: info.companyId }))
+      .map(([id, info]) => ({ id, name: info.name, companyId: info.companyId, photoUrl: info.photoUrl, linkedinConnected: info.linkedinConnected }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return { companies, tls };
@@ -138,10 +151,21 @@ export default function StrategistCalendarioPage() {
     }
   }, [companyFilter, filteredTlOptions, tlFilter]);
 
+  // ─── Posts by tab ──────
+  const emProducaoPosts = useMemo(() =>
+    allPosts.filter(p => p.status !== 'postado' && p.status !== 'arquivado'),
+    [allPosts]
+  );
+  const postadosPosts = useMemo(() =>
+    allPosts.filter(p => p.status === 'postado'),
+    [allPosts]
+  );
+  const activeTabPosts = activeTab === 'em_producao' ? emProducaoPosts : postadosPosts;
+
   // ─── Only posts with scheduledFor ──────
   const scheduledPosts = useMemo(() => {
-    return allPosts.filter(p => p.scheduledFor);
-  }, [allPosts]);
+    return activeTabPosts.filter(p => p.scheduledFor);
+  }, [activeTabPosts]);
 
   // ─── Apply filters ──────
   const filteredPosts = useMemo(() => {
@@ -380,6 +404,24 @@ export default function StrategistCalendarioPage() {
             </div>
           </div>
 
+          {/* Tabs: Em produção / Já postados */}
+          <div className="flex gap-2">
+            <Button
+              variant={activeTab === 'em_producao' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => { setActiveTab('em_producao'); setStatusFilter('all'); setCurrentPage(1); }}
+            >
+              Em produção ({emProducaoPosts.length})
+            </Button>
+            <Button
+              variant={activeTab === 'postados' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => { setActiveTab('postados'); setStatusFilter('all'); setCurrentPage(1); }}
+            >
+              Já postados ({postadosPosts.length})
+            </Button>
+          </div>
+
           {/* Status filters */}
           <div className="flex flex-wrap items-center gap-2">
             {statusFilterButtons.map(f => {
@@ -389,7 +431,7 @@ export default function StrategistCalendarioPage() {
                 <button
                   key={f.key}
                   type="button"
-                  onClick={() => setStatusFilter(f.key)}
+                  onClick={() => { setStatusFilter(f.key); setCurrentPage(1); }}
                   className={`
                     inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all
                     ${statusFilter === f.key ? f.color + ' ring-2 ring-primary/30 shadow-sm' : 'bg-muted/50 text-muted-foreground hover:bg-muted'}
@@ -460,23 +502,77 @@ export default function StrategistCalendarioPage() {
             </div>
           </div>
 
-          {/* Post list table — filtered by company selection, with profile filter */}
-          <PostListTable
-            posts={allPosts
+          {/* Post list table — filtered by tab + company + pagination */}
+          {(() => {
+            const tablePosts = activeTabPosts
               .filter(p => {
                 if (companyFilter !== 'all' && p.companyId !== companyFilter) return false;
+                if (tlFilter !== 'all' && p.tlUserId !== tlFilter) return false;
                 return true;
               })
-              .map(p => ({ ...p, _tlId: p.tlUserId }))}
-            tlProfiles={filteredTlOptions.map(tl => ({ id: tl.id, name: tl.name }))}
-            getStatusLabel={(status) => STATUS_CONFIG[status]?.label || status}
-            onPostClick={(postId) => {
-              const post = allPosts.find(p => p.id === postId);
-              if (post) handlePostClick(post);
-            }}
-            onDeletePost={handleDeletePost}
-          />
+              .map(p => ({ ...p, _tlId: p.tlUserId }));
+            const start = (currentPage - 1) * pageSize;
+            const paginatedPosts = tablePosts.slice(start, start + pageSize);
+            const totalPgs = Math.max(1, Math.ceil(tablePosts.length / pageSize));
 
+            return (
+              <>
+                <PostListTable
+                  posts={paginatedPosts}
+                  tlProfiles={filteredTlOptions.map(tl => ({ id: tl.id, name: tl.name }))}
+                  getStatusLabel={(status) => STATUS_CONFIG[status]?.label || status}
+                  onPostClick={(postId) => {
+                    const post = allPosts.find(p => p.id === postId);
+                    if (post) handlePostClick(post);
+                  }}
+                  onDeletePost={handleDeletePost}
+                />
+
+                {/* Pagination controls */}
+                {tablePosts.length > 20 && (
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Por página:</span>
+                      {[20, 50, 100].map(size => (
+                        <Button
+                          key={size}
+                          variant={pageSize === size ? 'default' : 'ghost'}
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => { setPageSize(size); setCurrentPage(1); }}
+                        >
+                          {size}
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7"
+                        disabled={currentPage <= 1}
+                        onClick={() => setCurrentPage(p => p - 1)}
+                      >
+                        Anterior
+                      </Button>
+                      <span className="text-sm text-muted-foreground">
+                        {currentPage} de {totalPgs}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7"
+                        disabled={currentPage >= totalPgs}
+                        onClick={() => setCurrentPage(p => p + 1)}
+                      >
+                        Próxima
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
         </div>
       </main>

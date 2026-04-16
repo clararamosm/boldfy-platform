@@ -16,11 +16,12 @@ import {
 import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
 import { getAuthToken } from '@/lib/auth-client';
-import { STATUS_CONFIG, PIPELINE_STATUSES, buildGetStatusLabel } from '@/lib/pipeline-config';
+import { STATUS_CONFIG, PIPELINE_STATUSES, PIPELINE_GRID_STATUSES, PIPELINE_TOGGLE_STATUSES, buildGetStatusLabel } from '@/lib/pipeline-config';
 import { resolveSlugs, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
 import { generateSlug } from '@/lib/slugify';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
+import { LinkedInBadge } from '@/components/ui/linkedin-badge';
 
 type TLSummary = {
   id: string;
@@ -29,6 +30,8 @@ type TLSummary = {
   companyId: string;
   companySlug: string;
   companyName: string;
+  photoUrl?: string;
+  linkedinConnected?: boolean;
 };
 
 const MAX_VISIBLE_POSTS = 10;
@@ -56,8 +59,8 @@ export default function StrategistPipelinePage() {
   // Create post loading
   const [isCreating, setIsCreating] = useState(false);
 
-  // Agendados toggle
-  const [showAgendados, setShowAgendados] = useState(true);
+  // Completed toggle (Postados & Arquivados)
+  const [showCompleted, setShowCompleted] = useState(false);
 
   // "Ver todos" dialog
   const [dialogStatus, setDialogStatus] = useState<PipelineStatus | null>(null);
@@ -118,6 +121,8 @@ export default function StrategistPipelinePage() {
               companyId,
               companySlug,
               companyName,
+              photoUrl: (data.photoURL as string) || (data.profile?.avatarUrl as string) || undefined,
+              linkedinConnected: !!(data.linkedinConnection as Record<string, unknown>)?.accessToken,
             });
           }
         }
@@ -399,12 +404,12 @@ export default function StrategistPipelinePage() {
     setDragOverStatus(null);
   };
 
-  // ─── Statuses for grid and agendado ──────
-  const gridStatuses = PIPELINE_STATUSES.filter(s => s !== 'agendado' && s !== 'arquivado');
-  const agendadoPosts = postsByStatus['agendado'] || [];
+  // ─── Statuses for grid and toggle ──────
+  const gridStatuses = PIPELINE_GRID_STATUSES;
+  const toggleStatuses = PIPELINE_TOGGLE_STATUSES;
 
   // ─── All available move targets (for bulk move) ──────
-  const moveTargetStatuses = PIPELINE_STATUSES.filter(s => s !== 'arquivado');
+  const moveTargetStatuses = PIPELINE_GRID_STATUSES;
 
   // ─── Loading state ──────
   if (isLoading) {
@@ -525,7 +530,7 @@ export default function StrategistPipelinePage() {
               {gridStatuses.map(status => {
                 const cfg = STATUS_CONFIG[status];
                 const columnPosts = postsByStatus[status] || [];
-                const showBox = columnPosts.length > 0 || ['backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post', 'post_aprovado', 'pronto_pra_postar'].includes(status);
+                const showBox = columnPosts.length > 0 || ['backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post', 'post_aprovado', 'ajuste'].includes(status);
 
                 if (!showBox) return null;
 
@@ -573,6 +578,8 @@ export default function StrategistPipelinePage() {
                           key={post.id}
                           post={post}
                           tlName={getTlName(post)}
+                          tlPhotoUrl={getTlForPost(post)?.photoUrl}
+                          tlLinkedinConnected={getTlForPost(post)?.linkedinConnected}
                           showTl={tlFilter === 'all'}
                           onClick={() => handlePostClick(post)}
                           isSelected={selectedPosts.has(post.id)}
@@ -601,52 +608,84 @@ export default function StrategistPipelinePage() {
               })}
             </div>
 
-            {/* Agendados section — horizontal box below */}
-            {agendadoPosts.length > 0 && (
-              <div
-                className={`rounded-lg border bg-card overflow-hidden border-t-2 ${STATUS_CONFIG.agendado.kanbanBorder} transition-all ${
-                  dragOverStatus === 'agendado' ? 'ring-2 ring-primary/40 bg-primary/5' : ''
-                }`}
-                onDragOver={(e) => handleDragOver(e, 'agendado')}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, 'agendado')}
-              >
-                {/* Toggle header */}
-                <button
-                  type="button"
-                  onClick={() => setShowAgendados(prev => !prev)}
-                  className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{getStatusLabel('agendado')}</span>
-                    <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
-                      {agendadoPosts.length}
-                    </span>
-                  </div>
-                  {showAgendados ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                </button>
+            {/* Completed section — Postados & Arquivados toggle */}
+            {(() => {
+              const completedCount = toggleStatuses.reduce((sum, s) => sum + (postsByStatus[s]?.length || 0), 0);
+              if (completedCount === 0) return null;
+              return (
+                <div className="rounded-lg border bg-card overflow-hidden">
+                  {/* Toggle header */}
+                  <button
+                    type="button"
+                    onClick={() => setShowCompleted(prev => !prev)}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{t.contentPipeline.completedPosts}</span>
+                      <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                        {completedCount}
+                      </span>
+                    </div>
+                    {showCompleted ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                  </button>
 
-                {/* Agendados list */}
-                {showAgendados && (
-                  <div className="divide-y">
-                    {agendadoPosts.map(post => (
-                      <PostRow
-                        key={post.id}
-                        post={post}
-                        tlName={getTlName(post)}
-                        showTl={tlFilter === 'all'}
-                        onClick={() => handlePostClick(post)}
-                        isSelected={selectedPosts.has(post.id)}
-                        onToggleSelect={() => toggleSelect(post.id)}
-                        isDragging={draggedPostId === post.id}
-                        onDragStart={(e) => handleDragStart(e, post.id)}
-                        onDragEnd={handleDragEnd}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                  {/* Completed posts grouped by status */}
+                  {showCompleted && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3">
+                      {toggleStatuses.map(status => {
+                        const cfg = STATUS_CONFIG[status];
+                        const columnPosts = postsByStatus[status] || [];
+                        if (columnPosts.length === 0) return null;
+                        const visiblePosts = columnPosts.slice(0, MAX_VISIBLE_POSTS);
+                        const hasMore = columnPosts.length > MAX_VISIBLE_POSTS;
+
+                        return (
+                          <div key={status} className={`rounded-lg border bg-card overflow-hidden border-t-2 ${cfg.kanbanBorder}`}>
+                            <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{getStatusLabel(status)}</span>
+                                <span className="text-xs text-muted-foreground bg-muted rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                                  {columnPosts.length}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="divide-y">
+                              {visiblePosts.map(post => (
+                                <PostRow
+                                  key={post.id}
+                                  post={post}
+                                  tlName={getTlName(post)}
+                                  tlPhotoUrl={getTlForPost(post)?.photoUrl}
+                                  tlLinkedinConnected={getTlForPost(post)?.linkedinConnected}
+                                  showTl={tlFilter === 'all'}
+                                  onClick={() => handlePostClick(post)}
+                                  isSelected={selectedPosts.has(post.id)}
+                                  onToggleSelect={() => toggleSelect(post.id)}
+                                  isDragging={false}
+                                  onDragStart={(e) => handleDragStart(e, post.id)}
+                                  onDragEnd={handleDragEnd}
+                                />
+                              ))}
+                            </div>
+                            {hasMore && (
+                              <div className="border-t px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setDialogStatus(status)}
+                                  className="w-full text-center text-xs font-medium text-primary hover:underline"
+                                >
+                                  Ver todos ({columnPosts.length})
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -664,6 +703,8 @@ export default function StrategistPipelinePage() {
                   key={post.id}
                   post={post}
                   tlName={getTlName(post)}
+                  tlPhotoUrl={getTlForPost(post)?.photoUrl}
+                  tlLinkedinConnected={getTlForPost(post)?.linkedinConnected}
                   showTl={tlFilter === 'all'}
                   onClick={() => { setDialogStatus(null); handlePostClick(post); }}
                   isSelected={selectedPosts.has(post.id)}
@@ -686,6 +727,8 @@ export default function StrategistPipelinePage() {
 function PostRow({
   post,
   tlName,
+  tlPhotoUrl,
+  tlLinkedinConnected,
   showTl,
   onClick,
   isSelected,
@@ -696,6 +739,8 @@ function PostRow({
 }: {
   post: PipelinePost;
   tlName: string;
+  tlPhotoUrl?: string;
+  tlLinkedinConnected?: boolean;
   showTl: boolean;
   onClick: () => void;
   isSelected: boolean;
@@ -763,9 +808,14 @@ function PostRow({
           </span>
         )}
         {showTl && tlName && (
-          <span className="hidden md:inline-flex items-center gap-0.5">
-            <User className="h-3 w-3" />
+          <span className="hidden md:inline-flex items-center gap-1">
+            {tlPhotoUrl ? (
+              <img src={tlPhotoUrl} alt="" className="h-4 w-4 rounded-full object-cover" />
+            ) : (
+              <User className="h-3 w-3" />
+            )}
             {tlName}
+            {tlLinkedinConnected && <LinkedInBadge />}
           </span>
         )}
       </div>

@@ -1309,6 +1309,9 @@ const en: Dictionary = {
     send: 'Send',
     scheduledFor: 'Scheduled for',
     nowLabel: 'Now',
+    editTitle: 'Edit Post',
+    postUpdated: 'Post updated!',
+    postUpdatedDescription: 'Your changes have been saved.',
   },
 
   // ══════════════════════════════════════════════
@@ -1419,6 +1422,15 @@ const en: Dictionary = {
     toastPostCreateError: 'Error creating post.',
     toastPostUpdated: 'Post updated successfully!',
     toastPostUpdateError: 'Error updating post.',
+    completedPosts: 'Published & Archived',
+    showCompleted: 'Show published and archived',
+    hideCompleted: 'Hide published and archived',
+    tabEmProducao: 'In production',
+    tabPostados: 'Published',
+    perPage: 'Per page',
+    previous: 'Previous',
+    next: 'Next',
+    pageOf: 'of',
   },
 
   // ══════════════════════════════════════════════

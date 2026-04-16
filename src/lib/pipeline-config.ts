@@ -140,6 +140,14 @@ export const TL_VISIBLE_STATUSES: PipelineStatus[] = [
   'post_aprovado', 'pronto_pra_postar', 'agendado', 'postado', 'ajuste',
 ];
 
+/** Statuses shown in the main pipeline grid (strategist kanban) */
+export const PIPELINE_GRID_STATUSES: PipelineStatus[] = [
+  'backlog', 'aprovar_ideia', 'em_producao', 'aprovar_post', 'post_aprovado', 'ajuste', 'agendado',
+];
+
+/** Statuses shown in the collapsible toggle section */
+export const PIPELINE_TOGGLE_STATUSES: PipelineStatus[] = ['postado', 'arquivado'];
+
 // ─── Property options ──────────────────────────────────
 
 export const ETAPA_OPTIONS = ['Visibilidade', 'Autoridade', 'Conversão'] as const;
