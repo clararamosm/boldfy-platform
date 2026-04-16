@@ -41,26 +41,6 @@ export function SimpleRichEditor({
 
   const handleInput = useCallback(() => {
     if (!editorRef.current) return;
-
-    // Auto-replace -> with →
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
-      const range = sel.getRangeAt(0);
-      const node = range.startContainer;
-      if (node.nodeType === Node.TEXT_NODE && node.textContent) {
-        const offset = range.startOffset;
-        const text = node.textContent;
-        if (offset >= 2 && text.slice(offset - 2, offset) === '->') {
-          node.textContent = text.slice(0, offset - 2) + '\u2192' + text.slice(offset);
-          const newRange = document.createRange();
-          newRange.setStart(node, offset - 1); // after the → char
-          newRange.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(newRange);
-        }
-      }
-    }
-
     isInternalChange.current = true;
     onChange(editorRef.current.innerHTML);
   }, [onChange]);
@@ -85,7 +65,7 @@ export function SimpleRichEditor({
         </button>
         {showTip && (
           <span className="text-xs text-muted-foreground">
-            Digite <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">-&gt;</kbd> para inserir uma seta →
+            Digite <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">-&gt;</kbd> (traço e maior) para inserir uma seta →. O LinkedIn converte automaticamente.
           </span>
         )}
       </div>

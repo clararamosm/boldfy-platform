@@ -134,6 +134,36 @@ export async function getScheduledPosts(
   }
 }
 
+export async function getScheduledPost(
+  idToken: string,
+  userId: string,
+  postId: string
+): Promise<{ post?: ScheduledPost; error?: string }> {
+  try {
+    await requireSelf(idToken, userId);
+    if (!postId) return { error: 'Post ID obrigatório.' };
+
+    const docSnap = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('scheduledPosts')
+      .doc(postId)
+      .get();
+
+    if (!docSnap.exists) return { error: 'Post não encontrado.' };
+
+    return {
+      post: {
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as ScheduledPost,
+    };
+  } catch (error) {
+    console.error('Error fetching scheduled post:', error);
+    return { error: 'Erro ao buscar post.' };
+  }
+}
+
 // ─── Company Feed ────────────────────────────────────────────────
 
 export type FeedPost = {

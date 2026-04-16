@@ -396,23 +396,8 @@ export function PostBodyEditor({
 
   const [showTip, setShowTip] = useState(false);
 
-  // Auto-replace -> with → in textarea
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    let newValue = e.target.value;
-    const cursorPos = e.target.selectionStart;
-
-    // Replace -> with → at cursor position
-    if (cursorPos >= 2 && newValue.slice(cursorPos - 2, cursorPos) === '->') {
-      newValue = newValue.slice(0, cursorPos - 2) + '\u2192' + newValue.slice(cursorPos);
-      onChange(newValue);
-      // Restore cursor position (→ is 1 char instead of 2)
-      requestAnimationFrame(() => {
-        e.target.setSelectionRange(cursorPos - 1, cursorPos - 1);
-      });
-      return;
-    }
-
-    onChange(newValue);
+    onChange(e.target.value);
   }, [onChange]);
 
   return (
@@ -430,7 +415,7 @@ export function PostBodyEditor({
           </button>
           {showTip && (
             <span className="text-xs text-muted-foreground">
-              Digite <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">-&gt;</kbd> para inserir uma seta →
+              Digite <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">-&gt;</kbd> (traço e maior) para inserir uma seta →. O LinkedIn converte automaticamente.
             </span>
           )}
         </div>
