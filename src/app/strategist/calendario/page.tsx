@@ -24,7 +24,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
-import { LinkedInBadge } from '@/components/ui/linkedin-badge';
+
 import { CalendarPostCard, type CalendarCardPost, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 import { PostListTable } from '@/components/calendar/post-list-table';

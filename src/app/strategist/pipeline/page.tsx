@@ -21,7 +21,7 @@ import { resolveSlugs, type PipelinePost, type PipelineStatus } from '@/app/acti
 import { generateSlug } from '@/lib/slugify';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
-import { LinkedInBadge } from '@/components/ui/linkedin-badge';
+
 
 type TLSummary = {
   id: string;
@@ -579,7 +579,7 @@ export default function StrategistPipelinePage() {
                           post={post}
                           tlName={getTlName(post)}
                           tlPhotoUrl={getTlForPost(post)?.photoUrl}
-                          tlLinkedinConnected={getTlForPost(post)?.linkedinConnected}
+
                           showTl={tlFilter === 'all'}
                           onClick={() => handlePostClick(post)}
                           isSelected={selectedPosts.has(post.id)}
@@ -656,7 +656,7 @@ export default function StrategistPipelinePage() {
                                   post={post}
                                   tlName={getTlName(post)}
                                   tlPhotoUrl={getTlForPost(post)?.photoUrl}
-                                  tlLinkedinConnected={getTlForPost(post)?.linkedinConnected}
+        
                                   showTl={tlFilter === 'all'}
                                   onClick={() => handlePostClick(post)}
                                   isSelected={selectedPosts.has(post.id)}
@@ -704,7 +704,6 @@ export default function StrategistPipelinePage() {
                   post={post}
                   tlName={getTlName(post)}
                   tlPhotoUrl={getTlForPost(post)?.photoUrl}
-                  tlLinkedinConnected={getTlForPost(post)?.linkedinConnected}
                   showTl={tlFilter === 'all'}
                   onClick={() => { setDialogStatus(null); handlePostClick(post); }}
                   isSelected={selectedPosts.has(post.id)}
@@ -728,7 +727,6 @@ function PostRow({
   post,
   tlName,
   tlPhotoUrl,
-  tlLinkedinConnected,
   showTl,
   onClick,
   isSelected,
@@ -740,7 +738,6 @@ function PostRow({
   post: PipelinePost;
   tlName: string;
   tlPhotoUrl?: string;
-  tlLinkedinConnected?: boolean;
   showTl: boolean;
   onClick: () => void;
   isSelected: boolean;
@@ -815,7 +812,6 @@ function PostRow({
               <User className="h-3 w-3" />
             )}
             {tlName}
-            {tlLinkedinConnected && <LinkedInBadge />}
           </span>
         )}
       </div>
