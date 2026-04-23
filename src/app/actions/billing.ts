@@ -24,6 +24,7 @@ import {
   type BillingModule,
 } from '@/lib/billing/stripe-modules';
 import { resyncPlatformSeats } from '@/lib/billing/seat-management';
+import { computeBillingWarnings, type BillingWarning } from '@/lib/billing/warnings';
 import type { CompanyBillingBlock } from '@/lib/billing/types';
 import {
   calculatePlatformMonthlyPriceCents,
@@ -487,6 +488,55 @@ export async function simulatePricing(
     return {
       success: false,
       error: e instanceof Error ? e.message : 'Erro ao simular precos.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// ADMIN: warnings de billing (banners/notificacoes)
+// ────────────────────────────────────────────────────────────
+
+export interface GetBillingWarningsResult {
+  warnings: BillingWarning[];
+  /** Timestamp de quando foi gerado (server). Client pode exibir "atualizado ha X". */
+  generatedAtISO: string;
+}
+
+/**
+ * Retorna lista de warnings ativos para a empresa do admin.
+ * - companyId inferido do token (sem cross-tenant).
+ * - Ordem: critical > warning > info.
+ * - Client apenas renderiza; nao decide severidade.
+ *
+ * Use em loops de polling no AdminLayout. Sugestao: refetch a cada 5 min.
+ */
+export async function getBillingWarnings(
+  idToken: string,
+): Promise<BillingActionResult<GetBillingWarningsResult>> {
+  try {
+    if (!idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const admin = await requireAdmin(idToken);
+    if (!admin.companyId) {
+      return { success: false, error: 'Admin sem empresa vinculada.' };
+    }
+
+    const billing = await getCompanyBillingBlock(admin.companyId);
+    const warnings = computeBillingWarnings(billing);
+
+    return {
+      success: true,
+      data: {
+        warnings,
+        generatedAtISO: new Date().toISOString(),
+      },
+    };
+  } catch (e: unknown) {
+    console.error('[getBillingWarnings] falhou:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao carregar avisos.',
     };
   }
 }

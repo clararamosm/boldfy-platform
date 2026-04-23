@@ -4,9 +4,19 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireAuth, requireStrategistForTL, requireAdminOrStrategist, requireTLOrMaster, requireActiveSubscription } from '@/lib/auth-guard';
+import { requireActiveModule, requireActiveModuleForCompany } from '@/lib/billing/module-gate';
 import { triggerSlackNotification } from '@/lib/slack-notifications';
 import { generateSlug } from '@/lib/slugify';
 import { notifyPostReadyForReview } from '@/lib/notifications';
+
+// ---- Helper: resolver companyId de um TL (1 round trip) ----
+
+async function getCompanyIdOfTL(tlUserId: string): Promise<string | null> {
+  const doc = await adminDb.collection('users').doc(tlUserId).get();
+  if (!doc.exists) return null;
+  const cid = doc.data()?.companyId;
+  return typeof cid === 'string' && cid ? cid : null;
+}
 
 // ---- Types ----
 
@@ -78,6 +88,12 @@ export async function createPipelinePost(
     const user = await requireStrategistForTL(idToken, tlUserId);
     await requireActiveSubscription(user);
 
+    // Gate granular: empresa do TL precisa ter modulo TL ativo (ou estar em beta/legacy).
+    const tlCompanyId = await getCompanyIdOfTL(tlUserId);
+    if (tlCompanyId) {
+      await requireActiveModuleForCompany(tlCompanyId, 'tl');
+    }
+
     const now = new Date().toISOString();
     const postData = {
       title: data.title || '',
@@ -123,6 +139,7 @@ export async function createPipelineIdea(
       return { error: 'Apenas Thought Leaders podem adicionar ideias.' };
     }
     await requireActiveSubscription(user);
+    await requireActiveModule(user, 'tl');
 
     const now = new Date().toISOString();
     const postData = {
@@ -179,6 +196,12 @@ export async function updatePipelinePost(
 ): Promise<ActionResult> {
   try {
     await requireStrategistForTL(idToken, tlUserId);
+
+    // Gate modulo TL no tenant do TL.
+    const tlCompanyId = await getCompanyIdOfTL(tlUserId);
+    if (tlCompanyId) {
+      await requireActiveModuleForCompany(tlCompanyId, 'tl');
+    }
 
     const docRef = adminDb.collection(getPipelinePath(tlUserId)).doc(postId);
     const docSnap = await docRef.get();
@@ -298,6 +321,7 @@ export async function approvePipelineIdea(
 ): Promise<ActionResult> {
   try {
     const user = await requireTLOrMaster(idToken);
+    await requireActiveModule(user, 'tl');
 
     const collPath = getPipelinePath(user.uid);
     const docRef = adminDb.collection(collPath).doc(postId);
@@ -334,6 +358,7 @@ export async function approvePipelinePost(
 ): Promise<ActionResult> {
   try {
     const user = await requireTLOrMaster(idToken);
+    await requireActiveModule(user, 'tl');
 
     const collPath = getPipelinePath(user.uid);
     const docRef = adminDb.collection(collPath).doc(postId);
@@ -464,6 +489,11 @@ export async function markPipelinePostPublished(
 ): Promise<ActionResult> {
   try {
     await requireStrategistForTL(idToken, tlUserId);
+
+    const tlCompanyId = await getCompanyIdOfTL(tlUserId);
+    if (tlCompanyId) {
+      await requireActiveModuleForCompany(tlCompanyId, 'tl');
+    }
 
     const docRef = adminDb.collection(getPipelinePath(tlUserId)).doc(postId);
     const docSnap = await docRef.get();

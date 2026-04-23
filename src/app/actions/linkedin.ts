@@ -5,6 +5,7 @@ import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { generateAuthUrl, publishLinkedInPost, refreshAccessToken, buildConnectionData, isTokenExpired, fetchPostMetricsBatch, type LinkedInConnection, type LinkedInPostMetrics } from '@/lib/linkedin';
 import { requireSelf, requireStrategistForTL, requireAdmin, requireAuth } from '@/lib/auth-guard';
+import { requireActiveModuleByRole } from '@/lib/billing/module-gate';
 import crypto from 'crypto';
 
 type LinkedInAuthResult = {
@@ -133,7 +134,8 @@ export async function publishToLinkedIn(
   mediaType?: string
 ): Promise<PublishResult> {
   try {
-    await requireSelf(idToken, userId);
+    const user = await requireSelf(idToken, userId);
+    await requireActiveModuleByRole(user);
 
     if (!content || content.trim().length === 0) {
       return { error: 'Conteúdo vazio. Escreva algo antes de publicar.' };

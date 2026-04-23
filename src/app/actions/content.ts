@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireAuth, requireSelf } from '@/lib/auth-guard';
+import { requireActiveModuleByRole } from '@/lib/billing/module-gate';
 import { ai } from '@/ai/genkit';
 
 // ---- Helpers ----
@@ -84,6 +85,7 @@ export async function handleAlignContent(
     let authUser;
     try {
       authUser = await requireAuth(idToken);
+      await requireActiveModuleByRole(authUser);
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Erro de autenticação.', alignedContent: null };
     }
@@ -179,6 +181,7 @@ export async function generateHooks(input: GenerateHooksInput): Promise<Generate
     let authUser;
     try {
       authUser = await requireAuth(input.idToken);
+      await requireActiveModuleByRole(authUser);
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Erro de autenticação.' };
     }
@@ -294,6 +297,7 @@ export async function generateWithHook(input: GenerateWithHookInput): Promise<Al
     let authUser;
     try {
       authUser = await requireAuth(input.idToken);
+      await requireActiveModuleByRole(authUser);
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Erro de autenticação.', alignedContent: null };
     }

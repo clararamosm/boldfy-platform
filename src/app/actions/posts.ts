@@ -4,6 +4,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireSelf, requireAuth, requireActiveSubscription } from '@/lib/auth-guard';
+import { requireActiveModuleByRole } from '@/lib/billing/module-gate';
 import { fetchPostMetricsBatch, isTokenExpired, refreshAccessToken, buildConnectionData, type LinkedInConnection } from '@/lib/linkedin';
 
 export type ScheduledPost = {
@@ -34,6 +35,7 @@ export async function createScheduledPost(
   try {
     const user = await requireSelf(idToken, userId);
     await requireActiveSubscription(user);
+    await requireActiveModuleByRole(user);
     if (!data.caption.trim()) return { error: 'A legenda não pode estar vazia.' };
     if (!data.scheduledFor) return { error: 'Data de agendamento é obrigatória.' };
 
@@ -71,7 +73,8 @@ export async function updateScheduledPost(
   }
 ): Promise<{ success?: boolean; error?: string }> {
   try {
-    await requireSelf(idToken, userId);
+    const user = await requireSelf(idToken, userId);
+    await requireActiveModuleByRole(user);
     if (!postId) return { error: 'Dados insuficientes.' };
 
     const updateData: Record<string, unknown> = {

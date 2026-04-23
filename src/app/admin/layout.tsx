@@ -20,6 +20,7 @@ import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useSubscription } from "@/hooks/use-subscription";
 import { SubscriptionGate } from "@/components/subscription-gate";
 import { OnboardingShell } from "@/components/onboarding";
+import { BillingWarningBanner } from "@/components/billing/billing-warning-banner";
 
 const TrialBanner = ({ daysLeft, plan }: { daysLeft: number; plan: string }) => {
     if (plan !== 'trial' || daysLeft > 7) return null;
@@ -129,6 +130,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
                 <TrialBanner daysLeft={subscription.daysLeft} plan={subscription.plan} />
+                <BillingWarningBanner />
                 {/* Block access when subscription is expired — except /admin/configuracoes (billing page) */}
                 {subscription.loading ? (
                     <div className="flex items-center justify-center min-h-[60vh]">
