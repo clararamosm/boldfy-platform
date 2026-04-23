@@ -116,76 +116,101 @@ export default function ColaboradorTrilhasPage() {
   const loadTrails = useCallback(async () => {
     if (!companyId || !authUser?.uid) return;
     setLoading(true);
-    try {
-      const allSessions: SessionWithTrails[] = [];
+    const allSessions: SessionWithTrails[] = [];
 
-      // 1. Load activated global trails
+    // 1. Load activated global trails (isolated try/catch so one failure doesn't kill all)
+    try {
       const actSnap = await getDocs(collection(db, `companies/${companyId}/activatedGlobalTrails`));
       const activatedBySession: Record<string, string[]> = {};
       actSnap.docs.forEach(d => {
         const data = d.data();
         const sessId = data.sessionId;
+        if (!sessId) return;
         if (!activatedBySession[sessId]) activatedBySession[sessId] = [];
         activatedBySession[sessId].push(d.id);
       });
 
-      // Load global sessions that have activated trails
       for (const [sessId, trailIds] of Object.entries(activatedBySession)) {
-        const sessDoc = await getDoc(doc(db, 'globalSessions', sessId));
-        if (!sessDoc.exists()) continue;
-        const session = { id: sessDoc.id, ...sessDoc.data() } as Sessao;
+        try {
+          const sessDoc = await getDoc(doc(db, 'globalSessions', sessId));
+          if (!sessDoc.exists()) continue;
+          const session = { id: sessDoc.id, ...sessDoc.data() } as Sessao;
 
-        const trails: Trilha[] = [];
-        for (const tid of trailIds) {
-          const tDoc = await getDoc(doc(db, `globalSessions/${sessId}/trails`, tid));
-          if (tDoc.exists()) trails.push({ id: tDoc.id, ...tDoc.data() } as Trilha);
-        }
-        if (trails.length > 0) {
-          trails.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-          allSessions.push({ session, trails });
+          const trails: Trilha[] = [];
+          for (const tid of trailIds) {
+            try {
+              const tDoc = await getDoc(doc(db, `globalSessions/${sessId}/trails`, tid));
+              if (tDoc.exists()) {
+                const trail = { id: tDoc.id, ...tDoc.data() } as Trilha;
+                if (trail.ativa !== false) trails.push(trail);
+              }
+            } catch (e) {
+              console.warn(`Skipping global trail ${tid}:`, e);
+            }
+          }
+          if (trails.length > 0) {
+            trails.sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+            allSessions.push({ session, trails });
+          }
+        } catch (e) {
+          console.warn(`Skipping global session ${sessId}:`, e);
         }
       }
+    } catch (err) {
+      console.error('Erro ao carregar trilhas globais:', err);
+    }
 
-      // 2. Load company custom sessions + trails
+    // 2. Load company custom sessions + trails (isolated)
+    try {
       const compSessSnap = await getDocs(
         query(collection(db, `companies/${companyId}/sessions`), orderBy('ordem', 'asc'))
       );
       for (const sessDoc of compSessSnap.docs) {
-        const session = { id: sessDoc.id, ...sessDoc.data() } as Sessao;
-        const trailSnap = await getDocs(
-          query(collection(db, `companies/${companyId}/sessions/${sessDoc.id}/trails`), orderBy('ordem', 'asc'))
-        );
-        const trails = trailSnap.docs.map(d => ({ id: d.id, ...d.data() } as Trilha)).filter(t => t.ativa);
-        if (trails.length > 0) allSessions.push({ session, trails });
+        try {
+          const session = { id: sessDoc.id, ...sessDoc.data() } as Sessao;
+          if (session.ativa === false) continue;
+          const trailSnap = await getDocs(
+            query(collection(db, `companies/${companyId}/sessions/${sessDoc.id}/trails`), orderBy('ordem', 'asc'))
+          );
+          const trails = trailSnap.docs
+            .map(d => ({ id: d.id, ...d.data() } as Trilha))
+            .filter(t => t.ativa);
+          if (trails.length > 0) allSessions.push({ session, trails });
+        } catch (e) {
+          console.warn(`Skipping custom session ${sessDoc.id}:`, e);
+        }
       }
-
-      // 3. Load user progress for all trails
-      const progressSnap = await getDocs(collection(db, `users/${authUser.uid}/trailProgress`));
-      const progressMap: Record<string, ProgressoTrilha> = {};
-      progressSnap.docs.forEach(d => { progressMap[d.id] = d.data() as ProgressoTrilha; });
-
-      // Merge progress into trails
-      let totalTrails = 0, inProgress = 0, completed = 0, totalPts = 0;
-      const merged = allSessions.map(sw => ({
-        ...sw,
-        trails: sw.trails.map(t => {
-          totalTrails++;
-          const prog = progressMap[t.id];
-          if (prog) {
-            if (prog.concluida) { completed++; totalPts += prog.pontosGanhos || 0; }
-            else { inProgress++; totalPts += prog.pontosGanhos || 0; }
-          }
-          return { ...t, progress: prog };
-        }),
-      }));
-
-      setSessionsWithTrails(merged);
-      setStats({ total: totalTrails, emProgresso: inProgress, concluidas: completed, pontos: totalPts });
     } catch (err) {
-      console.error('Erro ao carregar trilhas:', err);
-    } finally {
-      setLoading(false);
+      console.error('Erro ao carregar sessoes customizadas:', err);
     }
+
+    // 3. Load user progress (isolated)
+    const progressMap: Record<string, ProgressoTrilha> = {};
+    try {
+      const progressSnap = await getDocs(collection(db, `users/${authUser.uid}/trailProgress`));
+      progressSnap.docs.forEach(d => { progressMap[d.id] = d.data() as ProgressoTrilha; });
+    } catch (err) {
+      console.error('Erro ao carregar progresso:', err);
+    }
+
+    // Merge progress into trails
+    let totalTrails = 0, inProgress = 0, completed = 0, totalPts = 0;
+    const merged = allSessions.map(sw => ({
+      ...sw,
+      trails: sw.trails.map(t => {
+        totalTrails++;
+        const prog = progressMap[t.id];
+        if (prog) {
+          if (prog.concluida) { completed++; totalPts += prog.pontosGanhos || 0; }
+          else { inProgress++; totalPts += prog.pontosGanhos || 0; }
+        }
+        return { ...t, progress: prog };
+      }),
+    }));
+
+    setSessionsWithTrails(merged);
+    setStats({ total: totalTrails, emProgresso: inProgress, concluidas: completed, pontos: totalPts });
+    setLoading(false);
   }, [companyId, authUser?.uid]);
 
   useEffect(() => { if (companyId) loadTrails(); }, [companyId, loadTrails]);

@@ -196,7 +196,7 @@ service cloud.firestore {
         allow read: if request.auth != null
                     && hasRole(request.auth.uid, 'colaborador')
                     && getCompanyId(request.auth.uid) == companyId
-                    && subcollection in ['missions', 'missionSubmissions', 'trails', 'rewards', 'rescues', 'assets', 'library', 'activatedGlobalTrails'];
+                    && subcollection in ['missions', 'missionSubmissions', 'trails', 'rewards', 'rescues', 'assets', 'library', 'activatedGlobalTrails', 'sessions'];
 
         // Thought Leaders can read content strategy and brand manual of their company
         allow read: if request.auth != null
@@ -221,7 +221,7 @@ service cloud.firestore {
           allow read: if request.auth != null
                       && hasRole(request.auth.uid, 'colaborador')
                       && getCompanyId(request.auth.uid) == companyId
-                      && subcollection in ['missions', 'missionSubmissions', 'trails', 'rewards', 'rescues', 'assets', 'library', 'activatedGlobalTrails'];
+                      && subcollection in ['missions', 'missionSubmissions', 'trails', 'rewards', 'rescues', 'assets', 'library', 'activatedGlobalTrails', 'sessions'];
         }
       }
     }
