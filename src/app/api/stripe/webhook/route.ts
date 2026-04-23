@@ -7,10 +7,116 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
+import {
+  extractModuleFromSubscriptionMetadata,
+  markModuleAsActive,
+  markModuleAsBlocked,
+  type BillingModule,
+} from '@/lib/billing/stripe-modules';
 
 const BETA_MONTHS = 5; // 5 months at beta price, then full price
+
+// ────────────────────────────────────────────────────────────
+// HANDLERS MODULARES (billing.* em vez de subscription.*)
+// Executados quando a subscription tem metadata.module.
+// ────────────────────────────────────────────────────────────
+
+async function handleModuleCheckoutCompleted(args: {
+  companyId: string;
+  moduleKey: BillingModule;
+  subscription: Stripe.Subscription;
+}): Promise<void> {
+  const { companyId, moduleKey, subscription } = args;
+
+  // Dados especificos por modulo a persistir no Firestore
+  const extra: Record<string, unknown> = {};
+  const subAny = subscription as unknown as { current_period_end?: number };
+
+  if (moduleKey === 'platform') {
+    const seats = parseInt(subscription.metadata.seats || '0', 10);
+    const tier = subscription.metadata.tier || '';
+    const isBeta = subscription.metadata.isBeta === 'true';
+    extra.seats = seats;
+    extra.tier = tier;
+    extra.isBeta = isBeta;
+  } else if (moduleKey === 'tl') {
+    extra.executives = parseInt(subscription.metadata.executives || '0', 10);
+    extra.frequency = parseInt(subscription.metadata.frequency || '2', 10);
+  } else if (moduleKey === 'design') {
+    extra.pack = subscription.metadata.pack;
+  }
+
+  if (subAny.current_period_end) {
+    extra.currentPeriodEnd = toFirestoreDate(subAny.current_period_end);
+  }
+
+  await markModuleAsActive({
+    companyId,
+    module: moduleKey,
+    stripeSubscriptionId: subscription.id,
+    extra,
+  });
+}
+
+async function handleModuleSubscriptionUpdated(args: {
+  companyId: string;
+  moduleKey: BillingModule;
+  subscription: Stripe.Subscription;
+}): Promise<void> {
+  const { companyId, moduleKey, subscription } = args;
+  const subAny = subscription as unknown as {
+    status: string;
+    current_period_end?: number;
+    cancel_at_period_end?: boolean;
+  };
+
+  const statusMap: Record<string, 'active' | 'pending' | 'blocked' | 'disabled'> = {
+    active: 'active',
+    trialing: 'active',
+    past_due: 'blocked',
+    unpaid: 'blocked',
+    canceled: 'blocked',
+    incomplete: 'pending',
+    incomplete_expired: 'blocked',
+    paused: 'blocked',
+  };
+
+  const mappedStatus = statusMap[subAny.status] ?? 'blocked';
+
+  await adminDb.collection('companies').doc(companyId).update({
+    [`billing.${moduleKey}.status`]: mappedStatus,
+    [`billing.${moduleKey}.currentPeriodEnd`]: subAny.current_period_end
+      ? toFirestoreDate(subAny.current_period_end)
+      : FieldValue.delete(),
+    [`billing.${moduleKey}.cancelAtPeriodEnd`]: subAny.cancel_at_period_end === true,
+    'billing.updatedAt': FieldValue.serverTimestamp(),
+  });
+}
+
+async function handleModuleSubscriptionDeleted(args: {
+  companyId: string;
+  moduleKey: BillingModule;
+}): Promise<void> {
+  await markModuleAsBlocked({
+    companyId: args.companyId,
+    module: args.moduleKey,
+    reason: 'canceled',
+  });
+}
+
+async function handleModulePaymentFailed(args: {
+  companyId: string;
+  moduleKey: BillingModule;
+}): Promise<void> {
+  await adminDb.collection('companies').doc(args.companyId).update({
+    [`billing.${args.moduleKey}.status`]: 'blocked',
+    [`billing.${args.moduleKey}.blockedReason`]: 'payment_failed',
+    'billing.updatedAt': FieldValue.serverTimestamp(),
+  });
+}
 
 /** Safely convert a Stripe timestamp (unix seconds, Date, or undefined) to a JS Date */
 function toFirestoreDate(value: unknown): Date {
@@ -77,12 +183,26 @@ export async function POST(req: NextRequest) {
           const subId = typeof session.subscription === 'string'
             ? session.subscription
             : (session.subscription as { id: string })?.id;
+          const sub = await stripe.subscriptions.retrieve(subId as string);
+
+          // ── Fluxo MODULAR (Fase 2): subscription tem metadata.module ──
+          const modInfo = extractModuleFromSubscriptionMetadata(sub.metadata);
+          if (modInfo) {
+            await handleModuleCheckoutCompleted({
+              companyId: modInfo.companyId,
+              moduleKey: modInfo.module,
+              subscription: sub,
+            });
+            break;
+          }
+
+          // ── Fluxo LEGADO (Fase 1-): atualiza subscription.* monolitico ──
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const sub = await stripe.subscriptions.retrieve(subId as string) as any;
-          const seats = parseInt(sub.metadata.seats || '0', 10);
-          const tier = sub.metadata.tier || '';
-          const isBeta = sub.metadata.isBeta === 'true';
-          const fullPriceCents = parseInt(sub.metadata.fullPricePerSeatCents || '0', 10);
+          const subLegacy = sub as any;
+          const seats = parseInt(subLegacy.metadata.seats || '0', 10);
+          const tier = subLegacy.metadata.tier || '';
+          const isBeta = subLegacy.metadata.isBeta === 'true';
+          const fullPriceCents = parseInt(subLegacy.metadata.fullPricePerSeatCents || '0', 10);
 
           // Calculate beta end date (5 months from now)
           const betaEndsAt = isBeta
@@ -96,8 +216,8 @@ export async function POST(req: NextRequest) {
             'subscription.totalLicenses': seats,
             'subscription.tier': tier,
             'subscription.isBeta': isBeta,
-            'subscription.currentPeriodEnd': toFirestoreDate(sub.current_period_end),
-            'subscription.cancelAtPeriodEnd': sub.cancel_at_period_end || false,
+            'subscription.currentPeriodEnd': toFirestoreDate(subLegacy.current_period_end),
+            'subscription.cancelAtPeriodEnd': subLegacy.cancel_at_period_end || false,
           };
 
           if (betaEndsAt) {
@@ -124,11 +244,25 @@ export async function POST(req: NextRequest) {
       }
 
       case 'customer.subscription.updated': {
+        const subUpdated = event.data.object as Stripe.Subscription;
+
+        // ── Fluxo MODULAR (Fase 2) ──
+        const modInfoUpd = extractModuleFromSubscriptionMetadata(subUpdated.metadata);
+        if (modInfoUpd) {
+          await handleModuleSubscriptionUpdated({
+            companyId: modInfoUpd.companyId,
+            moduleKey: modInfoUpd.module,
+            subscription: subUpdated,
+          });
+          break;
+        }
+
+        // ── Fluxo LEGADO ──
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const subUpdated = event.data.object as any;
-        const companyIdUpd = subUpdated.metadata?.companyId;
+        const subUpdAny = subUpdated as any;
+        const companyIdUpd = subUpdAny.metadata?.companyId;
         if (!companyIdUpd) {
-          console.error(`customer.subscription.updated missing companyId in metadata. Sub: ${subUpdated.id}`);
+          console.error(`customer.subscription.updated missing companyId in metadata. Sub: ${subUpdAny.id}`);
           break;
         }
 
@@ -144,19 +278,32 @@ export async function POST(req: NextRequest) {
         };
 
         await adminDb.collection('companies').doc(companyIdUpd).update({
-          'subscription.status': statusMap[subUpdated.status] || subUpdated.status,
-          'subscription.currentPeriodEnd': toFirestoreDate(subUpdated.current_period_end),
-          'subscription.cancelAtPeriodEnd': subUpdated.cancel_at_period_end,
+          'subscription.status': statusMap[subUpdAny.status] || subUpdAny.status,
+          'subscription.currentPeriodEnd': toFirestoreDate(subUpdAny.current_period_end),
+          'subscription.cancelAtPeriodEnd': subUpdAny.cancel_at_period_end,
         });
         break;
       }
 
       case 'customer.subscription.deleted': {
+        const subDeleted = event.data.object as Stripe.Subscription;
+
+        // ── Fluxo MODULAR (Fase 2) ──
+        const modInfoDel = extractModuleFromSubscriptionMetadata(subDeleted.metadata);
+        if (modInfoDel) {
+          await handleModuleSubscriptionDeleted({
+            companyId: modInfoDel.companyId,
+            moduleKey: modInfoDel.module,
+          });
+          break;
+        }
+
+        // ── Fluxo LEGADO ──
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const subDeleted = event.data.object as any;
-        const companyIdDel = subDeleted.metadata?.companyId;
+        const subDelAny = subDeleted as any;
+        const companyIdDel = subDelAny.metadata?.companyId;
         if (!companyIdDel) {
-          console.error(`customer.subscription.deleted missing companyId in metadata. Sub: ${subDeleted.id}`);
+          console.error(`customer.subscription.deleted missing companyId in metadata. Sub: ${subDelAny.id}`);
           break;
         }
 
@@ -176,9 +323,22 @@ export async function POST(req: NextRequest) {
           : invoice.subscription?.id;
 
         if (failedSubId) {
+          const failedSub = await stripe.subscriptions.retrieve(failedSubId);
+
+          // ── Fluxo MODULAR (Fase 2) ──
+          const modInfoFailed = extractModuleFromSubscriptionMetadata(failedSub.metadata);
+          if (modInfoFailed) {
+            await handleModulePaymentFailed({
+              companyId: modInfoFailed.companyId,
+              moduleKey: modInfoFailed.module,
+            });
+            break;
+          }
+
+          // ── Fluxo LEGADO ──
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const failedSub = await stripe.subscriptions.retrieve(failedSubId) as any;
-          const companyIdFailed = failedSub.metadata?.companyId;
+          const failedSubAny = failedSub as any;
+          const companyIdFailed = failedSubAny.metadata?.companyId;
           if (companyIdFailed) {
             await adminDb.collection('companies').doc(companyIdFailed).update({
               'subscription.status': 'past_due',

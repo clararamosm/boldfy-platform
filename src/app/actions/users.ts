@@ -9,6 +9,7 @@ import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { generateSlug } from '@/lib/slugify';
 import { getDefaultBillingBlock } from '@/lib/billing/types';
+import { resyncPlatformSeats } from '@/lib/billing/seat-management';
 
 // ---- Email Invitation Helper ----
 
@@ -458,6 +459,14 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    // Billing: sincroniza seats do modulo Platform (Firestore + Stripe com proration).
+    // Nao bloqueia o convite caso falhe — erro ja e logado internamente.
+    try {
+      await resyncPlatformSeats(companyId);
+    } catch (seatErr) {
+      console.error('[inviteCollaborator] resyncPlatformSeats falhou:', seatErr);
+    }
+
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
     const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
     sendInvitationEmail({
@@ -511,6 +520,13 @@ export async function deleteCollaborator(idToken: string, userId: string): Promi
     }
 
     await userRef.delete();
+
+    // Billing: sincroniza seats apos remocao (decrementa Stripe com proration).
+    try {
+      await resyncPlatformSeats(targetData.companyId);
+    } catch (seatErr) {
+      console.error('[deleteCollaborator] resyncPlatformSeats falhou:', seatErr);
+    }
 
     return { success: true };
   } catch (error) {

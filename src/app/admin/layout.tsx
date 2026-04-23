@@ -12,7 +12,7 @@ import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle, Clock, Palette } from "lucide-react";
+import { User as UserIcon, AlertTriangle, Loader2, ArrowLeft, Shield, HelpCircle, Clock, Palette, CreditCard } from "lucide-react";
 import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { AuthProvider } from "@/contexts/auth-context";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
@@ -100,6 +100,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                     feedbackPage="Sidebar"
                     menuItems={[
                         { href: '/admin/configuracoes', label: t.nav.settings, icon: UserIcon },
+                        { href: '/admin/billing', label: 'Planos e cobrança', icon: CreditCard },
                         { href: '/admin/brand-context', label: 'Brand Context', icon: Palette },
                         { href: '/admin/suporte', label: t.nav.support, icon: HelpCircle },
                     ]}

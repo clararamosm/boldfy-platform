@@ -11,13 +11,29 @@
 
 'use server';
 
-import { requireMaster } from '@/lib/auth-guard';
+import { requireAdmin, requireMaster } from '@/lib/auth-guard';
 import {
   applyMasterBillingToggle,
+  computeFirstPaymentDeadline,
   getCompanyBillingBlock,
   validateMasterToggleInput,
 } from '@/lib/billing/master-rules';
+import {
+  createModuleCheckoutSession,
+  markModuleAsPending,
+  type BillingModule,
+} from '@/lib/billing/stripe-modules';
+import { resyncPlatformSeats } from '@/lib/billing/seat-management';
 import type { CompanyBillingBlock } from '@/lib/billing/types';
+import {
+  calculatePlatformMonthlyPriceCents,
+  calculateTLMonthlyPriceCents,
+  getDesignPack,
+  PLATFORM_MIN_SEATS,
+  PLATFORM_ENTERPRISE_THRESHOLD,
+  type DesignPackId,
+  type TLFrequency,
+} from '@/lib/billing/pricing';
 
 export interface BillingActionResult<T = void> {
   success: boolean;
@@ -130,6 +146,31 @@ export async function getCompanyBilling(
   }
 }
 
+/**
+ * Versao admin: admin so le billing da propria empresa.
+ * companyId e inferido do token — nao aceita param para evitar leak cross-tenant.
+ */
+export async function getMyCompanyBilling(
+  idToken: string,
+): Promise<BillingActionResult<SerializableBillingBlock>> {
+  try {
+    if (!idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const admin = await requireAdmin(idToken);
+    if (!admin.companyId) {
+      return { success: false, error: 'Admin sem empresa vinculada.' };
+    }
+    const block = await getCompanyBillingBlock(admin.companyId);
+    return { success: true, data: serializeBilling(block) };
+  } catch (e: unknown) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao carregar billing.',
+    };
+  }
+}
+
 // ────────────────────────────────────────────────────────────
 // WRITE (Master toggle)
 // ────────────────────────────────────────────────────────────
@@ -168,6 +209,284 @@ export async function updateCompanyBillingToggles(
     return {
       success: false,
       error: e instanceof Error ? e.message : 'Erro ao atualizar billing.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// ADMIN: ativar um modulo e iniciar Checkout
+// ────────────────────────────────────────────────────────────
+
+export interface ActivateModuleInput {
+  idToken: string;
+  module: BillingModule;
+  /** Para Platform: seats desejados (opcional — default = colabs atuais ou 5). */
+  platformSeats?: number;
+  /** Para TL: quantidade de executivos e frequencia. */
+  tlExecutives?: number;
+  tlFrequency?: TLFrequency;
+  /** Para Design: pack escolhido. */
+  designPack?: DesignPackId;
+}
+
+export interface ActivateModuleResult {
+  checkoutUrl: string;
+  deadlineISO: string;
+}
+
+/**
+ * Admin ativa um modulo:
+ * 1. Valida que admin pertence a empresa e empresa tem billing.enabled
+ * 2. Marca modulo como 'pending' + deadline 7 dias
+ * 3. Cria Checkout Stripe e retorna URL
+ *
+ * O webhook promove para 'active' apos pagamento. Cron bloqueia se passar prazo.
+ */
+export async function activateBillingModule(
+  input: ActivateModuleInput,
+): Promise<BillingActionResult<ActivateModuleResult>> {
+  try {
+    if (!input?.idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const admin = await requireAdmin(input.idToken);
+    if (!admin.companyId) {
+      return { success: false, error: 'Admin sem empresa vinculada.' };
+    }
+    if (!admin.email) {
+      return { success: false, error: 'Admin sem email.' };
+    }
+
+    // Validar modulo
+    const moduleKey = input.module;
+    if (moduleKey !== 'platform' && moduleKey !== 'tl' && moduleKey !== 'design') {
+      return { success: false, error: 'Modulo invalido.' };
+    }
+
+    // Ler estado do billing
+    const billing = await getCompanyBillingBlock(admin.companyId);
+    if (!billing.enabled) {
+      return {
+        success: false,
+        error: 'Billing desligado. Contate o suporte (Master) para ativar.',
+      };
+    }
+
+    // Para Platform: resyncar seats antes de ativar, garantindo min 5
+    let platformSeats = input.platformSeats;
+    if (moduleKey === 'platform') {
+      const sync = await resyncPlatformSeats(admin.companyId);
+      platformSeats = Math.max(platformSeats ?? sync.newSeats, sync.newSeats);
+    }
+
+    // Design requer Platform active — checa aqui tambem pra mensagem melhor
+    if (moduleKey === 'design' && billing.platform.status !== 'active') {
+      return {
+        success: false,
+        error: 'Design so pode ser ativado apos Platform estar ativo (pago).',
+      };
+    }
+
+    const deadline = computeFirstPaymentDeadline();
+
+    // Marcar modulo como pending com dados de config
+    const extra: Record<string, unknown> = {};
+    if (moduleKey === 'tl') {
+      extra.executives = input.tlExecutives ?? 0;
+      extra.frequency = input.tlFrequency ?? 2;
+    }
+    if (moduleKey === 'design') {
+      extra.pack = input.designPack;
+    }
+    if (moduleKey === 'platform') {
+      extra.seats = platformSeats;
+    }
+
+    await markModuleAsPending({
+      companyId: admin.companyId,
+      module: moduleKey,
+      deadline,
+      extra,
+    });
+
+    // Criar Checkout
+    const result = await createModuleCheckoutSession({
+      companyId: admin.companyId,
+      adminUid: admin.uid,
+      adminEmail: admin.email,
+      modules: [moduleKey],
+      platformSeats,
+      tlExecutives: input.tlExecutives,
+      tlFrequency: input.tlFrequency,
+      designPack: input.designPack,
+    });
+
+    return {
+      success: true,
+      data: {
+        checkoutUrl: result.checkoutUrl,
+        deadlineISO: deadline.toISOString(),
+      },
+    };
+  } catch (e: unknown) {
+    console.error('[activateBillingModule] falhou:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao ativar modulo.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// ADMIN: simulador de preco (read-only)
+// ────────────────────────────────────────────────────────────
+
+export interface SimulatePricingInput {
+  idToken: string;
+  platform?: {
+    seats: number;
+  };
+  tl?: {
+    executives: number;
+    frequency: TLFrequency;
+  };
+  design?: {
+    pack: DesignPackId;
+  };
+}
+
+export interface SimulatedModule {
+  valid: boolean;
+  /** Preco total mensal do modulo em centavos BRL. */
+  totalCents: number;
+  /** Para platform: tier aplicado. */
+  tierName?: string;
+  /** Para platform: preco por seat em centavos. */
+  perSeatCents?: number;
+  /** Para design: nome do pack. */
+  packName?: string;
+  /** Mensagem de erro quando valid=false. */
+  error?: string;
+}
+
+export interface SimulatePricingResult {
+  isBetaTester: boolean;
+  platform: SimulatedModule | null;
+  tl: SimulatedModule | null;
+  design: SimulatedModule | null;
+  /** Soma mensal de todos os modulos validos, em centavos. */
+  grandTotalCents: number;
+  /** Limites da tabela de Platform para exibir no UI. */
+  platformLimits: {
+    min: number;
+    max: number;
+  };
+}
+
+/**
+ * Calcula precos para o admin ver no simulador. Nao persiste nada.
+ * O flag isBetaTester e lido do Firestore — admin nao escolhe (so Master).
+ * Nenhum calculo de preco ocorre no client; tudo passa por aqui.
+ */
+export async function simulatePricing(
+  input: SimulatePricingInput,
+): Promise<BillingActionResult<SimulatePricingResult>> {
+  try {
+    if (!input?.idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const admin = await requireAdmin(input.idToken);
+    if (!admin.companyId) {
+      return { success: false, error: 'Admin sem empresa vinculada.' };
+    }
+
+    const billing = await getCompanyBillingBlock(admin.companyId);
+    const isBetaTester = billing.isBetaTester === true;
+
+    let grandTotal = 0;
+
+    // Platform
+    let platformResult: SimulatedModule | null = null;
+    if (input.platform) {
+      const seats = Math.floor(input.platform.seats);
+      if (!Number.isFinite(seats) || seats < 1) {
+        platformResult = { valid: false, totalCents: 0, error: 'Seats invalidos.' };
+      } else {
+        const calc = calculatePlatformMonthlyPriceCents(seats, isBetaTester);
+        if (!calc) {
+          platformResult = {
+            valid: false,
+            totalCents: 0,
+            error:
+              seats > PLATFORM_ENTERPRISE_THRESHOLD
+                ? 'Acima de 70 licencas e enterprise — fale com o time Boldfy.'
+                : `Minimo de ${PLATFORM_MIN_SEATS} licencas.`,
+          };
+        } else {
+          const perSeat = Math.round(calc.totalCents / seats);
+          platformResult = {
+            valid: true,
+            totalCents: calc.totalCents,
+            tierName: calc.tier.name,
+            perSeatCents: perSeat,
+          };
+          grandTotal += calc.totalCents;
+        }
+      }
+    }
+
+    // TL
+    let tlResult: SimulatedModule | null = null;
+    if (input.tl) {
+      const execs = Math.floor(input.tl.executives);
+      const freq = input.tl.frequency;
+      const totalCents = calculateTLMonthlyPriceCents(execs, freq);
+      if (totalCents == null) {
+        tlResult = {
+          valid: false,
+          totalCents: 0,
+          error:
+            execs > 5
+              ? 'Acima de 5 executivos e enterprise — fale com o time Boldfy.'
+              : 'Combinacao invalida de executivos e frequencia.',
+        };
+      } else {
+        tlResult = { valid: true, totalCents };
+        grandTotal += totalCents;
+      }
+    }
+
+    // Design
+    let designResult: SimulatedModule | null = null;
+    if (input.design) {
+      const pack = getDesignPack(input.design.pack);
+      if (!pack) {
+        designResult = { valid: false, totalCents: 0, error: 'Pack invalido.' };
+      } else {
+        designResult = { valid: true, totalCents: pack.priceCents, packName: pack.label };
+        grandTotal += pack.priceCents;
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        isBetaTester,
+        platform: platformResult,
+        tl: tlResult,
+        design: designResult,
+        grandTotalCents: grandTotal,
+        platformLimits: {
+          min: PLATFORM_MIN_SEATS,
+          max: PLATFORM_ENTERPRISE_THRESHOLD,
+        },
+      },
+    };
+  } catch (e: unknown) {
+    console.error('[simulatePricing] falhou:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao simular precos.',
     };
   }
 }
