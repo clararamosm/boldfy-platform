@@ -8,6 +8,7 @@ import { requireAuth, requireMaster, requireAdmin, requireAdminOrStrategist } fr
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 import { generateSlug } from '@/lib/slugify';
+import { getDefaultBillingBlock } from '@/lib/billing/types';
 
 // ---- Email Invitation Helper ----
 
@@ -207,6 +208,14 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
   }
 
   try {
+    // Empresa criada SEM trial automatico. Master liga billing manualmente
+    // via /master/empresas/[id]/billing. Ate la, empresa esta em periodo
+    // gratuito (billing.enabled = false).
+    //
+    // `subscription.plan = 'free'` mantem compatibilidade com o hook
+    // useSubscription e auth-guard.requireActiveSubscription que serao
+    // refatorados na Fase 2 para consumir `billing.*`. Ate la, 'free' nao
+    // bloqueia o app (status nao esta em BLOCKED_STATUSES do hook).
     const companyRef = await adminDb.collection("companies").add({
       companyName: companyName,
       status: 'Ativa',
@@ -216,11 +225,16 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       adminProfile: adminEmail ? { email: adminEmail, name: adminName } : { email: '', name: '' },
       brandContext: { valueProposition: '', tagline: '', businessKeywords: [], solutions: [], targetPainPoints: [], targetAudience: '', approvedTopics: [], prohibitedPhrases: [] },
       subscription: {
-        plan: 'trial',
-        status: 'trialing',
+        plan: 'free',
+        status: 'active',
         totalLicenses: licenses,
         usedLicenses: 0,
-        trialEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 1 month free trial (beta)
+        trialEnd: null,
+      },
+      billing: {
+        ...getDefaultBillingBlock(),
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
       },
       createdAt: FieldValue.serverTimestamp(),
     });

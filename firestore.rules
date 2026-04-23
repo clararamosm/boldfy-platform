@@ -159,12 +159,14 @@ service cloud.firestore {
                       || isStrategistForCompany(request.auth.uid, companyId)
                       || hasRole(request.auth.uid, 'master'));
 
-      // BILLING SECURITY: subscription and Stripe fields can ONLY be written by
-      // server-side code (Admin SDK / webhooks). Client writes are blocked.
-      // Without this, any admin could grant themselves a free subscription via DevTools.
+      // BILLING SECURITY: subscription, billing and Stripe fields can ONLY be
+      // written by server-side code (Admin SDK / webhooks). Client writes are
+      // blocked. Without this, any admin could grant themselves a free
+      // subscription via DevTools. `billing` is the new modular structure
+      // (Fase 1+): master toggles + platform/tl/design module states.
       function isNotChangingBillingFields() {
         return !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['subscription', 'stripeCustomerId']);
+          .hasAny(['subscription', 'stripeCustomerId', 'billing']);
       }
 
       // Only admins of the company, strategists, or master admins can update company data.

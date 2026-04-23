@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, PlusCircle, LogIn, Loader2, Pencil, Trash2, Globe, Mail } from "lucide-react";
+import { MoreHorizontal, PlusCircle, LogIn, Loader2, Pencil, Trash2, Globe, Mail, CreditCard } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -515,6 +515,12 @@ export default function MasterEmpresasPage() {
                                                 <DropdownMenuItem onClick={() => handleEditCompanyOpen(company)}>
                                                   <Pencil className="mr-2 h-4 w-4" />
                                                   Editar Empresa
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/master/empresas/${company.id}/billing`}>
+                                                        <CreditCard className="mr-2 h-4 w-4" />
+                                                        Billing
+                                                    </Link>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteCompanyConfirm(company)}>
                                                   <Trash2 className="mr-2 h-4 w-4" />
