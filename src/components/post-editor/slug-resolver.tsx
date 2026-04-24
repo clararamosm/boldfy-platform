@@ -21,15 +21,23 @@ export function SlugResolver({ companySlug, tlSlug, postId }: Props) {
     const resolve = async () => {
       try {
         const token = await getAuthToken();
+        if (!token) {
+          console.warn('[SlugResolver] No auth token — user may not be logged in');
+          setError('Você precisa estar logado para acessar este post.');
+          return;
+        }
         const result = await resolveSlugs(token, companySlug, tlSlug);
         if (result.error) {
+          console.error('[SlugResolver] Server returned error:', result.error, { companySlug, tlSlug });
           setError(result.error);
           return;
         }
         if (result.companyId) setCompanyId(result.companyId);
         if (result.tlId) setTlId(result.tlId);
-      } catch {
-        setError('Erro ao resolver identificadores.');
+      } catch (err) {
+        console.error('[SlugResolver] Unexpected error:', err, { companySlug, tlSlug });
+        const msg = err instanceof Error ? err.message : 'Erro ao resolver identificadores.';
+        setError(msg);
       }
     };
     resolve();
