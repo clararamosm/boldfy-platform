@@ -306,6 +306,33 @@ function htmlToLinkedInText(html: string): string {
 }
 
 /**
+ * Escape reserved characters for LinkedIn's "little" Text Format used in
+ * the Posts API `commentary` field.
+ *
+ * LinkedIn reserves these characters for structural syntax (mentions,
+ * hashtags, formatting): ( ) [ ] { } | @ # * ~ < > \ _
+ *
+ * If sent unescaped, the parser tries to interpret them as syntax and
+ * silently truncates the post when it gets confused — e.g. "(Ideias que Colam)"
+ * looks like a malformed mention because the mention format is
+ * "@[Name](urn:li:person:ID)".
+ *
+ * The backslash MUST be escaped first, otherwise we'd double-escape the
+ * backslashes we insert for the other reserved characters.
+ *
+ * Note: when mentions/hashtags land in the editor, their structural tokens
+ * should be inserted AFTER this function runs so they remain unescaped
+ * and valid little-text syntax.
+ *
+ * Ref: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/little-text-format
+ */
+export function escapeLittleText(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/[()[\]{}|@#*~<>_]/g, '\\$&');
+}
+
+/**
  * Upload a video to LinkedIn and return its video URN.
  * 3-step flow: initializeUpload → PUT binary (single chunk) → finalizeUpload.
  * LinkedIn Videos API supports up to 200MB; we upload in a single chunk for simplicity
@@ -447,9 +474,12 @@ export async function publishLinkedInPost(
   // If category === 'pdf', we skip media upload (LinkedIn doesn't support PDF via API)
 
   // Build post body (Posts API v2 format)
+  // IMPORTANT: commentary goes through escapeLittleText to prevent LinkedIn's
+  // parser from silently truncating the post when it encounters unescaped
+  // reserved characters like parentheses, brackets, etc.
   const body: Record<string, unknown> = {
     author: authorUrn,
-    commentary: cleanText,
+    commentary: escapeLittleText(cleanText),
     visibility: 'PUBLIC',
     lifecycleState: 'PUBLISHED',
     distribution: {

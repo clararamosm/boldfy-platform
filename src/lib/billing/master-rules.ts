@@ -191,3 +191,138 @@ export function isModuleBlocked(
   if (!deadline) return false;
   return deadline.getTime() < Date.now();
 }
+
+// ────────────────────────────────────────────────────────────
+// TL "billedOutsidePlatform" (caso Omie / contratos diretos)
+// ────────────────────────────────────────────────────────────
+// Casos especiais: empresa paga o modulo TL por fora (contrato direto,
+// NAO via Stripe). Master liga a flag e o modulo fica 'active' sem checkout,
+// sem deadline. Gate (module-gate.ts) e cron (cron-jobs.ts) ja respeitam
+// essa flag — aqui so adicionamos a camada de escrita.
+
+export interface SetTLBilledOutsidePlatformRuleInput {
+  companyId: string;
+  enabled: boolean;
+  executives?: 1 | 2 | 3 | 4 | 5;
+  frequency?: 2 | 3 | 4;
+}
+
+/** Valida entrada do master para o toggle billedOutsidePlatform do TL. */
+export function validateTLBilledOutsidePlatformInput(
+  input: unknown,
+): SetTLBilledOutsidePlatformRuleInput {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Payload invalido.');
+  }
+  const raw = input as Record<string, unknown>;
+
+  const companyId = typeof raw.companyId === 'string' ? raw.companyId.trim() : '';
+  if (!companyId) {
+    throw new Error('companyId obrigatorio.');
+  }
+
+  const enabled = raw.enabled === true;
+
+  // Quando desligando, nao precisa de executives/frequency.
+  if (!enabled) {
+    return { companyId, enabled: false };
+  }
+
+  // Quando ligando, executives (1-5) e frequency (2|3|4) sao obrigatorios.
+  const execsNum = Number(raw.executives);
+  if (!Number.isInteger(execsNum) || execsNum < 1 || execsNum > 5) {
+    throw new Error('executives deve ser inteiro entre 1 e 5.');
+  }
+  const freqNum = Number(raw.frequency);
+  if (freqNum !== 2 && freqNum !== 3 && freqNum !== 4) {
+    throw new Error('frequency deve ser 2, 3 ou 4.');
+  }
+
+  return {
+    companyId,
+    enabled: true,
+    executives: execsNum as 1 | 2 | 3 | 4 | 5,
+    frequency: freqNum as 2 | 3 | 4,
+  };
+}
+
+/**
+ * Liga/desliga a flag billedOutsidePlatform do modulo TL.
+ *
+ * Regras:
+ * - enabled=true exige billing.enabled=true previo (pre-requisito).
+ * - Ao ligar: seta tl.billedOutsidePlatform=true, status='active', active=true,
+ *   executives, frequency, seats, e limpa firstPaymentDeadline.
+ * - Ao desligar: remove a flag, status='disabled', active=false, mantem
+ *   executives/frequency/seats como historico.
+ * - NUNCA toca em stripeSubscriptionId (pode existir de historico Stripe previo).
+ * - Nao faz calls ao Stripe.
+ */
+export async function applyTLBilledOutsidePlatform(
+  input: SetTLBilledOutsidePlatformRuleInput,
+  masterUid: string,
+): Promise<CompanyBillingBlock> {
+  const companyRef = adminDb.collection('companies').doc(input.companyId);
+  const snap = await companyRef.get();
+  if (!snap.exists) {
+    throw new Error(`Empresa ${input.companyId} nao encontrada.`);
+  }
+
+  const existingBilling: CompanyBillingBlock =
+    (snap.data()?.billing as CompanyBillingBlock | undefined) ?? getDefaultBillingBlock();
+
+  // Pre-requisito: billing.enabled deve estar true para ligar a flag.
+  if (input.enabled && existingBilling.enabled !== true) {
+    throw new Error(
+      'Ative "Cobranca Ativa" (billing.enabled) antes de configurar ativacao especial.',
+    );
+  }
+
+  const updates: Record<string, unknown> = {
+    'billing.updatedAt': FieldValue.serverTimestamp(),
+    'billing.lastUpdatedByMasterUid': masterUid,
+  };
+
+  if (input.enabled) {
+    updates['billing.tl.billedOutsidePlatform'] = true;
+    updates['billing.tl.status'] = 'active';
+    updates['billing.tl.active'] = true;
+    updates['billing.tl.executives'] = input.executives;
+    updates['billing.tl.frequency'] = input.frequency;
+    updates['billing.tl.seats'] = input.executives; // 1 seat por TL
+    // Limpa deadline — nao faz sentido em cobranca externa.
+    updates['billing.tl.firstPaymentDeadline'] = FieldValue.delete();
+    // NUNCA toca em stripeSubscriptionId.
+  } else {
+    updates['billing.tl.billedOutsidePlatform'] = FieldValue.delete();
+    updates['billing.tl.status'] = 'disabled';
+    updates['billing.tl.active'] = false;
+    // Preserva executives/frequency/seats como historico.
+  }
+
+  await companyRef.update(updates);
+
+  // Projeta em memoria para devolver ao caller sem re-ler Firestore.
+  const projectedTl = input.enabled
+    ? {
+        ...existingBilling.tl,
+        billedOutsidePlatform: true,
+        status: 'active' as BillingModuleStatus,
+        active: true,
+        executives: input.executives as number,
+        frequency: input.frequency as 2 | 3 | 4,
+        seats: input.executives as number,
+        firstPaymentDeadline: undefined,
+      }
+    : {
+        ...existingBilling.tl,
+        billedOutsidePlatform: undefined,
+        status: 'disabled' as BillingModuleStatus,
+        active: false,
+      };
+
+  return {
+    ...existingBilling,
+    tl: projectedTl,
+  };
+}

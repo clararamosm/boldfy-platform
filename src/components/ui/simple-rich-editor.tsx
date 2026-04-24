@@ -65,7 +65,7 @@ export function SimpleRichEditor({
         </button>
         {showTip && (
           <span className="text-xs text-muted-foreground">
-            Digite <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">-&gt;</kbd> (traço e maior) para inserir uma seta →. O LinkedIn converte automaticamente.
+            Use o caractere <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">→</kbd> (seta) para destacar tópicos. Parênteses, colchetes e outros caracteres especiais são suportados normalmente.
           </span>
         )}
       </div>
