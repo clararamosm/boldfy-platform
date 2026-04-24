@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Check, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, AlertCircle, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type SaveStatus = 'saved' | 'saving' | 'unsaved' | 'error';
@@ -11,9 +11,10 @@ type Props = {
   postTitle: string;
   saveStatus: SaveStatus;
   onBack: () => void;
+  onCopyLink?: () => void;
 };
 
-export function PostHeaderBar({ companyName, tlName, postTitle, saveStatus, onBack }: Props) {
+export function PostHeaderBar({ companyName, tlName, postTitle, saveStatus, onBack, onCopyLink }: Props) {
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center justify-between px-4 h-14">
@@ -31,8 +32,20 @@ export function PostHeaderBar({ companyName, tlName, postTitle, saveStatus, onBa
           </nav>
         </div>
 
-        {/* Right: Save status */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+        {/* Right: Copy link + Save status */}
+        <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+          {onCopyLink && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onCopyLink}
+              className="h-8 gap-1.5 text-xs"
+              title="Copiar link deste post"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Copiar link</span>
+            </Button>
+          )}
           {saveStatus === 'saved' && (
             <>
               <Check className="h-3.5 w-3.5 text-green-500" />

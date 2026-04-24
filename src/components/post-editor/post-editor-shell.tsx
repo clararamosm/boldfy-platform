@@ -418,6 +418,26 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     }
   }, [post, postId, rejectFeedback, toast]);
 
+  // ---- Copy shareable link ----
+  const canShareLink = user?.role === 'strategist' || user?.role === 'thoughtleader' || user?.role === 'master';
+
+  const handleCopyLink = useCallback(async () => {
+    try {
+      const url = window.location.href;
+      await navigator.clipboard.writeText(url);
+      toast({
+        title: 'Link copiado!',
+        description: 'Cole no Slack ou compartilhe com o time.',
+      });
+    } catch {
+      toast({
+        title: 'Erro ao copiar',
+        description: 'Copie manualmente da barra de endereço.',
+        variant: 'destructive',
+      });
+    }
+  }, [toast]);
+
   // ---- Navigation back ----
   const handleBack = useCallback(() => {
     if (window.history.length > 1) {
@@ -476,6 +496,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
         postTitle={title || 'Sem título'}
         saveStatus={saveStatus}
         onBack={handleBack}
+        onCopyLink={canShareLink ? handleCopyLink : undefined}
       />
 
       {/* Mobile comments toggle */}
