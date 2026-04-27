@@ -15,8 +15,11 @@
 // - Beta SEM data de expiracao: tambem liberado (beta permanente).
 // - Beta com data VENCIDA: segue regras normais (nao ha bypass).
 // - Se billing.enabled === false: bloqueia (exceto beta valido).
+// - Se o modulo esta 'free': OK (trial gratuito, com ou sem deadline).
 // - Se o modulo esta 'active': OK.
 // - Se o modulo esta 'pending' e deadline ainda nao venceu: OK (periodo de gracia).
+// - Auto-migrate: empresas legadas (sem trialDurationDays) com Platform 'disabled' +
+//   billing.enabled=true sao tratadas como 'free' transitorio durante o deploy.
 // - Caso contrario: bloqueia.
 
 import 'server-only';
@@ -28,7 +31,7 @@ import type { CompanyBillingBlock, MaybeTimestamp } from './types';
 import { isModuleBlocked } from './master-rules';
 
 export type ModuleGateDecision =
-  | { allowed: true; reason: 'beta' | 'active' | 'pending-grace' | 'internal-role' | 'legacy-subscription' }
+  | { allowed: true; reason: 'beta' | 'active' | 'pending-grace' | 'internal-role' | 'legacy-subscription' | 'free-trial' | 'legacy-grandfathered' }
   | { allowed: false; reason: 'no-company' | 'billing-disabled' | 'module-disabled' | 'module-blocked' | 'pending-expired' | 'no-billing-no-legacy'; message: string };
 
 /**
@@ -73,9 +76,11 @@ function toDate(v: MaybeTimestamp): Date | null {
 
 function moduleState(billing: CompanyBillingBlock, module: BillingModule) {
   if (module === 'platform') {
+    // Novo fluxo: cardDeadlineEndsAt tem prioridade. Fallback para firstPaymentDeadline (legado).
+    const deadline = toDate(billing.platform.cardDeadlineEndsAt) ?? toDate(billing.platform.firstPaymentDeadline);
     return {
       status: billing.platform.status,
-      deadline: toDate(billing.platform.firstPaymentDeadline),
+      deadline,
     };
   }
   if (module === 'tl') {
@@ -182,7 +187,25 @@ export function evaluateModuleAccess(
     };
   }
 
+  // Auto-migrate: empresas legadas (criadas antes do refactor billing-trial-flow)
+  // com Platform 'disabled' mas billing.enabled=true sao tratadas como 'free' transitorio.
+  // Isso garante zero downtime no deploy. Master configura trial depois pela UI.
+  if (
+    module === 'platform' &&
+    billing.platform.status === 'disabled' &&
+    billing.platform.trialDurationDays === undefined &&
+    billing.platform.freeTrialUnlimited === undefined
+  ) {
+    return { allowed: true, reason: 'legacy-grandfathered' };
+  }
+
   const state = moduleState(billing, module);
+
+  // Trial gratuito ativo (Platform default apos admin first login).
+  // Allow independente de deadline — cron 'check-trial-expiration' transiciona para 'pending'.
+  if (state.status === 'free') {
+    return { allowed: true, reason: 'free-trial' };
+  }
 
   if (state.status === 'active') {
     return { allowed: true, reason: 'active' };
