@@ -21,18 +21,38 @@ export function SlugResolver({ companySlug, tlSlug, postId }: Props) {
 
   useEffect(() => {
     // Aguarda Firebase Auth terminar de hidratar antes de tentar resolver
-    if (authLoading) return;
+    if (authLoading) {
+      console.log('[SlugResolver] Waiting for auth hydration...');
+      return;
+    }
 
     // Após hidratação: se não há usuário, mostra mensagem específica
     if (!firebaseUser) {
+      console.warn('[SlugResolver] No firebaseUser after auth loaded');
       setError('Você precisa estar logado para acessar este post.');
       return;
     }
 
+    let cancelled = false;
+
+    // Timeout de segurança: se resolver não retornar em 15s, mostra erro
+    const timeout = setTimeout(() => {
+      if (!cancelled) {
+        console.error('[SlugResolver] Resolve timeout after 15s', { companySlug, tlSlug });
+        setError('Tempo esgotado ao resolver. Recarregue a página ou tente novamente.');
+      }
+    }, 15000);
+
     const resolve = async () => {
+      console.log('[SlugResolver] Starting resolve', { companySlug, tlSlug, uid: firebaseUser.uid });
       try {
+        console.log('[SlugResolver] Getting auth token...');
         const token = await getAuthToken();
+        console.log('[SlugResolver] Token OK, calling resolveSlugs...');
         const result = await resolveSlugs(token, companySlug, tlSlug);
+        console.log('[SlugResolver] resolveSlugs returned:', result);
+        if (cancelled) return;
+        clearTimeout(timeout);
         if (result.error) {
           console.error('[SlugResolver] Server returned error:', result.error, { companySlug, tlSlug });
           setError(result.error);
@@ -41,12 +61,19 @@ export function SlugResolver({ companySlug, tlSlug, postId }: Props) {
         if (result.companyId) setCompanyId(result.companyId);
         if (result.tlId) setTlId(result.tlId);
       } catch (err) {
+        if (cancelled) return;
+        clearTimeout(timeout);
         console.error('[SlugResolver] Unexpected error:', err, { companySlug, tlSlug });
         const msg = err instanceof Error ? err.message : 'Erro ao resolver identificadores.';
         setError(msg);
       }
     };
     resolve();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [companySlug, tlSlug, authLoading, firebaseUser]);
 
   if (error) {
