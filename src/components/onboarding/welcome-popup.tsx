@@ -26,7 +26,6 @@ type WelcomePopupProps = {
   userName: string;
   companyName?: string;
   licensesCount?: number;
-  trialDays?: number;
   onComplete: () => void;
 };
 
@@ -154,7 +153,7 @@ const TL_ITEMS = ['Conectar seu LinkedIn'];
 
 // ─── Message builders ────────────────────────────────────────
 
-function getAdminMessages(name: string, licenses: number, trialDays: number): ChatMessage[] {
+function getAdminMessages(name: string, licenses: number): ChatMessage[] {
   return [
     {
       type: 'fai',
@@ -197,7 +196,7 @@ function getAdminMessages(name: string, licenses: number, trialDays: number): Ch
     },
     {
       type: 'fai',
-      content: <>Você tem <span className="text-primary font-bold">{licenses} licenças de colaborador</span> e <span className="text-primary font-bold">{trialDays} dias de trial</span>. Pra adicionar Thought Leaders, fale com o time Boldfy. Missões geram pontos, pontos viram recompensas, e o time cresce junto!</>,
+      content: <>Você tem <span className="text-primary font-bold">{licenses} licenças de colaborador</span>. Pra adicionar Thought Leaders, fale com o time Boldfy. Missões geram pontos, pontos viram recompensas, e o time cresce junto!</>,
     },
     {
       type: 'fai',
@@ -314,14 +313,13 @@ export function WelcomePopup({
   userName,
   companyName = '',
   licensesCount = 5,
-  trialDays = 14,
   onComplete,
 }: WelcomePopupProps) {
   const [visibleCount, setVisibleCount] = useState(0);
   const messagesRef = useRef<HTMLDivElement>(null);
 
   const messages = role === 'admin'
-    ? getAdminMessages(userName, licensesCount, trialDays)
+    ? getAdminMessages(userName, licensesCount)
     : role === 'colaborador'
     ? getColaboradorMessages(userName, companyName)
     : getThoughtLeaderMessages(userName);

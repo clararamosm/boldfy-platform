@@ -17,7 +17,6 @@ type OnboardingShellProps = {
   role: OnboardingRole;
   companyName?: string;
   licensesCount?: number;
-  trialDays?: number;
   children: React.ReactNode;
 };
 
@@ -116,7 +115,6 @@ export function OnboardingShell({
   role,
   companyName = '',
   licensesCount = 5,
-  trialDays = 14,
   children,
 }: OnboardingShellProps) {
   const { user } = useAuth();
@@ -176,7 +174,6 @@ export function OnboardingShell({
         userName={user?.name || ''}
         companyName={companyName}
         licensesCount={licensesCount}
-        trialDays={trialDays}
         onComplete={ob.markWelcomeSeen}
       />
 

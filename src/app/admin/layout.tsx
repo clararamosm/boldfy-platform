@@ -143,7 +143,6 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                         role="admin"
                         companyName={companyName}
                         licensesCount={licensesCount}
-                        trialDays={subscription.daysLeft}
                     >
                         {children}
                     </OnboardingShell>
