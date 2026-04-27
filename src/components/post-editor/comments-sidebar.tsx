@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 import { MessageSquare, Send, Trash2, Loader2, X, MessageSquareQuote } from 'lucide-react';
 import { BoldfyIcon } from '@/components/icons/boldfy-icon';
 import type { PostComment } from '@/lib/post-editor-types';
@@ -37,6 +38,7 @@ export function CommentsSidebar({
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { toast } = useToast();
 
   const unresolvedComments = comments.filter(c => !c.resolved);
   const resolvedComments = comments.filter(c => c.resolved);
@@ -65,13 +67,24 @@ export function CommentsSidebar({
         setComments(prev => [...prev, result.comment!]);
         setNewComment('');
         onClearAnchor?.();
+      } else if (result.error) {
+        toast({
+          title: 'Não foi possível enviar o comentário',
+          description: result.error,
+          variant: 'destructive',
+        });
       }
-    } catch {
-      // silent
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro inesperado. Tente novamente.';
+      toast({
+        title: 'Não foi possível enviar o comentário',
+        description: msg,
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
-  }, [newComment, tlId, postId, setComments, pendingAnchor, onClearAnchor]);
+  }, [newComment, tlId, postId, setComments, pendingAnchor, onClearAnchor, toast]);
 
   const handleResolve = useCallback(async (commentId: string) => {
     // Optimistic
@@ -106,14 +119,15 @@ export function CommentsSidebar({
   }, [comments, tlId, postId, setComments]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+    // Enter sends; Shift+Enter inserts a newline (chat-style behavior)
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
   }, [handleSubmit]);
 
   return (
-    <aside className="w-80 border-l bg-muted/30 hidden lg:flex flex-col h-[calc(100vh-3.5rem)] sticky top-14">
+    <aside className="w-full lg:w-80 border-l bg-muted/30 flex flex-col h-[calc(100vh-3.5rem)] lg:sticky lg:top-14">
       {/* Header */}
       <div className="px-4 py-3 border-b">
         <div className="flex items-center gap-2 text-sm font-medium">
@@ -188,7 +202,7 @@ export function CommentsSidebar({
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={pendingAnchor ? 'Escreva seu feedback...' : 'Escreva um comentário... (Ctrl+Enter para enviar)'}
+          placeholder={pendingAnchor ? 'Escreva seu feedback... (Enter envia, Shift+Enter quebra linha)' : 'Escreva um comentário... (Enter envia, Shift+Enter quebra linha)'}
           className="text-xs min-h-[60px] resize-none"
           rows={2}
         />
