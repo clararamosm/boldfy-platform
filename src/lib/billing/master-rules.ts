@@ -314,8 +314,14 @@ export async function applyMasterTrialSetup(
   const trialStartedAt = existingBilling.platform?.trialStartedAt;
   const isUnlimited = existingBilling.platform?.freeTrialUnlimited === true;
 
-  let projectedTrialEndsAt: Date | undefined = existingBilling.platform?.trialEndsAt;
-  let projectedCardDeadline: Date | undefined = existingBilling.platform?.cardDeadlineEndsAt;
+  let projectedTrialEndsAt: Date | undefined =
+    existingBilling.platform?.trialEndsAt instanceof Date
+      ? existingBilling.platform.trialEndsAt
+      : (existingBilling.platform?.trialEndsAt as Timestamp | null | undefined)?.toDate?.() ?? undefined;
+  let projectedCardDeadline: Date | undefined =
+    existingBilling.platform?.cardDeadlineEndsAt instanceof Date
+      ? existingBilling.platform.cardDeadlineEndsAt
+      : (existingBilling.platform?.cardDeadlineEndsAt as Timestamp | null | undefined)?.toDate?.() ?? undefined;
 
   if (trialStartedAt && !isUnlimited) {
     const startedAtDate =
