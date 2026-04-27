@@ -14,9 +14,11 @@
 import { requireAdmin, requireMaster } from '@/lib/auth-guard';
 import {
   applyMasterBillingToggle,
+  applyTLBilledOutsidePlatform,
   computeFirstPaymentDeadline,
   getCompanyBillingBlock,
   validateMasterToggleInput,
+  validateTLBilledOutsidePlatformInput,
 } from '@/lib/billing/master-rules';
 import {
   createModuleCheckoutSession,
@@ -210,6 +212,52 @@ export async function updateCompanyBillingToggles(
     return {
       success: false,
       error: e instanceof Error ? e.message : 'Erro ao atualizar billing.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// WRITE (Master — TL cobrado fora da plataforma)
+// ────────────────────────────────────────────────────────────
+
+export interface SetTLBilledOutsidePlatformInput {
+  idToken: string;
+  companyId: string;
+  enabled: boolean;
+  executives?: 1 | 2 | 3 | 4 | 5;
+  frequency?: 2 | 3 | 4;
+}
+
+/**
+ * Master marca/desmarca TL como "cobrado fora da plataforma".
+ * - enabled=true: TL fica active sem cobranca Stripe (exige executives + frequency).
+ * - enabled=false: TL volta para disabled, preserva historico (executives/frequency).
+ * Nunca toca em stripeSubscriptionId.
+ */
+export async function setTLBilledOutsidePlatform(
+  input: SetTLBilledOutsidePlatformInput,
+): Promise<BillingActionResult<SerializableBillingBlock>> {
+  try {
+    if (!input?.idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const master = await requireMaster(input.idToken);
+
+    const validated = validateTLBilledOutsidePlatformInput({
+      companyId: input.companyId,
+      enabled: input.enabled,
+      executives: input.executives,
+      frequency: input.frequency,
+    });
+
+    const updated = await applyTLBilledOutsidePlatform(validated, master.uid);
+    return { success: true, data: serializeBilling(updated) };
+  } catch (e: unknown) {
+    console.error('[setTLBilledOutsidePlatform] falhou:', e);
+    return {
+      success: false,
+      error:
+        e instanceof Error ? e.message : 'Erro ao atualizar ativacao especial do TL.',
     };
   }
 }

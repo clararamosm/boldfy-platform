@@ -28,13 +28,21 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowLeft, ShieldCheck, Sparkles } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Loader2, ArrowLeft, ShieldCheck, Sparkles, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import {
   getCompanyBilling,
   updateCompanyBillingToggles,
+  setTLBilledOutsidePlatform,
   type SerializableBillingBlock,
 } from '@/app/actions/billing';
 
@@ -87,6 +95,11 @@ export default function MasterCompanyBillingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
+  const [tlOutsideEnabled, setTlOutsideEnabled] = useState(false);
+  const [tlOutsideExecutives, setTlOutsideExecutives] = useState<number>(1);
+  const [tlOutsideFrequency, setTlOutsideFrequency] = useState<2 | 3 | 4>(2);
+  const [isPendingTLOutside, startTLOutsideTransition] = useTransition();
+
   useEffect(() => {
     if (!companyId) return;
     let cancelled = false;
@@ -119,6 +132,11 @@ export default function MasterCompanyBillingPage() {
         setIsBetaTester(res.data.isBetaTester);
         setBetaExpiresAt(formatDateForInput(res.data.betaExpiresAtISO));
         setNotes(res.data.notes ?? '');
+        setTlOutsideEnabled(res.data.tl.billedOutsidePlatform === true);
+        const execs = res.data.tl.executives;
+        setTlOutsideExecutives(execs >= 1 && execs <= 5 ? execs : 1);
+        const freq = res.data.tl.frequency;
+        setTlOutsideFrequency(freq === 2 || freq === 3 || freq === 4 ? freq : 2);
       } catch (e) {
         if (!cancelled) {
           toast({
@@ -145,6 +163,61 @@ export default function MasterCompanyBillingPage() {
       setBetaExpiresAt('');
     }
   }, [isBetaTester, betaExpiresAt]);
+
+  function handleSaveTLOutside() {
+    if (!companyId || !token) return;
+
+    if (tlOutsideEnabled) {
+      if (!enabled) {
+        toast({
+          title: 'Cobranca desligada',
+          description:
+            'Ative "Cobranca Ativa" antes de configurar a ativacao especial do TL.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (
+        !Number.isInteger(tlOutsideExecutives) ||
+        tlOutsideExecutives < 1 ||
+        tlOutsideExecutives > 5
+      ) {
+        toast({
+          title: 'Numero de executivos invalido',
+          description: 'Informe um numero inteiro entre 1 e 5.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    startTLOutsideTransition(async () => {
+      const res = await setTLBilledOutsidePlatform({
+        idToken: token,
+        companyId,
+        enabled: tlOutsideEnabled,
+        executives: tlOutsideEnabled
+          ? (tlOutsideExecutives as 1 | 2 | 3 | 4 | 5)
+          : undefined,
+        frequency: tlOutsideEnabled ? tlOutsideFrequency : undefined,
+      });
+      if (!res.success || !res.data) {
+        toast({
+          title: 'Erro ao salvar',
+          description: res.error || 'Tente novamente.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setBilling(res.data);
+      toast({
+        title: 'Ativacao especial atualizada',
+        description: tlOutsideEnabled
+          ? 'TL marcado como cobrado fora da plataforma.'
+          : 'TL voltou para desativado.',
+      });
+    });
+  }
 
   function handleSave() {
     if (!companyId || !token) return;
@@ -254,6 +327,86 @@ export default function MasterCompanyBillingPage() {
                 />
               </>
             ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Ativacao Especial — TL cobrado fora da plataforma */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ExternalLink className="h-5 w-5" /> Ativacao Especial — TL cobrado fora da plataforma
+            </CardTitle>
+            <CardDescription>
+              Use quando a empresa paga o modulo TL por fora da Boldfy (contrato direto, sem
+              Stripe). O modulo fica ativo, os TLs tem acesso, e nada e cobrado pela plataforma.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div>
+                <Label htmlFor="tlOutsideEnabled" className="text-base">
+                  TL cobrado fora da plataforma
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Requer "Cobranca Ativa" ligada. Marca o modulo TL como ativo sem cobranca via
+                  Stripe.
+                </p>
+              </div>
+              <Switch
+                id="tlOutsideEnabled"
+                checked={tlOutsideEnabled}
+                onCheckedChange={setTlOutsideEnabled}
+                disabled={isPendingTLOutside}
+              />
+            </div>
+
+            {tlOutsideEnabled && (
+              <div className="grid gap-4 md:grid-cols-2 rounded-lg border p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tlOutsideExecutives">Numero de executivos (1 a 5)</Label>
+                  <Input
+                    id="tlOutsideExecutives"
+                    type="number"
+                    min={1}
+                    max={5}
+                    step={1}
+                    value={tlOutsideExecutives}
+                    onChange={(e) => setTlOutsideExecutives(Number(e.target.value))}
+                    disabled={isPendingTLOutside}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tlOutsideFrequency">Frequencia semanal</Label>
+                  <Select
+                    value={String(tlOutsideFrequency)}
+                    onValueChange={(v) =>
+                      setTlOutsideFrequency(Number(v) as 2 | 3 | 4)
+                    }
+                    disabled={isPendingTLOutside}
+                  >
+                    <SelectTrigger id="tlOutsideFrequency">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2x por semana</SelectItem>
+                      <SelectItem value="3">3x por semana</SelectItem>
+                      <SelectItem value="4">4x por semana</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                variant="secondary"
+                onClick={handleSaveTLOutside}
+                disabled={isPendingTLOutside}
+              >
+                {isPendingTLOutside && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar ativacao especial
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
