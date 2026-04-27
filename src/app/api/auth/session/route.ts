@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth as adminAuth } from '@/lib/firebase-admin';
 import { db as adminDb } from '@/lib/firebase-admin';
 import { signSessionValue } from '@/lib/session';
+import { applyAdminFirstLogin } from '@/lib/billing/master-rules';
 
 const COOKIE_NAME = 'boldfy-session';
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 14; // 14 days
@@ -34,6 +35,29 @@ export async function POST(req: NextRequest) {
     const role = userDoc.data()?.role;
     if (!role) {
       return NextResponse.json({ error: 'Role não definida' }, { status: 403 });
+    }
+
+    // Hook: admin first login dispara inicio do trial Platform.
+    // applyAdminFirstLogin eh idempotente (so age se status='disabled').
+    // Nao bloqueante: se falhar, login segue normal (nao deve impedir entrada).
+    if (role === 'admin') {
+      const companyId = userDoc.data()?.companyId;
+      if (typeof companyId === 'string' && companyId.length > 0) {
+        try {
+          const result = await applyAdminFirstLogin(companyId);
+          if (result.started) {
+            console.log(
+              '[admin-first-login] Trial Platform iniciado para company=' + companyId + ' uid=' + decoded.uid,
+            );
+          }
+        } catch (err) {
+          // Log mas nao quebra login.
+          console.error(
+            '[admin-first-login] Falha ao aplicar para company=' + companyId + ' uid=' + decoded.uid + ':',
+            err,
+          );
+        }
+      }
     }
 
     // Create signed cookie value
