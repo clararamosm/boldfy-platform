@@ -20,6 +20,10 @@ import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type { BillingModule } from './stripe-modules';
 import type { CompanyBillingBlock, MaybeTimestamp } from './types';
+import {
+  CARD_DEADLINE_WINDOW_DAYS,
+  computeCardDeadlineFromTrialEnd,
+} from './master-rules';
 
 // ────────────────────────────────────────────────────────────
 // HELPERS
@@ -247,3 +251,103 @@ export async function runCheckBetaExpiration(
     ranAtISO: ranAt.toISOString(),
   };
 }
+
+// ────────────────────────────────────────────────────────────
+// JOB 3: TRIAL TO PENDING (Platform)
+// ────────────────────────────────────────────────────────────
+
+export interface TrialToPendingRecord {
+  companyId: string;
+  trialEndedAtISO: string;
+  cardDeadlineEndsAtISO: string;
+}
+
+export interface RunCheckTrialToPendingResult {
+  scanned: number;
+  promoted: TrialToPendingRecord[];
+  errors: Array<{ companyId: string; message: string }>;
+  ranAtISO: string;
+}
+
+/**
+ * Varre empresas com platform.status='free' e promove para 'pending'
+ * quando trialEndsAt venceu. Garante cardDeadlineEndsAt = trialEndsAt + 7d
+ * (recalcula se ausente — protecao contra empresas migradas/legadas).
+ *
+ * Pula:
+ * - freeTrialUnlimited=true (parceiros Boldfy nao expiram)
+ * - trialEndsAt ausente (free sem prazo definido — provavel parceiro)
+ * - trialEndsAt ainda no futuro
+ *
+ * Idempotente. NAO bloqueia ninguem — apenas inicia janela de 7 dias
+ * para cadastro de cartao. O bloqueio em si fica com runCheckModuleDeadlines
+ * (que ja monitora cardDeadlineEndsAt via firstPaymentDeadline pos-migracao).
+ *
+ * @param now data de referencia (default: Date.now()). Injetavel para testes.
+ */
+export async function runCheckTrialToPending(
+  now: Date = new Date(),
+): Promise<RunCheckTrialToPendingResult> {
+  const ranAt = now;
+  const promoted: TrialToPendingRecord[] = [];
+  const errors: Array<{ companyId: string; message: string }> = [];
+  let scanned = 0;
+
+  const snapshot = await adminDb
+    .collection('companies')
+    .where('billing.platform.status', '==', 'free')
+    .get();
+
+  for (const doc of snapshot.docs) {
+    scanned += 1;
+    const companyId = doc.id;
+    const data = doc.data();
+    const billing = data.billing as CompanyBillingBlock | undefined;
+
+    if (!billing || !billing.platform) continue;
+    if (billing.platform.status !== 'free') continue; // paranoia pos-filtro
+
+    // Free permanente (parceiro): nunca expira.
+    if (billing.platform.freeTrialUnlimited === true) continue;
+
+    const trialEndsAt = toDate(billing.platform.trialEndsAt);
+    if (!trialEndsAt) continue; // sem prazo: deixa para o master configurar
+    if (trialEndsAt.getTime() > now.getTime()) continue; // ainda no prazo
+
+    // Garante cardDeadlineEndsAt: respeita o existente; recalcula se ausente.
+    let cardDeadline = toDate(billing.platform.cardDeadlineEndsAt);
+    if (!cardDeadline) {
+      cardDeadline = computeCardDeadlineFromTrialEnd(trialEndsAt);
+    }
+
+    const updates: Record<string, unknown> = {
+      'billing.platform.status': 'pending',
+      'billing.platform.cardDeadlineEndsAt': Timestamp.fromDate(cardDeadline),
+      // Espelho legado: gates antigos consultam firstPaymentDeadline.
+      'billing.platform.firstPaymentDeadline': Timestamp.fromDate(cardDeadline),
+      'billing.updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    try {
+      await doc.ref.update(updates);
+      promoted.push({
+        companyId,
+        trialEndedAtISO: trialEndsAt.toISOString(),
+        cardDeadlineEndsAtISO: cardDeadline.toISOString(),
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      errors.push({ companyId, message });
+    }
+  }
+
+  return {
+    scanned,
+    promoted,
+    errors,
+    ranAtISO: ranAt.toISOString(),
+  };
+}
+
+// Manter referencia explicita para evitar tree-shake do constante.
+void CARD_DEADLINE_WINDOW_DAYS;
