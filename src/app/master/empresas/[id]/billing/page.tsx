@@ -70,7 +70,7 @@ function statusLabel(status: string): string {
     case 'active':
       return 'Ativo';
     case 'free':
-      return 'Trial gratuito';
+      return 'Teste gratuito';
     case 'pending':
       return 'Aguardando pagamento';
     case 'blocked':
@@ -215,7 +215,7 @@ export default function MasterCompanyBillingPage() {
       });
       if (!res.success || !res.data) {
         toast({
-          title: 'Erro ao salvar duracao do trial',
+          title: 'Erro ao salvar duracao do teste',
           description: res.error || 'Tente novamente.',
           variant: 'destructive',
         });
@@ -223,8 +223,8 @@ export default function MasterCompanyBillingPage() {
       }
       setBilling(res.data);
       toast({
-        title: 'Duracao do trial atualizada',
-        description: `Trial Platform agora dura ${value} dias.`,
+        title: 'Duracao do teste atualizada',
+        description: `Teste Platform agora dura ${value} dias.`,
       });
     });
   }
@@ -242,7 +242,7 @@ export default function MasterCompanyBillingPage() {
         // rollback visual
         setFreeTrialUnlimited(!enabled);
         toast({
-          title: 'Erro ao alterar free trial',
+          title: 'Erro ao alterar teste gratuito ilimitado',
           description: res.error || 'Tente novamente.',
           variant: 'destructive',
         });
@@ -250,10 +250,10 @@ export default function MasterCompanyBillingPage() {
       }
       setBilling(res.data);
       toast({
-        title: enabled ? 'Free trial ilimitado ativado' : 'Free trial ilimitado desativado',
+        title: enabled ? 'Teste gratuito ilimitado ativado' : 'Teste gratuito ilimitado desativado',
         description: enabled
           ? 'Empresa marcada como parceira Boldfy. Sem cobranca.'
-          : 'Empresa volta para o fluxo normal de trial.',
+          : 'Empresa volta para o fluxo normal de teste gratuito.',
       });
     });
   }
@@ -427,9 +427,9 @@ export default function MasterCompanyBillingPage() {
         {/* Plano Platform — Trial (master) */}
         <Card>
           <CardHeader>
-            <CardTitle>Plano Platform — Trial</CardTitle>
+            <CardTitle>Plano Platform</CardTitle>
             <CardDescription>
-              Define a duracao do trial gratuito do modulo Platform. O trial comeca
+              Define a duracao do teste gratuito do modulo Platform. O teste comeca
               quando o admin loga pela primeira vez. Apos o fim, a empresa tem 7 dias
               para cadastrar cartao antes do bloqueio.
             </CardDescription>
@@ -437,7 +437,7 @@ export default function MasterCompanyBillingPage() {
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 rounded-lg border p-4">
               <div className="space-y-2">
-                <Label htmlFor="trialDurationDays">Duracao do trial</Label>
+                <Label htmlFor="trialDurationDays">Duracao do teste</Label>
                 <Select
                   value={String(trialDurationDays)}
                   onValueChange={(v) =>
@@ -455,12 +455,12 @@ export default function MasterCompanyBillingPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Padrao: 15 dias. Se o trial ja comecou, mudar a duracao recalcula
+                  Padrao: 15 dias. Se o teste ja comecou, mudar a duracao recalcula
                   trialEndsAt e cardDeadlineEndsAt a partir de trialStartedAt.
                 </p>
               </div>
               <div className="space-y-2">
-                <Label className="text-sm">Estado atual do trial</Label>
+                <Label className="text-sm">Estado atual do teste</Label>
                 <div className="rounded-md border p-3 text-xs space-y-1">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status:</span>
@@ -469,11 +469,11 @@ export default function MasterCompanyBillingPage() {
                     </Badge>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Trial iniciou:</span>
+                    <span className="text-muted-foreground">Teste iniciou:</span>
                     <span>{formatDateBR(billing?.platform.trialStartedAtISO ?? null)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Trial termina:</span>
+                    <span className="text-muted-foreground">Teste termina:</span>
                     <span>{formatDateBR(billing?.platform.trialEndsAtISO ?? null)}</span>
                   </div>
                   <div className="flex justify-between">
@@ -487,12 +487,12 @@ export default function MasterCompanyBillingPage() {
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <Label htmlFor="freeTrialUnlimited" className="text-base">
-                  Free trial ilimitado (parceiro Boldfy)
+                  Teste gratuito ilimitado (parceiro Boldfy)
                 </Label>
                 <p className="text-sm text-muted-foreground">
                   Use para empresas parceiras que nao serao cobradas. Mantem o modulo
                   Platform em status &quot;free&quot; sem prazo de bloqueio. Desligar volta
-                  para o fluxo normal de trial.
+                  para o fluxo normal de teste gratuito.
                 </p>
               </div>
               <Switch
