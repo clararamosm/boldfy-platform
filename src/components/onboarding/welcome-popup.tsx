@@ -178,25 +178,36 @@ function getAdminMessages(name: string, licenses: number): ChatMessage[] {
     },
     {
       type: 'fai',
+      content: <>Na plataforma, você pode adicionar <strong>dois tipos de usuário</strong>. Te explico:</>,
+    },
+    {
+      type: 'fai',
       content: (
         <>
-          Na plataforma, você pode adicionar <strong>dois tipos de usuário</strong>:
-          <div className="mt-2 flex flex-col gap-2">
-            <div className="bg-white/70 border border-primary/10 rounded-[10px] px-3 py-2">
-              <div className="text-xs font-bold text-foreground">👥 Colaboradores</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">Escrevem seus próprios posts com ajuda da IA, completam missões e ganham pontos. Ideais pra escalar o Employee Advocacy do time.</div>
-            </div>
-            <div className="bg-white/70 border border-primary/10 rounded-[10px] px-3 py-2">
-              <div className="text-xs font-bold text-foreground">🎯 Thought Leaders</div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">Executivos ou porta-vozes que recebem conteúdo pronto da equipe de estratégia. Eles só revisam, aprovam e publicam.</div>
-            </div>
+          Os primeiros são os <strong>Colaboradores</strong>:
+          <div className="mt-2 bg-white/70 border border-primary/10 rounded-[10px] px-3 py-2">
+            <div className="text-xs font-bold text-foreground">👥 Colaboradores</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">Escrevem seus próprios posts com ajuda da IA, completam missões e ganham pontos. Ideais pra escalar o Employee Advocacy do time.</div>
+          </div>
+          <div className="mt-2 text-[13px]">Eles <strong>completam missões, ganham pontos e trocam por recompensas reais</strong> — assim o time engaja e cresce junto!</div>
+        </>
+      ),
+    },
+    {
+      type: 'fai',
+      content: (
+        <>
+          Os outros são os <strong>Thought Leaders</strong>:
+          <div className="mt-2 bg-white/70 border border-primary/10 rounded-[10px] px-3 py-2">
+            <div className="text-xs font-bold text-foreground">🎯 Thought Leaders</div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">Executivos ou porta-vozes que recebem conteúdo pronto da equipe de estratégia. Eles só revisam, aprovam e publicam.</div>
           </div>
         </>
       ),
     },
     {
       type: 'fai',
-      content: <>Você tem <span className="text-primary font-bold">{licenses} licenças de colaborador</span>. Pra adicionar Thought Leaders, fale com o time Boldfy. Missões geram pontos, pontos viram recompensas, e o time cresce junto!</>,
+      content: <>Você tem <span className="text-primary font-bold">{licenses} licenças de colaborador</span>. Pra adicionar Thought Leaders, fale com o time Boldfy.</>,
     },
     {
       type: 'fai',
