@@ -98,7 +98,7 @@ async function getIdToken(): Promise<string> {
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string; Icon: typeof CheckCircle }> = {
     active: { label: 'Ativo', cls: 'bg-green-100 text-green-800 hover:bg-green-100', Icon: CheckCircle },
-    free: { label: 'Trial gratuito', cls: 'bg-blue-100 text-blue-800 hover:bg-blue-100', Icon: Sparkles },
+    free: { label: 'Teste gratuito', cls: 'bg-blue-100 text-blue-800 hover:bg-blue-100', Icon: Sparkles },
     pending: { label: 'Aguardando pagamento', cls: 'bg-amber-100 text-amber-800 hover:bg-amber-100', Icon: Clock },
     blocked: { label: 'Bloqueado', cls: 'bg-red-100 text-red-800 hover:bg-red-100', Icon: AlertTriangle },
     disabled: { label: 'Desligado', cls: 'bg-slate-100 text-slate-700 hover:bg-slate-100', Icon: Info },
@@ -324,12 +324,12 @@ export default function AdminBillingPage() {
                   <Sparkles className="h-5 w-5 text-blue-700 mt-0.5 shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm font-medium text-blue-900">
-                      Voce esta no trial gratuito do Platform
+                      Voce esta no teste gratuito do Platform
                     </p>
                     <p className="text-sm text-blue-800 mt-1">
                       {trialEndDays !== null && trialEndDays > 0
-                        ? `Restam ${trialEndDays} dia${trialEndDays === 1 ? '' : 's'} de trial. `
-                        : 'Seu trial terminou. '}
+                        ? `Restam ${trialEndDays} dia${trialEndDays === 1 ? '' : 's'} de teste. `
+                        : 'Seu teste terminou. '}
                       {cardDeadline
                         ? `Cadastre o cartao ate ${formatDateBR(cardDeadline)} pra continuar usando.`
                         : 'Cadastre o cartao pra continuar usando.'}
@@ -367,7 +367,7 @@ export default function AdminBillingPage() {
                   <AlertTriangle className="h-5 w-5 text-amber-700 mt-0.5 shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-amber-900">
-                      Trial encerrado — cadastre o cartao
+                      Teste encerrado — cadastre o cartao
                     </p>
                     <p className="text-sm text-amber-800 mt-1">
                       {daysLeft !== null && daysLeft > 0
@@ -409,7 +409,7 @@ export default function AdminBillingPage() {
                     Aguardando primeiro acesso
                   </p>
                   <p className="text-sm text-slate-700 mt-1">
-                    Seu trial Platform comeca automaticamente no primeiro login do admin.
+                    Seu teste gratuito do Platform comeca automaticamente no primeiro login do admin.
                   </p>
                 </div>
               </CardContent>
@@ -522,13 +522,13 @@ export default function AdminBillingPage() {
                     <p className="text-xs font-medium text-blue-900">Linha do tempo</p>
                     {billing.platform.trialStartedAtISO && (
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Trial iniciou:</span>
+                        <span className="text-muted-foreground">Teste iniciou:</span>
                         <span>{formatDateBR(billing.platform.trialStartedAtISO)}</span>
                       </div>
                     )}
                     {billing.platform.trialEndsAtISO && (
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Trial termina:</span>
+                        <span className="text-muted-foreground">Teste termina:</span>
                         <span>{formatDateBR(billing.platform.trialEndsAtISO)}</span>
                       </div>
                     )}

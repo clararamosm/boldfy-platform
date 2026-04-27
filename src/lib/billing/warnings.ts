@@ -227,7 +227,7 @@ export function computeBillingWarnings(
           out.push({
             id: 'platform-trial-expired',
             severity: 'critical',
-            title: 'Trial gratuito expirou',
+            title: 'Teste gratuito expirou',
             message: 'Cadastre seu cartao em ate 7 dias para nao perder acesso a Plataforma.',
             cta: { label: 'Cadastrar cartao', href: '/admin/billing' },
             module: 'platform',
@@ -237,7 +237,7 @@ export function computeBillingWarnings(
           out.push({
             id: 'platform-trial-ending',
             severity: 'warning',
-            title: `Trial gratuito termina em ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'}`,
+            title: `Teste gratuito termina em ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'}`,
             message: 'Cadastre seu cartao para continuar usando a Plataforma sem interrupcao.',
             cta: { label: 'Cadastrar cartao', href: '/admin/billing' },
             module: 'platform',
@@ -247,8 +247,8 @@ export function computeBillingWarnings(
           out.push({
             id: 'platform-trial-soon',
             severity: 'info',
-            title: `Trial gratuito: ${daysLeft} dias restantes`,
-            message: 'Quando o trial acabar, voce tem 7 dias para cadastrar o cartao.',
+            title: `Teste gratuito: ${daysLeft} dias restantes`,
+            message: 'Quando o teste acabar, voce tem 7 dias para cadastrar o cartao.',
             cta: { label: 'Cadastrar cartao', href: '/admin/billing' },
             module: 'platform',
             triggerISO: trialEnd.toISOString(),

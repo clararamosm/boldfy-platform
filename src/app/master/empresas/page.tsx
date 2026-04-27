@@ -220,7 +220,7 @@ export default function MasterEmpresasPage() {
         if(inviteState.success) {
             toast({
                 title: 'Empresa e Admin Criados!',
-                description: 'A empresa foi criada em modo Trial. O admin pode agora fazer login e iniciar a assinatura.',
+                description: 'A empresa foi criada em modo de teste gratuito. O admin pode agora fazer login e iniciar a assinatura.',
             });
             setIsDialogOpen(false);
             fetchCompanies();
@@ -276,7 +276,7 @@ export default function MasterEmpresasPage() {
                     : new Date(trialEnd as string);
                 daysLeft = Math.max(0, Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
             }
-            return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Trial ({daysLeft}d)</Badge>;
+            return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Teste ({daysLeft}d)</Badge>;
         }
 
         // Paid / Beta
@@ -409,7 +409,7 @@ export default function MasterEmpresasPage() {
                 </div>
                  <ActionDialog
                     title="Adicionar Nova Empresa"
-                    description="Preencha os dados para criar uma nova empresa. Ela começará com um free trial."
+                    description="Preencha os dados para criar uma nova empresa. Ela começará com um teste gratuito."
                     trigger={addCompanyButton}
                     actionText="Criar e Convidar Admin"
                     onAction={() => formRef.current?.requestSubmit()}
