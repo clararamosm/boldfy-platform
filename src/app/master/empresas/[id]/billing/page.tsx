@@ -43,6 +43,8 @@ import {
   getCompanyBilling,
   updateCompanyBillingToggles,
   setTLBilledOutsidePlatform,
+  setMasterTrialDuration,
+  toggleFreeTrialUnlimited,
   type SerializableBillingBlock,
 } from '@/app/actions/billing';
 
@@ -67,6 +69,8 @@ function statusLabel(status: string): string {
   switch (status) {
     case 'active':
       return 'Ativo';
+    case 'free':
+      return 'Trial gratuito';
     case 'pending':
       return 'Aguardando pagamento';
     case 'blocked':
@@ -75,6 +79,27 @@ function statusLabel(status: string): string {
     default:
       return 'Desativado';
   }
+}
+
+function statusBadgeVariantPlatform(
+  status: string,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (status === 'active') return 'default';
+  if (status === 'free') return 'secondary';
+  if (status === 'pending') return 'secondary';
+  if (status === 'blocked') return 'destructive';
+  return 'outline';
+}
+
+function formatDateBR(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
 }
 
 export default function MasterCompanyBillingPage() {
@@ -99,6 +124,12 @@ export default function MasterCompanyBillingPage() {
   const [tlOutsideExecutives, setTlOutsideExecutives] = useState<number>(1);
   const [tlOutsideFrequency, setTlOutsideFrequency] = useState<2 | 3 | 4>(2);
   const [isPendingTLOutside, startTLOutsideTransition] = useTransition();
+
+  // Trial Platform (master)
+  const [trialDurationDays, setTrialDurationDays] = useState<15 | 30 | 60>(15);
+  const [freeTrialUnlimited, setFreeTrialUnlimited] = useState(false);
+  const [isPendingTrialDuration, startTrialDurationTransition] = useTransition();
+  const [isPendingFreeUnlimited, startFreeUnlimitedTransition] = useTransition();
 
   useEffect(() => {
     if (!companyId) return;
@@ -137,6 +168,15 @@ export default function MasterCompanyBillingPage() {
         setTlOutsideExecutives(execs >= 1 && execs <= 5 ? execs : 1);
         const freq = res.data.tl.frequency;
         setTlOutsideFrequency(freq === 2 || freq === 3 || freq === 4 ? freq : 2);
+
+        // Hidrata trial Platform
+        const trialDur = res.data.platform.trialDurationDays;
+        if (trialDur === 15 || trialDur === 30 || trialDur === 60) {
+          setTrialDurationDays(trialDur);
+        } else {
+          setTrialDurationDays(15);
+        }
+        setFreeTrialUnlimited(res.data.platform.freeTrialUnlimited === true);
       } catch (e) {
         if (!cancelled) {
           toast({
@@ -163,6 +203,60 @@ export default function MasterCompanyBillingPage() {
       setBetaExpiresAt('');
     }
   }, [isBetaTester, betaExpiresAt]);
+
+  function handleSaveTrialDuration(value: 15 | 30 | 60) {
+    if (!companyId || !token) return;
+    setTrialDurationDays(value);
+    startTrialDurationTransition(async () => {
+      const res = await setMasterTrialDuration({
+        idToken: token,
+        companyId,
+        trialDurationDays: value,
+      });
+      if (!res.success || !res.data) {
+        toast({
+          title: 'Erro ao salvar duracao do trial',
+          description: res.error || 'Tente novamente.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setBilling(res.data);
+      toast({
+        title: 'Duracao do trial atualizada',
+        description: `Trial Platform agora dura ${value} dias.`,
+      });
+    });
+  }
+
+  function handleToggleFreeUnlimited(enabled: boolean) {
+    if (!companyId || !token) return;
+    setFreeTrialUnlimited(enabled);
+    startFreeUnlimitedTransition(async () => {
+      const res = await toggleFreeTrialUnlimited({
+        idToken: token,
+        companyId,
+        enabled,
+      });
+      if (!res.success || !res.data) {
+        // rollback visual
+        setFreeTrialUnlimited(!enabled);
+        toast({
+          title: 'Erro ao alterar free trial',
+          description: res.error || 'Tente novamente.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setBilling(res.data);
+      toast({
+        title: enabled ? 'Free trial ilimitado ativado' : 'Free trial ilimitado desativado',
+        description: enabled
+          ? 'Empresa marcada como parceira Boldfy. Sem cobranca.'
+          : 'Empresa volta para o fluxo normal de trial.',
+      });
+    });
+  }
 
   function handleSaveTLOutside() {
     if (!companyId || !token) return;
@@ -327,6 +421,87 @@ export default function MasterCompanyBillingPage() {
                 />
               </>
             ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Plano Platform — Trial (master) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Plano Platform — Trial</CardTitle>
+            <CardDescription>
+              Define a duracao do trial gratuito do modulo Platform. O trial comeca
+              quando o admin loga pela primeira vez. Apos o fim, a empresa tem 7 dias
+              para cadastrar cartao antes do bloqueio.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 rounded-lg border p-4">
+              <div className="space-y-2">
+                <Label htmlFor="trialDurationDays">Duracao do trial</Label>
+                <Select
+                  value={String(trialDurationDays)}
+                  onValueChange={(v) =>
+                    handleSaveTrialDuration(Number(v) as 15 | 30 | 60)
+                  }
+                  disabled={isPendingTrialDuration || freeTrialUnlimited}
+                >
+                  <SelectTrigger id="trialDurationDays">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 dias</SelectItem>
+                    <SelectItem value="30">30 dias</SelectItem>
+                    <SelectItem value="60">60 dias</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Padrao: 15 dias. Se o trial ja comecou, mudar a duracao recalcula
+                  trialEndsAt e cardDeadlineEndsAt a partir de trialStartedAt.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Estado atual do trial</Label>
+                <div className="rounded-md border p-3 text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status:</span>
+                    <Badge variant={statusBadgeVariantPlatform(billing?.platform.status ?? 'disabled')}>
+                      {statusLabel(billing?.platform.status ?? 'disabled')}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Trial iniciou:</span>
+                    <span>{formatDateBR(billing?.platform.trialStartedAtISO ?? null)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Trial termina:</span>
+                    <span>{formatDateBR(billing?.platform.trialEndsAtISO ?? null)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Prazo do cartao:</span>
+                    <span>{formatDateBR(billing?.platform.cardDeadlineEndsAtISO ?? null)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div>
+                <Label htmlFor="freeTrialUnlimited" className="text-base">
+                  Free trial ilimitado (parceiro Boldfy)
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Use para empresas parceiras que nao serao cobradas. Mantem o modulo
+                  Platform em status &quot;free&quot; sem prazo de bloqueio. Desligar volta
+                  para o fluxo normal de trial.
+                </p>
+              </div>
+              <Switch
+                id="freeTrialUnlimited"
+                checked={freeTrialUnlimited}
+                onCheckedChange={handleToggleFreeUnlimited}
+                disabled={isPendingFreeUnlimited}
+              />
+            </div>
           </CardContent>
         </Card>
 

@@ -151,30 +151,14 @@ export function computeBillingWarnings(
 ): BillingWarning[] {
   const out: BillingWarning[] = [];
 
-  // 1. Billing global desligado (so relevante se empresa ja configurou algum modulo)
-  if (billing && billing.enabled === false) {
-    const anyModuleConfigured =
-      billing.platform?.status !== 'disabled' ||
-      billing.tl?.status !== 'disabled' ||
-      billing.design?.status !== 'disabled';
-
-    if (anyModuleConfigured) {
-      out.push({
-        id: 'billing-disabled',
-        severity: 'warning',
-        title: 'Cobranca desligada pelo time Boldfy',
-        message:
-          'Sua cobranca esta pausada. Acesso continua normal, mas nao e possivel ativar novos modulos. Fale com o suporte para reativar.',
-        cta: { label: 'Abrir suporte', href: '/admin/suporte' },
-      });
-    }
-  }
-
   if (!billing) return out;
 
   // 2. Beta tester
   if (billing.isBetaTester === true) {
-    const betaEnd = toDate(billing.betaExpiresAt);
+    // Novo schema: billing.betaEndsAt (top-level, gravado em markModuleAsActive
+    // quando Platform vira active pela primeira vez). Fallback: betaExpiresAt
+    // (campo legado, compat retroativo com empresas pre-refactor).
+    const betaEnd = toDate(billing.betaEndsAt) ?? toDate(billing.betaExpiresAt);
     if (!betaEnd) {
       // Beta permanente (sem data) — apenas info discreta
       out.push({
@@ -217,6 +201,61 @@ export function computeBillingWarnings(
         });
       }
       // > 14 dias: silencio, nao precisa avisar ainda
+    }
+  }
+
+  // 2.5. Trial gratuito Platform (status 'free')
+  // - Free unlimited (parceiro Boldfy): info discreta sem countdown
+  // - Trial em curso > 7d: silencio (nao polui)
+  // - Trial em curso 4-7d: info
+  // - Trial em curso 1-3d: warning
+  // - Trial expirado (<= 0d): critical (cron promove para 'pending', mas
+  //   defesa em profundidade caso cron atrase)
+  if (billing.platform?.status === 'free') {
+    if (billing.platform.freeTrialUnlimited === true) {
+      out.push({
+        id: 'platform-trial-unlimited',
+        severity: 'info',
+        title: 'Acesso de parceiro Boldfy',
+        message: 'Sua empresa tem cortesia ilimitada na Plataforma. Aproveite.',
+      });
+    } else {
+      const trialEnd = toDate(billing.platform.trialEndsAt);
+      if (trialEnd) {
+        const daysLeft = daysUntil(trialEnd, now);
+        if (daysLeft <= 0) {
+          out.push({
+            id: 'platform-trial-expired',
+            severity: 'critical',
+            title: 'Trial gratuito expirou',
+            message: 'Cadastre seu cartao em ate 7 dias para nao perder acesso a Plataforma.',
+            cta: { label: 'Cadastrar cartao', href: '/admin/billing' },
+            module: 'platform',
+            triggerISO: trialEnd.toISOString(),
+          });
+        } else if (daysLeft <= 3) {
+          out.push({
+            id: 'platform-trial-ending',
+            severity: 'warning',
+            title: `Trial gratuito termina em ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'}`,
+            message: 'Cadastre seu cartao para continuar usando a Plataforma sem interrupcao.',
+            cta: { label: 'Cadastrar cartao', href: '/admin/billing' },
+            module: 'platform',
+            triggerISO: trialEnd.toISOString(),
+          });
+        } else if (daysLeft <= 7) {
+          out.push({
+            id: 'platform-trial-soon',
+            severity: 'info',
+            title: `Trial gratuito: ${daysLeft} dias restantes`,
+            message: 'Quando o trial acabar, voce tem 7 dias para cadastrar o cartao.',
+            cta: { label: 'Cadastrar cartao', href: '/admin/billing' },
+            module: 'platform',
+            triggerISO: trialEnd.toISOString(),
+          });
+        }
+        // > 7 dias: silencio
+      }
     }
   }
 

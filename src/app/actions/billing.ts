@@ -14,11 +14,16 @@
 import { requireAdmin, requireMaster } from '@/lib/auth-guard';
 import {
   applyMasterBillingToggle,
+  applyMasterTrialSetup,
+  applyToggleFreeUnlimited,
   applyTLBilledOutsidePlatform,
   computeFirstPaymentDeadline,
   getCompanyBillingBlock,
   validateMasterToggleInput,
+  validateMasterTrialSetupInput,
+  validateToggleFreeUnlimitedInput,
   validateTLBilledOutsidePlatformInput,
+  type ValidTrialDurationDays,
 } from '@/lib/billing/master-rules';
 import {
   createModuleCheckoutSession,
@@ -55,6 +60,11 @@ export interface SerializableBillingBlock {
     status: string;
     stripeSubscriptionId: string | null;
     firstPaymentDeadlineISO: string | null;
+    trialDurationDays: number | null;
+    freeTrialUnlimited: boolean;
+    trialStartedAtISO: string | null;
+    trialEndsAtISO: string | null;
+    cardDeadlineEndsAtISO: string | null;
   };
   tl: {
     active: boolean;
@@ -104,6 +114,14 @@ function serializeBilling(b: CompanyBillingBlock): SerializableBillingBlock {
       status: b.platform.status,
       stripeSubscriptionId: b.platform.stripeSubscriptionId ?? null,
       firstPaymentDeadlineISO: toISO(b.platform.firstPaymentDeadline),
+      trialDurationDays:
+        typeof b.platform.trialDurationDays === 'number'
+          ? b.platform.trialDurationDays
+          : null,
+      freeTrialUnlimited: b.platform.freeTrialUnlimited === true,
+      trialStartedAtISO: toISO(b.platform.trialStartedAt),
+      trialEndsAtISO: toISO(b.platform.trialEndsAt),
+      cardDeadlineEndsAtISO: toISO(b.platform.cardDeadlineEndsAt),
     },
     tl: {
       active: b.tl.active,
@@ -258,6 +276,89 @@ export async function setTLBilledOutsidePlatform(
       success: false,
       error:
         e instanceof Error ? e.message : 'Erro ao atualizar ativacao especial do TL.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// WRITE (Master — Setup do trial Platform)
+// ────────────────────────────────────────────────────────────
+
+export interface SetMasterTrialDurationInput {
+  idToken: string;
+  companyId: string;
+  trialDurationDays: 15 | 30 | 60;
+}
+
+/**
+ * Master configura quanto tempo dura o trial Platform da empresa.
+ * Pode ser chamado mesmo apos o trial ja ter iniciado — neste caso,
+ * recalcula trialEndsAt = trialStartedAt + novoDurationDays e
+ * cardDeadlineEndsAt = trialEndsAt + 7 dias (extensao/reducao do trial).
+ */
+export async function setMasterTrialDuration(
+  input: SetMasterTrialDurationInput,
+): Promise<BillingActionResult<SerializableBillingBlock>> {
+  try {
+    if (!input?.idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const master = await requireMaster(input.idToken);
+
+    const validated = validateMasterTrialSetupInput({
+      companyId: input.companyId,
+      trialDurationDays: input.trialDurationDays as ValidTrialDurationDays,
+    });
+
+    const updated = await applyMasterTrialSetup(validated, master.uid);
+    return { success: true, data: serializeBilling(updated) };
+  } catch (e: unknown) {
+    console.error('[setMasterTrialDuration] falhou:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao configurar duracao do trial.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// WRITE (Master — Free trial unlimited / parceiros como Boldfy)
+// ────────────────────────────────────────────────────────────
+
+export interface ToggleFreeTrialUnlimitedInput {
+  idToken: string;
+  companyId: string;
+  enabled: boolean;
+}
+
+/**
+ * Master liga/desliga "Plataforma free ilimitada" para a empresa.
+ * - enabled=true: status='free' permanente, sem trialEndsAt e sem cardDeadline.
+ *   Se Platform estava em pending/blocked, e resgatado de volta para 'free'.
+ * - enabled=false: volta ao fluxo normal de trial. Recalcula datas a partir
+ *   de trialStartedAt + trialDurationDays (se trial ja tinha comecado).
+ */
+export async function toggleFreeTrialUnlimited(
+  input: ToggleFreeTrialUnlimitedInput,
+): Promise<BillingActionResult<SerializableBillingBlock>> {
+  try {
+    if (!input?.idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const master = await requireMaster(input.idToken);
+
+    const validated = validateToggleFreeUnlimitedInput({
+      companyId: input.companyId,
+      enabled: input.enabled,
+    });
+
+    const updated = await applyToggleFreeUnlimited(validated, master.uid);
+    return { success: true, data: serializeBilling(updated) };
+  } catch (e: unknown) {
+    console.error('[toggleFreeTrialUnlimited] falhou:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao alterar free trial ilimitado.',
     };
   }
 }

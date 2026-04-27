@@ -36,6 +36,15 @@ import { computeFirstPaymentDeadline } from './master-rules';
 
 export type BillingModule = 'platform' | 'tl' | 'design';
 
+/**
+ * Trial nativo do Stripe (em dias) para modulos TL e Design.
+ * Platform NAO usa este trial — Platform tem trial proprio gerenciado pelo
+ * status 'free' antes do Checkout. TL/Design vao direto de 'disabled' para
+ * Checkout, e o Stripe gerencia os 7 dias de trial nativo (cobranca automatica
+ * apos o trial). Webhook 'customer.subscription.updated' mapeia trialing -> active.
+ */
+const STRIPE_NATIVE_TRIAL_DAYS = 7;
+
 export interface StripeModuleMetadata {
   companyId: string;
   module: BillingModule;
@@ -364,12 +373,19 @@ export async function createModuleCheckoutSession(
   const successPath = input.successPath || `/admin/configuracoes/billing?checkout=success&module=${moduleKey}`;
   const cancelPath = input.cancelPath || `/admin/configuracoes/billing?checkout=cancelled&module=${moduleKey}`;
 
+  // TL/Design ganham trial nativo Stripe (7 dias). Platform NAO — Platform
+  // tem trial 'free' proprio antes do Checkout, gerenciado pelos crons.
+  const useStripeNativeTrial = moduleKey === 'tl' || moduleKey === 'design';
+
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
     line_items: [moduleLineItem.lineItem],
     subscription_data: {
       metadata: moduleLineItem.subscriptionMetadata,
+      ...(useStripeNativeTrial
+        ? { trial_period_days: STRIPE_NATIVE_TRIAL_DAYS }
+        : {}),
     },
     metadata: {
       companyId: input.companyId,
@@ -450,6 +466,29 @@ export async function markModuleAsActive(args: {
       updates[`billing.${args.module}.${k}`] = v;
     }
   }
+
+  // Beta startsAt retroativo: quando Platform vira 'active' pela primeira vez
+  // E a empresa e beta tester, gravamos betaStartsAt e betaEndsAt no bloco
+  // billing.* (top-level, nao billing.platform.*). Idempotente: so grava se
+  // betaStartsAt ainda nao existe.
+  if (args.module === 'platform') {
+    const snap = await companyRef.get();
+    const data = snap.data() ?? {};
+    const billing = (data.billing as CompanyBillingBlock | undefined);
+    const isBeta = billing?.isBetaTester === true;
+    const alreadyHasBetaStart = !!billing?.betaStartsAt;
+
+    if (isBeta && !alreadyHasBetaStart) {
+      const now = new Date();
+      const durationMonths = billing?.betaDurationMonths ?? 5;
+      const endsAt = new Date(
+        now.getTime() + durationMonths * 30 * 24 * 60 * 60 * 1000,
+      );
+      updates['billing.betaStartsAt'] = Timestamp.fromDate(now);
+      updates['billing.betaEndsAt'] = Timestamp.fromDate(endsAt);
+    }
+  }
+
   await companyRef.update(updates);
 }
 

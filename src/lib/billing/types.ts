@@ -6,12 +6,13 @@ import type { Timestamp } from 'firebase/firestore';
 
 /**
  * Status de um modulo de billing.
- * - disabled: modulo nao ativado pelo admin
- * - pending: admin ativou, aguardando primeiro pagamento (dentro dos 7 dias)
+ * - disabled: modulo nao ativado (admin convidado mas nao aceitou ainda, ou TL/Design nao ligado)
+ * - free: trial gratuito ativo (Platform default apos admin first login)
+ * - pending: trial acabou, aguardando admin cadastrar cartao (7 dias)
  * - active: pagamento realizado, subscription ativa no Stripe
- * - blocked: 7 dias passaram sem pagamento, acesso bloqueado
+ * - blocked: deadline de cartao venceu, acesso bloqueado
  */
-export type BillingModuleStatus = 'disabled' | 'pending' | 'active' | 'blocked';
+export type BillingModuleStatus = 'disabled' | 'free' | 'pending' | 'active' | 'blocked';
 
 /**
  * Representa um Timestamp que pode vir como:
@@ -36,8 +37,21 @@ export interface PlatformBillingState {
   active: boolean;
   seats: number;
   stripeSubscriptionId?: string;
+  /** @deprecated use cardDeadlineEndsAt */
   firstPaymentDeadline?: MaybeTimestamp;
   status: BillingModuleStatus;
+
+  // Trial flow (refactor billing-trial-flow)
+  /** Duracao do trial em dias (default 15, configuravel pelo Master) */
+  trialDurationDays?: number;
+  /** Setado quando admin faz primeiro login bem-sucedido */
+  trialStartedAt?: MaybeTimestamp;
+  /** Calculado: trialStartedAt + trialDurationDays. Ausente se freeTrialUnlimited=true */
+  trialEndsAt?: MaybeTimestamp;
+  /** Boldfy/parceiros: pula trial countdown, fica em 'free' indefinidamente */
+  freeTrialUnlimited?: boolean;
+  /** Deadline de 7 dias apos trialEndsAt para cadastrar cartao. Substitui firstPaymentDeadline */
+  cardDeadlineEndsAt?: MaybeTimestamp;
 }
 
 /**
@@ -105,6 +119,14 @@ export interface CompanyBillingBlock {
   stripeCustomerId?: string;
   fiscal?: FiscalData;
 
+  // Beta com timeline propria (refactor billing-trial-flow)
+  /** Duracao do beta em meses (default 5). Master configura por empresa */
+  betaDurationMonths?: number;
+  /** Setado quando platform vira 'active' pela primeira vez */
+  betaStartsAt?: MaybeTimestamp;
+  /** Calculado: betaStartsAt + betaDurationMonths */
+  betaEndsAt?: MaybeTimestamp;
+
   createdAt?: MaybeTimestamp;
   updatedAt?: MaybeTimestamp;
 }
@@ -117,10 +139,13 @@ export function getDefaultBillingBlock(): Omit<CompanyBillingBlock, 'createdAt' 
   return {
     enabled: false,
     isBetaTester: false,
+    betaDurationMonths: 5,
     platform: {
       active: false,
       seats: 0,
       status: 'disabled',
+      trialDurationDays: 15,
+      freeTrialUnlimited: false,
     },
     tl: {
       active: false,

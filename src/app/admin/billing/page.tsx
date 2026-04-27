@@ -41,6 +41,7 @@ import {
   Loader2,
   MessagesSquare,
   Palette,
+  Sparkles,
   Users,
 } from 'lucide-react';
 import {
@@ -70,6 +71,20 @@ function formatDateBR(iso: string | null): string {
   }
 }
 
+/** Retorna dias restantes (ceil) a partir de hoje. Negativo = vencido. */
+function computeDaysRemaining(iso: string | null): number | null {
+  if (!iso) return null;
+  const target = new Date(iso);
+  if (Number.isNaN(target.getTime())) return null;
+  const diffMs = target.getTime() - Date.now();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+/** Prazo efetivo do Platform: usa cardDeadlineEndsAtISO se houver, senao firstPaymentDeadlineISO. */
+function platformDeadlineISO(p: SerializableBillingBlock['platform']): string | null {
+  return p.cardDeadlineEndsAtISO ?? p.firstPaymentDeadlineISO ?? null;
+}
+
 // ─── Token helper ───────────────────────────────────────────────
 
 async function getIdToken(): Promise<string> {
@@ -83,6 +98,7 @@ async function getIdToken(): Promise<string> {
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string; Icon: typeof CheckCircle }> = {
     active: { label: 'Ativo', cls: 'bg-green-100 text-green-800 hover:bg-green-100', Icon: CheckCircle },
+    free: { label: 'Trial gratuito', cls: 'bg-blue-100 text-blue-800 hover:bg-blue-100', Icon: Sparkles },
     pending: { label: 'Aguardando pagamento', cls: 'bg-amber-100 text-amber-800 hover:bg-amber-100', Icon: Clock },
     blocked: { label: 'Bloqueado', cls: 'bg-red-100 text-red-800 hover:bg-red-100', Icon: AlertTriangle },
     disabled: { label: 'Desligado', cls: 'bg-slate-100 text-slate-700 hover:bg-slate-100', Icon: Info },
@@ -221,12 +237,19 @@ export default function AdminBillingPage() {
   };
 
   const canActivate = (module: 'platform' | 'tl' | 'design') => {
-    if (!billing || !billing.enabled) return false;
+    if (!billing) return false;
     if (activatingModule) return false;
     const m = billing[module];
-    // Permite ativar se desligado, bloqueado ou sem sub
+    // Platform: pode cadastrar cartao a qualquer momento durante 'free' (adianta)
+    // ou em 'pending'. Bloqueia em 'active' (ja pagou) e quando freeTrialUnlimited.
+    if (module === 'platform') {
+      if (billing.platform.freeTrialUnlimited) return false;
+      if (m.status === 'active') return false;
+      return simulation?.platform?.valid === true;
+    }
+    // TL/Design: comportamento original (precisa enabled global e estado nao-active/pending)
+    if (!billing.enabled) return false;
     if (m.status === 'active' || m.status === 'pending') return false;
-    // Design exige Platform ativo
     if (module === 'design' && billing.platform.status !== 'active') return false;
     if (module === 'tl' && billing.tl.billedOutsidePlatform) return false;
     return simulation?.[module]?.valid === true;
@@ -291,18 +314,102 @@ export default function AdminBillingPage() {
       />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-6 max-w-5xl mx-auto">
-          {/* ─── Aviso global de estado ─────────────────────────── */}
-          {disabledByMaster && (
-            <Card className="border-amber-300 bg-amber-50/40">
+          {/* ─── Banner: trial Platform ativo ────────────────────── */}
+          {billing.platform.status === 'free' && !billing.platform.freeTrialUnlimited && (() => {
+            const trialEndDays = computeDaysRemaining(billing.platform.trialEndsAtISO);
+            const cardDeadline = billing.platform.cardDeadlineEndsAtISO;
+            return (
+              <Card className="border-blue-300 bg-blue-50/40">
+                <CardContent className="pt-6 flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-blue-700 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900">
+                      Voce esta no trial gratuito do Platform
+                    </p>
+                    <p className="text-sm text-blue-800 mt-1">
+                      {trialEndDays !== null && trialEndDays > 0
+                        ? `Restam ${trialEndDays} dia${trialEndDays === 1 ? '' : 's'} de trial. `
+                        : 'Seu trial terminou. '}
+                      {cardDeadline
+                        ? `Cadastre o cartao ate ${formatDateBR(cardDeadline)} pra continuar usando.`
+                        : 'Cadastre o cartao pra continuar usando.'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* ─── Banner: parceiro Boldfy (free unlimited) ────────── */}
+          {billing.platform.freeTrialUnlimited && (
+            <Card className="border-purple-300 bg-purple-50/40">
               <CardContent className="pt-6 flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-700 mt-0.5 shrink-0" />
+                <Sparkles className="h-5 w-5 text-purple-700 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-amber-900">
-                    Billing desligado pelo time Boldfy
+                  <p className="text-sm font-medium text-purple-900">
+                    Sua empresa e parceira Boldfy
                   </p>
-                  <p className="text-sm text-amber-800 mt-1">
-                    Voce pode simular precos, mas a ativacao esta temporariamente bloqueada.
-                    Entre em contato com o suporte para liberar.
+                  <p className="text-sm text-purple-800 mt-1">
+                    Acesso gratuito ilimitado ao modulo Platform. Sem prazo de bloqueio.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ─── Banner: Platform pending (trial venceu, cartao em prazo) ─ */}
+          {billing.platform.status === 'pending' && !billing.platform.freeTrialUnlimited && (() => {
+            const deadline = platformDeadlineISO(billing.platform);
+            const daysLeft = computeDaysRemaining(deadline);
+            return (
+              <Card className="border-amber-300 bg-amber-50/40">
+                <CardContent className="pt-6 flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-700 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">
+                      Trial encerrado — cadastre o cartao
+                    </p>
+                    <p className="text-sm text-amber-800 mt-1">
+                      {daysLeft !== null && daysLeft > 0
+                        ? `Voce tem ${daysLeft} dia${daysLeft === 1 ? '' : 's'} pra cadastrar o cartao antes do bloqueio.`
+                        : deadline
+                          ? `Prazo final: ${formatDateBR(deadline)}.`
+                          : 'Cadastre o cartao pra evitar bloqueio.'}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* ─── Banner: Platform bloqueado ──────────────────────── */}
+          {billing.platform.status === 'blocked' && (
+            <Card className="border-red-300 bg-red-50/40">
+              <CardContent className="pt-6 flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-red-700 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-red-900">
+                    Modulo Platform bloqueado
+                  </p>
+                  <p className="text-sm text-red-800 mt-1">
+                    Cadastre o cartao agora pra reativar o acesso.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ─── Banner: aguardando primeiro acesso ──────────────── */}
+          {disabledByMaster && billing.platform.status === 'disabled' && (
+            <Card className="border-slate-300 bg-slate-50/40">
+              <CardContent className="pt-6 flex items-start gap-3">
+                <Info className="h-5 w-5 text-slate-700 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-slate-900">
+                    Aguardando primeiro acesso
+                  </p>
+                  <p className="text-sm text-slate-700 mt-1">
+                    Seu trial Platform comeca automaticamente no primeiro login do admin.
                   </p>
                 </div>
               </CardContent>
@@ -406,11 +513,33 @@ export default function AdminBillingPage() {
                 )}
               </div>
 
-              {billing.platform.firstPaymentDeadlineISO &&
-                billing.platform.status === 'pending' && (
-                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
-                    Pagamento pendente ate{' '}
-                    <strong>{formatDateBR(billing.platform.firstPaymentDeadlineISO)}</strong>.
+              {/* Bloco de status detalhado do Platform */}
+              {(billing.platform.status === 'free' ||
+                billing.platform.status === 'pending' ||
+                billing.platform.status === 'blocked') &&
+                !billing.platform.freeTrialUnlimited && (
+                  <div className="rounded-lg border p-4 space-y-2 bg-blue-50/30">
+                    <p className="text-xs font-medium text-blue-900">Linha do tempo</p>
+                    {billing.platform.trialStartedAtISO && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Trial iniciou:</span>
+                        <span>{formatDateBR(billing.platform.trialStartedAtISO)}</span>
+                      </div>
+                    )}
+                    {billing.platform.trialEndsAtISO && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Trial termina:</span>
+                        <span>{formatDateBR(billing.platform.trialEndsAtISO)}</span>
+                      </div>
+                    )}
+                    {platformDeadlineISO(billing.platform) && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Prazo do cartao:</span>
+                        <span className="font-medium">
+                          {formatDateBR(platformDeadlineISO(billing.platform))}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
             </CardContent>
@@ -426,8 +555,14 @@ export default function AdminBillingPage() {
                 <CreditCard className="h-4 w-4 mr-2" />
                 {billing.platform.status === 'active'
                   ? 'Ativo'
+                  : billing.platform.freeTrialUnlimited
+                  ? 'Acesso ilimitado (parceiro)'
+                  : billing.platform.status === 'free'
+                  ? 'Cadastrar cartao'
                   : billing.platform.status === 'pending'
-                  ? 'Aguardando pagamento'
+                  ? 'Cadastrar cartao'
+                  : billing.platform.status === 'blocked'
+                  ? 'Reativar com cartao'
                   : 'Ativar Platform'}
               </Button>
             </CardFooter>
