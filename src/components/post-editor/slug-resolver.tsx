@@ -21,14 +21,10 @@ export function SlugResolver({ companySlug, tlSlug, postId }: Props) {
 
   useEffect(() => {
     // Aguarda Firebase Auth terminar de hidratar antes de tentar resolver
-    if (authLoading) {
-      console.log('[SlugResolver] Waiting for auth hydration...');
-      return;
-    }
+    if (authLoading) return;
 
     // Após hidratação: se não há usuário, mostra mensagem específica
     if (!firebaseUser) {
-      console.warn('[SlugResolver] No firebaseUser after auth loaded');
       setError('Você precisa estar logado para acessar este post.');
       return;
     }
@@ -44,13 +40,9 @@ export function SlugResolver({ companySlug, tlSlug, postId }: Props) {
     }, 15000);
 
     const resolve = async () => {
-      console.log('[SlugResolver] Starting resolve', { companySlug, tlSlug, uid: firebaseUser.uid });
       try {
-        console.log('[SlugResolver] Getting auth token...');
         const token = await getAuthToken();
-        console.log('[SlugResolver] Token OK, calling resolveSlugs...');
         const result = await resolveSlugs(token, companySlug, tlSlug);
-        console.log('[SlugResolver] resolveSlugs returned:', result);
         if (cancelled) return;
         clearTimeout(timeout);
         if (result.error) {
