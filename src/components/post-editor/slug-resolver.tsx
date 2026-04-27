@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getAuthToken } from '@/lib/auth-client';
 import { resolveSlugs } from '@/app/actions/content-pipeline';
+import { useAuth } from '@/contexts/auth-context';
 import { PostEditorShell } from './post-editor-shell';
 import { Loader2 } from 'lucide-react';
 
@@ -13,19 +14,24 @@ type Props = {
 };
 
 export function SlugResolver({ companySlug, tlSlug, postId }: Props) {
+  const { firebaseUser, loading: authLoading } = useAuth();
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [tlId, setTlId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Aguarda Firebase Auth terminar de hidratar antes de tentar resolver
+    if (authLoading) return;
+
+    // Após hidratação: se não há usuário, mostra mensagem específica
+    if (!firebaseUser) {
+      setError('Você precisa estar logado para acessar este post.');
+      return;
+    }
+
     const resolve = async () => {
       try {
         const token = await getAuthToken();
-        if (!token) {
-          console.warn('[SlugResolver] No auth token — user may not be logged in');
-          setError('Você precisa estar logado para acessar este post.');
-          return;
-        }
         const result = await resolveSlugs(token, companySlug, tlSlug);
         if (result.error) {
           console.error('[SlugResolver] Server returned error:', result.error, { companySlug, tlSlug });
@@ -41,7 +47,7 @@ export function SlugResolver({ companySlug, tlSlug, postId }: Props) {
       }
     };
     resolve();
-  }, [companySlug, tlSlug]);
+  }, [companySlug, tlSlug, authLoading, firebaseUser]);
 
   if (error) {
     return (
