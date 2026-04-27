@@ -17,6 +17,21 @@ import {
 import { FIRST_PAYMENT_DEADLINE_MS } from './pricing';
 
 // ────────────────────────────────────────────────────────────
+// CONSTANTES DO NOVO FLUXO DE TRIAL
+// ────────────────────────────────────────────────────────────
+
+/** Opcoes validas para duracao do trial Platform configurado pelo master. */
+export const VALID_TRIAL_DURATIONS_DAYS = [15, 30, 60] as const;
+export type ValidTrialDurationDays = (typeof VALID_TRIAL_DURATIONS_DAYS)[number];
+
+/** Default quando empresa eh criada sem master setar duracao explicitamente. */
+export const DEFAULT_TRIAL_DURATION_DAYS: ValidTrialDurationDays = 15;
+
+/** Janela em dias para admin adicionar cartao apos fim do trial Platform. */
+export const CARD_DEADLINE_WINDOW_DAYS = 7;
+const CARD_DEADLINE_WINDOW_MS = CARD_DEADLINE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+
+// ────────────────────────────────────────────────────────────
 // INPUT VALIDATION
 // ────────────────────────────────────────────────────────────
 
@@ -179,6 +194,22 @@ export function computeFirstPaymentDeadline(): Date {
 }
 
 /**
+ * Calcula data de fim do trial Platform a partir de agora.
+ * Usada quando admin entra pela 1a vez na plataforma.
+ */
+export function computePlatformTrialEndDate(durationDays: number): Date {
+  return new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Calcula deadline para admin adicionar cartao apos fim do trial Platform.
+ * = trialEndsAt + 7 dias.
+ */
+export function computeCardDeadlineFromTrialEnd(trialEndsAt: Date): Date {
+  return new Date(trialEndsAt.getTime() + CARD_DEADLINE_WINDOW_MS);
+}
+
+/**
  * Verifica se um modulo esta bloqueado (deadline vencido sem pagamento).
  * Util para SubscriptionGate no futuro.
  */
@@ -190,6 +221,378 @@ export function isModuleBlocked(
   if (status !== 'pending') return false;
   if (!deadline) return false;
   return deadline.getTime() < Date.now();
+}
+
+// ────────────────────────────────────────────────────────────
+// MASTER: SETUP DE TRIAL DO PLATFORM (duracao do free trial)
+// ────────────────────────────────────────────────────────────
+// Master define quanto dura o periodo gratuito da Platform daquela empresa.
+// Pode ser chamado a qualquer momento (ate mesmo apos trial ja iniciado).
+// Se trial ja comecou, recalcula trialEndsAt = trialStartedAt + novoDurationDays.
+
+export interface MasterTrialSetupInput {
+  companyId: string;
+  trialDurationDays: ValidTrialDurationDays;
+}
+
+export function validateMasterTrialSetupInput(input: unknown): MasterTrialSetupInput {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Payload invalido.');
+  }
+  const raw = input as Record<string, unknown>;
+
+  const companyId = typeof raw.companyId === 'string' ? raw.companyId.trim() : '';
+  if (!companyId) {
+    throw new Error('companyId obrigatorio.');
+  }
+
+  const durationNum = Number(raw.trialDurationDays);
+  if (
+    !Number.isInteger(durationNum) ||
+    !VALID_TRIAL_DURATIONS_DAYS.includes(durationNum as ValidTrialDurationDays)
+  ) {
+    throw new Error(
+      `trialDurationDays deve ser um de: ${VALID_TRIAL_DURATIONS_DAYS.join(', ')}.`,
+    );
+  }
+
+  return {
+    companyId,
+    trialDurationDays: durationNum as ValidTrialDurationDays,
+  };
+}
+
+/**
+ * Aplica configuracao de duracao de trial do Platform.
+ *
+ * Regras:
+ * - Sempre escreve trialDurationDays.
+ * - Se trial ainda nao comecou (trialStartedAt undefined): apenas configura,
+ *   sem mexer em datas (admin first login que vai disparar).
+ * - Se trial ja comecou: recalcula trialEndsAt = trialStartedAt + novoDurationDays.
+ *   Tambem recalcula cardDeadlineEndsAt = novoTrialEndsAt + 7 dias.
+ *   (mesmo se trial ja terminou — master pode estar dando "extensao").
+ * - Se freeTrialUnlimited=true: configura trialDurationDays mesmo assim
+ *   (fica como "valor base" caso o ilimitado seja desligado depois),
+ *   mas NAO recalcula trialEndsAt/cardDeadlineEndsAt (continuam undefined).
+ */
+export async function applyMasterTrialSetup(
+  input: MasterTrialSetupInput,
+  masterUid: string,
+): Promise<CompanyBillingBlock> {
+  const companyRef = adminDb.collection('companies').doc(input.companyId);
+  const snap = await companyRef.get();
+  if (!snap.exists) {
+    throw new Error(`Empresa ${input.companyId} nao encontrada.`);
+  }
+
+  const existingBilling: CompanyBillingBlock =
+    (snap.data()?.billing as CompanyBillingBlock | undefined) ?? getDefaultBillingBlock();
+
+  const updates: Record<string, unknown> = {
+    'billing.platform.trialDurationDays': input.trialDurationDays,
+    'billing.updatedAt': FieldValue.serverTimestamp(),
+    'billing.lastUpdatedByMasterUid': masterUid,
+  };
+
+  // Se billing nunca foi inicializado, cria defaults dos modulos antes.
+  if (!snap.data()?.billing) {
+    const defaults = getDefaultBillingBlock();
+    updates['billing.enabled'] = defaults.enabled;
+    updates['billing.isBetaTester'] = defaults.isBetaTester;
+    updates['billing.tl'] = defaults.tl;
+    updates['billing.design'] = defaults.design;
+    updates['billing.createdAt'] = FieldValue.serverTimestamp();
+    // Sobrescreve apenas trialDurationDays no platform default.
+    updates['billing.platform'] = {
+      ...defaults.platform,
+      trialDurationDays: input.trialDurationDays,
+    };
+  }
+
+  // Se trial ja comecou e nao eh ilimitado, recalcula datas.
+  const trialStartedAt = existingBilling.platform?.trialStartedAt;
+  const isUnlimited = existingBilling.platform?.freeTrialUnlimited === true;
+
+  let projectedTrialEndsAt: Date | undefined = existingBilling.platform?.trialEndsAt;
+  let projectedCardDeadline: Date | undefined = existingBilling.platform?.cardDeadlineEndsAt;
+
+  if (trialStartedAt && !isUnlimited) {
+    const startedAtDate =
+      trialStartedAt instanceof Date ? trialStartedAt : (trialStartedAt as Timestamp).toDate();
+    const newTrialEndsAt = new Date(
+      startedAtDate.getTime() + input.trialDurationDays * 24 * 60 * 60 * 1000,
+    );
+    const newCardDeadline = computeCardDeadlineFromTrialEnd(newTrialEndsAt);
+
+    updates['billing.platform.trialEndsAt'] = Timestamp.fromDate(newTrialEndsAt);
+    updates['billing.platform.cardDeadlineEndsAt'] = Timestamp.fromDate(newCardDeadline);
+
+    projectedTrialEndsAt = newTrialEndsAt;
+    projectedCardDeadline = newCardDeadline;
+  }
+
+  await companyRef.update(updates);
+
+  return {
+    ...existingBilling,
+    platform: {
+      ...existingBilling.platform,
+      trialDurationDays: input.trialDurationDays,
+      trialEndsAt: projectedTrialEndsAt,
+      cardDeadlineEndsAt: projectedCardDeadline,
+    },
+  };
+}
+
+// ────────────────────────────────────────────────────────────
+// MASTER: TOGGLE FREE UNLIMITED (Boldfy / parceiros)
+// ────────────────────────────────────────────────────────────
+// Marca uma empresa como "Plataforma free ilimitada" (caso Boldfy).
+// Quando ligado: status='free' permanente, sem trialEndsAt, sem cardDeadline.
+// Quando desligado: volta a fluxo normal de trial (mantem trialDurationDays).
+
+export interface ToggleFreeUnlimitedInput {
+  companyId: string;
+  enabled: boolean;
+}
+
+export function validateToggleFreeUnlimitedInput(input: unknown): ToggleFreeUnlimitedInput {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Payload invalido.');
+  }
+  const raw = input as Record<string, unknown>;
+
+  const companyId = typeof raw.companyId === 'string' ? raw.companyId.trim() : '';
+  if (!companyId) {
+    throw new Error('companyId obrigatorio.');
+  }
+
+  return { companyId, enabled: raw.enabled === true };
+}
+
+/**
+ * Liga/desliga "Free Unlimited" do Platform.
+ *
+ * Regras LIGAR:
+ * - freeTrialUnlimited=true.
+ * - status='free' (forca de volta mesmo se estava em pending/blocked — resgate).
+ * - Limpa trialEndsAt e cardDeadlineEndsAt (nao fazem sentido em ilimitado).
+ * - Se trialStartedAt undefined, seta agora (efetivamente "destrava" o uso).
+ *
+ * Regras DESLIGAR:
+ * - freeTrialUnlimited=false.
+ * - Se trialStartedAt definido e trialDurationDays definido: recalcula
+ *   trialEndsAt = trialStartedAt + trialDurationDays e
+ *   cardDeadlineEndsAt = trialEndsAt + 7 dias.
+ *   Se trial ja teria terminado, status vira 'pending'. Senao, fica 'free'.
+ * - Se trial nunca comecou: status volta para 'disabled' (espera admin login).
+ */
+export async function applyToggleFreeUnlimited(
+  input: ToggleFreeUnlimitedInput,
+  masterUid: string,
+): Promise<CompanyBillingBlock> {
+  const companyRef = adminDb.collection('companies').doc(input.companyId);
+  const snap = await companyRef.get();
+  if (!snap.exists) {
+    throw new Error(`Empresa ${input.companyId} nao encontrada.`);
+  }
+
+  const existingBilling: CompanyBillingBlock =
+    (snap.data()?.billing as CompanyBillingBlock | undefined) ?? getDefaultBillingBlock();
+
+  const updates: Record<string, unknown> = {
+    'billing.updatedAt': FieldValue.serverTimestamp(),
+    'billing.lastUpdatedByMasterUid': masterUid,
+  };
+
+  // Se billing nunca foi inicializado, cria defaults antes.
+  if (!snap.data()?.billing) {
+    const defaults = getDefaultBillingBlock();
+    updates['billing.enabled'] = defaults.enabled;
+    updates['billing.isBetaTester'] = defaults.isBetaTester;
+    updates['billing.tl'] = defaults.tl;
+    updates['billing.design'] = defaults.design;
+    updates['billing.createdAt'] = FieldValue.serverTimestamp();
+    updates['billing.platform'] = defaults.platform;
+  }
+
+  let projectedPlatformStatus: BillingModuleStatus = existingBilling.platform?.status ?? 'disabled';
+  let projectedTrialStartedAt: Date | undefined =
+    existingBilling.platform?.trialStartedAt instanceof Date
+      ? existingBilling.platform?.trialStartedAt
+      : (existingBilling.platform?.trialStartedAt as Timestamp | undefined)?.toDate();
+  let projectedTrialEndsAt: Date | undefined;
+  let projectedCardDeadline: Date | undefined;
+
+  if (input.enabled) {
+    // LIGAR: free permanente.
+    updates['billing.platform.freeTrialUnlimited'] = true;
+    updates['billing.platform.status'] = 'free';
+    updates['billing.platform.trialEndsAt'] = FieldValue.delete();
+    updates['billing.platform.cardDeadlineEndsAt'] = FieldValue.delete();
+    // Mantem firstPaymentDeadline (deprecated) limpo tambem.
+    updates['billing.platform.firstPaymentDeadline'] = FieldValue.delete();
+
+    // Se nunca comecou, marca trialStartedAt=agora para fins de auditoria.
+    if (!projectedTrialStartedAt) {
+      const now = new Date();
+      updates['billing.platform.trialStartedAt'] = Timestamp.fromDate(now);
+      projectedTrialStartedAt = now;
+    }
+
+    projectedPlatformStatus = 'free';
+    projectedTrialEndsAt = undefined;
+    projectedCardDeadline = undefined;
+  } else {
+    // DESLIGAR: volta para fluxo normal.
+    updates['billing.platform.freeTrialUnlimited'] = false;
+
+    const durationDays =
+      existingBilling.platform?.trialDurationDays ?? DEFAULT_TRIAL_DURATION_DAYS;
+
+    if (projectedTrialStartedAt) {
+      const newTrialEndsAt = new Date(
+        projectedTrialStartedAt.getTime() + durationDays * 24 * 60 * 60 * 1000,
+      );
+      const newCardDeadline = computeCardDeadlineFromTrialEnd(newTrialEndsAt);
+
+      updates['billing.platform.trialEndsAt'] = Timestamp.fromDate(newTrialEndsAt);
+      updates['billing.platform.cardDeadlineEndsAt'] = Timestamp.fromDate(newCardDeadline);
+      projectedTrialEndsAt = newTrialEndsAt;
+      projectedCardDeadline = newCardDeadline;
+
+      if (newTrialEndsAt.getTime() <= Date.now()) {
+        // Trial ja teria acabado — entra em pending (admin tem 7d para cartao).
+        updates['billing.platform.status'] = 'pending';
+        projectedPlatformStatus = 'pending';
+      } else {
+        // Ainda no trial.
+        updates['billing.platform.status'] = 'free';
+        projectedPlatformStatus = 'free';
+      }
+    } else {
+      // Nunca comecou trial (admin nao logou ainda) — espera login.
+      updates['billing.platform.status'] = 'disabled';
+      updates['billing.platform.trialEndsAt'] = FieldValue.delete();
+      updates['billing.platform.cardDeadlineEndsAt'] = FieldValue.delete();
+      projectedPlatformStatus = 'disabled';
+      projectedTrialEndsAt = undefined;
+      projectedCardDeadline = undefined;
+    }
+  }
+
+  await companyRef.update(updates);
+
+  return {
+    ...existingBilling,
+    platform: {
+      ...existingBilling.platform,
+      freeTrialUnlimited: input.enabled,
+      status: projectedPlatformStatus,
+      trialStartedAt: projectedTrialStartedAt,
+      trialEndsAt: projectedTrialEndsAt,
+      cardDeadlineEndsAt: projectedCardDeadline,
+    },
+  };
+}
+
+// ────────────────────────────────────────────────────────────
+// HOOK: ADMIN FIRST LOGIN (dispara inicio do trial Platform)
+// ────────────────────────────────────────────────────────────
+// Chamado quando admin entra na plataforma pela 1a vez.
+// Idempotente: chamadas seguintes nao alteram nada (so atualiza se for transicao valida).
+
+export interface ApplyAdminFirstLoginResult {
+  /** True se a chamada efetivamente iniciou o trial agora. */
+  started: boolean;
+  billing: CompanyBillingBlock;
+}
+
+/**
+ * Inicia o trial Platform de uma empresa quando admin loga pela 1a vez.
+ *
+ * Regras:
+ * - So age se status='disabled' (estado inicial pos-criacao pelo master).
+ * - Se freeTrialUnlimited=true: pula transicao (mantem 'free' indefinido,
+ *   sem trialEndsAt). Apenas marca trialStartedAt=agora para auditoria
+ *   e seta status='free' se ainda estava 'disabled'.
+ * - Caso normal: status='free', trialStartedAt=agora,
+ *   trialEndsAt=agora+trialDurationDays, cardDeadlineEndsAt=trialEndsAt+7d.
+ * - Idempotente: se status ja eh diferente de 'disabled', retorna sem mudar.
+ *
+ * IMPORTANTE: nao valida quem chamou — caller deve garantir que eh admin
+ * da empresa em questao.
+ */
+export async function applyAdminFirstLogin(
+  companyId: string,
+): Promise<ApplyAdminFirstLoginResult> {
+  if (!companyId || typeof companyId !== 'string') {
+    throw new Error('companyId obrigatorio.');
+  }
+
+  const companyRef = adminDb.collection('companies').doc(companyId);
+  const snap = await companyRef.get();
+  if (!snap.exists) {
+    throw new Error(`Empresa ${companyId} nao encontrada.`);
+  }
+
+  const existingBilling: CompanyBillingBlock =
+    (snap.data()?.billing as CompanyBillingBlock | undefined) ?? getDefaultBillingBlock();
+
+  // Idempotencia: so age se Platform ainda esta 'disabled'.
+  if (existingBilling.platform?.status !== 'disabled') {
+    return { started: false, billing: existingBilling };
+  }
+
+  const isUnlimited = existingBilling.platform?.freeTrialUnlimited === true;
+  const durationDays =
+    existingBilling.platform?.trialDurationDays ?? DEFAULT_TRIAL_DURATION_DAYS;
+  const now = new Date();
+
+  const updates: Record<string, unknown> = {
+    'billing.platform.status': 'free',
+    'billing.platform.trialStartedAt': Timestamp.fromDate(now),
+    'billing.updatedAt': FieldValue.serverTimestamp(),
+  };
+
+  let projectedTrialEndsAt: Date | undefined;
+  let projectedCardDeadline: Date | undefined;
+
+  if (isUnlimited) {
+    // Free ilimitado: nao seta trialEndsAt nem cardDeadline.
+    updates['billing.platform.trialEndsAt'] = FieldValue.delete();
+    updates['billing.platform.cardDeadlineEndsAt'] = FieldValue.delete();
+  } else {
+    const trialEndsAt = computePlatformTrialEndDate(durationDays);
+    const cardDeadline = computeCardDeadlineFromTrialEnd(trialEndsAt);
+    updates['billing.platform.trialEndsAt'] = Timestamp.fromDate(trialEndsAt);
+    updates['billing.platform.cardDeadlineEndsAt'] = Timestamp.fromDate(cardDeadline);
+    // Garante trialDurationDays escrito caso seja empresa antiga sem o campo.
+    if (existingBilling.platform?.trialDurationDays === undefined) {
+      updates['billing.platform.trialDurationDays'] = durationDays;
+    }
+    projectedTrialEndsAt = trialEndsAt;
+    projectedCardDeadline = cardDeadline;
+  }
+
+  await companyRef.update(updates);
+
+  return {
+    started: true,
+    billing: {
+      ...existingBilling,
+      platform: {
+        ...existingBilling.platform,
+        status: 'free',
+        trialStartedAt: now,
+        trialEndsAt: projectedTrialEndsAt,
+        cardDeadlineEndsAt: projectedCardDeadline,
+        trialDurationDays:
+          existingBilling.platform?.trialDurationDays ?? durationDays,
+      },
+    },
+  };
 }
 
 // ────────────────────────────────────────────────────────────
