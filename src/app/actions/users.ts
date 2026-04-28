@@ -209,9 +209,10 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
   }
 
   try {
-    // Empresa criada SEM trial automatico. Master liga billing manualmente
-    // via /master/empresas/[id]/billing. Ate la, empresa esta em periodo
-    // gratuito (billing.enabled = false).
+    // Empresa criada SEM configuracao especial de billing. Master pode
+    // configurar parceiro Boldfy / beta tester via /master/empresas/[id]/billing.
+    // Por padrao, empresa entra no fluxo normal de teste gratuito (15 dias)
+    // que comeca quando o admin loga pela primeira vez.
     //
     // `subscription.plan = 'free'` mantem compatibilidade com o hook
     // useSubscription e auth-guard.requireActiveSubscription que serao

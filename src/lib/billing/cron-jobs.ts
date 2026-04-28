@@ -91,12 +91,12 @@ export async function runCheckModuleDeadlines(
   let scanned = 0;
 
   // Varre apenas empresas com billing existente. Sem billing, nada pra checar.
-  // Nota: nao filtramos por billing.enabled aqui porque mesmo em enabled=false
-  // o status 'pending' de um modulo pode ter vencido — o gate ja bloqueia,
-  // mas marcar blocked mantem o estado coerente pra reports do master.
+  // Filtramos por billing.platform.status existir (qualquer valor) — funciona
+  // como proxy para 'tem bloco billing inicializado'. O loop interno descarta
+  // docs sem billing pra robustez.
   const snapshot = await adminDb
     .collection('companies')
-    .where('billing.enabled', '==', true)
+    .where('billing.platform.status', 'in', ['disabled', 'free', 'pending', 'active', 'blocked'])
     .get();
 
   for (const doc of snapshot.docs) {

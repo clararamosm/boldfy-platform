@@ -151,25 +151,6 @@ export function computeBillingWarnings(
 ): BillingWarning[] {
   const out: BillingWarning[] = [];
 
-  // 1. Billing global desligado (so relevante se empresa ja configurou algum modulo)
-  if (billing && billing.enabled === false) {
-    const anyModuleConfigured =
-      billing.platform?.status !== 'disabled' ||
-      billing.tl?.status !== 'disabled' ||
-      billing.design?.status !== 'disabled';
-
-    if (anyModuleConfigured) {
-      out.push({
-        id: 'billing-disabled',
-        severity: 'warning',
-        title: 'Cobranca desligada pelo time Boldfy',
-        message:
-          'Sua cobranca esta pausada. Acesso continua normal, mas nao e possivel ativar novos modulos. Fale com o suporte para reativar.',
-        cta: { label: 'Abrir suporte', href: '/admin/suporte' },
-      });
-    }
-  }
-
   if (!billing) return out;
 
   // 2. Beta tester
@@ -255,7 +236,7 @@ export function computeBillingWarnings(
     if (w) out.push(w);
   }
 
-  // Ordenacao: critical > warning > info. Dentro do mesmo nivel, preservar ordem (modulo primeiro, beta depois, billing-disabled por ultimo).
+  // Ordenacao: critical > warning > info. Dentro do mesmo nivel, preservar ordem (modulo primeiro, beta depois).
   const severityRank: Record<BillingWarningSeverity, number> = {
     critical: 0,
     warning: 1,

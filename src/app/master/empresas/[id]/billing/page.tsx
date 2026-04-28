@@ -1,17 +1,21 @@
 // src/app/master/empresas/[id]/billing/page.tsx
-// Painel do Master para ligar/desligar cobranca e beta de uma empresa.
+// Painel do Master para configurar cobranca e beta de uma empresa.
 //
 // Princı́pios:
 // - Este componente NAO decide nada. Apenas:
 //   1. le estado serializado via server action `getCompanyBilling`
-//   2. mostra switches
-//   3. envia mudancas via server action `updateCompanyBillingToggles`
+//   2. mostra os controles em 3 cards
+//   3. envia TODAS as mudancas via server action unica `saveMasterBilling`
 // - Toda validacao acontece no servidor (master-rules.ts).
+//
+// NOTA: Antigo flag billing.enabled foi REMOVIDO. Toda empresa entra
+// no fluxo de cobranca; a unica forma de nao pagar e o toggle nativo
+// "Parceiro Boldfy" (freeTrialUnlimited).
 
 'use client';
 
-import React, { useEffect, useState, useTransition } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useEffect, useMemo, useState, useTransition } from 'react';
+import { useParams } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Header } from '@/components/dashboard/header';
@@ -35,14 +39,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, ArrowLeft, ShieldCheck, Sparkles, ExternalLink } from 'lucide-react';
+import { Loader2, ArrowLeft, Sparkles, ExternalLink, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import {
   getCompanyBilling,
-  updateCompanyBillingToggles,
-  setTLBilledOutsidePlatform,
+  saveMasterBilling,
   type SerializableBillingBlock,
 } from '@/app/actions/billing';
 
@@ -50,7 +53,6 @@ function formatDateForInput(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  // yyyy-MM-dd (input[type=date])
   return d.toISOString().slice(0, 10);
 }
 
@@ -58,6 +60,7 @@ function statusBadgeVariant(
   status: string,
 ): 'default' | 'secondary' | 'destructive' | 'outline' {
   if (status === 'active') return 'default';
+  if (status === 'free') return 'secondary';
   if (status === 'pending') return 'secondary';
   if (status === 'blocked') return 'destructive';
   return 'outline';
@@ -67,6 +70,8 @@ function statusLabel(status: string): string {
   switch (status) {
     case 'active':
       return 'Ativo';
+    case 'free':
+      return 'Teste gratuito';
     case 'pending':
       return 'Aguardando pagamento';
     case 'blocked':
@@ -77,33 +82,63 @@ function statusLabel(status: string): string {
   }
 }
 
+function formatDateBR(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+}
+
+function formatDateShortBR(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+/** Retorna true se a data ISO ja passou (em relacao a now). */
+function isPast(iso: string | null, now: Date = new Date()): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getTime() < now.getTime();
+}
+
 export default function MasterCompanyBillingPage() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
   const { toast } = useToast();
   const companyId = params?.id;
 
   const [companyName, setCompanyName] = useState<string>('');
   const [token, setToken] = useState<string>('');
   const [billing, setBilling] = useState<SerializableBillingBlock | null>(null);
-
-  const [enabled, setEnabled] = useState(false);
-  const [isBetaTester, setIsBetaTester] = useState(false);
-  const [betaExpiresAt, setBetaExpiresAt] = useState('');
-  const [notes, setNotes] = useState('');
-
   const [isLoading, setIsLoading] = useState(true);
-  const [isPending, startTransition] = useTransition();
+  const [isSaving, startSavingTransition] = useTransition();
 
+  // Form state — Plano Platform
+  const [trialDurationDays, setTrialDurationDays] = useState<15 | 30 | 60>(15);
+  const [freeTrialUnlimited, setFreeTrialUnlimited] = useState(false);
+
+  // Form state — Beta Tester
+  const [isBetaTester, setIsBetaTester] = useState(false);
+  const [betaDurationMonths, setBetaDurationMonths] = useState<number>(3);
+  const [betaStartsAt, setBetaStartsAt] = useState<string>('');
+
+  // Form state — Plano Thought Leader (Omie)
   const [tlOutsideEnabled, setTlOutsideEnabled] = useState(false);
   const [tlOutsideExecutives, setTlOutsideExecutives] = useState<number>(1);
   const [tlOutsideFrequency, setTlOutsideFrequency] = useState<2 | 3 | 4>(2);
-  const [isPendingTLOutside, startTLOutsideTransition] = useTransition();
+
+  // Form state — Notas
+  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     if (!companyId) return;
     let cancelled = false;
-
     (async () => {
       try {
         const idToken = await getAuthToken();
@@ -127,11 +162,27 @@ export default function MasterCompanyBillingPage() {
           });
           return;
         }
+
         setBilling(res.data);
-        setEnabled(res.data.enabled);
-        setIsBetaTester(res.data.isBetaTester);
-        setBetaExpiresAt(formatDateForInput(res.data.betaExpiresAtISO));
         setNotes(res.data.notes ?? '');
+
+        // Hidrata Plano Platform
+        const trialDur = res.data.platform.trialDurationDays;
+        setTrialDurationDays(
+          trialDur === 15 || trialDur === 30 || trialDur === 60 ? trialDur : 15,
+        );
+        setFreeTrialUnlimited(res.data.platform.freeTrialUnlimited === true);
+
+        // Hidrata Beta Tester
+        setIsBetaTester(res.data.isBetaTester === true);
+        setBetaDurationMonths(
+          typeof res.data.betaDurationMonths === 'number' && res.data.betaDurationMonths > 0
+            ? res.data.betaDurationMonths
+            : 3,
+        );
+        setBetaStartsAt(formatDateForInput(res.data.betaStartsAtISO));
+
+        // Hidrata Plano TL
         setTlOutsideEnabled(res.data.tl.billedOutsidePlatform === true);
         const execs = res.data.tl.executives;
         setTlOutsideExecutives(execs >= 1 && execs <= 5 ? execs : 1);
@@ -150,33 +201,55 @@ export default function MasterCompanyBillingPage() {
         if (!cancelled) setIsLoading(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
   }, [companyId, toast]);
 
-  // Regra de UI (espelho de validateMasterToggleInput; servidor e fonte de verdade):
-  // se nao e beta, desabilita campo de expiracao.
-  useEffect(() => {
-    if (!isBetaTester && betaExpiresAt) {
-      setBetaExpiresAt('');
-    }
-  }, [isBetaTester, betaExpiresAt]);
+  // Tags historicas "Concluido"
+  const trialConcluded = useMemo(() => {
+    if (!billing) return null;
+    if (freeTrialUnlimited) return null;
+    const start = billing.platform.trialStartedAtISO;
+    const end = billing.platform.trialEndsAtISO;
+    if (!end || !isPast(end)) return null;
+    return {
+      start: formatDateShortBR(start),
+      end: formatDateShortBR(end),
+    };
+  }, [billing, freeTrialUnlimited]);
 
-  function handleSaveTLOutside() {
+  const betaConcluded = useMemo(() => {
+    if (!billing) return null;
+    const start = billing.betaStartsAtISO;
+    const end = billing.betaEndsAtISO;
+    if (!end || !isPast(end)) return null;
+    return {
+      start: formatDateShortBR(start),
+      end: formatDateShortBR(end),
+    };
+  }, [billing]);
+
+  function handleSaveAll() {
     if (!companyId || !token) return;
 
-    if (tlOutsideEnabled) {
-      if (!enabled) {
+    // Validacoes leves de UI antes de mandar pro servidor
+    if (isBetaTester) {
+      if (
+        !Number.isInteger(betaDurationMonths) ||
+        betaDurationMonths < 1 ||
+        betaDurationMonths > 24
+      ) {
         toast({
-          title: 'Cobranca desligada',
-          description:
-            'Ative "Cobranca Ativa" antes de configurar a ativacao especial do TL.',
+          title: 'Duracao do beta invalida',
+          description: 'Informe um numero inteiro entre 1 e 24 meses.',
           variant: 'destructive',
         });
         return;
       }
+    }
+
+    if (tlOutsideEnabled) {
       if (
         !Number.isInteger(tlOutsideExecutives) ||
         tlOutsideExecutives < 1 ||
@@ -191,58 +264,34 @@ export default function MasterCompanyBillingPage() {
       }
     }
 
-    startTLOutsideTransition(async () => {
-      const res = await setTLBilledOutsidePlatform({
-        idToken: token,
-        companyId,
-        enabled: tlOutsideEnabled,
-        executives: tlOutsideEnabled
-          ? (tlOutsideExecutives as 1 | 2 | 3 | 4 | 5)
-          : undefined,
-        frequency: tlOutsideEnabled ? tlOutsideFrequency : undefined,
-      });
-      if (!res.success || !res.data) {
-        toast({
-          title: 'Erro ao salvar',
-          description: res.error || 'Tente novamente.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      setBilling(res.data);
-      toast({
-        title: 'Ativacao especial atualizada',
-        description: tlOutsideEnabled
-          ? 'TL marcado como cobrado fora da plataforma.'
-          : 'TL voltou para desativado.',
-      });
-    });
-  }
-
-  function handleSave() {
-    if (!companyId || !token) return;
-
-    let betaExpiresAtISO: string | null = null;
-    if (isBetaTester && betaExpiresAt) {
-      const d = new Date(betaExpiresAt + 'T23:59:59');
+    let betaStartsAtISO: string | null = null;
+    if (isBetaTester && betaStartsAt) {
+      const d = new Date(betaStartsAt + 'T00:00:00');
       if (Number.isNaN(d.getTime())) {
         toast({
           title: 'Data invalida',
-          description: 'Verifique a data de expiracao do beta.',
+          description: 'Verifique a data de inicio do beta.',
           variant: 'destructive',
         });
         return;
       }
-      betaExpiresAtISO = d.toISOString();
+      betaStartsAtISO = d.toISOString();
     }
 
-    startTransition(async () => {
-      const res = await updateCompanyBillingToggles({
+    startSavingTransition(async () => {
+      const res = await saveMasterBilling({
         idToken: token,
         companyId,
-        enabled,
+        trialDurationDays,
+        freeTrialUnlimited,
         isBetaTester,
-        betaExpiresAt: betaExpiresAtISO,
+        betaDurationMonths: isBetaTester ? betaDurationMonths : null,
+        betaStartsAt: betaStartsAtISO,
+        tlBilledOutsidePlatform: tlOutsideEnabled,
+        tlExecutives: tlOutsideEnabled
+          ? (tlOutsideExecutives as 1 | 2 | 3 | 4 | 5)
+          : undefined,
+        tlFrequency: tlOutsideEnabled ? tlOutsideFrequency : undefined,
         notes: notes || undefined,
       });
       if (!res.success || !res.data) {
@@ -255,8 +304,8 @@ export default function MasterCompanyBillingPage() {
       }
       setBilling(res.data);
       toast({
-        title: 'Billing atualizado',
-        description: 'Flags de cobranca e beta foram salvas.',
+        title: 'Configuracoes salvas',
+        description: 'Todas as alteracoes de billing foram aplicadas.',
       });
     });
   }
@@ -276,31 +325,29 @@ export default function MasterCompanyBillingPage() {
     <div className="min-h-screen bg-background">
       <Header />
       <div className="container max-w-4xl py-8 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <Link
-              href="/master/empresas"
-              className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="mr-1 h-4 w-4" />
-              Voltar para empresas
-            </Link>
-            <h1 className="mt-2 text-2xl font-bold">
-              Billing — {companyName || companyId}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Controle Master de cobranca e beta. Apenas flags — Stripe na Fase 2.
-            </p>
-          </div>
+        <div>
+          <Link
+            href="/master/empresas"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Voltar para empresas
+          </Link>
+          <h1 className="mt-2 text-2xl font-bold">
+            Billing — {companyName || companyId}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Configure o plano, parceiros e ativacao especial. Toda mudanca e aplicada
+            ao clicar em &quot;Salvar alteracoes&quot; no fim da pagina.
+          </p>
         </div>
 
-        {/* Status atual dos modulos (read-only) */}
+        {/* Card 1: Status dos Modulos (read-only) */}
         <Card>
           <CardHeader>
             <CardTitle>Status dos Modulos</CardTitle>
             <CardDescription>
-              Estado atual de cada modulo de cobranca. Modulos serao ativados via
-              integracao Stripe na Fase 2.
+              Estado atual de cada modulo de cobranca.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3">
@@ -330,33 +377,191 @@ export default function MasterCompanyBillingPage() {
           </CardContent>
         </Card>
 
-        {/* Ativacao Especial — TL cobrado fora da plataforma */}
+        {/* Card 2: Plano Platform — engloba Teste Gratuito + Beta Tester */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Plano Platform</CardTitle>
+            <CardDescription>
+              Define o teste gratuito do modulo Platform, parceria especial (sem cobranca)
+              e periodo de beta tester.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Sub-secao: Teste Gratuito */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Teste Gratuito</h3>
+                {trialConcluded ? (
+                  <Badge variant="outline" className="gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Concluido — {trialConcluded.start} — {trialConcluded.end}
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="trialDurationDays">Duracao do teste</Label>
+                  <Select
+                    value={String(trialDurationDays)}
+                    onValueChange={(v) =>
+                      setTrialDurationDays(Number(v) as 15 | 30 | 60)
+                    }
+                    disabled={isSaving || freeTrialUnlimited}
+                  >
+                    <SelectTrigger id="trialDurationDays">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">15 dias</SelectItem>
+                      <SelectItem value="30">30 dias</SelectItem>
+                      <SelectItem value="60">60 dias</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Comeca quando o admin loga pela primeira vez. Apos o fim, a empresa
+                    tem 7 dias para cadastrar cartao antes do bloqueio.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm">Estado atual do teste</Label>
+                  <div className="rounded-md border p-3 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Status:</span>
+                      <Badge variant={statusBadgeVariant(billing?.platform.status ?? 'disabled')}>
+                        {statusLabel(billing?.platform.status ?? 'disabled')}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Iniciou:</span>
+                      <span>{formatDateBR(billing?.platform.trialStartedAtISO ?? null)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Termina:</span>
+                      <span>{formatDateBR(billing?.platform.trialEndsAtISO ?? null)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Prazo do cartao:</span>
+                      <span>{formatDateBR(billing?.platform.cardDeadlineEndsAtISO ?? null)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3">
+                <div>
+                  <Label htmlFor="freeTrialUnlimited" className="text-sm font-medium">
+                    Parceiro Boldfy (sem cobranca)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Empresa fica em status &quot;free&quot; permanente, sem prazo de bloqueio.
+                  </p>
+                </div>
+                <Switch
+                  id="freeTrialUnlimited"
+                  checked={freeTrialUnlimited}
+                  onCheckedChange={setFreeTrialUnlimited}
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+
+            {/* Sub-secao: Beta Tester */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" /> Beta Tester
+                </h3>
+                {betaConcluded ? (
+                  <Badge variant="outline" className="gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Concluido — {betaConcluded.start} — {betaConcluded.end}
+                  </Badge>
+                ) : null}
+              </div>
+
+              <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3">
+                <div>
+                  <Label htmlFor="isBetaTester" className="text-sm font-medium">
+                    Empresa em beta
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Aplica 30% de desconto apenas no modulo Platform durante o periodo
+                    definido. TL e Design nao tem desconto beta.
+                  </p>
+                </div>
+                <Switch
+                  id="isBetaTester"
+                  checked={isBetaTester}
+                  onCheckedChange={setIsBetaTester}
+                  disabled={isSaving}
+                />
+              </div>
+
+              {isBetaTester && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="betaDurationMonths">Duracao (meses)</Label>
+                    <Input
+                      id="betaDurationMonths"
+                      type="number"
+                      min={1}
+                      max={24}
+                      step={1}
+                      value={betaDurationMonths}
+                      onChange={(e) =>
+                        setBetaDurationMonths(Number(e.target.value))
+                      }
+                      disabled={isSaving}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="betaStartsAt">Data de inicio</Label>
+                    <Input
+                      id="betaStartsAt"
+                      type="date"
+                      value={betaStartsAt}
+                      onChange={(e) => setBetaStartsAt(e.target.value)}
+                      disabled={isSaving}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Termina automaticamente em inicio + meses.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Plano Thought Leader (Omie) */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ExternalLink className="h-5 w-5" /> Ativacao Especial — TL cobrado fora da plataforma
+              <ExternalLink className="h-5 w-5" /> Plano Thought Leader
             </CardTitle>
             <CardDescription>
-              Use quando a empresa paga o modulo TL por fora da Boldfy (contrato direto, sem
-              Stripe). O modulo fica ativo, os TLs tem acesso, e nada e cobrado pela plataforma.
+              Use quando a empresa paga o modulo TL por fora da Boldfy (contrato direto,
+              sem Stripe). O modulo fica ativo, os TLs tem acesso, e nada e cobrado pela
+              plataforma.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <Label htmlFor="tlOutsideEnabled" className="text-base">
-                  TL cobrado fora da plataforma
+                  TL cobrado fora da plataforma (Omie)
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Requer "Cobranca Ativa" ligada. Marca o modulo TL como ativo sem cobranca via
-                  Stripe.
+                  Marca o modulo TL como ativo sem cobranca via Stripe.
                 </p>
               </div>
               <Switch
                 id="tlOutsideEnabled"
                 checked={tlOutsideEnabled}
                 onCheckedChange={setTlOutsideEnabled}
-                disabled={isPendingTLOutside}
+                disabled={isSaving}
               />
             </div>
 
@@ -372,7 +577,7 @@ export default function MasterCompanyBillingPage() {
                     step={1}
                     value={tlOutsideExecutives}
                     onChange={(e) => setTlOutsideExecutives(Number(e.target.value))}
-                    disabled={isPendingTLOutside}
+                    disabled={isSaving}
                   />
                 </div>
                 <div className="space-y-2">
@@ -382,7 +587,7 @@ export default function MasterCompanyBillingPage() {
                     onValueChange={(v) =>
                       setTlOutsideFrequency(Number(v) as 2 | 3 | 4)
                     }
-                    disabled={isPendingTLOutside}
+                    disabled={isSaving}
                   >
                     <SelectTrigger id="tlOutsideFrequency">
                       <SelectValue placeholder="Selecione" />
@@ -396,86 +601,12 @@ export default function MasterCompanyBillingPage() {
                 </div>
               </div>
             )}
-
-            <div className="flex justify-end">
-              <Button
-                variant="secondary"
-                onClick={handleSaveTLOutside}
-                disabled={isPendingTLOutside}
-              >
-                {isPendingTLOutside && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar ativacao especial
-              </Button>
-            </div>
           </CardContent>
         </Card>
 
-        {/* Toggles do Master */}
+        {/* Notas internas + botao unico Salvar */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5" /> Toggles do Master
-            </CardTitle>
-            <CardDescription>
-              Ligar cobranca inicia o periodo de 7 dias para o primeiro pagamento
-              de cada modulo ativado pelo admin.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <Label htmlFor="enabled" className="text-base">
-                  Cobranca Ativa
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Quando ligado, a empresa passa a ser cobrada por modulos que o
-                  admin ativar. Desligado = empresa em periodo gratuito (sem
-                  prazo).
-                </p>
-              </div>
-              <Switch
-                id="enabled"
-                checked={enabled}
-                onCheckedChange={setEnabled}
-                disabled={isPending}
-              />
-            </div>
-
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div>
-                <Label htmlFor="isBetaTester" className="text-base flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" /> Beta Tester
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Aplica 30% de desconto apenas no modulo Platform. TL e Design
-                  nao tem desconto beta.
-                </p>
-              </div>
-              <Switch
-                id="isBetaTester"
-                checked={isBetaTester}
-                onCheckedChange={setIsBetaTester}
-                disabled={isPending}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="betaExpiresAt">
-                Data de expiracao do beta (opcional)
-              </Label>
-              <Input
-                id="betaExpiresAt"
-                type="date"
-                value={betaExpiresAt}
-                onChange={(e) => setBetaExpiresAt(e.target.value)}
-                disabled={!isBetaTester || isPending}
-              />
-              <p className="text-xs text-muted-foreground">
-                Se vazio, beta nao expira automaticamente. Ao expirar, desconto e
-                removido e subscription e recalculada (Fase 4).
-              </p>
-            </div>
-
+          <CardContent className="space-y-4 pt-6">
             <div className="space-y-2">
               <Label htmlFor="notes">Notas internas (apenas Master)</Label>
               <Textarea
@@ -484,14 +615,14 @@ export default function MasterCompanyBillingPage() {
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Ex: Cliente Omie, TL cobrado externamente."
                 maxLength={1000}
-                disabled={isPending}
+                disabled={isSaving}
                 rows={3}
               />
             </div>
 
             <div className="flex justify-end">
-              <Button onClick={handleSave} disabled={isPending}>
-                {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button onClick={handleSaveAll} disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar alteracoes
               </Button>
             </div>

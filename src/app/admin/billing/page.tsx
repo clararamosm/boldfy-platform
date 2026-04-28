@@ -221,7 +221,7 @@ export default function AdminBillingPage() {
   };
 
   const canActivate = (module: 'platform' | 'tl' | 'design') => {
-    if (!billing || !billing.enabled) return false;
+    if (!billing) return false;
     if (activatingModule) return false;
     const m = billing[module];
     // Permite ativar se desligado, bloqueado ou sem sub
@@ -280,7 +280,6 @@ export default function AdminBillingPage() {
     );
   }
 
-  const disabledByMaster = !billing.enabled;
   const betaActive = billing.isBetaTester;
 
   return (
@@ -292,7 +291,7 @@ export default function AdminBillingPage() {
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-6 max-w-5xl mx-auto">
           {/* ─── Aviso global de estado ─────────────────────────── */}
-          {disabledByMaster && (
+          {(
             <Card className="border-amber-300 bg-amber-50/40">
               <CardContent className="pt-6 flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-amber-700 mt-0.5 shrink-0" />

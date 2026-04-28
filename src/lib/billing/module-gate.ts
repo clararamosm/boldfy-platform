@@ -14,10 +14,17 @@
 //   a todos os modulos (cortesia).
 // - Beta SEM data de expiracao: tambem liberado (beta permanente).
 // - Beta com data VENCIDA: segue regras normais (nao ha bypass).
-// - Se billing.enabled === false: bloqueia (exceto beta valido).
+// - Se billing inteiro ausente:
+//     graceLegacy + subscription legacy ativa => libera (legacy-subscription)
+//     caso contrario => bloqueia.
+// - Se o modulo esta 'free': OK (trial gratuito, com ou sem deadline).
 // - Se o modulo esta 'active': OK.
 // - Se o modulo esta 'pending' e deadline ainda nao venceu: OK (periodo de gracia).
 // - Caso contrario: bloqueia.
+//
+// NOTA: Antigo flag billing.enabled foi REMOVIDO. Toda empresa entra no
+// fluxo de cobranca por padrao; a unica forma de nao pagar e o toggle
+// nativo "Parceiro Boldfy" (freeTrialUnlimited) configurado pelo master.
 
 import 'server-only';
 
@@ -28,8 +35,8 @@ import type { CompanyBillingBlock, MaybeTimestamp } from './types';
 import { isModuleBlocked } from './master-rules';
 
 export type ModuleGateDecision =
-  | { allowed: true; reason: 'beta' | 'active' | 'pending-grace' | 'internal-role' | 'legacy-subscription' }
-  | { allowed: false; reason: 'no-company' | 'billing-disabled' | 'module-disabled' | 'module-blocked' | 'pending-expired' | 'no-billing-no-legacy'; message: string };
+  | { allowed: true; reason: 'beta' | 'active' | 'pending-grace' | 'internal-role' | 'legacy-subscription' | 'free-trial' }
+  | { allowed: false; reason: 'no-company' | 'no-billing' | 'module-disabled' | 'module-blocked' | 'pending-expired' | 'no-billing-no-legacy'; message: string };
 
 /**
  * Status de assinatura legacy que contam como "ativa" para o fallback.
@@ -73,9 +80,11 @@ function toDate(v: MaybeTimestamp): Date | null {
 
 function moduleState(billing: CompanyBillingBlock, module: BillingModule) {
   if (module === 'platform') {
+    // Novo fluxo: cardDeadlineEndsAt tem prioridade. Fallback para firstPaymentDeadline (legado).
+    const deadline = toDate(billing.platform.cardDeadlineEndsAt) ?? toDate(billing.platform.firstPaymentDeadline);
     return {
       status: billing.platform.status,
-      deadline: toDate(billing.platform.firstPaymentDeadline),
+      deadline,
     };
   }
   if (module === 'tl') {
@@ -103,7 +112,7 @@ const MODULE_LABEL_PT: Record<BillingModule, string> = {
 
 export interface EvaluateModuleAccessOptions {
   /**
-   * Se true, quando billing novo nao estiver configurado/habilitado,
+   * Se true, quando billing novo nao estiver configurado,
    * cai para o sistema antigo (`company.subscription.status`). Isso permite
    * coexistir com empresas ainda nao migradas para o billing modular.
    * Default: false (estrito).
@@ -124,10 +133,11 @@ export interface EvaluateModuleAccessOptions {
  *
  * Ordem de decisao:
  * 1. Beta tester com tempo restante => allow (cortesia).
- * 2. billing ausente ou disabled:
+ * 2. billing ausente:
  *      se graceLegacy && subscription legacy ativa => allow (legacy-subscription)
- *      caso contrario => deny (no-billing-no-legacy | billing-disabled)
+ *      caso contrario => deny (no-billing-no-legacy | no-billing)
  * 3. Estado do modulo:
+ *      free => allow (trial gratuito)
  *      active => allow
  *      pending com deadline no futuro => allow (pending-grace)
  *      pending com deadline vencido => deny (pending-expired)
@@ -141,7 +151,6 @@ export function evaluateModuleAccess(
 ): ModuleGateDecision {
   const now = options.now ?? new Date();
   const graceLegacy = options.graceLegacy === true;
-
   const label = MODULE_LABEL_PT[module];
 
   // Helper pra aplicar fallback legacy sem duplicar codigo.
@@ -158,8 +167,8 @@ export function evaluateModuleAccess(
     if (legacy) return legacy;
     return {
       allowed: false,
-      reason: graceLegacy ? 'no-billing-no-legacy' : 'billing-disabled',
-      message: 'Empresa sem configuracao de cobranca ativa.',
+      reason: graceLegacy ? 'no-billing-no-legacy' : 'no-billing',
+      message: 'Empresa sem configuracao de cobranca.',
     };
   }
 
@@ -172,17 +181,13 @@ export function evaluateModuleAccess(
     // Beta expirado: cai nas regras normais abaixo.
   }
 
-  if (billing.enabled === false) {
-    const legacy = legacyAllowIfActive();
-    if (legacy) return legacy;
-    return {
-      allowed: false,
-      reason: 'billing-disabled',
-      message: 'Cobranca desligada para esta empresa. Contate o suporte Boldfy.',
-    };
-  }
-
   const state = moduleState(billing, module);
+
+  // Trial gratuito ativo (Platform default apos admin first login).
+  // Allow independente de deadline — cron 'check-trial-expiration' transiciona para 'pending'.
+  if (state.status === 'free') {
+    return { allowed: true, reason: 'free-trial' };
+  }
 
   if (state.status === 'active') {
     return { allowed: true, reason: 'active' };
@@ -255,11 +260,11 @@ export async function requireActiveModule(
   }
 
   const graceLegacy = options.graceLegacy !== false; // default true
-
   const snap = await adminDb.collection('companies').doc(user.companyId).get();
   if (!snap.exists) {
     throw new Error('Empresa nao encontrada.');
   }
+
   const data = snap.data() ?? {};
   const billing = (data.billing as CompanyBillingBlock | undefined) ?? null;
   const legacySubscription = graceLegacy
@@ -324,11 +329,11 @@ export async function requireActiveModuleForCompany(
   }
 
   const graceLegacy = options.graceLegacy !== false;
-
   const snap = await adminDb.collection('companies').doc(companyId).get();
   if (!snap.exists) {
     throw new Error('Empresa nao encontrada.');
   }
+
   const data = snap.data() ?? {};
   const billing = (data.billing as CompanyBillingBlock | undefined) ?? null;
   const legacySubscription = graceLegacy

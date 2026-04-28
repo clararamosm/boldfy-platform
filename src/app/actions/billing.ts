@@ -8,17 +8,28 @@
 //   e valida idToken + role via auth-guard.
 // - Nao expor objetos do Firestore diretamente; normalizar antes.
 // - Front recebe apenas dados serializaveis.
+//
+// NOTA: Antigo flag billing.enabled foi REMOVIDO. Toda empresa entra
+// no fluxo de cobranca; a unica forma de nao pagar e o toggle nativo
+// "Parceiro Boldfy" (freeTrialUnlimited).
 
 'use server';
 
 import { requireAdmin, requireMaster } from '@/lib/auth-guard';
 import {
-  applyMasterBillingToggle,
+  applyMasterTrialSetup,
+  applySaveMasterBilling,
+  applyAdminFirstLogin,
+  applyToggleFreeUnlimited,
   applyTLBilledOutsidePlatform,
   computeFirstPaymentDeadline,
   getCompanyBillingBlock,
-  validateMasterToggleInput,
+  validateMasterTrialSetupInput,
+  validateSaveMasterBillingInput,
+  validateToggleFreeUnlimitedInput,
   validateTLBilledOutsidePlatformInput,
+  type ValidTrialDurationDays,
+  type SaveMasterBillingInput,
 } from '@/lib/billing/master-rules';
 import {
   createModuleCheckoutSession,
@@ -45,9 +56,11 @@ export interface BillingActionResult<T = void> {
 }
 
 export interface SerializableBillingBlock {
-  enabled: boolean;
   isBetaTester: boolean;
   betaExpiresAtISO: string | null;
+  betaStartsAtISO: string | null;
+  betaEndsAtISO: string | null;
+  betaDurationMonths: number | null;
   notes: string | null;
   platform: {
     active: boolean;
@@ -55,6 +68,11 @@ export interface SerializableBillingBlock {
     status: string;
     stripeSubscriptionId: string | null;
     firstPaymentDeadlineISO: string | null;
+    trialDurationDays: number | null;
+    freeTrialUnlimited: boolean;
+    trialStartedAtISO: string | null;
+    trialEndsAtISO: string | null;
+    cardDeadlineEndsAtISO: string | null;
   };
   tl: {
     active: boolean;
@@ -94,9 +112,12 @@ function toISO(ts: unknown): string | null {
 
 function serializeBilling(b: CompanyBillingBlock): SerializableBillingBlock {
   return {
-    enabled: b.enabled,
     isBetaTester: b.isBetaTester,
     betaExpiresAtISO: toISO(b.betaExpiresAt),
+    betaStartsAtISO: toISO(b.betaStartsAt),
+    betaEndsAtISO: toISO(b.betaEndsAt),
+    betaDurationMonths:
+      typeof b.betaDurationMonths === 'number' ? b.betaDurationMonths : null,
     notes: b.notes ?? null,
     platform: {
       active: b.platform.active,
@@ -104,6 +125,14 @@ function serializeBilling(b: CompanyBillingBlock): SerializableBillingBlock {
       status: b.platform.status,
       stripeSubscriptionId: b.platform.stripeSubscriptionId ?? null,
       firstPaymentDeadlineISO: toISO(b.platform.firstPaymentDeadline),
+      trialDurationDays:
+        typeof b.platform.trialDurationDays === 'number'
+          ? b.platform.trialDurationDays
+          : null,
+      freeTrialUnlimited: b.platform.freeTrialUnlimited === true,
+      trialStartedAtISO: toISO(b.platform.trialStartedAt),
+      trialEndsAtISO: toISO(b.platform.trialEndsAt),
+      cardDeadlineEndsAtISO: toISO(b.platform.cardDeadlineEndsAt),
     },
     tl: {
       active: b.tl.active,
@@ -173,22 +202,65 @@ export async function getMyCompanyBilling(
     };
   }
 }
+/**
+ * Dispara onboarding billing apos primeiro login do admin.
+ * Idempotente: so age se Platform ainda esta 'disabled'.
+ * Seguro chamar a cada login.
+ */
+export async function triggerAdminFirstLogin(
+  idToken: string,
+): Promise<BillingActionResult> {
+  try {
+    if (!idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const admin = await requireAdmin(idToken);
+    if (!admin.companyId) {
+      return { success: false, error: 'Admin sem empresa vinculada.' };
+    }
+    await applyAdminFirstLogin(admin.companyId);
+    return { success: true };
+  } catch (e: unknown) {
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao iniciar onboarding.',
+    };
+  }
+}
+
 
 // ────────────────────────────────────────────────────────────
-// WRITE (Master toggle)
+// WRITE (Master — Save consolidado: 1 botao para tudo)
 // ────────────────────────────────────────────────────────────
 
-export interface MasterToggleBillingFormInput {
+export interface SaveMasterBillingFormInput {
   idToken: string;
   companyId: string;
-  enabled: boolean;
+  // Plano Platform
+  trialDurationDays: 15 | 30 | 60;
+  freeTrialUnlimited: boolean;
+  // Beta tester
   isBetaTester: boolean;
-  betaExpiresAt: string | null; // ISO string ou null
+  betaDurationMonths?: number | null;
+  betaStartsAt?: string | null; // ISO
+  // TL Omie
+  tlBilledOutsidePlatform: boolean;
+  tlExecutives?: 1 | 2 | 3 | 4 | 5;
+  tlFrequency?: 2 | 3 | 4;
+  // Notas (opcional)
   notes?: string;
 }
 
-export async function updateCompanyBillingToggles(
-  input: MasterToggleBillingFormInput,
+/**
+ * Aplica TODAS as mudancas do painel master de billing numa unica transacao.
+ * Substitui as varias actions individuais que existiam antes.
+ *
+ * Idempotente: pode ser chamada com os mesmos valores que ja estao no Firestore
+ * sem efeito colateral. Internamente, applySaveMasterBilling decide quais
+ * sub-regras disparar.
+ */
+export async function saveMasterBilling(
+  input: SaveMasterBillingFormInput,
 ): Promise<BillingActionResult<SerializableBillingBlock>> {
   try {
     if (!input?.idToken) {
@@ -196,22 +268,26 @@ export async function updateCompanyBillingToggles(
     }
     const master = await requireMaster(input.idToken);
 
-    // Delega validacao para camada de regras (zero logica no endpoint)
-    const validated = validateMasterToggleInput({
+    const validated: SaveMasterBillingInput = validateSaveMasterBillingInput({
       companyId: input.companyId,
-      enabled: input.enabled,
+      trialDurationDays: input.trialDurationDays as ValidTrialDurationDays,
+      freeTrialUnlimited: input.freeTrialUnlimited,
       isBetaTester: input.isBetaTester,
-      betaExpiresAt: input.betaExpiresAt,
+      betaDurationMonths: input.betaDurationMonths ?? null,
+      betaStartsAt: input.betaStartsAt ?? null,
+      tlBilledOutsidePlatform: input.tlBilledOutsidePlatform,
+      tlExecutives: input.tlExecutives,
+      tlFrequency: input.tlFrequency,
       notes: input.notes,
     });
 
-    const updated = await applyMasterBillingToggle(validated, master.uid);
+    const updated = await applySaveMasterBilling(validated, master.uid);
     return { success: true, data: serializeBilling(updated) };
   } catch (e: unknown) {
-    console.error('[updateCompanyBillingToggles] falhou:', e);
+    console.error('[saveMasterBilling] falhou:', e);
     return {
       success: false,
-      error: e instanceof Error ? e.message : 'Erro ao atualizar billing.',
+      error: e instanceof Error ? e.message : 'Erro ao salvar configuracoes de billing.',
     };
   }
 }
@@ -233,6 +309,8 @@ export interface SetTLBilledOutsidePlatformInput {
  * - enabled=true: TL fica active sem cobranca Stripe (exige executives + frequency).
  * - enabled=false: TL volta para disabled, preserva historico (executives/frequency).
  * Nunca toca em stripeSubscriptionId.
+ *
+ * Mantida para compatibilidade. A nova UI master usa saveMasterBilling.
  */
 export async function setTLBilledOutsidePlatform(
   input: SetTLBilledOutsidePlatformInput,
@@ -242,14 +320,12 @@ export async function setTLBilledOutsidePlatform(
       return { success: false, error: 'Token de autenticacao ausente.' };
     }
     const master = await requireMaster(input.idToken);
-
     const validated = validateTLBilledOutsidePlatformInput({
       companyId: input.companyId,
       enabled: input.enabled,
       executives: input.executives,
       frequency: input.frequency,
     });
-
     const updated = await applyTLBilledOutsidePlatform(validated, master.uid);
     return { success: true, data: serializeBilling(updated) };
   } catch (e: unknown) {
@@ -258,6 +334,89 @@ export async function setTLBilledOutsidePlatform(
       success: false,
       error:
         e instanceof Error ? e.message : 'Erro ao atualizar ativacao especial do TL.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// WRITE (Master — Setup do trial Platform)
+// ────────────────────────────────────────────────────────────
+
+export interface SetMasterTrialDurationInput {
+  idToken: string;
+  companyId: string;
+  trialDurationDays: 15 | 30 | 60;
+}
+
+/**
+ * Master configura quanto tempo dura o trial Platform da empresa.
+ * Pode ser chamado mesmo apos o trial ja ter iniciado — neste caso,
+ * recalcula trialEndsAt = trialStartedAt + novoDurationDays e
+ * cardDeadlineEndsAt = trialEndsAt + 7 dias (extensao/reducao do trial).
+ *
+ * Mantida para compatibilidade. A nova UI master usa saveMasterBilling.
+ */
+export async function setMasterTrialDuration(
+  input: SetMasterTrialDurationInput,
+): Promise<BillingActionResult<SerializableBillingBlock>> {
+  try {
+    if (!input?.idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const master = await requireMaster(input.idToken);
+    const validated = validateMasterTrialSetupInput({
+      companyId: input.companyId,
+      trialDurationDays: input.trialDurationDays as ValidTrialDurationDays,
+    });
+    const updated = await applyMasterTrialSetup(validated, master.uid);
+    return { success: true, data: serializeBilling(updated) };
+  } catch (e: unknown) {
+    console.error('[setMasterTrialDuration] falhou:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao configurar duracao do trial.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// WRITE (Master — Free trial unlimited / parceiros como Boldfy)
+// ────────────────────────────────────────────────────────────
+
+export interface ToggleFreeTrialUnlimitedInput {
+  idToken: string;
+  companyId: string;
+  enabled: boolean;
+}
+
+/**
+ * Master liga/desliga "Plataforma free ilimitada" para a empresa.
+ * - enabled=true: status='free' permanente, sem trialEndsAt e sem cardDeadline.
+ *   Se Platform estava em pending/blocked, e resgatado de volta para 'free'.
+ * - enabled=false: volta ao fluxo normal de trial. Recalcula datas a partir
+ *   de trialStartedAt + trialDurationDays (se trial ja tinha comecado).
+ *
+ * Mantida para compatibilidade. A nova UI master usa saveMasterBilling.
+ */
+export async function toggleFreeTrialUnlimited(
+  input: ToggleFreeTrialUnlimitedInput,
+): Promise<BillingActionResult<SerializableBillingBlock>> {
+  try {
+    if (!input?.idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const master = await requireMaster(input.idToken);
+    const validated = validateToggleFreeUnlimitedInput({
+      companyId: input.companyId,
+      enabled: input.enabled,
+    });
+    const updated = await applyToggleFreeUnlimited(validated, master.uid);
+    return { success: true, data: serializeBilling(updated) };
+  } catch (e: unknown) {
+    console.error('[toggleFreeTrialUnlimited] falhou:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao alterar free trial ilimitado.',
     };
   }
 }
@@ -285,7 +444,7 @@ export interface ActivateModuleResult {
 
 /**
  * Admin ativa um modulo:
- * 1. Valida que admin pertence a empresa e empresa tem billing.enabled
+ * 1. Valida que admin pertence a empresa
  * 2. Marca modulo como 'pending' + deadline 7 dias
  * 3. Cria Checkout Stripe e retorna URL
  *
@@ -305,29 +464,19 @@ export async function activateBillingModule(
     if (!admin.email) {
       return { success: false, error: 'Admin sem email.' };
     }
-
     // Validar modulo
     const moduleKey = input.module;
     if (moduleKey !== 'platform' && moduleKey !== 'tl' && moduleKey !== 'design') {
       return { success: false, error: 'Modulo invalido.' };
     }
-
     // Ler estado do billing
     const billing = await getCompanyBillingBlock(admin.companyId);
-    if (!billing.enabled) {
-      return {
-        success: false,
-        error: 'Billing desligado. Contate o suporte (Master) para ativar.',
-      };
-    }
-
     // Para Platform: resyncar seats antes de ativar, garantindo min 5
     let platformSeats = input.platformSeats;
     if (moduleKey === 'platform') {
       const sync = await resyncPlatformSeats(admin.companyId);
       platformSeats = Math.max(platformSeats ?? sync.newSeats, sync.newSeats);
     }
-
     // Design requer Platform active — checa aqui tambem pra mensagem melhor
     if (moduleKey === 'design' && billing.platform.status !== 'active') {
       return {
@@ -335,9 +484,7 @@ export async function activateBillingModule(
         error: 'Design so pode ser ativado apos Platform estar ativo (pago).',
       };
     }
-
     const deadline = computeFirstPaymentDeadline();
-
     // Marcar modulo como pending com dados de config
     const extra: Record<string, unknown> = {};
     if (moduleKey === 'tl') {
@@ -350,14 +497,12 @@ export async function activateBillingModule(
     if (moduleKey === 'platform') {
       extra.seats = platformSeats;
     }
-
     await markModuleAsPending({
       companyId: admin.companyId,
       module: moduleKey,
       deadline,
       extra,
     });
-
     // Criar Checkout
     const result = await createModuleCheckoutSession({
       companyId: admin.companyId,
@@ -369,7 +514,6 @@ export async function activateBillingModule(
       tlFrequency: input.tlFrequency,
       designPack: input.designPack,
     });
-
     return {
       success: true,
       data: {
@@ -448,12 +592,9 @@ export async function simulatePricing(
     if (!admin.companyId) {
       return { success: false, error: 'Admin sem empresa vinculada.' };
     }
-
     const billing = await getCompanyBillingBlock(admin.companyId);
     const isBetaTester = billing.isBetaTester === true;
-
     let grandTotal = 0;
-
     // Platform
     let platformResult: SimulatedModule | null = null;
     if (input.platform) {
@@ -483,7 +624,6 @@ export async function simulatePricing(
         }
       }
     }
-
     // TL
     let tlResult: SimulatedModule | null = null;
     if (input.tl) {
@@ -504,7 +644,6 @@ export async function simulatePricing(
         grandTotal += totalCents;
       }
     }
-
     // Design
     let designResult: SimulatedModule | null = null;
     if (input.design) {
@@ -516,7 +655,6 @@ export async function simulatePricing(
         grandTotal += pack.priceCents;
       }
     }
-
     return {
       success: true,
       data: {
@@ -569,10 +707,8 @@ export async function getBillingWarnings(
     if (!admin.companyId) {
       return { success: false, error: 'Admin sem empresa vinculada.' };
     }
-
     const billing = await getCompanyBillingBlock(admin.companyId);
     const warnings = computeBillingWarnings(billing);
-
     return {
       success: true,
       data: {
