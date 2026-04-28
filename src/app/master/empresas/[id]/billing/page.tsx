@@ -54,13 +54,16 @@ import { getAuthToken } from '@/lib/auth-client';
 import {
   getCompanyBilling,
   saveMasterBilling,
+  getCompanyActivityLog,
   type SerializableBillingBlock,
   type PlatformUsageInfo,
   type TLUsageInfo,
   type DesignUsageInfo,
   type BillingChargeType,
 } from '@/app/actions/billing';
+import type { ActivityLogEntry } from '@/lib/billing/activity-log-types';
 import { formatBRL } from '@/lib/billing/format';
+import { ActivityLogRow } from '@/components/master/activity-log-row';
 
 function statusBadgeVariant(
   status: string,
@@ -143,6 +146,12 @@ export default function MasterCompanyBillingPage() {
   // Form state — Notas
   const [notes, setNotes] = useState('');
 
+  // Activity log state — carregado independente do billing pra nao travar pagina
+  const [logEntries, setLogEntries] = useState<ActivityLogEntry[]>([]);
+  const [logHasMore, setLogHasMore] = useState(false);
+  const [isLoadingLog, setIsLoadingLog] = useState(false);
+  const [isLoadingMoreLog, setIsLoadingMoreLog] = useState(false);
+
   useEffect(() => {
     if (!companyId) return;
     let cancelled = false;
@@ -211,6 +220,59 @@ export default function MasterCompanyBillingPage() {
       cancelled = true;
     };
   }, [companyId, toast]);
+
+  // Activity log: carrega ao montar a pagina, sem bloquear o resto.
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    (async () => {
+      setIsLoadingLog(true);
+      try {
+        const idToken = await getAuthToken();
+        if (cancelled) return;
+        const res = await getCompanyActivityLog(idToken, companyId, { limit: 50 });
+        if (cancelled) return;
+        if (!res.success || !res.data) {
+          // Nao mostra toast aqui — log e secundario, evitamos ruido na UI.
+          console.error('[activityLog] load falhou:', res.error);
+          return;
+        }
+        setLogEntries(res.data.entries);
+        setLogHasMore(res.data.hasMore);
+      } catch (e) {
+        console.error('[activityLog] load erro:', e);
+      } finally {
+        if (!cancelled) setIsLoadingLog(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  async function handleLoadMoreLog() {
+    if (!companyId || logEntries.length === 0) return;
+    const last = logEntries[logEntries.length - 1];
+    if (!last?.ts) return;
+    setIsLoadingMoreLog(true);
+    try {
+      const idToken = await getAuthToken();
+      const res = await getCompanyActivityLog(idToken, companyId, {
+        limit: 50,
+        cursorTs: last.ts,
+      });
+      if (!res.success || !res.data) {
+        console.error('[activityLog] loadMore falhou:', res.error);
+        return;
+      }
+      setLogEntries((prev) => [...prev, ...res.data!.entries]);
+      setLogHasMore(res.data.hasMore);
+    } catch (e) {
+      console.error('[activityLog] loadMore erro:', e);
+    } finally {
+      setIsLoadingMoreLog(false);
+    }
+  }
 
   // Tags historicas "Concluido"
   const trialConcluded = useMemo(() => {
@@ -817,26 +879,69 @@ export default function MasterCompanyBillingPage() {
               </Card>
             </section>
 
-            {/* Secao: Historico (placeholder — PR 7) */}
+            {/* Secao: Historico */}
             <section id="historico" className="scroll-mt-20">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    Historico
-                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
-                      <Construction className="h-3 w-3" />
-                      Em construcao
-                    </Badge>
-                  </CardTitle>
+                  <CardTitle>Historico</CardTitle>
                   <CardDescription>
                     Linha do tempo de eventos relevantes (billing, admin, pagamentos).
+                    Sem aviso pra empresa: visivel apenas para o master.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Em breve: tabela com todos os eventos registrados, ordenados
-                    do mais recente ao mais antigo.
-                  </p>
+                <CardContent className="p-0">
+                  {isLoadingLog ? (
+                    <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Carregando historico...
+                    </div>
+                  ) : logEntries.length === 0 ? (
+                    <p className="px-6 py-10 text-center text-sm text-muted-foreground">
+                      Nenhuma atividade registrada ainda.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="py-2 px-3 text-xs font-medium text-muted-foreground">
+                              Data/Hora
+                            </th>
+                            <th className="py-2 px-3 text-xs font-medium text-muted-foreground">
+                              Tipo
+                            </th>
+                            <th className="py-2 px-3 text-xs font-medium text-muted-foreground">
+                              Quem
+                            </th>
+                            <th className="py-2 px-3 text-xs font-medium text-muted-foreground">
+                              Resumo
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {logEntries.map((entry) => (
+                            <ActivityLogRow key={entry.id} entry={entry} />
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {logHasMore ? (
+                    <div className="flex justify-center border-t py-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleLoadMoreLog}
+                        disabled={isLoadingMoreLog}
+                      >
+                        {isLoadingMoreLog && (
+                          <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                        )}
+                        Carregar mais
+                      </Button>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             </section>
