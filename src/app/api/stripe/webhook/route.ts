@@ -22,11 +22,11 @@ import {
 } from '@/lib/billing/master-rules';
 import type { CompanyBillingBlock } from '@/lib/billing/types';
 
-const BETA_MONTHS = 5; // [DEPRECATED legacy flow] 5 months at beta price, then full price
-
 // ────────────────────────────────────────────────────────────
 // HANDLERS MODULARES (billing.* em vez de subscription.*)
-// Executados quando a subscription tem metadata.module.
+// Toda subscription nova carrega metadata.module no Stripe;
+// fluxo legado (subscription.*) foi removido junto com o
+// endpoint /api/stripe/checkout.
 // ────────────────────────────────────────────────────────────
 
 async function handleModuleCheckoutCompleted(args: {
@@ -190,132 +190,47 @@ export async function POST(req: NextRequest) {
             : (session.subscription as { id: string })?.id;
           const sub = await stripe.subscriptions.retrieve(subId as string);
 
-          // ── Fluxo MODULAR (Fase 2): subscription tem metadata.module ──
+          // Toda subscription nova carrega metadata.module. Sem ele, ignoramos.
           const modInfo = extractModuleFromSubscriptionMetadata(sub.metadata);
-          if (modInfo) {
-            await handleModuleCheckoutCompleted({
-              companyId: modInfo.companyId,
-              moduleKey: modInfo.module,
-              subscription: sub,
-            });
+          if (!modInfo) {
+            console.warn('checkout.session.completed sem metadata.module — ignorando');
             break;
           }
 
-          // ── Fluxo LEGADO (Fase 1-): atualiza subscription.* monolitico ──
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const subLegacy = sub as any;
-          const seats = parseInt(subLegacy.metadata.seats || '0', 10);
-          const tier = subLegacy.metadata.tier || '';
-          const isBeta = subLegacy.metadata.isBeta === 'true';
-          const fullPriceCents = parseInt(subLegacy.metadata.fullPricePerSeatCents || '0', 10);
-
-          // Calculate beta end date (5 months from now)
-          const betaEndsAt = isBeta
-            ? new Date(Date.now() + BETA_MONTHS * 30 * 24 * 60 * 60 * 1000)
-            : null;
-
-          const updateData: Record<string, unknown> = {
-            'subscription.plan': isBeta ? 'beta' : 'paid',
-            'subscription.status': 'active',
-            'subscription.stripeSubscriptionId': sub.id,
-            'subscription.totalLicenses': seats,
-            'subscription.tier': tier,
-            'subscription.isBeta': isBeta,
-            'subscription.currentPeriodEnd': toFirestoreDate(subLegacy.current_period_end),
-            'subscription.cancelAtPeriodEnd': subLegacy.cancel_at_period_end || false,
-          };
-
-          if (betaEndsAt) {
-            updateData['subscription.betaEndsAt'] = betaEndsAt;
-            updateData['subscription.fullPricePerSeatCents'] = fullPriceCents;
-          }
-
-          await adminDb.collection('companies').doc(companyId).update(updateData);
-
-          // For beta subscriptions, create a Subscription Schedule to
-          // auto-transition from beta price to full price after 5 months.
-          if (isBeta && fullPriceCents > 0) {
-            try {
-              await createBetaToFullSchedule(stripe, sub.id, sub, seats, fullPriceCents);
-              console.log('Created beta->full schedule (legacy flow)');
-            } catch (scheduleErr) {
-              // Non-fatal: log the error. The master can manually transition.
-              console.error('Failed to create beta→full schedule:', scheduleErr);
-              // Still save betaEndsAt so master knows when to transition
-            }
-          }
+          await handleModuleCheckoutCompleted({
+            companyId: modInfo.companyId,
+            moduleKey: modInfo.module,
+            subscription: sub,
+          });
         }
         break;
       }
 
       case 'customer.subscription.updated': {
         const subUpdated = event.data.object as Stripe.Subscription;
-
-        // ── Fluxo MODULAR (Fase 2) ──
         const modInfoUpd = extractModuleFromSubscriptionMetadata(subUpdated.metadata);
-        if (modInfoUpd) {
-          await handleModuleSubscriptionUpdated({
-            companyId: modInfoUpd.companyId,
-            moduleKey: modInfoUpd.module,
-            subscription: subUpdated,
-          });
+        if (!modInfoUpd) {
+          console.warn('customer.subscription.updated sem metadata.module — ignorando');
           break;
         }
-
-        // ── Fluxo LEGADO ──
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const subUpdAny = subUpdated as any;
-        const companyIdUpd = subUpdAny.metadata?.companyId;
-        if (!companyIdUpd) {
-          console.error('customer.subscription.updated missing companyId in metadata');
-          break;
-        }
-
-        const statusMap: Record<string, string> = {
-          active: 'active',
-          past_due: 'past_due',
-          canceled: 'canceled',
-          unpaid: 'unpaid',
-          trialing: 'trialing',
-          incomplete: 'incomplete',
-          incomplete_expired: 'expired',
-          paused: 'paused',
-        };
-
-        await adminDb.collection('companies').doc(companyIdUpd).update({
-          'subscription.status': statusMap[subUpdAny.status] || subUpdAny.status,
-          'subscription.currentPeriodEnd': toFirestoreDate(subUpdAny.current_period_end),
-          'subscription.cancelAtPeriodEnd': subUpdAny.cancel_at_period_end,
+        await handleModuleSubscriptionUpdated({
+          companyId: modInfoUpd.companyId,
+          moduleKey: modInfoUpd.module,
+          subscription: subUpdated,
         });
         break;
       }
 
       case 'customer.subscription.deleted': {
         const subDeleted = event.data.object as Stripe.Subscription;
-
-        // ── Fluxo MODULAR (Fase 2) ──
         const modInfoDel = extractModuleFromSubscriptionMetadata(subDeleted.metadata);
-        if (modInfoDel) {
-          await handleModuleSubscriptionDeleted({
-            companyId: modInfoDel.companyId,
-            moduleKey: modInfoDel.module,
-          });
+        if (!modInfoDel) {
+          console.warn('customer.subscription.deleted sem metadata.module — ignorando');
           break;
         }
-
-        // ── Fluxo LEGADO ──
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const subDelAny = subDeleted as any;
-        const companyIdDel = subDelAny.metadata?.companyId;
-        if (!companyIdDel) {
-          console.error('customer.subscription.deleted missing companyId in metadata');
-          break;
-        }
-
-        await adminDb.collection('companies').doc(companyIdDel).update({
-          'subscription.status': 'canceled',
-          'subscription.plan': 'canceled',
-          'subscription.cancelAtPeriodEnd': false,
+        await handleModuleSubscriptionDeleted({
+          companyId: modInfoDel.companyId,
+          moduleKey: modInfoDel.module,
         });
         break;
       }
@@ -326,30 +241,18 @@ export async function POST(req: NextRequest) {
         const failedSubId = typeof invoice.subscription === 'string'
           ? invoice.subscription
           : invoice.subscription?.id;
+        if (!failedSubId) break;
 
-        if (failedSubId) {
-          const failedSub = await stripe.subscriptions.retrieve(failedSubId);
-
-          // ── Fluxo MODULAR (Fase 2) ──
-          const modInfoFailed = extractModuleFromSubscriptionMetadata(failedSub.metadata);
-          if (modInfoFailed) {
-            await handleModulePaymentFailed({
-              companyId: modInfoFailed.companyId,
-              moduleKey: modInfoFailed.module,
-            });
-            break;
-          }
-
-          // ── Fluxo LEGADO ──
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const failedSubAny = failedSub as any;
-          const companyIdFailed = failedSubAny.metadata?.companyId;
-          if (companyIdFailed) {
-            await adminDb.collection('companies').doc(companyIdFailed).update({
-              'subscription.status': 'past_due',
-            });
-          }
+        const failedSub = await stripe.subscriptions.retrieve(failedSubId);
+        const modInfoFailed = extractModuleFromSubscriptionMetadata(failedSub.metadata);
+        if (!modInfoFailed) {
+          console.warn('invoice.payment_failed sem metadata.module — ignorando');
+          break;
         }
+        await handleModulePaymentFailed({
+          companyId: modInfoFailed.companyId,
+          moduleKey: modInfoFailed.module,
+        });
         break;
       }
 
@@ -412,64 +315,3 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── Beta → Full Price Schedule ─────────────────────────────────
-// [DEPRECATED] Pertence ao fluxo monolitico legado (subscription.*) que sera
-// removido apos o nuke. O fluxo modular novo nao usa Subscription Schedule —
-// o beta start/end vive em billing.* e o cron desliga isBetaTester quando vence.
-// Manter aqui apenas para compatibilidade com docs legados ja em producao
-// (nenhum apos o nuke). Remover em PR futura.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function createBetaToFullSchedule(
-  stripe: ReturnType<typeof getStripe>,
-  subscriptionId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  sub: any,
-  seats: number,
-  fullPriceCents: number,
-) {
-  // Get the current price ID from the subscription items
-  const currentItem = sub.items?.data?.[0];
-  if (!currentItem?.price?.id) {
-    console.warn('No price found on subscription item, skipping schedule creation');
-    return;
-  }
-
-  const currentPriceId = currentItem.price.id;
-
-  // Create a recurring price for the full (non-beta) amount
-  const fullPrice = await stripe.prices.create({
-    currency: 'brl',
-    unit_amount: fullPriceCents,
-    recurring: { interval: 'month' },
-    product: currentItem.price.product as string,
-  });
-
-  // Create subscription schedule from the existing subscription.
-  // This wraps the subscription in a schedule with 2 phases:
-  // Phase 1: Current (beta) price for 5 months
-  // Phase 2: Full price ongoing
-  const schedule = await stripe.subscriptionSchedules.create({
-    from_subscription: subscriptionId,
-  });
-
-  // Calculate the transition timestamp (5 months from now)
-  const betaEndTimestamp = Math.floor(Date.now() / 1000) + (BETA_MONTHS * 30 * 24 * 60 * 60);
-
-  // Update the schedule with 2 phases
-  await stripe.subscriptionSchedules.update(schedule.id, {
-    end_behavior: 'release', // After schedule ends, subscription continues normally
-    phases: [
-      {
-        // Phase 1: Beta price (current) — lasts 5 months
-        items: [{ price: currentPriceId, quantity: seats }],
-        end_date: betaEndTimestamp,
-        metadata: sub.metadata,
-      },
-      {
-        // Phase 2: Full price — ongoing
-        items: [{ price: fullPrice.id, quantity: seats }],
-        metadata: { ...sub.metadata, isBeta: 'false' },
-      },
-    ],
-  });
-}

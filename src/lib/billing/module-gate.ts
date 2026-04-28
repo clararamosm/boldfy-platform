@@ -40,7 +40,8 @@ export type ModuleGateDecision =
 
 /**
  * Status de assinatura legacy que contam como "ativa" para o fallback.
- * Mantem paridade com requireActiveSubscription em auth-guard.ts.
+ * Usado no caminho `legacyAllowIfActive()` quando billing.* nao existe
+ * mas a empresa tem subscription.* preenchido (empresas pre-modulares).
  */
 const LEGACY_ACTIVE_STATUSES = new Set(['active', 'trialing', 'past_due']);
 

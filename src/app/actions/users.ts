@@ -212,12 +212,11 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     // Empresa criada SEM configuracao especial de billing. Master pode
     // configurar parceiro Boldfy / beta tester via /master/empresas/[id]/billing.
     // Por padrao, empresa entra no fluxo normal de teste gratuito (15 dias)
-    // que comeca quando o admin loga pela primeira vez.
+    // que comeca quando o admin loga pela primeira vez (applyAdminFirstLogin).
     //
-    // `subscription.plan = 'free'` mantem compatibilidade com o hook
-    // useSubscription e auth-guard.requireActiveSubscription que serao
-    // refatorados na Fase 2 para consumir `billing.*`. Ate la, 'free' nao
-    // bloqueia o app (status nao esta em BLOCKED_STATUSES do hook).
+    // O bloco subscription.* abaixo e legacy/visualizacao apenas; o sistema
+    // de billing real vive em billing.* (PlatformBillingState/CompanyBillingBlock)
+    // e e populado on-demand pelo master ou pelo applyAdminFirstLogin.
     const companyRef = await adminDb.collection("companies").add({
       companyName: companyName,
       status: 'Ativa',

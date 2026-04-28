@@ -48,7 +48,7 @@ interface RoleLayoutProps {
   sidebarFooterExtra?: React.ReactNode;
   /** Avatar override URL (e.g. company logo) */
   avatarOverride?: string;
-  /** Wrap children with additional elements (e.g. SubscriptionGate) */
+  /** Wrap children with additional elements (e.g. OnboardingShell) */
   renderChildren?: (children: React.ReactNode, ctx: { loading: boolean }) => React.ReactNode;
   /** Banner/overlay above children (e.g. master mode banner, trial banner) */
   topBanner?: React.ReactNode;
