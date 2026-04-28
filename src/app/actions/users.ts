@@ -69,6 +69,18 @@ function buildPrimeiroAcessoUrl(firebaseLink: string, email: string): string {
   return `${base}/primeiro-acesso?${params.toString()}`;
 }
 
+/**
+ * Mesma logica de buildPrimeiroAcessoUrl, mas pra /redefinir-senha
+ * (fluxo de "esqueci minha senha" — usuario ja existente).
+ */
+function buildRedefinirSenhaUrl(firebaseLink: string, email: string): string {
+  const oobCode = extractOobCode(firebaseLink);
+  if (!oobCode) return firebaseLink;
+  const base = getInviteBaseUrl();
+  const params = new URLSearchParams({ oobCode, email });
+  return `${base}/redefinir-senha?${params.toString()}`;
+}
+
 async function sendInvitationEmail({ to, name, companyName, role, resetLink, locale = 'pt-BR' }: {
   to: string;
   name: string;
@@ -203,6 +215,214 @@ async function sendInvitationEmail({ to, name, companyName, role, resetLink, loc
 </html>
     `,
   });
+}
+
+// ---- Password Reset Email (branded) ----
+
+/**
+ * Envia email brandado de reset de senha. Usado pelo fluxo "esqueci minha
+ * senha" no /login. O link aponta pra /redefinir-senha no nosso dominio
+ * (em vez do dominio default do Firebase) — mesmo motivo do invite:
+ * autoridade visual da Boldfy + autofill do browser na mesma origem.
+ */
+async function sendPasswordResetMail({ to, name, resetLink, locale = 'pt-BR' }: {
+  to: string;
+  name: string;
+  resetLink: string;
+  locale?: 'pt-BR' | 'en';
+}) {
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.SMTP_EMAIL,
+      pass: process.env.SMTP_PASSWORD,
+    },
+  });
+
+  const appUrl = getInviteBaseUrl();
+  const faiPhoto = `${appUrl}/images/email/fai-avatar.png`;
+  const boldfyLogo = `${appUrl}/images/email/boldfy-logo.svg`;
+
+  const isEN = locale === 'en';
+  const firstName = name?.split(' ')[0] || name || (isEN ? 'there' : 'tudo bem');
+
+  const subject = isEN
+    ? 'Reset your Boldfy password'
+    : 'Redefinir sua senha da Boldfy';
+
+  const footer = isEN
+    ? 'If you did not request a password reset, you can safely ignore this email.'
+    : 'Se você não pediu para redefinir sua senha, pode ignorar este e-mail com tranquilidade.';
+
+  const expiryNote = isEN
+    ? 'This link is valid for 1 hour.'
+    : 'Este link é válido por 1 hora.';
+
+  const bodyContent = isEN
+    ? `
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Hi, ${firstName}! 👋
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        We received a request to reset your password on Boldfy.
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+        Click below to set a new password:
+      </p>
+      <p style="margin: 0 0 24px;">
+        <a href="${resetLink}"
+           style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+          → Reset my password
+        </a>
+      </p>
+      <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">
+        ${expiryNote}
+      </p>`
+    : `
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Oi, ${firstName}! 👋
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        A gente recebeu um pedido pra redefinir a senha da sua conta na Boldfy.
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+        Clica aqui embaixo pra criar uma nova senha:
+      </p>
+      <p style="margin: 0 0 24px;">
+        <a href="${resetLink}"
+           style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+          → Redefinir minha senha
+        </a>
+      </p>
+      <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">
+        ${expiryNote}
+      </p>`;
+
+  await transporter.sendMail({
+    from: `"${FAI_NAME}" <${process.env.SMTP_EMAIL}>`,
+    replyTo: FAI_EMAIL,
+    to,
+    subject,
+    html: `
+<!DOCTYPE html>
+<html lang="${isEN ? 'en' : 'pt-BR'}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body style="margin: 0; padding: 0; background-color: #ffffff;">
+  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 24px 32px; color: #374151;">
+
+    <!-- Body -->
+    ${bodyContent}
+
+    <!-- Signature -->
+    <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+      <table cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="vertical-align: top; padding-right: 14px;">
+            <img src="${faiPhoto}" alt="Fai" width="48" height="48"
+              style="border-radius: 50%; display: block;" />
+          </td>
+          <td style="vertical-align: top;">
+            <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">
+              ${FAI_NAME}
+            </p>
+            <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">
+              ${FAI_ROLE}
+            </p>
+            <a href="mailto:${FAI_EMAIL}" style="font-size: 12px; color: #9333ea; text-decoration: none;">
+              ${FAI_EMAIL}
+            </a>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Logo -->
+    <div style="margin-top: 28px; text-align: center;">
+      <a href="${appUrl}" style="text-decoration: none;">
+        <img src="${boldfyLogo}" alt="Boldfy" width="90" height="auto" style="display: inline-block;" />
+      </a>
+    </div>
+
+    <!-- Footer -->
+    <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">
+      ${footer}
+    </p>
+  </div>
+</body>
+</html>
+    `,
+  });
+}
+
+/**
+ * Server action publica usada pelo /login para pedir reset de senha.
+ *
+ * Nao requer autenticacao (e' fluxo "esqueci senha"). Sempre devolve
+ * `success: true` mesmo se o email nao existe — pra nao vazar quais
+ * emails estao cadastrados (best practice de seguranca).
+ *
+ * Localizacao: tenta ler users/{uid}.profile.locale via lookup por email,
+ * com fallback pra pt-BR.
+ */
+export async function requestPasswordReset(
+  email: string,
+): Promise<{ success: true } | { error: string }> {
+  if (!adminAuth) {
+    return { error: 'Servico de autenticacao indisponivel.' };
+  }
+
+  const normalizedEmail = (email || '').trim().toLowerCase();
+  if (!normalizedEmail || !normalizedEmail.includes('@')) {
+    return { error: 'E-mail invalido.' };
+  }
+
+  try {
+    // Tenta achar o usuario pra pegar nome e locale (best-effort).
+    let displayName = '';
+    let locale: 'pt-BR' | 'en' = 'pt-BR';
+    let userExists = false;
+
+    try {
+      const userRecord = await adminAuth.getUserByEmail(normalizedEmail);
+      userExists = true;
+      displayName = userRecord.displayName || '';
+
+      // Tenta enriquecer com profile do Firestore.
+      const userDoc = await adminDb.collection('users').doc(userRecord.uid).get();
+      if (userDoc.exists) {
+        const data = userDoc.data() || {};
+        displayName = data.profile?.name || data.name || displayName;
+        if (data.profile?.locale === 'en' || data.locale === 'en') locale = 'en';
+      }
+    } catch {
+      // Email nao existe — seguimos retornando success pra nao vazar.
+      userExists = false;
+    }
+
+    if (userExists) {
+      const loginUrl = getInviteBaseUrl() + '/login';
+      const firebaseLink = await adminAuth.generatePasswordResetLink(normalizedEmail, { url: loginUrl });
+      const resetLink = buildRedefinirSenhaUrl(firebaseLink, normalizedEmail);
+
+      await sendPasswordResetMail({
+        to: normalizedEmail,
+        name: displayName,
+        resetLink,
+        locale,
+      });
+    }
+
+    // Sempre success — nao revelamos se o email existe.
+    return { success: true };
+  } catch (error) {
+    console.error('Error in requestPasswordReset:', error);
+    // Mesmo em caso de erro genero, devolvemos success pra nao vazar info.
+    // Erros operacionais reais (ex: SMTP fora) ficam no log do servidor.
+    return { success: true };
+  }
 }
 
 // ---- Company & Admin Onboarding Action (by Master) ----

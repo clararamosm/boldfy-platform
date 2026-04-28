@@ -1,17 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { Suspense, useEffect, useState } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { triggerAdminFirstLogin } from '@/app/actions/billing';
+import { requestPasswordReset } from '@/app/actions/users';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
 import { LogoFull } from '@/components/logo';
 import { PublicLocaleWrapper } from '@/components/public-locale-wrapper';
 import { LanguageToggle } from '@/components/language-toggle';
@@ -19,14 +20,28 @@ import { useT } from '@/lib/i18n/context';
 
 function LoginForm() {
   const t = useT();
-  const [email, setEmail] = useState('');
+  const searchParams = useSearchParams();
+
+  // Quando o usuario chega aqui depois de criar a senha em /primeiro-acesso,
+  // mostramos um banner verde e ja preenchemos o email.
+  const justCreatedPassword = searchParams.get('primeiroAcesso') === '1';
+  const emailFromUrl = searchParams.get('email') ?? '';
+
+  const [email, setEmail] = useState(emailFromUrl);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<'login' | 'forgotPassword'>('login');
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [showFirstAccessBanner, setShowFirstAccessBanner] = useState(justCreatedPassword);
   const router = useRouter();
+
+  // Mantem email sincronizado se o param mudar (caso edge de navegacao).
+  useEffect(() => {
+    if (emailFromUrl && !email) setEmail(emailFromUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emailFromUrl]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,23 +105,19 @@ function LoginForm() {
     setResetSuccess(false);
     setResetLoading(true);
     try {
-      await sendPasswordResetEmail(auth, email);
-      setResetSuccess(true);
-    } catch (err: unknown) {
-      if (err && typeof err === 'object' && 'code' in err) {
-        const code = (err as { code: string }).code;
-        if (code === 'auth/user-not-found') {
-          setError(t.auth.errors.userNotFound);
-        } else if (code === 'auth/invalid-email') {
-          setError(t.auth.errors.invalidEmail);
-        } else if (code === 'auth/too-many-requests') {
-          setError(t.auth.errors.tooManyResetAttempts);
-        } else {
-          setError(t.auth.errors.resetGeneric);
-        }
+      // Server action: gera link branded apontando pra /redefinir-senha
+      // e manda email pelo nosso template (mesma logica do invite).
+      // Sempre devolve success pra nao vazar quais emails estao cadastrados.
+      const res = await requestPasswordReset(email);
+      if ('error' in res) {
+        // Unico caso de erro exposto: email mal formado.
+        setError(res.error);
       } else {
-        setError(t.auth.errors.resetGeneric);
+        setResetSuccess(true);
       }
+    } catch (err: unknown) {
+      console.error('[login/forgotPassword] erro:', err);
+      setError(t.auth.errors.resetGeneric);
     } finally {
       setResetLoading(false);
     }
@@ -133,13 +144,19 @@ function LoginForm() {
       <CardContent>
         {mode === 'login' ? (
           <form onSubmit={handleLogin} className="space-y-4">
+            {showFirstAccessBanner && (
+              <div className="flex items-start gap-2 rounded-md bg-green-50 p-3 text-sm text-green-700">
+                <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{t.auth.firstAccess.bannerLoginNow}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">{t.auth.email}</Label>
-              <Input id="email" type="email" placeholder={t.auth.emailPlaceholder} value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="email" type="email" placeholder={t.auth.emailPlaceholder} value={email} onChange={(e) => { setEmail(e.target.value); setShowFirstAccessBanner(false); }} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">{t.auth.password}</Label>
-              <PasswordInput id="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <PasswordInput id="password" placeholder="••••••••" value={password} onChange={(e) => { setPassword(e.target.value); setShowFirstAccessBanner(false); }} required />
             </div>
             {error && (<div className="text-sm text-red-500 text-center">{error}</div>)}
             <Button type="submit" className="w-full" disabled={loading}>
@@ -182,7 +199,9 @@ export default function LoginPage() {
           <div className="absolute top-4 right-4">
             <LanguageToggle locale={locale} onChange={setLocale} />
           </div>
-          <LoginForm />
+          <Suspense fallback={null}>
+            <LoginForm />
+          </Suspense>
         </div>
       )}
     </PublicLocaleWrapper>

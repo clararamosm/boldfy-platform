@@ -11,18 +11,21 @@
 // no /login da gente.
 //
 // Aqui a gente parseia o `oobCode` (do email) e usa client SDK pra
-// confirmar a nova senha + auto-login + redirecionar por role.
-// Tudo no nosso dominio: browser salva a senha aqui e o autofill funciona.
+// confirmar a nova senha — depois redireciona pro /login com
+// ?primeiroAcesso=1. Tudo no nosso dominio: browser salva a senha aqui
+// e o autofill funciona quando ele logar.
+//
+// IMPORTANTE: nao fazemos auto-login aqui. O usuario PRECISA passar
+// pelo /login pra que o trigger `triggerAdminFirstLogin` (e similares)
+// dispare e a empresa fique marcada como "ativada".
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   verifyPasswordResetCode,
   confirmPasswordReset,
-  signInWithEmailAndPassword,
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -93,26 +96,6 @@ function PrimeiroAcessoForm() {
     };
   }, [oobCode, t.auth.firstAccess.errors]);
 
-  async function redirectByRole(uid: string) {
-    const userRef = doc(db, 'users', uid);
-    const userDoc = await getDoc(userRef);
-    if (!userDoc.exists()) {
-      setSubmitError(t.auth.errors.profileNotRecognized);
-      setSubmitting(false);
-      return;
-    }
-    const role = userDoc.data().role;
-    if (role === 'master') router.push('/master/empresas');
-    else if (role === 'admin') router.push('/admin/dashboard');
-    else if (role === 'colaborador') router.push('/colaborador/dashboard');
-    else if (role === 'thoughtleader') router.push('/thoughtleader/dashboard');
-    else if (role === 'strategist') router.push('/strategist/dashboard');
-    else {
-      setSubmitError(t.auth.errors.profileNotRecognized);
-      setSubmitting(false);
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
@@ -132,7 +115,9 @@ function PrimeiroAcessoForm() {
 
     setSubmitting(true);
 
-    // 1) Confirma reset (define a senha).
+    // Define a senha. NAO fazemos auto-login: usuario precisa passar pelo
+    // /login pra disparar o trigger de "primeiro login" (ex.: ativacao
+    // da empresa visivel pro master).
     try {
       await confirmPasswordReset(auth, oobCode, password);
     } catch (err: unknown) {
@@ -151,30 +136,11 @@ function PrimeiroAcessoForm() {
       return;
     }
 
-    // 2) Auto-login com email confirmado.
-    try {
-      const cred = await signInWithEmailAndPassword(auth, verifiedEmail, password);
-      const idToken = await cred.user.getIdToken();
-
-      // 3) Cria sessao HttpOnly assinada (mesma logica do /login).
-      const sessionRes = await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-      if (!sessionRes.ok) {
-        setSubmitError(t.auth.errors.generic);
-        setSubmitting(false);
-        return;
-      }
-
-      // 4) Redireciona por role.
-      await redirectByRole(cred.user.uid);
-    } catch (err: unknown) {
-      console.error('[primeiro-acesso] auto-login falhou:', err);
-      setSubmitError(t.auth.firstAccess.errors.autoLoginFailed);
-      setSubmitting(false);
-    }
+    // Redireciona pro login com flag pra mostrar banner de sucesso e
+    // pre-preencher o email.
+    const params = new URLSearchParams({ primeiroAcesso: '1' });
+    if (verifiedEmail) params.set('email', verifiedEmail);
+    router.push(`/login?${params.toString()}`);
   }
 
   // ── render ───────────────────────────────────────────────────────────
