@@ -173,8 +173,9 @@ export function evaluateModuleAccess(
   }
 
   // Beta tester — cortesia, vence beta e modulo ao mesmo tempo se estiver ativo.
+  // Le betaEndsAt (canonico) com fallback para betaExpiresAt (deprecated) por retrocompat.
   if (billing.isBetaTester === true) {
-    const betaEnd = toDate(billing.betaExpiresAt);
+    const betaEnd = toDate(billing.betaEndsAt) ?? toDate(billing.betaExpiresAt);
     if (!betaEnd || betaEnd.getTime() > now.getTime()) {
       return { allowed: true, reason: 'beta' };
     }
