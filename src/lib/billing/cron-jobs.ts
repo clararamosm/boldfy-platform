@@ -6,13 +6,19 @@
 // Os endpoints HTTP (Route Handlers) apenas validam o Bearer token e chamam
 // estas funcoes. Toda logica fica aqui, isolada e testavel.
 //
-// Dois jobs principais:
-// 1. runCheckModuleDeadlines: promove modulos pending -> blocked quando
-//    firstPaymentDeadline venceu.
-// 2. runCheckBetaExpiration: desliga flag isBetaTester quando betaExpiresAt
+// Tres jobs principais (todos idempotentes):
+// 1. runCheckTrialExpiration: promove Platform 'free' -> 'pending' quando
+//    trialEndsAt venceu (e cardDeadlineEndsAt e calculado em paralelo
+//    se ainda nao existir).
+// 2. runCheckModuleDeadlines: promove modulos pending -> blocked quando
+//    firstPaymentDeadline (ou cardDeadlineEndsAt no Platform) venceu.
+// 3. runCheckBetaExpiration: desliga flag isBetaTester quando betaEndsAt
 //    venceu.
 //
-// Ambos sao idempotentes: rodar 2x no mesmo dia nao quebra nada.
+// Ordem ideal de execucao (Cloud Scheduler):
+//   trial-expiration (00:00) -> module-deadlines (00:15) -> beta-expiration (00:30)
+// Mas sao independentes; ordem nao quebra correctness, apenas atrasa
+// transicoes em 1 dia caso rodem fora de ordem.
 
 import 'server-only';
 
@@ -47,6 +53,120 @@ function toDate(v: MaybeTimestamp): Date | null {
     if (typeof s === 'number') return new Date(s * 1000);
   }
   return null;
+}
+
+// ────────────────────────────────────────────────────────────
+// JOB: CHECK TRIAL EXPIRATION (Platform free -> pending)
+// ────────────────────────────────────────────────────────────
+
+export interface TrialExpirationRecord {
+  companyId: string;
+  trialEndedAtISO: string;
+  cardDeadlineSetAt: 'preserved' | 'newly-calculated';
+}
+
+export interface RunCheckTrialExpirationResult {
+  scanned: number;
+  promoted: TrialExpirationRecord[];
+  errors: Array<{ companyId: string; message: string }>;
+  ranAtISO: string;
+}
+
+/** Default de 7 dias para o admin cadastrar cartao apos fim do trial. */
+const DEFAULT_CARD_DEADLINE_DAYS = 7;
+
+/**
+ * Varre empresas com Platform em status 'free' e promove para 'pending'
+ * quando trialEndsAt venceu. Tambem calcula cardDeadlineEndsAt
+ * (trialEndsAt + 7 dias) caso ainda nao exista — o cron de
+ * runCheckModuleDeadlines vai usar esse deadline para eventualmente
+ * passar pra 'blocked' se cartao nao for cadastrado.
+ *
+ * Empresas com freeTrialUnlimited=true (parceiros Boldfy) sao ignoradas:
+ * elas ficam permanentemente em 'free' sem trialEndsAt.
+ *
+ * Beta tester ATIVO (com tempo restante) tambem e protegido — beta
+ * cobre tudo enquanto valido.
+ *
+ * Idempotente: empresas ja em pending/active/blocked nao sao tocadas.
+ *
+ * @param now data de referencia (default: Date.now()). Injetavel para testes.
+ */
+export async function runCheckTrialExpiration(
+  now: Date = new Date(),
+): Promise<RunCheckTrialExpirationResult> {
+  const ranAt = now;
+  const promoted: TrialExpirationRecord[] = [];
+  const errors: Array<{ companyId: string; message: string }> = [];
+  let scanned = 0;
+
+  // Filtramos por status 'free' apenas — empresa ainda no trial gratuito.
+  // freeTrialUnlimited fica em 'free' sem trialEndsAt e sera ignorada
+  // no loop pelo guard "if (!trialEndsAt) continue".
+  const snapshot = await adminDb
+    .collection('companies')
+    .where('billing.platform.status', '==', 'free')
+    .get();
+
+  for (const doc of snapshot.docs) {
+    scanned += 1;
+    const companyId = doc.id;
+    const data = doc.data();
+    const billing = data.billing as CompanyBillingBlock | undefined;
+
+    if (!billing) continue;
+    if (!billing.platform) continue;
+
+    // Beta tester valido? Cobre tudo enquanto durar — nao toca.
+    if (billing.isBetaTester === true) {
+      const betaEnd = toDate(billing.betaEndsAt) ?? toDate(billing.betaExpiresAt);
+      if (!betaEnd || betaEnd.getTime() > now.getTime()) {
+        continue;
+      }
+      // beta expirado: cai nas regras normais.
+    }
+
+    // Parceiros Boldfy: freeTrialUnlimited=true => nunca sai de 'free'.
+    if (billing.platform.freeTrialUnlimited === true) continue;
+
+    const trialEnd = toDate(billing.platform.trialEndsAt);
+    if (!trialEnd) continue; // sem data, nao tem como expirar
+    if (trialEnd.getTime() > now.getTime()) continue; // ainda no prazo
+
+    // Trial venceu: promove para 'pending'. Calcula cardDeadlineEndsAt
+    // se ainda nao existir (trialEnd + 7 dias).
+    const updates: Record<string, unknown> = {
+      'billing.platform.status': 'pending',
+      'billing.updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    let cardDeadlineSetAt: TrialExpirationRecord['cardDeadlineSetAt'] = 'preserved';
+    const existingCardDeadline = toDate(billing.platform.cardDeadlineEndsAt);
+    if (!existingCardDeadline) {
+      const cardDeadline = new Date(trialEnd.getTime() + DEFAULT_CARD_DEADLINE_DAYS * 24 * 60 * 60 * 1000);
+      updates['billing.platform.cardDeadlineEndsAt'] = Timestamp.fromDate(cardDeadline);
+      cardDeadlineSetAt = 'newly-calculated';
+    }
+
+    try {
+      await doc.ref.update(updates);
+      promoted.push({
+        companyId,
+        trialEndedAtISO: trialEnd.toISOString(),
+        cardDeadlineSetAt,
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      errors.push({ companyId, message });
+    }
+  }
+
+  return {
+    scanned,
+    promoted,
+    errors,
+    ranAtISO: ranAt.toISOString(),
+  };
 }
 
 // ────────────────────────────────────────────────────────────
