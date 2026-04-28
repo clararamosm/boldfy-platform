@@ -76,9 +76,11 @@ function statusLabel(status: string): string {
     case 'active':
       return 'Ativo';
     case 'free':
-      return 'Teste gratuito';
+      // Trial gratuito = empresa tem acesso ao modulo (= ativo do ponto de vista de uso).
+      // O regime financeiro (em teste gratuito) e' comunicado pela 2a tag (chargeTag).
+      return 'Ativo';
     case 'pending':
-      return 'Aguardando pagamento';
+      return 'Pendente';
     case 'blocked':
       return 'Bloqueado';
     case 'disabled':
@@ -685,7 +687,8 @@ function chargeTag(type: BillingChargeType): {
 } {
   switch (type) {
     case 'free':
-      return { label: 'Sem cobranca', variant: 'secondary' };
+      // Parceiro Boldfy: nao paga por decisao do master (freeTrialUnlimited).
+      return { label: 'Sem cobranca (parceiro)', variant: 'secondary' };
     case 'trial':
       return { label: 'Em teste gratuito', variant: 'secondary' };
     case 'beta':
@@ -698,7 +701,8 @@ function chargeTag(type: BillingChargeType): {
       return { label: 'Aguardando pagamento', variant: 'secondary' };
     case 'inactive':
     default:
-      return { label: 'Sem cobranca', variant: 'outline' };
+      // Modulo nao ativado — falar de cobranca aqui nao faz sentido.
+      return { label: 'Nao aplicavel', variant: 'outline' };
   }
 }
 
