@@ -16,6 +16,7 @@
 'use server';
 
 import { requireAdmin, requireMaster } from '@/lib/auth-guard';
+import { db as adminDb } from '@/lib/firebase-admin';
 import {
   applyMasterTrialSetup,
   applySaveMasterBilling,
@@ -55,6 +56,65 @@ export interface BillingActionResult<T = void> {
   data?: T;
 }
 
+/**
+ * Marca o tipo de cobranca de um modulo no momento atual. Usado pela UI
+ * pra escolher qual badge/tag mostrar no Status dos Modulos.
+ *   - 'free'      => Parceiro Boldfy (sem cobranca, permanente)
+ *   - 'trial'     => Em teste gratuito (status='free' nao-permanente)
+ *   - 'beta'      => Pagando com 30% de desconto
+ *   - 'paid'      => Pagando preco cheio
+ *   - 'external'  => TL cobrado fora da plataforma (Omie)
+ *   - 'pending'   => Em pending/blocked (sem cobranca recorrente ainda)
+ *   - 'inactive'  => Modulo nunca foi ativado
+ */
+export type BillingChargeType =
+  | 'free'
+  | 'trial'
+  | 'beta'
+  | 'paid'
+  | 'external'
+  | 'pending'
+  | 'inactive';
+
+/**
+ * Informacao computada de uso real do modulo Platform. Vem da contagem
+ * real de users com role='colaborador' na empresa, nao do snapshot do billing.
+ */
+export interface PlatformUsageInfo {
+  /** Numero real de colaboradores no Firestore (count de users). */
+  collaboratorsCount: number;
+  /** Seats efetivamente cobrados (max(collabsCount, 5)). */
+  billedSeats: number;
+  /** True se a empresa esta no minimo (5 seats por menos colabs). */
+  atMinimum: boolean;
+  /** Preco por seat (em centavos), ja com desconto beta se aplicavel. */
+  perSeatCents: number | null;
+  /** Preco total mensal (em centavos), perSeat * billedSeats. */
+  totalCents: number | null;
+  /** Tipo de cobranca atual (free/trial/beta/paid/inactive). */
+  chargeType: BillingChargeType;
+}
+
+/** Informacao computada de uso real do modulo TL. */
+export interface TLUsageInfo {
+  /** Numero real de users com role='thoughtleader'. */
+  thoughtLeadersCount: number;
+  /** Preco total mensal (em centavos), com base em executives + frequency. */
+  totalCents: number | null;
+  /** Tipo de cobranca atual (external/paid/inactive). */
+  chargeType: BillingChargeType;
+}
+
+/** Informacao computada de uso real do modulo Design. */
+export interface DesignUsageInfo {
+  /** Pack contratado (label legivel) ou null. */
+  packLabel: string | null;
+  /** Preco total mensal (em centavos). */
+  totalCents: number | null;
+  /** Tipo de cobranca atual (paid/inactive). */
+  chargeType: BillingChargeType;
+}
+
 export interface SerializableBillingBlock {
   isBetaTester: boolean;
   betaExpiresAtISO: string | null;
@@ -73,6 +133,8 @@ export interface SerializableBillingBlock {
     trialStartedAtISO: string | null;
     trialEndsAtISO: string | null;
     cardDeadlineEndsAtISO: string | null;
+    /** Calculado em runtime — nao persistido. */
+    usage: PlatformUsageInfo;
   };
   tl: {
     active: boolean;
@@ -83,6 +145,8 @@ export interface SerializableBillingBlock {
     stripeSubscriptionId: string | null;
     firstPaymentDeadlineISO: string | null;
     billedOutsidePlatform: boolean;
+    /** Calculado em runtime — nao persistido. */
+    usage: TLUsageInfo;
   };
   design: {
     active: boolean;
@@ -90,8 +154,12 @@ export interface SerializableBillingBlock {
     status: string;
     stripeSubscriptionId: string | null;
     firstPaymentDeadlineISO: string | null;
+    /** Calculado em runtime — nao persistido. */
+    usage: DesignUsageInfo;
   };
   stripeCustomerId: string | null;
+  /** Indica que beta esta ativo agora (entre betaStartsAt e betaEndsAt). */
+  betaCurrentlyActive: boolean;
 }
 
 /** Converte timestamps/undefined do Firestore em tipos JSON-safe para o front. */
@@ -110,7 +178,178 @@ function toISO(ts: unknown): string | null {
   return null;
 }
 
-function serializeBilling(b: CompanyBillingBlock): SerializableBillingBlock {
+/** Conta usuarios reais por role para uma empresa. */
+async function countCompanyUsers(companyId: string): Promise<{
+  collaborators: number;
+  thoughtLeaders: number;
+}> {
+  const [collabSnap, tlSnap] = await Promise.all([
+    adminDb
+      .collection('users')
+      .where('companyId', '==', companyId)
+      .where('role', '==', 'colaborador')
+      .count()
+      .get(),
+    adminDb
+      .collection('users')
+      .where('companyId', '==', companyId)
+      .where('role', '==', 'thoughtleader')
+      .count()
+      .get(),
+  ]);
+  return {
+    collaborators: collabSnap.data().count,
+    thoughtLeaders: tlSnap.data().count,
+  };
+}
+
+/** Beta esta efetivamente ativo (entre betaStartsAt e betaEndsAt)? */
+function isBetaCurrentlyActive(b: CompanyBillingBlock, now: Date = new Date()): boolean {
+  if (b.isBetaTester !== true) return false;
+  const start = parseToDate(b.betaStartsAt);
+  const end = parseToDate(b.betaEndsAt);
+  if (!start) return false;
+  if (start.getTime() > now.getTime()) return false;
+  if (end && end.getTime() < now.getTime()) return false;
+  return true;
+}
+
+/** Helper local pra converter timestamps em Date sem alocar string intermediaria. */
+function parseToDate(ts: unknown): Date | null {
+  if (!ts) return null;
+  if (ts instanceof Date) return ts;
+  if (typeof ts === 'string') {
+    const d = new Date(ts);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof ts === 'object' && ts !== null) {
+    const obj = ts as { toDate?: () => Date; _seconds?: number; seconds?: number };
+    if (typeof obj.toDate === 'function') return obj.toDate();
+    const seconds = obj._seconds ?? obj.seconds;
+    if (typeof seconds === 'number') return new Date(seconds * 1000);
+  }
+  return null;
+}
+
+/** Computa usage info de Platform (contagem + breakdown monetario + tipo de cobranca). */
+function computePlatformUsage(
+  b: CompanyBillingBlock,
+  collaboratorsCount: number,
+  betaActive: boolean,
+): PlatformUsageInfo {
+  const billedSeats = Math.max(collaboratorsCount, PLATFORM_MIN_SEATS);
+  const atMinimum = collaboratorsCount < PLATFORM_MIN_SEATS;
+
+  // Decide tipo de cobranca
+  let chargeType: BillingChargeType;
+  if (b.platform.freeTrialUnlimited === true) {
+    chargeType = 'free';
+  } else if (b.platform.status === 'free') {
+    chargeType = 'trial';
+  } else if (b.platform.status === 'active') {
+    chargeType = betaActive ? 'beta' : 'paid';
+  } else if (b.platform.status === 'pending' || b.platform.status === 'blocked') {
+    chargeType = 'pending';
+  } else {
+    chargeType = 'inactive';
+  }
+
+  // Calcula preco (apenas para tiers suportados; acima de 70 retorna null)
+  let perSeatCents: number | null = null;
+  let totalCents: number | null = null;
+  if (billedSeats <= PLATFORM_ENTERPRISE_THRESHOLD) {
+    const calc = calculatePlatformMonthlyPriceCents(billedSeats, betaActive);
+    if (calc) {
+      totalCents = calc.totalCents;
+      perSeatCents = Math.round(calc.totalCents / billedSeats);
+    }
+  }
+
+  return {
+    collaboratorsCount,
+    billedSeats,
+    atMinimum,
+    perSeatCents,
+    totalCents,
+    chargeType,
+  };
+}
+
+/** Computa usage info de TL. */
+function computeTLUsage(
+  b: CompanyBillingBlock,
+  thoughtLeadersCount: number,
+): TLUsageInfo {
+  let chargeType: BillingChargeType;
+  if (b.tl.billedOutsidePlatform === true) {
+    chargeType = 'external';
+  } else if (b.tl.status === 'active') {
+    chargeType = 'paid';
+  } else if (b.tl.status === 'pending' || b.tl.status === 'blocked') {
+    chargeType = 'pending';
+  } else {
+    chargeType = 'inactive';
+  }
+
+  // Cobranca externa nao gera valor visivel na plataforma.
+  // Inativo tambem nao tem valor.
+  let totalCents: number | null = null;
+  if (chargeType === 'paid' && b.tl.executives && b.tl.frequency) {
+    totalCents = calculateTLMonthlyPriceCents(b.tl.executives, b.tl.frequency) ?? null;
+  }
+
+  return {
+    thoughtLeadersCount,
+    totalCents,
+    chargeType,
+  };
+}
+
+/** Computa usage info de Design. */
+function computeDesignUsage(b: CompanyBillingBlock): DesignUsageInfo {
+  let chargeType: BillingChargeType;
+  if (b.design.status === 'active') {
+    chargeType = 'paid';
+  } else if (b.design.status === 'pending' || b.design.status === 'blocked') {
+    chargeType = 'pending';
+  } else {
+    chargeType = 'inactive';
+  }
+
+  let packLabel: string | null = null;
+  let totalCents: number | null = null;
+  if (b.design.pack) {
+    const pack = getDesignPack(b.design.pack);
+    if (pack) {
+      packLabel = pack.label;
+      if (chargeType === 'paid') {
+        totalCents = pack.priceCents;
+      }
+    }
+  }
+
+  return {
+    packLabel,
+    totalCents,
+    chargeType,
+  };
+}
+
+/** Atalho: conta usuarios + serializa. Usado por todas as actions. */
+async function serializeWithCounts(
+  companyId: string,
+  b: CompanyBillingBlock,
+): Promise<SerializableBillingBlock> {
+  const counts = await countCompanyUsers(companyId);
+  return serializeBilling(b, counts);
+}
+
+/** Serializa o block + enriquece com usage info computado. */
+function serializeBilling(
+  b: CompanyBillingBlock,
+  counts: { collaborators: number; thoughtLeaders: number },
+): SerializableBillingBlock {
+  const betaActive = isBetaCurrentlyActive(b);
   return {
     isBetaTester: b.isBetaTester,
     betaExpiresAtISO: toISO(b.betaExpiresAt),
@@ -133,6 +372,7 @@ function serializeBilling(b: CompanyBillingBlock): SerializableBillingBlock {
       trialStartedAtISO: toISO(b.platform.trialStartedAt),
       trialEndsAtISO: toISO(b.platform.trialEndsAt),
       cardDeadlineEndsAtISO: toISO(b.platform.cardDeadlineEndsAt),
+      usage: computePlatformUsage(b, counts.collaborators, betaActive),
     },
     tl: {
       active: b.tl.active,
@@ -143,6 +383,7 @@ function serializeBilling(b: CompanyBillingBlock): SerializableBillingBlock {
       stripeSubscriptionId: b.tl.stripeSubscriptionId ?? null,
       firstPaymentDeadlineISO: toISO(b.tl.firstPaymentDeadline),
       billedOutsidePlatform: b.tl.billedOutsidePlatform === true,
+      usage: computeTLUsage(b, counts.thoughtLeaders),
     },
     design: {
       active: b.design.active,
@@ -150,10 +391,13 @@ function serializeBilling(b: CompanyBillingBlock): SerializableBillingBlock {
       status: b.design.status,
       stripeSubscriptionId: b.design.stripeSubscriptionId ?? null,
       firstPaymentDeadlineISO: toISO(b.design.firstPaymentDeadline),
+      usage: computeDesignUsage(b),
     },
     stripeCustomerId: b.stripeCustomerId ?? null,
+    betaCurrentlyActive: betaActive,
   };
 }
+
 
 // ────────────────────────────────────────────────────────────
 // READ
@@ -169,7 +413,8 @@ export async function getCompanyBilling(
       return { success: false, error: 'companyId invalido.' };
     }
     const block = await getCompanyBillingBlock(companyId);
-    return { success: true, data: serializeBilling(block) };
+    const data = await serializeWithCounts(companyId, block);
+    return { success: true, data };
   } catch (e: unknown) {
     return {
       success: false,
@@ -194,7 +439,8 @@ export async function getMyCompanyBilling(
       return { success: false, error: 'Admin sem empresa vinculada.' };
     }
     const block = await getCompanyBillingBlock(admin.companyId);
-    return { success: true, data: serializeBilling(block) };
+    const data = await serializeWithCounts(admin.companyId, block);
+    return { success: true, data };
   } catch (e: unknown) {
     return {
       success: false,
@@ -241,8 +487,10 @@ export interface SaveMasterBillingFormInput {
   freeTrialUnlimited: boolean;
   // Beta tester
   isBetaTester: boolean;
+  /** Obrigatorio quando isBetaTester=true; ignorado caso contrario */
   betaDurationMonths?: number | null;
-  betaStartsAt?: string | null; // ISO
+  // NOTA: betaStartsAt nao e mais aceito do cliente. O webhook do Stripe
+  // (`invoice.paid`) seta automaticamente quando a 1a fatura do Platform e paga.
   // TL Omie
   tlBilledOutsidePlatform: boolean;
   tlExecutives?: 1 | 2 | 3 | 4 | 5;
@@ -274,7 +522,6 @@ export async function saveMasterBilling(
       freeTrialUnlimited: input.freeTrialUnlimited,
       isBetaTester: input.isBetaTester,
       betaDurationMonths: input.betaDurationMonths ?? null,
-      betaStartsAt: input.betaStartsAt ?? null,
       tlBilledOutsidePlatform: input.tlBilledOutsidePlatform,
       tlExecutives: input.tlExecutives,
       tlFrequency: input.tlFrequency,
@@ -282,7 +529,8 @@ export async function saveMasterBilling(
     });
 
     const updated = await applySaveMasterBilling(validated, master.uid);
-    return { success: true, data: serializeBilling(updated) };
+    const data = await serializeWithCounts(input.companyId, updated);
+    return { success: true, data };
   } catch (e: unknown) {
     console.error('[saveMasterBilling] falhou:', e);
     return {
@@ -327,7 +575,8 @@ export async function setTLBilledOutsidePlatform(
       frequency: input.frequency,
     });
     const updated = await applyTLBilledOutsidePlatform(validated, master.uid);
-    return { success: true, data: serializeBilling(updated) };
+    const data = await serializeWithCounts(input.companyId, updated);
+    return { success: true, data };
   } catch (e: unknown) {
     console.error('[setTLBilledOutsidePlatform] falhou:', e);
     return {
@@ -369,7 +618,8 @@ export async function setMasterTrialDuration(
       trialDurationDays: input.trialDurationDays as ValidTrialDurationDays,
     });
     const updated = await applyMasterTrialSetup(validated, master.uid);
-    return { success: true, data: serializeBilling(updated) };
+    const data = await serializeWithCounts(input.companyId, updated);
+    return { success: true, data };
   } catch (e: unknown) {
     console.error('[setMasterTrialDuration] falhou:', e);
     return {
@@ -411,7 +661,8 @@ export async function toggleFreeTrialUnlimited(
       enabled: input.enabled,
     });
     const updated = await applyToggleFreeUnlimited(validated, master.uid);
-    return { success: true, data: serializeBilling(updated) };
+    const data = await serializeWithCounts(input.companyId, updated);
+    return { success: true, data };
   } catch (e: unknown) {
     console.error('[toggleFreeTrialUnlimited] falhou:', e);
     return {

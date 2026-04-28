@@ -154,8 +154,10 @@ export function computeBillingWarnings(
   if (!billing) return out;
 
   // 2. Beta tester
+  // Le campo novo (betaEndsAt) com fallback para legado (betaExpiresAt).
+  // Ausencia significa: beta permanente OU ainda nao iniciou (pre 1a fatura paga).
   if (billing.isBetaTester === true) {
-    const betaEnd = toDate(billing.betaExpiresAt);
+    const betaEnd = toDate(billing.betaEndsAt) ?? toDate(billing.betaExpiresAt);
     if (!betaEnd) {
       // Beta permanente (sem data) — apenas info discreta
       out.push({

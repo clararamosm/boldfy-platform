@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getStripe } from '@/lib/stripe';
 import type Stripe from 'stripe';
 import {
@@ -16,8 +16,13 @@ import {
   markModuleAsBlocked,
   type BillingModule,
 } from '@/lib/billing/stripe-modules';
+import {
+  computeBetaEndDate,
+  DEFAULT_BETA_DURATION_MONTHS,
+} from '@/lib/billing/master-rules';
+import type { CompanyBillingBlock } from '@/lib/billing/types';
 
-const BETA_MONTHS = 5; // 5 months at beta price, then full price
+const BETA_MONTHS = 5; // [DEPRECATED legacy flow] 5 months at beta price, then full price
 
 // ────────────────────────────────────────────────────────────
 // HANDLERS MODULARES (billing.* em vez de subscription.*)
@@ -348,6 +353,48 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case 'invoice.paid': {
+        // Quando a 1a fatura do Platform e paga e a empresa esta marcada como
+        // beta tester pelo master, setamos betaStartsAt = invoice.created e
+        // calculamos betaEndsAt. Idempotente: guard `if (betaStartsAt) break`
+        // garante que faturas subsequentes nao reiniciam o beta.
+        const invoice = event.data.object as Stripe.Invoice & {
+          subscription?: string | { id: string };
+          created: number;
+        };
+        const subId = typeof invoice.subscription === 'string'
+          ? invoice.subscription
+          : invoice.subscription?.id;
+        if (!subId) break;
+
+        const sub = await stripe.subscriptions.retrieve(subId);
+        const modInfo = extractModuleFromSubscriptionMetadata(sub.metadata);
+        // Apenas o modulo Platform aciona o ciclo do beta tester.
+        if (!modInfo || modInfo.module !== 'platform') break;
+
+        const companyRef = adminDb.collection('companies').doc(modInfo.companyId);
+        const snap = await companyRef.get();
+        const billing = snap.data()?.billing as CompanyBillingBlock | undefined;
+        if (!billing) break;
+        if (billing.isBetaTester !== true) break;
+        // Guard de idempotencia: se beta ja comecou, nao toca.
+        if (billing.betaStartsAt) break;
+
+        const durationMonths = billing.betaDurationMonths ?? DEFAULT_BETA_DURATION_MONTHS;
+        const startsAt = new Date(invoice.created * 1000);
+        const endsAt = computeBetaEndDate(startsAt, durationMonths);
+
+        await companyRef.update({
+          'billing.betaStartsAt': Timestamp.fromDate(startsAt),
+          'billing.betaEndsAt': Timestamp.fromDate(endsAt),
+          'billing.updatedAt': FieldValue.serverTimestamp(),
+        });
+        console.log(
+          `Beta tester iniciado para ${modInfo.companyId}: ${startsAt.toISOString()} -> ${endsAt.toISOString()} (${durationMonths} meses)`,
+        );
+        break;
+      }
+
       default:
         // Unhandled event type — acknowledge receipt
         break;
@@ -368,9 +415,11 @@ export async function POST(req: NextRequest) {
 }
 
 // ── Beta → Full Price Schedule ─────────────────────────────────
-// Creates a Stripe Subscription Schedule that keeps the current beta price
-// for 5 billing periods, then transitions to the full price automatically.
-
+// [DEPRECATED] Pertence ao fluxo monolitico legado (subscription.*) que sera
+// removido apos o nuke. O fluxo modular novo nao usa Subscription Schedule —
+// o beta start/end vive em billing.* e o cron desliga isBetaTester quando vence.
+// Manter aqui apenas para compatibilidade com docs legados ja em producao
+// (nenhum apos o nuke). Remover em PR futura.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function createBetaToFullSchedule(
   stripe: ReturnType<typeof getStripe>,

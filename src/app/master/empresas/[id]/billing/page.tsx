@@ -4,13 +4,20 @@
 // Princı́pios:
 // - Este componente NAO decide nada. Apenas:
 //   1. le estado serializado via server action `getCompanyBilling`
-//   2. mostra os controles em 3 cards
+//   2. mostra os controles em 4 cards independentes
 //   3. envia TODAS as mudancas via server action unica `saveMasterBilling`
 // - Toda validacao acontece no servidor (master-rules.ts).
 //
-// NOTA: Antigo flag billing.enabled foi REMOVIDO. Toda empresa entra
-// no fluxo de cobranca; a unica forma de nao pagar e o toggle nativo
-// "Parceiro Boldfy" (freeTrialUnlimited).
+// Layout dos cards (apos refactor):
+//   - Status dos Modulos (read-only)
+//   - Parceiro Boldfy (toggle isolado)
+//   - Teste Gratuito (duracao do trial Platform)
+//   - Beta Tester (duracao em meses; data de inicio e setada AUTOMATICAMENTE
+//     pelo webhook do Stripe quando a 1a fatura do Platform e paga)
+//   - Plano Thought Leader (Omie)
+//
+// Quando "Parceiro Boldfy" esta ligado, os cards Teste/Beta ficam
+// visualmente desabilitados — partner companies nao tem trial nem beta.
 
 'use client';
 
@@ -39,7 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, ArrowLeft, Sparkles, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Users, Mic, Palette, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
@@ -47,14 +54,12 @@ import {
   getCompanyBilling,
   saveMasterBilling,
   type SerializableBillingBlock,
+  type PlatformUsageInfo,
+  type TLUsageInfo,
+  type DesignUsageInfo,
+  type BillingChargeType,
 } from '@/app/actions/billing';
-
-function formatDateForInput(iso: string | null): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 10);
-}
+import { formatBRL } from '@/lib/billing/pricing';
 
 function statusBadgeVariant(
   status: string,
@@ -126,7 +131,6 @@ export default function MasterCompanyBillingPage() {
   // Form state — Beta Tester
   const [isBetaTester, setIsBetaTester] = useState(false);
   const [betaDurationMonths, setBetaDurationMonths] = useState<number>(3);
-  const [betaStartsAt, setBetaStartsAt] = useState<string>('');
 
   // Form state — Plano Thought Leader (Omie)
   const [tlOutsideEnabled, setTlOutsideEnabled] = useState(false);
@@ -180,7 +184,6 @@ export default function MasterCompanyBillingPage() {
             ? res.data.betaDurationMonths
             : 3,
         );
-        setBetaStartsAt(formatDateForInput(res.data.betaStartsAtISO));
 
         // Hidrata Plano TL
         setTlOutsideEnabled(res.data.tl.billedOutsidePlatform === true);
@@ -219,16 +222,28 @@ export default function MasterCompanyBillingPage() {
     };
   }, [billing, freeTrialUnlimited]);
 
-  const betaConcluded = useMemo(() => {
-    if (!billing) return null;
+  // Estado visual do beta com 3 fases:
+  //   - waiting:   isBetaTester=true mas betaStartsAt ausente (ainda nao pagou 1a fatura)
+  //   - active:    betaStartsAt presente, betaEndsAt no futuro
+  //   - concluded: betaEndsAt no passado
+  const betaState = useMemo(() => {
+    if (!billing || !isBetaTester) return null;
     const start = billing.betaStartsAtISO;
     const end = billing.betaEndsAtISO;
-    if (!end || !isPast(end)) return null;
+    if (!start) return { phase: 'waiting' as const };
+    if (end && isPast(end)) {
+      return {
+        phase: 'concluded' as const,
+        start: formatDateShortBR(start),
+        end: formatDateShortBR(end),
+      };
+    }
     return {
+      phase: 'active' as const,
       start: formatDateShortBR(start),
-      end: formatDateShortBR(end),
+      end: end ? formatDateShortBR(end) : '—',
     };
-  }, [billing]);
+  }, [billing, isBetaTester]);
 
   function handleSaveAll() {
     if (!companyId || !token) return;
@@ -264,20 +279,6 @@ export default function MasterCompanyBillingPage() {
       }
     }
 
-    let betaStartsAtISO: string | null = null;
-    if (isBetaTester && betaStartsAt) {
-      const d = new Date(betaStartsAt + 'T00:00:00');
-      if (Number.isNaN(d.getTime())) {
-        toast({
-          title: 'Data invalida',
-          description: 'Verifique a data de inicio do beta.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      betaStartsAtISO = d.toISOString();
-    }
-
     startSavingTransition(async () => {
       const res = await saveMasterBilling({
         idToken: token,
@@ -286,7 +287,6 @@ export default function MasterCompanyBillingPage() {
         freeTrialUnlimited,
         isBetaTester,
         betaDurationMonths: isBetaTester ? betaDurationMonths : null,
-        betaStartsAt: betaStartsAtISO,
         tlBilledOutsidePlatform: tlOutsideEnabled,
         tlExecutives: tlOutsideEnabled
           ? (tlOutsideExecutives as 1 | 2 | 3 | 4 | 5)
@@ -353,194 +353,227 @@ export default function MasterCompanyBillingPage() {
           <CardContent className="grid gap-4 md:grid-cols-3">
             {billing ? (
               <>
-                <ModuleStatusCard
-                  title="Platform (colaboradores)"
+                <PlatformStatusCard
                   status={billing.platform.status}
-                  extra={`${billing.platform.seats} seats`}
+                  usage={billing.platform.usage}
                 />
-                <ModuleStatusCard
-                  title="Thought Leaders"
+                <TLStatusCard
                   status={billing.tl.status}
-                  extra={
-                    billing.tl.billedOutsidePlatform
-                      ? 'Cobrado fora da plataforma'
-                      : `${billing.tl.seats} TLs`
-                  }
+                  usage={billing.tl.usage}
                 />
-                <ModuleStatusCard
-                  title="Design"
+                <DesignStatusCard
                   status={billing.design.status}
-                  extra={billing.design.pack ? `Pack ${billing.design.pack}` : '—'}
+                  usage={billing.design.usage}
                 />
               </>
             ) : null}
           </CardContent>
         </Card>
 
-        {/* Card 2: Plano Platform — engloba Teste Gratuito + Beta Tester */}
+        {/* Card 2: Parceiro Boldfy (isolado, controla habilitacao dos proximos) */}
         <Card>
           <CardHeader>
-            <CardTitle>Plano Platform</CardTitle>
+            <CardTitle>Parceiro Boldfy</CardTitle>
             <CardDescription>
-              Define o teste gratuito do modulo Platform, parceria especial (sem cobranca)
-              e periodo de beta tester.
+              Empresas parceiras nao tem cobranca. Quando ligado, Teste Gratuito e
+              Beta Tester ficam inativos — a empresa permanece em status &quot;free&quot;
+              permanente, sem prazo de bloqueio.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Sub-secao: Teste Gratuito */}
-            <div className="rounded-lg border p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Teste Gratuito</h3>
-                {trialConcluded ? (
-                  <Badge variant="outline" className="gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Concluido — {trialConcluded.start} — {trialConcluded.end}
-                  </Badge>
-                ) : null}
+          <CardContent>
+            <div className="flex items-center justify-between rounded-md border bg-muted/30 p-4">
+              <div>
+                <Label htmlFor="freeTrialUnlimited" className="text-sm font-medium">
+                  Sem cobranca
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Liga o modo parceiro: empresa nunca e cobrada nem bloqueada.
+                </p>
               </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="trialDurationDays">Duracao do teste</Label>
-                  <Select
-                    value={String(trialDurationDays)}
-                    onValueChange={(v) =>
-                      setTrialDurationDays(Number(v) as 15 | 30 | 60)
-                    }
-                    disabled={isSaving || freeTrialUnlimited}
-                  >
-                    <SelectTrigger id="trialDurationDays">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="15">15 dias</SelectItem>
-                      <SelectItem value="30">30 dias</SelectItem>
-                      <SelectItem value="60">60 dias</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Comeca quando o admin loga pela primeira vez. Apos o fim, a empresa
-                    tem 7 dias para cadastrar cartao antes do bloqueio.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm">Estado atual do teste</Label>
-                  <div className="rounded-md border p-3 text-xs space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Status:</span>
-                      <Badge variant={statusBadgeVariant(billing?.platform.status ?? 'disabled')}>
-                        {statusLabel(billing?.platform.status ?? 'disabled')}
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Iniciou:</span>
-                      <span>{formatDateBR(billing?.platform.trialStartedAtISO ?? null)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Termina:</span>
-                      <span>{formatDateBR(billing?.platform.trialEndsAtISO ?? null)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Prazo do cartao:</span>
-                      <span>{formatDateBR(billing?.platform.cardDeadlineEndsAtISO ?? null)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3">
-                <div>
-                  <Label htmlFor="freeTrialUnlimited" className="text-sm font-medium">
-                    Parceiro Boldfy (sem cobranca)
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Empresa fica em status &quot;free&quot; permanente, sem prazo de bloqueio.
-                  </p>
-                </div>
-                <Switch
-                  id="freeTrialUnlimited"
-                  checked={freeTrialUnlimited}
-                  onCheckedChange={setFreeTrialUnlimited}
-                  disabled={isSaving}
-                />
-              </div>
-            </div>
-
-            {/* Sub-secao: Beta Tester */}
-            <div className="rounded-lg border p-4 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" /> Beta Tester
-                </h3>
-                {betaConcluded ? (
-                  <Badge variant="outline" className="gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Concluido — {betaConcluded.start} — {betaConcluded.end}
-                  </Badge>
-                ) : null}
-              </div>
-
-              <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3">
-                <div>
-                  <Label htmlFor="isBetaTester" className="text-sm font-medium">
-                    Empresa em beta
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Aplica 30% de desconto apenas no modulo Platform durante o periodo
-                    definido. TL e Design nao tem desconto beta.
-                  </p>
-                </div>
-                <Switch
-                  id="isBetaTester"
-                  checked={isBetaTester}
-                  onCheckedChange={setIsBetaTester}
-                  disabled={isSaving}
-                />
-              </div>
-
-              {isBetaTester && (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="betaDurationMonths">Duracao (meses)</Label>
-                    <Input
-                      id="betaDurationMonths"
-                      type="number"
-                      min={1}
-                      max={24}
-                      step={1}
-                      value={betaDurationMonths}
-                      onChange={(e) =>
-                        setBetaDurationMonths(Number(e.target.value))
-                      }
-                      disabled={isSaving}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="betaStartsAt">Data de inicio</Label>
-                    <Input
-                      id="betaStartsAt"
-                      type="date"
-                      value={betaStartsAt}
-                      onChange={(e) => setBetaStartsAt(e.target.value)}
-                      disabled={isSaving}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Termina automaticamente em inicio + meses.
-                    </p>
-                  </div>
-                </div>
-              )}
+              <Switch
+                id="freeTrialUnlimited"
+                checked={freeTrialUnlimited}
+                onCheckedChange={setFreeTrialUnlimited}
+                disabled={isSaving}
+              />
             </div>
           </CardContent>
         </Card>
 
-        {/* Card 3: Plano Thought Leader (Omie) */}
+        {/* Card 3: Teste Gratuito */}
+        <Card className={freeTrialUnlimited ? 'opacity-60' : ''}>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Teste Gratuito</span>
+              {trialConcluded ? (
+                <Badge variant="outline" className="gap-1">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Concluido — {trialConcluded.start} — {trialConcluded.end}
+                </Badge>
+              ) : null}
+            </CardTitle>
+            <CardDescription>
+              Define a duracao do teste gratuito do modulo Platform. Comeca quando o
+              admin loga pela primeira vez. Apos o fim, a empresa tem 7 dias para
+              cadastrar cartao antes do bloqueio.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {freeTrialUnlimited ? (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+                Inativo porque <strong>Parceiro Boldfy</strong> esta ligado.
+              </div>
+            ) : null}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="trialDurationDays">Duracao do teste</Label>
+                <Select
+                  value={String(trialDurationDays)}
+                  onValueChange={(v) =>
+                    setTrialDurationDays(Number(v) as 15 | 30 | 60)
+                  }
+                  disabled={isSaving || freeTrialUnlimited}
+                >
+                  <SelectTrigger id="trialDurationDays">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 dias</SelectItem>
+                    <SelectItem value="30">30 dias</SelectItem>
+                    <SelectItem value="60">60 dias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Estado atual do teste</Label>
+                <div className="rounded-md border p-3 text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status:</span>
+                    <Badge variant={statusBadgeVariant(billing?.platform.status ?? 'disabled')}>
+                      {statusLabel(billing?.platform.status ?? 'disabled')}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Iniciou:</span>
+                    <span>{formatDateBR(billing?.platform.trialStartedAtISO ?? null)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Termina:</span>
+                    <span>{formatDateBR(billing?.platform.trialEndsAtISO ?? null)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Prazo do cartao:</span>
+                    <span>{formatDateBR(billing?.platform.cardDeadlineEndsAtISO ?? null)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Beta Tester */}
+        <Card className={freeTrialUnlimited ? 'opacity-60' : ''}>
+          <CardHeader>
+            <CardTitle>Beta Tester</CardTitle>
+            <CardDescription>
+              Aplica 30% de desconto no modulo Platform durante o periodo definido.
+              O beta comeca <strong>automaticamente</strong> quando a empresa paga a
+              primeira fatura — nao e necessario informar data de inicio.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {freeTrialUnlimited ? (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200">
+                Inativo porque <strong>Parceiro Boldfy</strong> esta ligado.
+              </div>
+            ) : null}
+
+            <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3">
+              <div>
+                <Label htmlFor="isBetaTester" className="text-sm font-medium">
+                  Empresa em beta
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Desconto aplicado apenas no Platform. TL e Design nao tem desconto.
+                </p>
+              </div>
+              <Switch
+                id="isBetaTester"
+                checked={isBetaTester}
+                onCheckedChange={setIsBetaTester}
+                disabled={isSaving || freeTrialUnlimited}
+              />
+            </div>
+
+            {isBetaTester && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="betaDurationMonths">Duracao (meses)</Label>
+                  <Input
+                    id="betaDurationMonths"
+                    type="number"
+                    min={1}
+                    max={24}
+                    step={1}
+                    value={betaDurationMonths}
+                    onChange={(e) =>
+                      setBetaDurationMonths(Number(e.target.value))
+                    }
+                    disabled={isSaving || freeTrialUnlimited}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Inicio e setado automaticamente quando a empresa paga a 1a fatura
+                    do Platform.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm">Estado atual do beta</Label>
+                  <div className="rounded-md border p-3 text-xs space-y-1">
+                    {betaState?.phase === 'waiting' && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Status:</span>
+                        <Badge variant="secondary">Aguardando 1a fatura paga</Badge>
+                      </div>
+                    )}
+                    {betaState?.phase === 'active' && (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Status:</span>
+                          <Badge variant="default">Ativo</Badge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Iniciou:</span>
+                          <span>{formatDateBR(billing?.betaStartsAtISO ?? null)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Termina:</span>
+                          <span>{formatDateBR(billing?.betaEndsAtISO ?? null)}</span>
+                        </div>
+                      </>
+                    )}
+                    {betaState?.phase === 'concluded' && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Status:</span>
+                        <Badge variant="outline" className="gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Concluido — {betaState.start} — {betaState.end}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Card 5: Plano Thought Leader (Omie) */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ExternalLink className="h-5 w-5" /> Plano Thought Leader
-            </CardTitle>
+            <CardTitle>Plano Thought Leader</CardTitle>
             <CardDescription>
               Use quando a empresa paga o modulo TL por fora da Boldfy (contrato direto,
               sem Stripe). O modulo fica ativo, os TLs tem acesso, e nada e cobrado pela
@@ -637,20 +670,234 @@ export default function MasterCompanyBillingPage() {
   );
 }
 
-function ModuleStatusCard({
+// ────────────────────────────────────────────────────────────
+// Status cards por modulo
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Tag visual de tipo de cobranca. Substitui a logica antiga que so
+ * mostrava status. Agora a UI deixa explicito o regime financeiro
+ * (free/trial/beta/paid/external/pending).
+ */
+function chargeTag(type: BillingChargeType): {
+  label: string;
+  variant: 'default' | 'secondary' | 'destructive' | 'outline';
+} {
+  switch (type) {
+    case 'free':
+      return { label: 'Sem cobranca', variant: 'secondary' };
+    case 'trial':
+      return { label: 'Em teste gratuito', variant: 'secondary' };
+    case 'beta':
+      return { label: 'Beta -30%', variant: 'default' };
+    case 'paid':
+      return { label: 'Pagando', variant: 'default' };
+    case 'external':
+      return { label: 'Externo (Omie)', variant: 'outline' };
+    case 'pending':
+      return { label: 'Aguardando pagamento', variant: 'secondary' };
+    case 'inactive':
+    default:
+      return { label: 'Sem cobranca', variant: 'outline' };
+  }
+}
+
+/** Header padrao reutilizavel pelos 3 cards. */
+function StatusCardHeader({
+  icon: Icon,
   title,
   status,
-  extra,
+  chargeType,
 }: {
+  icon: React.ComponentType<{ className?: string }>;
   title: string;
   status: string;
-  extra: string;
+  chargeType: BillingChargeType;
+}) {
+  const tag = chargeTag(chargeType);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <p className="text-sm font-medium">{title}</p>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        <Badge variant={statusBadgeVariant(status)} className="text-[11px]">
+          {statusLabel(status)}
+        </Badge>
+        <Badge variant={tag.variant} className="text-[11px]">
+          {tag.label}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+
+/** Linha de breakdown monetario (icone + texto). */
+function PriceBreakdown({
+  text,
+  total,
+}: {
+  text: string;
+  total: string | null;
 }) {
   return (
-    <div className="rounded-lg border p-4 space-y-2">
-      <p className="text-sm font-medium text-muted-foreground">{title}</p>
-      <Badge variant={statusBadgeVariant(status)}>{statusLabel(status)}</Badge>
-      <p className="text-xs text-muted-foreground">{extra}</p>
+    <div className="flex items-start gap-2 text-xs">
+      <CreditCard className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <div className="space-y-0.5">
+        <p className="text-muted-foreground">{text}</p>
+        {total ? <p className="font-medium text-foreground">{total}</p> : null}
+      </div>
+    </div>
+  );
+}
+
+function PlatformStatusCard({
+  status,
+  usage,
+}: {
+  status: string;
+  usage: PlatformUsageInfo;
+}) {
+  const { collaboratorsCount, billedSeats, atMinimum, perSeatCents, totalCents, chargeType } = usage;
+
+  // Texto de breakdown depende do tipo de cobranca
+  let breakdown: { text: string; total: string | null };
+  if (chargeType === 'free' || chargeType === 'trial' || chargeType === 'inactive') {
+    breakdown = {
+      text:
+        chargeType === 'free'
+          ? 'Parceiro Boldfy — sem cobranca.'
+          : chargeType === 'trial'
+            ? 'Em teste gratuito — sem cobranca ate o fim do trial.'
+            : 'Modulo nao ativado — sem cobranca.',
+      total: null,
+    };
+  } else if (perSeatCents != null && totalCents != null) {
+    const perSeat = formatBRL(perSeatCents);
+    const total = formatBRL(totalCents);
+    const minNote = atMinimum ? ' (minimo 5)' : '';
+    breakdown = {
+      text: `${billedSeats} seats${minNote} × ${perSeat}/seat`,
+      total: `${total}/mes`,
+    };
+  } else {
+    breakdown = {
+      text: 'Acima de 70 seats — enterprise. Calculo manual.',
+      total: null,
+    };
+  }
+
+  return (
+    <div className="rounded-lg border p-4 space-y-3">
+      <StatusCardHeader
+        icon={Users}
+        title="Platform"
+        status={status}
+        chargeType={chargeType}
+      />
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Users className="h-3.5 w-3.5" />
+        <span>
+          {collaboratorsCount} {collaboratorsCount === 1 ? 'colaborador' : 'colaboradores'}
+        </span>
+      </div>
+      <PriceBreakdown text={breakdown.text} total={breakdown.total} />
+    </div>
+  );
+}
+
+function TLStatusCard({
+  status,
+  usage,
+}: {
+  status: string;
+  usage: TLUsageInfo;
+}) {
+  const { thoughtLeadersCount, totalCents, chargeType } = usage;
+
+  let breakdown: { text: string; total: string | null };
+  if (chargeType === 'external') {
+    breakdown = {
+      text: 'Cobrado fora da plataforma (contrato direto).',
+      total: null,
+    };
+  } else if (chargeType === 'paid' && totalCents != null) {
+    breakdown = {
+      text: 'Cobrado via Stripe',
+      total: `${formatBRL(totalCents)}/mes`,
+    };
+  } else if (chargeType === 'pending') {
+    breakdown = {
+      text: 'Modulo aguardando 1o pagamento.',
+      total: null,
+    };
+  } else {
+    breakdown = {
+      text: 'Modulo nao ativado — sem cobranca.',
+      total: null,
+    };
+  }
+
+  return (
+    <div className="rounded-lg border p-4 space-y-3">
+      <StatusCardHeader
+        icon={Mic}
+        title="Thought Leaders"
+        status={status}
+        chargeType={chargeType}
+      />
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Mic className="h-3.5 w-3.5" />
+        <span>
+          {thoughtLeadersCount} {thoughtLeadersCount === 1 ? 'thought leader' : 'thought leaders'}
+        </span>
+      </div>
+      <PriceBreakdown text={breakdown.text} total={breakdown.total} />
+    </div>
+  );
+}
+
+function DesignStatusCard({
+  status,
+  usage,
+}: {
+  status: string;
+  usage: DesignUsageInfo;
+}) {
+  const { packLabel, totalCents, chargeType } = usage;
+
+  let breakdown: { text: string; total: string | null };
+  if (chargeType === 'paid' && totalCents != null) {
+    breakdown = {
+      text: 'Cobrado via Stripe',
+      total: `${formatBRL(totalCents)}/mes`,
+    };
+  } else if (chargeType === 'pending') {
+    breakdown = {
+      text: 'Modulo aguardando 1o pagamento.',
+      total: null,
+    };
+  } else {
+    breakdown = {
+      text: 'Modulo nao ativado — sem cobranca.',
+      total: null,
+    };
+  }
+
+  return (
+    <div className="rounded-lg border p-4 space-y-3">
+      <StatusCardHeader
+        icon={Palette}
+        title="Design"
+        status={status}
+        chargeType={chargeType}
+      />
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Palette className="h-3.5 w-3.5" />
+        <span>{packLabel ? `Pack ${packLabel}` : 'Sem pack'}</span>
+      </div>
+      <PriceBreakdown text={breakdown.text} total={breakdown.total} />
     </div>
   );
 }

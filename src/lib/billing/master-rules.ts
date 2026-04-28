@@ -658,9 +658,10 @@ export interface SaveMasterBillingInput {
   // Plano Platform
   trialDurationDays: ValidTrialDurationDays;
   freeTrialUnlimited: boolean;
-  // Beta tester (sub-secao do Plano Platform)
+  // Beta tester (card independente)
   isBetaTester: boolean;
-  betaDurationMonths: number;
+  /** Obrigatorio quando isBetaTester=true; ignorado quando false */
+  betaDurationMonths?: number;
   // Plano TL
   tlBilledOutsidePlatform: boolean;
   tlExecutives?: 1 | 2 | 3 | 4 | 5;
@@ -690,9 +691,15 @@ export function validateSaveMasterBillingInput(input: unknown): SaveMasterBillin
   const freeTrialUnlimited = raw.freeTrialUnlimited === true;
   const isBetaTester = raw.isBetaTester === true;
 
-  const betaNum = Number(raw.betaDurationMonths);
-  if (!Number.isInteger(betaNum) || betaNum < 1 || betaNum > 24) {
-    throw new Error('betaDurationMonths deve ser inteiro entre 1 e 24.');
+  // betaDurationMonths so e validado quando isBetaTester=true.
+  // Quando o switch esta desligado, a UI envia null/undefined — aceitamos.
+  let betaDurationMonths: number | undefined;
+  if (isBetaTester) {
+    const betaNum = Number(raw.betaDurationMonths);
+    if (!Number.isInteger(betaNum) || betaNum < 1 || betaNum > 24) {
+      throw new Error('betaDurationMonths deve ser inteiro entre 1 e 24.');
+    }
+    betaDurationMonths = betaNum;
   }
 
   const tlBilledOutsidePlatform = raw.tlBilledOutsidePlatform === true;
@@ -725,7 +732,7 @@ export function validateSaveMasterBillingInput(input: unknown): SaveMasterBillin
     trialDurationDays: trialNum as ValidTrialDurationDays,
     freeTrialUnlimited,
     isBetaTester,
-    betaDurationMonths: betaNum,
+    betaDurationMonths,
     tlBilledOutsidePlatform,
     tlExecutives,
     tlFrequency,
@@ -796,6 +803,10 @@ export async function applySaveMasterBilling(
   }
 
   // Calcula estado projetado do Beta
+  // IMPORTANTE: master NUNCA seta betaStartsAt manualmente. Apenas o webhook
+  // do Stripe (`invoice.paid`) seta quando a 1a fatura do Platform e paga.
+  // Aqui apenas preservamos data existente e recalculamos betaEndsAt se a
+  // duracao mudou no meio do beta (ex: master estendeu de 3 pra 5 meses).
   const existingBetaStartsAtRaw = existingBilling.betaStartsAt;
   let projectedBetaStartsAt: Date | undefined;
   if (existingBetaStartsAtRaw instanceof Date) {
@@ -805,10 +816,7 @@ export async function applySaveMasterBilling(
   }
 
   let projectedBetaEndsAt: Date | undefined;
-  if (input.isBetaTester) {
-    if (!projectedBetaStartsAt) {
-      projectedBetaStartsAt = now;
-    }
+  if (input.isBetaTester && projectedBetaStartsAt && input.betaDurationMonths) {
     projectedBetaEndsAt = computeBetaEndDate(projectedBetaStartsAt, input.betaDurationMonths);
   }
 
@@ -817,19 +825,30 @@ export async function applySaveMasterBilling(
     'billing.updatedAt': FieldValue.serverTimestamp(),
     'billing.lastUpdatedByMasterUid': masterUid,
     'billing.isBetaTester': input.isBetaTester,
-    'billing.betaDurationMonths': input.betaDurationMonths,
     'billing.notes':
       input.notes !== undefined && input.notes !== '' ? input.notes : FieldValue.delete(),
   };
 
-  // Beta dates
+  // Beta duration: persistido somente quando beta ligado.
+  if (input.isBetaTester && input.betaDurationMonths !== undefined) {
+    updates['billing.betaDurationMonths'] = input.betaDurationMonths;
+  } else if (!input.isBetaTester) {
+    // Beta desligado: limpa duration tambem para nao deixar lixo no doc.
+    updates['billing.betaDurationMonths'] = FieldValue.delete();
+  }
+
+  // Beta dates: master NUNCA cria betaStartsAt — webhook invoice.paid faz isso.
   if (input.isBetaTester) {
-    updates['billing.betaStartsAt'] = projectedBetaStartsAt
-      ? Timestamp.fromDate(projectedBetaStartsAt)
-      : FieldValue.serverTimestamp();
-    updates['billing.betaEndsAt'] = projectedBetaEndsAt
-      ? Timestamp.fromDate(projectedBetaEndsAt)
-      : FieldValue.delete();
+    if (projectedBetaStartsAt) {
+      // Beta ja iniciado — preserva data e recalcula fim (caso duration mudou).
+      updates['billing.betaStartsAt'] = Timestamp.fromDate(projectedBetaStartsAt);
+      if (projectedBetaEndsAt) {
+        updates['billing.betaEndsAt'] = Timestamp.fromDate(projectedBetaEndsAt);
+      } else {
+        updates['billing.betaEndsAt'] = FieldValue.delete();
+      }
+    }
+    // Beta ainda nao comecou: nao toca em betaStartsAt/betaEndsAt — webhook fara.
   } else {
     // Beta desligado: limpa datas (preserva historico via betaExpiresAt deprecated)
     updates['billing.betaStartsAt'] = FieldValue.delete();

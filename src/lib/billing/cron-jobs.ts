@@ -108,9 +108,10 @@ export async function runCheckModuleDeadlines(
     if (!billing) continue;
 
     // Beta tester com tempo restante nao tem modulos bloqueados por deadline.
-    // (betaExpiresAt ausente = beta permanente)
+    // Le betaEndsAt (campo novo) com fallback para betaExpiresAt (deprecated).
+    // (data ausente = beta permanente OU ainda nao iniciado — em ambos casos protegemos)
     if (billing.isBetaTester === true) {
-      const betaEnd = toDate(billing.betaExpiresAt);
+      const betaEnd = toDate(billing.betaEndsAt) ?? toDate(billing.betaExpiresAt);
       if (!betaEnd || betaEnd.getTime() > now.getTime()) {
         continue;
       }
@@ -220,13 +221,17 @@ export async function runCheckBetaExpiration(
     if (!billing) continue;
     if (billing.isBetaTester !== true) continue; // paranoia pos-filtro
 
-    const betaEnd = toDate(billing.betaExpiresAt);
-    if (!betaEnd) continue; // beta permanente, ignorar
+    // Le campo novo (betaEndsAt) com fallback para legado (betaExpiresAt).
+    const betaEnd = toDate(billing.betaEndsAt) ?? toDate(billing.betaExpiresAt);
+    if (!betaEnd) continue; // beta permanente OU ainda nao iniciado (aguardando 1a fatura), ignorar
     if (betaEnd.getTime() > now.getTime()) continue; // ainda no prazo
 
     try {
       await doc.ref.update({
         'billing.isBetaTester': false,
+        // Limpa todos os campos do beta (novo + legado) para nao deixar lixo.
+        'billing.betaStartsAt': FieldValue.delete(),
+        'billing.betaEndsAt': FieldValue.delete(),
         'billing.betaExpiresAt': FieldValue.delete(),
         'billing.updatedAt': FieldValue.serverTimestamp(),
       });
