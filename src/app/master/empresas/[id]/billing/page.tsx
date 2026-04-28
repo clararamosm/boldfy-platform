@@ -21,10 +21,11 @@
 
 'use client';
 
-import React, { useEffect, useMemo, useState, useTransition } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import { Header } from '@/components/dashboard/header';
 import { Button } from '@/components/ui/button';
 import {
@@ -46,7 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, ArrowLeft, CheckCircle2, Users, Mic, Palette, CreditCard, Construction } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Users, Mic, Palette, CreditCard, Construction, Copy, Upload, ImageIcon, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useScrollSpy } from '@/hooks/use-scroll-spy';
@@ -61,6 +62,8 @@ import {
   type DesignUsageInfo,
   type BillingChargeType,
 } from '@/app/actions/billing';
+import { saveCompanyIdentity } from '@/app/actions/master-company';
+import { inviteAdminToCompany } from '@/app/actions/users';
 import type { ActivityLogEntry } from '@/lib/billing/activity-log-types';
 import { formatBRL } from '@/lib/billing/format';
 import { ActivityLogRow } from '@/components/master/activity-log-row';
@@ -152,6 +155,34 @@ export default function MasterCompanyBillingPage() {
   const [isLoadingLog, setIsLoadingLog] = useState(false);
   const [isLoadingMoreLog, setIsLoadingMoreLog] = useState(false);
 
+  // Identidade
+  const [editName, setEditName] = useState('');
+  const [editLocale, setEditLocale] = useState<'pt-BR' | 'en'>('pt-BR');
+  const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
+  const [createdAtISO, setCreatedAtISO] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isSavingIdentity, setIsSavingIdentity] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Seats
+  const [editLicenses, setEditLicenses] = useState<number>(5);
+  const [editTLLicenses, setEditTLLicenses] = useState<number>(0);
+  const [isSavingSeatsPlatform, setIsSavingSeatsPlatform] = useState(false);
+  const [isSavingSeatsTL, setIsSavingSeatsTL] = useState(false);
+
+  // Admin section
+  interface CompanyAdminInfo {
+    uid: string;
+    name: string;
+    emailMasked: string;
+    lastLoginAtISO: string | null;
+  }
+  const [adminInfo, setAdminInfo] = useState<CompanyAdminInfo | null>(null);
+  const [isLoadingAdmin, setIsLoadingAdmin] = useState(false);
+  const [inviteName, setInviteName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isInvitingAdmin, setIsInvitingAdmin] = useState(false);
+
   useEffect(() => {
     if (!companyId) return;
     let cancelled = false;
@@ -161,10 +192,28 @@ export default function MasterCompanyBillingPage() {
         if (cancelled) return;
         setToken(idToken);
 
-        // Nome da empresa (UI) — leitura direta do doc
+        // Nome da empresa + identidade (UI) — leitura direta do doc
         const snap = await getDoc(doc(db, 'companies', companyId));
         if (!cancelled && snap.exists()) {
-          setCompanyName((snap.data()?.companyName as string) || '');
+          const data = snap.data() ?? {};
+          const name = (data.companyName as string) || '';
+          setCompanyName(name);
+          setEditName(name);
+          setEditLocale(data.locale === 'en' ? 'en' : 'pt-BR');
+          setEditLogoUrl(typeof data.logoUrl === 'string' && data.logoUrl ? data.logoUrl : null);
+          const licenses = typeof data.licenses === 'number' ? data.licenses : 5;
+          setEditLicenses(licenses);
+          const tlLic = typeof data.tlLicenses === 'number' ? data.tlLicenses : 0;
+          setEditTLLicenses(tlLic);
+          // createdAt: Firestore Timestamp ou string
+          const created = data.createdAt;
+          if (created && typeof created === 'object' && 'toDate' in created) {
+            setCreatedAtISO(((created as { toDate: () => Date }).toDate()).toISOString());
+          } else if (typeof created === 'string') {
+            setCreatedAtISO(created);
+          } else {
+            setCreatedAtISO(null);
+          }
         }
 
         // Estado de billing via server action (valida role master)
@@ -272,6 +321,173 @@ export default function MasterCompanyBillingPage() {
     } finally {
       setIsLoadingMoreLog(false);
     }
+  }
+
+  // Helper local: mascara email para nao expor identidade.
+  // Ex: joao.silva@boldfy.com -> jo***@boldfy.com
+  function maskEmailLocal(email: string): string {
+    if (!email || !email.includes('@')) return '—';
+    const [local, domain] = email.split('@');
+    if (local.length <= 2) return `${local}***@${domain}`;
+    return `${local.slice(0, 2)}***@${domain}`;
+  }
+
+  // Carrega admin info (independente do billing)
+  async function loadAdminInfo() {
+    if (!companyId) return;
+    setIsLoadingAdmin(true);
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('companyId', '==', companyId),
+        where('role', '==', 'admin'),
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        setAdminInfo(null);
+      } else {
+        const adminDoc = snap.docs[0];
+        const data = adminDoc.data() ?? {};
+        const lastLogin = data.lastLoginAt;
+        let lastLoginISO: string | null = null;
+        if (lastLogin && typeof lastLogin === 'object' && 'toDate' in lastLogin) {
+          lastLoginISO = (lastLogin as { toDate: () => Date }).toDate().toISOString();
+        } else if (typeof lastLogin === 'string') {
+          lastLoginISO = lastLogin;
+        }
+        setAdminInfo({
+          uid: adminDoc.id,
+          name: (data.name as string) || (data.displayName as string) || '—',
+          emailMasked: maskEmailLocal((data.email as string) || ''),
+          lastLoginAtISO: lastLoginISO,
+        });
+      }
+    } catch (e) {
+      console.error('[admin] load erro:', e);
+    } finally {
+      setIsLoadingAdmin(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!companyId) return;
+    loadAdminInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+
+  async function handleSaveIdentity() {
+    if (!companyId || !token) return;
+    setIsSavingIdentity(true);
+    try {
+      const res = await saveCompanyIdentity({
+        idToken: token,
+        companyId,
+        companyName: editName,
+        locale: editLocale,
+        logoUrl: editLogoUrl ?? '',
+      });
+      if (!res.success || !res.data) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({ title: 'Identidade salva.' });
+      setCompanyName(res.data.companyName);
+    } finally {
+      setIsSavingIdentity(false);
+    }
+  }
+
+  async function handleSaveSeatsPlatform() {
+    if (!companyId || !token) return;
+    setIsSavingSeatsPlatform(true);
+    try {
+      const res = await saveCompanyIdentity({
+        idToken: token,
+        companyId,
+        licenses: editLicenses,
+      });
+      if (!res.success) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({ title: 'Seats Platform salvos.' });
+    } finally {
+      setIsSavingSeatsPlatform(false);
+    }
+  }
+
+  async function handleSaveSeatsTL() {
+    if (!companyId || !token) return;
+    setIsSavingSeatsTL(true);
+    try {
+      const res = await saveCompanyIdentity({
+        idToken: token,
+        companyId,
+        tlLicenses: editTLLicenses,
+      });
+      if (!res.success) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({ title: 'Seats TL salvos.' });
+    } finally {
+      setIsSavingSeatsTL(false);
+    }
+  }
+
+  async function handleLogoUpload(file: File) {
+    if (!companyId || !file) return;
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ variant: 'destructive', title: 'Use PNG, JPG ou WEBP.' });
+      return;
+    }
+    setIsUploadingLogo(true);
+    try {
+      const ext = file.name.split('.').pop() || 'png';
+      const ref = storageRef(storage, `companies/${companyId}/logo.${ext}`);
+      await uploadBytes(ref, file);
+      const url = await getDownloadURL(ref);
+      setEditLogoUrl(url);
+      toast({ title: 'Logo enviado. Lembre de salvar a identidade.' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Erro ao fazer upload do logo.' });
+      console.error('[logo upload] erro:', e);
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  }
+
+  async function handleInviteAdmin() {
+    if (!companyId || !token) return;
+    if (!inviteName.trim() || !inviteEmail.trim()) {
+      toast({ variant: 'destructive', title: 'Nome e email obrigatorios.' });
+      return;
+    }
+    setIsInvitingAdmin(true);
+    try {
+      const res = await inviteAdminToCompany(token, companyId, inviteName.trim(), inviteEmail.trim());
+      if (res.error) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({ title: 'Admin convidado.' });
+      setInviteName('');
+      setInviteEmail('');
+      // Recarrega admin info pra mostrar o novo
+      await loadAdminInfo();
+    } finally {
+      setIsInvitingAdmin(false);
+    }
+  }
+
+  function handleCopyId() {
+    if (!companyId) return;
+    navigator.clipboard.writeText(companyId).then(
+      () => toast({ title: 'ID copiado.' }),
+      () => toast({ variant: 'destructive', title: 'Falhou ao copiar.' }),
+    );
   }
 
   // Tags historicas "Concluido"
@@ -448,26 +664,129 @@ export default function MasterCompanyBillingPage() {
 
           {/* Main content */}
           <main className="flex-1 min-w-0 space-y-6">
-            {/* Secao: Identidade (placeholder — PR 5 implementa) */}
+            {/* Secao: Identidade */}
             <section id="identidade" className="scroll-mt-20">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    Identidade
-                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
-                      <Construction className="h-3 w-3" />
-                      Em construcao
-                    </Badge>
-                  </CardTitle>
+                  <CardTitle>Identidade</CardTitle>
                   <CardDescription>
-                    Logo, nome, idioma, ID e data de criacao. Substitui o dialog
-                    &quot;Editar Empresa&quot; da listagem.
+                    Logo, nome, idioma e metadados da empresa.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Em breve nesta secao: editar logo, nome e idioma da empresa.
-                  </p>
+                <CardContent className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-[140px_1fr] gap-5 items-start">
+                    {/* Logo */}
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-28 w-28 rounded-md border bg-muted/30 flex items-center justify-center overflow-hidden">
+                        {editLogoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={editLogoUrl} alt="Logo" className="object-contain h-full w-full" />
+                        ) : (
+                          <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                        )}
+                      </div>
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleLogoUpload(f);
+                          if (logoInputRef.current) logoInputRef.current.value = '';
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isUploadingLogo}
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        {isUploadingLogo ? (
+                          <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Upload className="mr-2 h-3 w-3" />
+                        )}
+                        Trocar logo
+                      </Button>
+                      {editLogoUrl && (
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-destructive underline"
+                          onClick={() => setEditLogoUrl(null)}
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Campos */}
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="ident-name">Nome da empresa</Label>
+                        <Input
+                          id="ident-name"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          maxLength={200}
+                          placeholder="Nome legal ou comercial"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="ident-locale">Idioma</Label>
+                        <Select value={editLocale} onValueChange={(v) => setEditLocale(v as 'pt-BR' | 'en')}>
+                          <SelectTrigger id="ident-locale" className="w-full md:w-60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pt-BR">Portugues (Brasil)</SelectItem>
+                            <SelectItem value="en">English</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">ID da empresa</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <code className="text-xs bg-muted/50 px-2 py-1 rounded truncate flex-1">
+                              {companyId ?? '—'}
+                            </code>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={handleCopyId}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Criada em</Label>
+                          <p className="text-sm mt-2">
+                            {createdAtISO
+                              ? new Date(createdAtISO).toLocaleDateString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                })
+                              : '—'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2 border-t">
+                    <Button onClick={handleSaveIdentity} disabled={isSavingIdentity}>
+                      {isSavingIdentity && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Salvar identidade
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </section>
@@ -704,6 +1023,34 @@ export default function MasterCompanyBillingPage() {
           </CardContent>
         </Card>
 
+        {/* Card Seats Platform */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Seats Platform</CardTitle>
+            <CardDescription>
+              Numero de licencas Platform contratadas. Minimo 5.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-3">
+              <div className="space-y-1.5 flex-1 max-w-xs">
+                <Label htmlFor="platform-seats">Quantidade</Label>
+                <Input
+                  id="platform-seats"
+                  type="number"
+                  min={5}
+                  value={editLicenses}
+                  onChange={(e) => setEditLicenses(Number(e.target.value))}
+                />
+              </div>
+              <Button onClick={handleSaveSeatsPlatform} disabled={isSavingSeatsPlatform}>
+                {isSavingSeatsPlatform && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar seats Platform
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
             </section>
 
             {/* Secao: Thought Leader */}
@@ -777,6 +1124,35 @@ export default function MasterCompanyBillingPage() {
           </CardContent>
         </Card>
 
+        {/* Card Seats TL */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Seats Thought Leader</CardTitle>
+            <CardDescription>
+              Numero de licencas TL contratadas (0-50). Cada seat habilita um executivo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-3">
+              <div className="space-y-1.5 flex-1 max-w-xs">
+                <Label htmlFor="tl-seats">Quantidade</Label>
+                <Input
+                  id="tl-seats"
+                  type="number"
+                  min={0}
+                  max={50}
+                  value={editTLLicenses}
+                  onChange={(e) => setEditTLLicenses(Number(e.target.value))}
+                />
+              </div>
+              <Button onClick={handleSaveSeatsTL} disabled={isSavingSeatsTL}>
+                {isSavingSeatsTL && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar seats TL
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
             </section>
 
             {/* Secao: Design (placeholder — nao tem card dedicado ainda alem do status) */}
@@ -832,26 +1208,91 @@ export default function MasterCompanyBillingPage() {
           Todas as mudancas sao logadas no Firestore com o UID do master que executou.
         </p>
 
-            {/* Secao: Admin (placeholder — PR 6) */}
+            {/* Secao: Admin */}
             <section id="admin" className="scroll-mt-20">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    Admin da Empresa
-                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
-                      <Construction className="h-3 w-3" />
-                      Em construcao
-                    </Badge>
-                  </CardTitle>
+                  <CardTitle>Admin da Empresa</CardTitle>
                   <CardDescription>
-                    Informacoes do admin atual e convite quando ainda nao ha admin.
+                    Visivel apenas para o master. Email e mascarado por privacidade.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Em breve: nome, email mascarado, ultimo login, e form de convite
-                    quando a empresa ainda nao tem admin.
-                  </p>
+                  {isLoadingAdmin ? (
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Carregando admin...
+                    </div>
+                  ) : adminInfo ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-md border bg-muted/20 p-4">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Nome</Label>
+                          <p className="text-sm font-medium mt-1">{adminInfo.name}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Email</Label>
+                          <p className="text-sm font-mono mt-1">{adminInfo.emailMasked}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Ultimo login</Label>
+                          <p className="text-sm mt-1">
+                            {adminInfo.lastLoginAtISO
+                              ? new Date(adminInfo.lastLoginAtISO).toLocaleString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Para trocar o admin, exclua o usuario na area de Usuarios e convide outro.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="rounded-md border border-dashed p-4 text-center">
+                        <p className="text-sm text-muted-foreground">
+                          Esta empresa ainda nao tem admin. Convide um abaixo.
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="invite-name">Nome do admin</Label>
+                          <Input
+                            id="invite-name"
+                            value={inviteName}
+                            onChange={(e) => setInviteName(e.target.value)}
+                            placeholder="Ex: Joao Silva"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="invite-email">Email</Label>
+                          <Input
+                            id="invite-email"
+                            type="email"
+                            value={inviteEmail}
+                            onChange={(e) => setInviteEmail(e.target.value)}
+                            placeholder="admin@empresa.com"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <Button onClick={handleInviteAdmin} disabled={isInvitingAdmin}>
+                          {isInvitingAdmin ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <UserPlus className="mr-2 h-4 w-4" />
+                          )}
+                          Convidar admin
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </section>
