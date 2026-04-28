@@ -41,6 +41,7 @@ import { resyncPlatformSeats } from '@/lib/billing/seat-management';
 import { computeBillingWarnings, type BillingWarning } from '@/lib/billing/warnings';
 import type { CompanyBillingBlock } from '@/lib/billing/types';
 import type { ActivityLogEntry } from '@/lib/billing/activity-log-types';
+import { appendActivityLog } from '@/lib/billing/activity-log';
 import {
   calculatePlatformMonthlyPriceCents,
   calculateTLMonthlyPriceCents,
@@ -466,6 +467,17 @@ export async function triggerAdminFirstLogin(
       return { success: false, error: 'Admin sem empresa vinculada.' };
     }
     await applyAdminFirstLogin(admin.companyId);
+    // Log best-effort: idempotente via uid do admin (1 entry por admin/empresa)
+    await appendActivityLog(
+      admin.companyId,
+      {
+        kind: 'admin.first_login',
+        actorRole: 'admin',
+        actorUid: admin.uid,
+        summary: 'Admin acessou a plataforma pela primeira vez',
+      },
+      { idempotencyKey: admin.uid },
+    );
     return { success: true };
   } catch (e: unknown) {
     return {
@@ -531,6 +543,14 @@ export async function saveMasterBilling(
 
     const updated = await applySaveMasterBilling(validated, master.uid);
     const data = await serializeWithCounts(input.companyId, updated);
+    // Log best-effort: cada save = 1 entrada (auto-id, sem idempotencia).
+    // Summary descritivo sem expor valores cobrados ou IDs sensiveis.
+    await appendActivityLog(input.companyId, {
+      kind: 'billing.config_changed',
+      actorRole: 'master',
+      actorUid: master.uid,
+      summary: 'Configuracoes de billing atualizadas pelo master',
+    });
     return { success: true, data };
   } catch (e: unknown) {
     console.error('[saveMasterBilling] falhou:', e);

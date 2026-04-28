@@ -10,6 +10,19 @@ import crypto from 'crypto';
 import { generateSlug } from '@/lib/slugify';
 import { getDefaultBillingBlock } from '@/lib/billing/types';
 import { resyncPlatformSeats } from '@/lib/billing/seat-management';
+import { appendActivityLog } from '@/lib/billing/activity-log';
+
+// Mascara email para uso em activity log (compliance: nao expor email cru).
+// Ex: 'joao.silva@boldfy.com' => 'jo***@boldfy.com'
+function maskEmail(email: string): string {
+  if (!email || typeof email !== 'string') return '***';
+  const at = email.indexOf('@');
+  if (at < 0) return '***';
+  const local = email.slice(0, at);
+  const domain = email.slice(at);
+  const visible = local.slice(0, Math.min(2, local.length));
+  return `${visible}***${domain}`;
+}
 
 // ---- Email Invitation Helper ----
 
@@ -245,6 +258,18 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     const companySlug = generateSlug(companyName, companyId);
     await companyRef.update({ slug: companySlug });
 
+    // Log: empresa criada. Idempotente via companyId (1 por empresa).
+    await appendActivityLog(
+      companyId,
+      {
+        kind: 'company.created',
+        actorRole: 'master',
+        actorUid: null,
+        summary: `Empresa criada com ${licenses} licenca(s) Platform`,
+      },
+      { idempotencyKey: companyId },
+    );
+
     // Seed default AI credits reward for the new company
     await adminDb.collection('companies').doc(companyId).collection('rewards').add({
       name: '5 Creditos de IA',
@@ -278,6 +303,18 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       profile: { name: adminName, email: adminEmail },
       createdAt: FieldValue.serverTimestamp(),
     });
+
+    // Log: admin convidado. Idempotente via uid (1 entry por admin/empresa).
+    await appendActivityLog(
+      companyId,
+      {
+        kind: 'admin.invited',
+        actorRole: 'master',
+        actorUid: null,
+        summary: `Admin convidado (${maskEmail(adminEmail)})`,
+      },
+      { idempotencyKey: userRecord.uid },
+    );
 
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
     const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
@@ -356,6 +393,18 @@ export async function inviteAdminToCompany(
     await adminDb.collection('companies').doc(companyId).update({
       adminProfile: { email: adminEmail, name: adminName },
     });
+
+    // Log: admin convidado para empresa existente. Idempotente via uid.
+    await appendActivityLog(
+      companyId,
+      {
+        kind: 'admin.invited',
+        actorRole: 'master',
+        actorUid: null,
+        summary: `Admin convidado (${maskEmail(adminEmail)})`,
+      },
+      { idempotencyKey: userRecord.uid },
+    );
 
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
     const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
@@ -458,6 +507,18 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
       profile: { name, email },
       createdAt: FieldValue.serverTimestamp(),
     });
+
+    // Log: colaborador convidado. Idempotente via uid.
+    await appendActivityLog(
+      companyId,
+      {
+        kind: 'collaborator.invited',
+        actorRole: 'admin',
+        actorUid: null,
+        summary: `Colaborador convidado (${maskEmail(email)})`,
+      },
+      { idempotencyKey: userRecord.uid },
+    );
 
     // Billing: sincroniza seats do modulo Platform (Firestore + Stripe com proration).
     // Nao bloqueia o convite caso falhe — erro ja e logado internamente.

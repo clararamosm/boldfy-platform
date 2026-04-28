@@ -21,6 +21,7 @@ import {
   DEFAULT_BETA_DURATION_MONTHS,
 } from '@/lib/billing/master-rules';
 import type { CompanyBillingBlock } from '@/lib/billing/types';
+import { appendActivityLog } from '@/lib/billing/activity-log';
 
 // ────────────────────────────────────────────────────────────
 // HANDLERS MODULARES (billing.* em vez de subscription.*)
@@ -202,6 +203,18 @@ export async function POST(req: NextRequest) {
             moduleKey: modInfo.module,
             subscription: sub,
           });
+
+          // Log: modulo ativado via checkout completo. Idempotencia por event.id.
+          await appendActivityLog(
+            modInfo.companyId,
+            {
+              kind: 'billing.status_changed',
+              actorRole: 'webhook',
+              actorUid: null,
+              summary: `Modulo ${modInfo.module} ativado via pagamento`,
+            },
+            { idempotencyKey: event.id },
+          );
         }
         break;
       }
@@ -218,6 +231,18 @@ export async function POST(req: NextRequest) {
           moduleKey: modInfoUpd.module,
           subscription: subUpdated,
         });
+
+        // Log: assinatura atualizada (mudanca de status, seats, period etc).
+        await appendActivityLog(
+          modInfoUpd.companyId,
+          {
+            kind: 'subscription.updated',
+            actorRole: 'webhook',
+            actorUid: null,
+            summary: `Assinatura ${modInfoUpd.module} atualizada`,
+          },
+          { idempotencyKey: event.id },
+        );
         break;
       }
 
@@ -232,6 +257,18 @@ export async function POST(req: NextRequest) {
           companyId: modInfoDel.companyId,
           moduleKey: modInfoDel.module,
         });
+
+        // Log: assinatura cancelada / modulo bloqueado.
+        await appendActivityLog(
+          modInfoDel.companyId,
+          {
+            kind: 'billing.status_changed',
+            actorRole: 'webhook',
+            actorUid: null,
+            summary: `Modulo ${modInfoDel.module} cancelado`,
+          },
+          { idempotencyKey: event.id },
+        );
         break;
       }
 
@@ -253,6 +290,18 @@ export async function POST(req: NextRequest) {
           companyId: modInfoFailed.companyId,
           moduleKey: modInfoFailed.module,
         });
+
+        // Log: pagamento falhou, modulo bloqueado.
+        await appendActivityLog(
+          modInfoFailed.companyId,
+          {
+            kind: 'payment.failed',
+            actorRole: 'webhook',
+            actorUid: null,
+            summary: `Pagamento ${modInfoFailed.module} falhou`,
+          },
+          { idempotencyKey: event.id },
+        );
         break;
       }
 
@@ -293,6 +342,18 @@ export async function POST(req: NextRequest) {
           'billing.updatedAt': FieldValue.serverTimestamp(),
         });
         console.log(`Beta tester iniciado (${durationMonths} meses)`);
+
+        // Log: primeira fatura paga marca o inicio do beta tester.
+        await appendActivityLog(
+          modInfo.companyId,
+          {
+            kind: 'payment.received',
+            actorRole: 'webhook',
+            actorUid: null,
+            summary: `Primeira fatura paga — beta iniciado (${durationMonths} meses)`,
+          },
+          { idempotencyKey: event.id },
+        );
         break;
       }
 
