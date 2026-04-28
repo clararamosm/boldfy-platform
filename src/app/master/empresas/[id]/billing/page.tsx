@@ -59,7 +59,7 @@ import {
   type DesignUsageInfo,
   type BillingChargeType,
 } from '@/app/actions/billing';
-import { formatBRL } from '@/lib/billing/pricing';
+import { formatBRL } from '@/lib/billing/format';
 
 function statusBadgeVariant(
   status: string,
