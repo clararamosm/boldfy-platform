@@ -57,7 +57,7 @@ export interface PlatformBillingState {
 /**
  * Estado do modulo TL (thought leaders).
  * executives/frequency: usados para calcular preco via matriz.
- * billedOutsidePlatform: caso especial (ex: Omie).
+ * billedOutsidePlatform: caso especial (contrato direto, cobrado fora).
  */
 export interface TLBillingState {
   active: boolean;
@@ -105,10 +105,15 @@ export interface FiscalData {
 /**
  * Bloco `billing` completo dentro de `companies/{id}`.
  * So o server pode modificar. Cliente apenas le.
+ *
+ * NOTA: campo `enabled` foi REMOVIDO no refactor billing-remove-enabled.
+ * Toda empresa entra automaticamente no fluxo de cobranca. Para isencao,
+ * use platform.freeTrialUnlimited (parceiro Boldfy) ou tl.billedOutsidePlatform
+ * (cobrado fora da plataforma via contrato direto).
  */
 export interface CompanyBillingBlock {
-  enabled: boolean;
   isBetaTester: boolean;
+  /** @deprecated use betaEndsAt. Mantido para compat retroativa. */
   betaExpiresAt?: MaybeTimestamp;
   notes?: string;
 
@@ -122,7 +127,7 @@ export interface CompanyBillingBlock {
   // Beta com timeline propria (refactor billing-trial-flow)
   /** Duracao do beta em meses (default 5). Master configura por empresa */
   betaDurationMonths?: number;
-  /** Setado quando platform vira 'active' pela primeira vez */
+  /** Setado quando platform vira 'active' pela primeira vez (ou quando master liga manualmente) */
   betaStartsAt?: MaybeTimestamp;
   /** Calculado: betaStartsAt + betaDurationMonths */
   betaEndsAt?: MaybeTimestamp;
@@ -133,11 +138,10 @@ export interface CompanyBillingBlock {
 
 /**
  * Defaults seguros para uma empresa recem-criada.
- * Sem trial, sem beta, sem Stripe. Master liga quando quiser cobrar.
+ * Empresa entra ja no fluxo de cobranca; trial Platform comeca no admin first login.
  */
 export function getDefaultBillingBlock(): Omit<CompanyBillingBlock, 'createdAt' | 'updatedAt'> {
   return {
-    enabled: false,
     isBetaTester: false,
     betaDurationMonths: 5,
     platform: {

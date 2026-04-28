@@ -3,7 +3,7 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { requireAuth, requireStrategistForTL, requireAdminOrStrategist, requireTLOrMaster, requireActiveSubscription } from '@/lib/auth-guard';
+import { requireAuth, requireStrategistForTL, requireAdminOrStrategist, requireTLOrMaster } from '@/lib/auth-guard';
 import { requireActiveModule, requireActiveModuleForCompany } from '@/lib/billing/module-gate';
 import { triggerSlackNotification } from '@/lib/slack-notifications';
 import { generateSlug } from '@/lib/slugify';
@@ -86,9 +86,9 @@ export async function createPipelinePost(
 ): Promise<ActionResult> {
   try {
     const user = await requireStrategistForTL(idToken, tlUserId);
-    await requireActiveSubscription(user);
 
     // Gate granular: empresa do TL precisa ter modulo TL ativo (ou estar em beta/legacy).
+    // requireActiveModuleForCompany ja cobre billing.tl; legacy gate foi removido.
     const tlCompanyId = await getCompanyIdOfTL(tlUserId);
     if (tlCompanyId) {
       await requireActiveModuleForCompany(tlCompanyId, 'tl');
@@ -138,7 +138,7 @@ export async function createPipelineIdea(
     if (user.role !== 'thoughtleader') {
       return { error: 'Apenas Thought Leaders podem adicionar ideias.' };
     }
-    await requireActiveSubscription(user);
+    // requireActiveModule cobre billing.tl; legacy gate foi removido.
     await requireActiveModule(user, 'tl');
 
     const now = new Date().toISOString();

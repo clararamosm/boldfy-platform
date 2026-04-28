@@ -1,26 +1,22 @@
 // src/app/admin/configuracoes/page.tsx
 'use client';
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { doc, setDoc } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage, auth as firebaseAuth } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
 import { Header } from "@/components/dashboard/header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Camera, CreditCard, ExternalLink, CheckCircle, AlertTriangle, Clock } from "lucide-react";
+import { Loader2, Camera } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useT } from '@/lib/i18n/context';
-import { useAuth } from '@/contexts/auth-context';
 import { useCompanyData } from '@/hooks/use-company-data';
 import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
-import { useSubscription } from '@/hooks/use-subscription';
 import { NotificationSettings } from '@/components/notification-settings';
 
 const ADMIN_NOTIF_OPTIONS = [
@@ -74,12 +70,13 @@ const SettingsSkeleton = () => (
         </main>
     </>
 );
-// ── Billing Card ───────────────────────────────────────────────
+// NOTA: BillingCard legado foi REMOVIDO desta tela.
+// Toda gestao de assinatura agora vive em /admin/billing (rota dedicada).
+// Esta pagina cuida apenas de perfil + notificacoes.
 
 function ConfiguracoesPageContent() {
     const t = useT();
     const { toast } = useToast();
-    const { user } = useAuth();
     const companyId = useResolvedCompanyId();
     const { company, isLoading: companyLoading } = useCompanyData(companyId);
 

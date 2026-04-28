@@ -16,9 +16,14 @@ import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { LinkedInSidebarBox } from "@/components/dashboard/linkedin-sidebar-box";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
-import { useSubscription } from "@/hooks/use-subscription";
-import { SubscriptionGate } from "@/components/subscription-gate";
 import { OnboardingShell } from "@/components/onboarding";
+import { BillingWarningBanner } from "@/components/billing/billing-warning-banner";
+
+// NOTA: useSubscription e SubscriptionGate legados foram removidos.
+// O sistema novo de billing (BillingWarningBanner + module-gate.ts server-side)
+// cobre os mesmos casos lendo o billing block ao inves do campo subscription
+// (que foi deprecated). Bloqueio de modulo agora e gated no server por
+// chamada (assertModuleAllowed em module-gate.ts), nao mais no client layout.
 
 function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
@@ -26,7 +31,6 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
         role: 'thoughtleader',
         checkLinkedInToken: true,
     });
-    const subscription = useSubscription(companyId);
     const router = useRouter();
     const [companyLogoUrl, setCompanyLogoUrl] = useState<string | undefined>();
 
@@ -82,17 +86,10 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
     return (
         <LocaleProvider locale={locale}>
         <DashboardLayout sidebar={sidebarContent}>
-            {subscription.loading ? (
-                <div className="flex items-center justify-center min-h-[60vh]">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-            ) : subscription.isBlocked ? (
-                <SubscriptionGate role="colaborador" plan={subscription.plan} />
-            ) : (
-                <OnboardingShell role="thoughtleader">
-                    {children}
-                </OnboardingShell>
-            )}
+            <BillingWarningBanner />
+            <OnboardingShell role="thoughtleader">
+                {children}
+            </OnboardingShell>
         </DashboardLayout>
         </LocaleProvider>
     );

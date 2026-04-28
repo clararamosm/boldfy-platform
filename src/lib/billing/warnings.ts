@@ -154,6 +154,8 @@ export function computeBillingWarnings(
   if (!billing) return out;
 
   // 2. Beta tester
+  // Le campo novo (betaEndsAt) com fallback para legado (betaExpiresAt).
+  // Ausencia significa: beta permanente OU ainda nao iniciou (pre 1a fatura paga).
   if (billing.isBetaTester === true) {
     // Novo schema: billing.betaEndsAt (top-level, gravado em markModuleAsActive
     // quando Platform vira active pela primeira vez). Fallback: betaExpiresAt
@@ -294,7 +296,7 @@ export function computeBillingWarnings(
     if (w) out.push(w);
   }
 
-  // Ordenacao: critical > warning > info. Dentro do mesmo nivel, preservar ordem (modulo primeiro, beta depois, billing-disabled por ultimo).
+  // Ordenacao: critical > warning > info. Dentro do mesmo nivel, preservar ordem (modulo primeiro, beta depois).
   const severityRank: Record<BillingWarningSeverity, number> = {
     critical: 0,
     warning: 1,

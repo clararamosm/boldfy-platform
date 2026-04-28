@@ -17,9 +17,14 @@ import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { LinkedInSidebarBox } from "@/components/dashboard/linkedin-sidebar-box";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
-import { useSubscription } from "@/hooks/use-subscription";
-import { SubscriptionGate } from "@/components/subscription-gate";
 import { OnboardingShell } from "@/components/onboarding";
+import { BillingWarningBanner } from "@/components/billing/billing-warning-banner";
+
+// NOTA: useSubscription e SubscriptionGate legados foram removidos.
+// O sistema novo de billing (BillingWarningBanner + module-gate.ts server-side)
+// cobre os mesmos casos lendo o billing block ao inves do campo subscription
+// (que foi deprecated). Bloqueio de modulo agora e gated no server por
+// chamada (assertModuleAllowed em module-gate.ts), nao mais no client layout.
 
 function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
@@ -27,7 +32,6 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
         role: 'colaborador',
         checkLinkedInToken: true,
     });
-    const subscription = useSubscription(companyId);
     const router = useRouter();
     const [companyLogoUrl, setCompanyLogoUrl] = useState<string | undefined>();
     const [companyName, setCompanyName] = useState('');
@@ -88,18 +92,10 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
     return (
         <LocaleProvider locale={locale}>
         <DashboardLayout sidebar={sidebarContent}>
-            {/* Block access when company subscription is expired */}
-            {subscription.loading ? (
-                <div className="flex items-center justify-center min-h-[60vh]">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-            ) : subscription.isBlocked ? (
-                <SubscriptionGate role="colaborador" plan={subscription.plan} />
-            ) : (
-                <OnboardingShell role="colaborador" companyName={companyName}>
-                    {children}
-                </OnboardingShell>
-            )}
+            <BillingWarningBanner />
+            <OnboardingShell role="colaborador" companyName={companyName}>
+                {children}
+            </OnboardingShell>
         </DashboardLayout>
         </LocaleProvider>
     );

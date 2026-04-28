@@ -11,23 +11,25 @@ import { AdminSidebarNav } from "@/components/dashboard/admin-sidebar-nav";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { User as UserIcon, Loader2, ArrowLeft, Shield, HelpCircle, Palette, CreditCard } from "lucide-react";
 import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { AuthProvider } from "@/contexts/auth-context";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
-import { useSubscription } from "@/hooks/use-subscription";
-import { SubscriptionGate } from "@/components/subscription-gate";
 import { OnboardingShell } from "@/components/onboarding";
 import { BillingWarningBanner } from "@/components/billing/billing-warning-banner";
+
+// NOTA: TrialBanner e SubscriptionGate legados foram removidos.
+// O sistema novo de billing (BillingWarningBanner + module-gate.ts server-side)
+// cobre os mesmos casos lendo o billing block ao inves do campo subscription
+// (que foi deprecated). Bloqueio de modulo agora e gated no server por
+// chamada (assertModuleAllowed em module-gate.ts), nao mais no client layout.
 
 function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
     const { user, companyId, locale, loading, ready, isMasterMode, masterCompanyName } = useAuthGuard({ role: 'admin' });
-    const subscription = useSubscription(companyId);
     const router = useRouter();
-    const pathname = usePathname();
     const [companyLogoUrl, setCompanyLogoUrl] = useState<string | undefined>();
     const [companyName, setCompanyName] = useState('');
     const [licensesCount, setLicensesCount] = useState(5);
@@ -38,7 +40,11 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             const data = snap.data();
             setCompanyLogoUrl(data?.logoUrl || undefined);
             setCompanyName(data?.companyName || '');
-            setLicensesCount(data?.subscription?.totalLicenses || 5);
+            // Le seats do billing block novo. Fallback no legado (subscription.totalLicenses)
+            // permanece para empresas que ainda nao foram migradas.
+            const billingSeats = data?.billing?.platform?.seats;
+            const legacySeats = data?.subscription?.totalLicenses;
+            setLicensesCount(billingSeats || legacySeats || 5);
         }).catch(() => {});
     }, [companyId]);
 
@@ -104,22 +110,13 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
                 <BillingWarningBanner />
-                {/* Block access when subscription is expired — except /admin/configuracoes (billing page) */}
-                {subscription.loading ? (
-                    <div className="flex items-center justify-center min-h-[60vh]">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                ) : subscription.isBlocked && !isMasterMode && pathname !== '/admin/configuracoes' ? (
-                    <SubscriptionGate role="admin" plan={subscription.plan} />
-                ) : (
-                    <OnboardingShell
-                        role="admin"
-                        companyName={companyName}
-                        licensesCount={licensesCount}
-                    >
-                        {children}
-                    </OnboardingShell>
-                )}
+                <OnboardingShell
+                    role="admin"
+                    companyName={companyName}
+                    licensesCount={licensesCount}
+                >
+                    {children}
+                </OnboardingShell>
             </DashboardLayout>
         </LocaleProvider>
     );

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { triggerAdminFirstLogin } from '@/app/actions/billing';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -52,7 +53,11 @@ function LoginForm() {
           return;
         }
         if (userRole === 'master') { router.push('/master/empresas'); }
-        else if (userRole === 'admin') { router.push('/admin/dashboard'); }
+        else if (userRole === 'admin') {
+          // Idempotente: dispara onboarding billing no primeiro login do admin
+          await triggerAdminFirstLogin(idToken);
+          router.push('/admin/dashboard');
+        }
         else if (userRole === 'colaborador') { router.push('/colaborador/dashboard'); }
         else if (userRole === 'thoughtleader') { router.push('/thoughtleader/dashboard'); }
         else if (userRole === 'strategist') { router.push('/strategist/dashboard'); }

@@ -308,13 +308,12 @@ export async function createModuleCheckoutSession(
   const data = snap.data() ?? {};
   const companyName = (data.companyName as string | undefined) ?? 'Boldfy Company';
   const billing = (data.billing as CompanyBillingBlock | undefined);
-  const isBeta = billing?.isBetaTester === true;
-
-  if (!billing?.enabled) {
+  if (!billing) {
     throw new Error(
-      'Billing desligado para esta empresa. Master precisa ativar antes.',
+      `Empresa ${input.companyId} sem bloco de billing. Contate o suporte.`,
     );
   }
+  const isBeta = billing.isBetaTester === true;
 
   const customerId = await getOrCreateStripeCustomer({
     companyId: input.companyId,

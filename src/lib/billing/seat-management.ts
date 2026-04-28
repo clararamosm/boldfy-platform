@@ -98,7 +98,7 @@ export async function resyncPlatformSeats(companyId: string): Promise<SeatSyncRe
     const sub = await stripe.subscriptions.retrieve(platform.stripeSubscriptionId);
     const item = sub.items?.data?.[0];
     if (!item) {
-      console.warn(`[seat-management] Subscription ${platform.stripeSubscriptionId} sem items.`);
+      console.warn('[seat-management] Subscription sem items.');
       return { newSeats: desiredSeats, stripeUpdated: false };
     }
 
