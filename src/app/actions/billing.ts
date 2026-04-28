@@ -40,6 +40,7 @@ import {
 import { resyncPlatformSeats } from '@/lib/billing/seat-management';
 import { computeBillingWarnings, type BillingWarning } from '@/lib/billing/warnings';
 import type { CompanyBillingBlock } from '@/lib/billing/types';
+import type { ActivityLogEntry } from '@/lib/billing/activity-log-types';
 import {
   calculatePlatformMonthlyPriceCents,
   calculateTLMonthlyPriceCents,
@@ -972,6 +973,111 @@ export async function getBillingWarnings(
     return {
       success: false,
       error: e instanceof Error ? e.message : 'Erro ao carregar avisos.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// MASTER: Activity Log da empresa (read-only)
+// ────────────────────────────────────────────────────────────
+
+export interface GetCompanyActivityLogOptions {
+  /** Quantos itens trazer. Default 50, max 100. */
+  limit?: number;
+  /** ISO string do `ts` do ultimo item da pagina anterior. Usado em startAfter(). */
+  cursorTs?: string;
+}
+
+export interface GetCompanyActivityLogResult {
+  entries: ActivityLogEntry[];
+  hasMore: boolean;
+}
+
+const ACTIVITY_LOG_DEFAULT_LIMIT = 50;
+const ACTIVITY_LOG_MAX_LIMIT = 100;
+
+/**
+ * Master le a activity log de uma empresa, ordenada por ts desc.
+ *
+ * Compliance: campos como `redactedDetails` (se existirem no doc) sao strippados
+ * automaticamente pela tipagem — o ActivityLogEntry exposto so tem os campos
+ * publicos (id, ts, kind, actorRole, actorUid, summary).
+ *
+ * Quando a colecao esta vazia (empresa antiga, sem nenhum log gerado pos-deploy),
+ * retorna 1 entrada sintetica 'system.log_started' calculada em runtime — nao
+ * persiste nada. Isso evita backfill artificial e da contexto pro master.
+ */
+export async function getCompanyActivityLog(
+  idToken: string,
+  companyId: string,
+  opts?: GetCompanyActivityLogOptions,
+): Promise<BillingActionResult<GetCompanyActivityLogResult>> {
+  try {
+    if (!idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    await requireMaster(idToken);
+    if (!companyId || typeof companyId !== 'string') {
+      return { success: false, error: 'companyId invalido.' };
+    }
+
+    const requested = Math.floor(opts?.limit ?? ACTIVITY_LOG_DEFAULT_LIMIT);
+    const limit = Math.max(1, Math.min(requested, ACTIVITY_LOG_MAX_LIMIT));
+
+    let query = adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('activityLog')
+      .orderBy('ts', 'desc')
+      .limit(limit + 1); // +1 pra detectar hasMore sem segundo round-trip
+
+    if (opts?.cursorTs) {
+      const cursorDate = new Date(opts.cursorTs);
+      if (!Number.isNaN(cursorDate.getTime())) {
+        query = query.startAfter(cursorDate);
+      }
+    }
+
+    const snap = await query.get();
+
+    // Empresa sem log algum: devolve placeholder sintetico (nao persiste).
+    if (snap.empty && !opts?.cursorTs) {
+      const placeholder: ActivityLogEntry = {
+        id: 'synthetic_log_started',
+        ts: new Date().toISOString(),
+        kind: 'system.log_started',
+        actorRole: 'system',
+        actorUid: null,
+        summary: 'Histórico de atividades iniciado.',
+      };
+      return {
+        success: true,
+        data: { entries: [placeholder], hasMore: false },
+      };
+    }
+
+    const docs = snap.docs;
+    const hasMore = docs.length > limit;
+    const sliced = hasMore ? docs.slice(0, limit) : docs;
+
+    const entries: ActivityLogEntry[] = sliced.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ts: toISO(data.ts) ?? new Date(0).toISOString(),
+        kind: data.kind,
+        actorRole: data.actorRole,
+        actorUid: data.actorUid ?? null,
+        summary: typeof data.summary === 'string' ? data.summary : '',
+      };
+    });
+
+    return { success: true, data: { entries, hasMore } };
+  } catch (e: unknown) {
+    console.error('[getCompanyActivityLog] falhou:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao carregar histórico.',
     };
   }
 }
