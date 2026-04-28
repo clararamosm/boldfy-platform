@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
       return false;
     });
     if (alreadyProcessed) {
-      console.log(`Webhook event ${event.id} already processed, skipping`);
+      console.log(`Webhook event ${event.type} already processed, skipping`);
       return NextResponse.json({ received: true, skipped: true });
     }
 
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         const companyId = session.metadata?.companyId;
         if (!companyId) {
-          console.error(`checkout.session.completed missing companyId in metadata. Session: ${session.id}`);
+          console.error('checkout.session.completed missing companyId in metadata');
           break;
         }
 
@@ -237,7 +237,7 @@ export async function POST(req: NextRequest) {
           if (isBeta && fullPriceCents > 0) {
             try {
               await createBetaToFullSchedule(stripe, sub.id, sub, seats, fullPriceCents);
-              console.log(`Created beta→full schedule for company ${companyId}`);
+              console.log('Created beta->full schedule (legacy flow)');
             } catch (scheduleErr) {
               // Non-fatal: log the error. The master can manually transition.
               console.error('Failed to create beta→full schedule:', scheduleErr);
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
         const subUpdAny = subUpdated as any;
         const companyIdUpd = subUpdAny.metadata?.companyId;
         if (!companyIdUpd) {
-          console.error(`customer.subscription.updated missing companyId in metadata. Sub: ${subUpdAny.id}`);
+          console.error('customer.subscription.updated missing companyId in metadata');
           break;
         }
 
@@ -308,7 +308,7 @@ export async function POST(req: NextRequest) {
         const subDelAny = subDeleted as any;
         const companyIdDel = subDelAny.metadata?.companyId;
         if (!companyIdDel) {
-          console.error(`customer.subscription.deleted missing companyId in metadata. Sub: ${subDelAny.id}`);
+          console.error('customer.subscription.deleted missing companyId in metadata');
           break;
         }
 
@@ -389,9 +389,7 @@ export async function POST(req: NextRequest) {
           'billing.betaEndsAt': Timestamp.fromDate(endsAt),
           'billing.updatedAt': FieldValue.serverTimestamp(),
         });
-        console.log(
-          `Beta tester iniciado para ${modInfo.companyId}: ${startsAt.toISOString()} -> ${endsAt.toISOString()} (${durationMonths} meses)`,
-        );
+        console.log(`Beta tester iniciado (${durationMonths} meses)`);
         break;
       }
 
