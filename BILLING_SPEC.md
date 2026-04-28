@@ -128,8 +128,8 @@ Apenas 2 empresas existentes hoje:
 - Nunca paga (ambiente de testes internos)
 - Master não liga o toggle
 
-### 4.2 Omie (cliente legado)
-- TL foi contratado fora da plataforma, pago externamente
+### 4.2 Cliente com TL contratado fora (legado)
+- TL foi contratado fora da plataforma, pago externamente (contrato direto)
 - **Admin ainda não foi convidado** (momento ideal para aplicar nova lógica)
 - Quando admin for convidado:
   - `billingEnabled = true` para Platform (colaboradores normais)
@@ -173,7 +173,7 @@ Apenas 2 empresas existentes hoje:
       stripeSubscriptionId?: string;
       firstPaymentDeadline?: Timestamp;
       status: 'pending' | 'active' | 'blocked' | 'disabled';
-      billedOutsidePlatform?: boolean;  // caso Omie
+      billedOutsidePlatform?: boolean;  // contrato direto, cobrado fora
     };
 
     design: {
@@ -277,7 +277,7 @@ Apenas 2 empresas existentes hoje:
 ✅ Sem preservação de legacy no Stripe — pode resetar tudo
 ✅ Beta toggle nunca retroativo
 ✅ Boldfy: `billingEnabled=false` permanente
-✅ Omie: Platform normal, TL com flag `billedOutsidePlatform`
+✅ Cliente com TL externo: Platform normal, TL com flag `billedOutsidePlatform`
 ✅ Tabela de preços: espelho do `boldfy-site/src/components/proposal-builder.tsx`
 ✅ Per-seat dinâmico estilo Notion
 ✅ 5 seats pré-ativados no Platform

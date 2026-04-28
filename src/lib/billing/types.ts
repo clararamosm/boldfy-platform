@@ -57,7 +57,7 @@ export interface PlatformBillingState {
 /**
  * Estado do modulo TL (thought leaders).
  * executives/frequency: usados para calcular preco via matriz.
- * billedOutsidePlatform: caso especial (ex: Omie).
+ * billedOutsidePlatform: caso especial (contrato direto, cobrado fora).
  */
 export interface TLBillingState {
   active: boolean;
@@ -109,7 +109,7 @@ export interface FiscalData {
  * NOTA: campo `enabled` foi REMOVIDO no refactor billing-remove-enabled.
  * Toda empresa entra automaticamente no fluxo de cobranca. Para isencao,
  * use platform.freeTrialUnlimited (parceiro Boldfy) ou tl.billedOutsidePlatform
- * (cobrado fora, ex: Omie).
+ * (cobrado fora da plataforma via contrato direto).
  */
 export interface CompanyBillingBlock {
   isBetaTester: boolean;

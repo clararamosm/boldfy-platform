@@ -88,7 +88,7 @@ function moduleState(billing: CompanyBillingBlock, module: BillingModule) {
     };
   }
   if (module === 'tl') {
-    // Caso especial: TL pode ser cobrado fora da plataforma (Omie).
+    // Caso especial: TL pode ser cobrado fora da plataforma (contrato direto).
     if (billing.tl.billedOutsidePlatform === true) {
       // Trata como 'active' — a empresa ja paga por outro canal.
       return { status: 'active' as const, deadline: null, outsidePlatform: true };

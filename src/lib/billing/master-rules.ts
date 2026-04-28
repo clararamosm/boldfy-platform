@@ -493,7 +493,7 @@ export async function applyAdminFirstLogin(
 }
 
 // ────────────────────────────────────────────────────────────
-// TL "billedOutsidePlatform" (caso Omie / contratos diretos)
+// TL "billedOutsidePlatform" (contratos diretos / cobrados fora da plataforma)
 // ────────────────────────────────────────────────────────────
 
 export interface SetTLBilledOutsidePlatformRuleInput {

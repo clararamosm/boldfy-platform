@@ -14,7 +14,7 @@
 //   - Teste Gratuito (duracao do trial Platform)
 //   - Beta Tester (duracao em meses; data de inicio e setada AUTOMATICAMENTE
 //     pelo webhook do Stripe quando a 1a fatura do Platform e paga)
-//   - Plano Thought Leader (Omie)
+//   - Plano Thought Leader (cobrado fora da plataforma)
 //
 // Quando "Parceiro Boldfy" esta ligado, os cards Teste/Beta ficam
 // visualmente desabilitados — partner companies nao tem trial nem beta.
@@ -132,7 +132,7 @@ export default function MasterCompanyBillingPage() {
   const [isBetaTester, setIsBetaTester] = useState(false);
   const [betaDurationMonths, setBetaDurationMonths] = useState<number>(3);
 
-  // Form state — Plano Thought Leader (Omie)
+  // Form state — Plano Thought Leader (cobrado fora da plataforma)
   const [tlOutsideEnabled, setTlOutsideEnabled] = useState(false);
   const [tlOutsideExecutives, setTlOutsideExecutives] = useState<number>(1);
   const [tlOutsideFrequency, setTlOutsideFrequency] = useState<2 | 3 | 4>(2);
@@ -570,7 +570,7 @@ export default function MasterCompanyBillingPage() {
           </CardContent>
         </Card>
 
-        {/* Card 5: Plano Thought Leader (Omie) */}
+        {/* Card 5: Plano Thought Leader (cobrado fora da plataforma) */}
         <Card>
           <CardHeader>
             <CardTitle>Plano Thought Leader</CardTitle>
@@ -584,7 +584,7 @@ export default function MasterCompanyBillingPage() {
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <Label htmlFor="tlOutsideEnabled" className="text-base">
-                  TL cobrado fora da plataforma (Omie)
+                  TL cobrado fora da plataforma
                 </Label>
                 <p className="text-sm text-muted-foreground">
                   Marca o modulo TL como ativo sem cobranca via Stripe.
@@ -646,7 +646,7 @@ export default function MasterCompanyBillingPage() {
                 id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ex: Cliente Omie, TL cobrado externamente."
+                placeholder="Ex: Contrato direto, TL cobrado externamente."
                 maxLength={1000}
                 disabled={isSaving}
                 rows={3}
@@ -693,7 +693,7 @@ function chargeTag(type: BillingChargeType): {
     case 'paid':
       return { label: 'Pagando', variant: 'default' };
     case 'external':
-      return { label: 'Externo (Omie)', variant: 'outline' };
+      return { label: 'Externo', variant: 'outline' };
     case 'pending':
       return { label: 'Aguardando pagamento', variant: 'secondary' };
     case 'inactive':

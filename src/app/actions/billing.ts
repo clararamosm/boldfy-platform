@@ -63,7 +63,7 @@ export interface BillingActionResult<T = void> {
  *   - 'trial'     => Em teste gratuito (status='free' nao-permanente)
  *   - 'beta'      => Pagando com 30% de desconto
  *   - 'paid'      => Pagando preco cheio
- *   - 'external'  => TL cobrado fora da plataforma (Omie)
+ *   - 'external'  => TL cobrado fora da plataforma (contrato direto)
  *   - 'pending'   => Em pending/blocked (sem cobranca recorrente ainda)
  *   - 'inactive'  => Modulo nunca foi ativado
  */
@@ -491,7 +491,7 @@ export interface SaveMasterBillingFormInput {
   betaDurationMonths?: number | null;
   // NOTA: betaStartsAt nao e mais aceito do cliente. O webhook do Stripe
   // (`invoice.paid`) seta automaticamente quando a 1a fatura do Platform e paga.
-  // TL Omie
+  // TL cobrado fora da plataforma (contrato direto)
   tlBilledOutsidePlatform: boolean;
   tlExecutives?: 1 | 2 | 3 | 4 | 5;
   tlFrequency?: 2 | 3 | 4;
