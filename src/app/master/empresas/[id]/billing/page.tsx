@@ -47,7 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, ArrowLeft, CheckCircle2, Users, Mic, Palette, CreditCard, Construction, Copy, Upload, ImageIcon, UserPlus } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Users, Mic, Palette, CreditCard, Construction, Copy, Upload, ImageIcon, UserPlus, Mail, Send, Trash2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useScrollSpy } from '@/hooks/use-scroll-spy';
@@ -62,8 +62,8 @@ import {
   type DesignUsageInfo,
   type BillingChargeType,
 } from '@/app/actions/billing';
-import { saveCompanyIdentity } from '@/app/actions/master-company';
-import { inviteAdminToCompany } from '@/app/actions/users';
+import { saveCompanyIdentity, deleteCompanyAdmin } from '@/app/actions/master-company';
+import { inviteAdminToCompany, resendInvite } from '@/app/actions/users';
 import type { ActivityLogEntry } from '@/lib/billing/activity-log-types';
 import { formatBRL } from '@/lib/billing/format';
 import { ActivityLogRow } from '@/components/master/activity-log-row';
@@ -164,24 +164,25 @@ export default function MasterCompanyBillingPage() {
   const [isSavingIdentity, setIsSavingIdentity] = useState(false);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Seats
-  const [editLicenses, setEditLicenses] = useState<number>(5);
-  const [editTLLicenses, setEditTLLicenses] = useState<number>(0);
-  const [isSavingSeatsPlatform, setIsSavingSeatsPlatform] = useState(false);
-  const [isSavingSeatsTL, setIsSavingSeatsTL] = useState(false);
-
   // Admin section
   interface CompanyAdminInfo {
     uid: string;
     name: string;
     emailMasked: string;
+    /** Email cru, usado pra reenvio de convite (action e' server-side e mascara no log). */
+    emailRaw: string;
     lastLoginAtISO: string | null;
+    /** True quando admin foi convidado mas ainda nao logou (lastLoginAt ausente). */
+    isPending: boolean;
   }
   const [adminInfo, setAdminInfo] = useState<CompanyAdminInfo | null>(null);
   const [isLoadingAdmin, setIsLoadingAdmin] = useState(false);
   const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [isInvitingAdmin, setIsInvitingAdmin] = useState(false);
+  const [isResendingInvite, setIsResendingInvite] = useState(false);
+  const [isRemovingAdmin, setIsRemovingAdmin] = useState(false);
+  const [confirmRemoveAdmin, setConfirmRemoveAdmin] = useState(false);
 
   useEffect(() => {
     if (!companyId) return;
@@ -201,10 +202,6 @@ export default function MasterCompanyBillingPage() {
           setEditName(name);
           setEditLocale(data.locale === 'en' ? 'en' : 'pt-BR');
           setEditLogoUrl(typeof data.logoUrl === 'string' && data.logoUrl ? data.logoUrl : null);
-          const licenses = typeof data.licenses === 'number' ? data.licenses : 5;
-          setEditLicenses(licenses);
-          const tlLic = typeof data.tlLicenses === 'number' ? data.tlLicenses : 0;
-          setEditTLLicenses(tlLic);
           // createdAt: Firestore Timestamp ou string
           const created = data.createdAt;
           if (created && typeof created === 'object' && 'toDate' in created) {
@@ -356,11 +353,19 @@ export default function MasterCompanyBillingPage() {
         } else if (typeof lastLogin === 'string') {
           lastLoginISO = lastLogin;
         }
+        const emailRaw = (data.profile?.email as string)
+          || (data.email as string)
+          || '';
         setAdminInfo({
           uid: adminDoc.id,
-          name: (data.name as string) || (data.displayName as string) || '—',
-          emailMasked: maskEmailLocal((data.email as string) || ''),
+          name: (data.profile?.name as string)
+            || (data.name as string)
+            || (data.displayName as string)
+            || '—',
+          emailMasked: maskEmailLocal(emailRaw),
+          emailRaw,
           lastLoginAtISO: lastLoginISO,
+          isPending: lastLoginISO === null,
         });
       }
     } catch (e) {
@@ -395,44 +400,6 @@ export default function MasterCompanyBillingPage() {
       setCompanyName(res.data.companyName);
     } finally {
       setIsSavingIdentity(false);
-    }
-  }
-
-  async function handleSaveSeatsPlatform() {
-    if (!companyId || !token) return;
-    setIsSavingSeatsPlatform(true);
-    try {
-      const res = await saveCompanyIdentity({
-        idToken: token,
-        companyId,
-        licenses: editLicenses,
-      });
-      if (!res.success) {
-        toast({ variant: 'destructive', title: 'Erro', description: res.error });
-        return;
-      }
-      toast({ title: 'Seats Platform salvos.' });
-    } finally {
-      setIsSavingSeatsPlatform(false);
-    }
-  }
-
-  async function handleSaveSeatsTL() {
-    if (!companyId || !token) return;
-    setIsSavingSeatsTL(true);
-    try {
-      const res = await saveCompanyIdentity({
-        idToken: token,
-        companyId,
-        tlLicenses: editTLLicenses,
-      });
-      if (!res.success) {
-        toast({ variant: 'destructive', title: 'Erro', description: res.error });
-        return;
-      }
-      toast({ title: 'Seats TL salvos.' });
-    } finally {
-      setIsSavingSeatsTL(false);
     }
   }
 
@@ -488,6 +455,45 @@ export default function MasterCompanyBillingPage() {
       () => toast({ title: 'ID copiado.' }),
       () => toast({ variant: 'destructive', title: 'Falhou ao copiar.' }),
     );
+  }
+
+  async function handleResendInvite() {
+    if (!token || !adminInfo) return;
+    setIsResendingInvite(true);
+    try {
+      const res = await resendInvite(token, adminInfo.uid);
+      if (res.error) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({ title: 'Convite reenviado.', description: 'Email de redefinicao enviado.' });
+    } finally {
+      setIsResendingInvite(false);
+    }
+  }
+
+  async function handleRemoveAdmin() {
+    if (!companyId || !token || !adminInfo) return;
+    setIsRemovingAdmin(true);
+    try {
+      const res = await deleteCompanyAdmin({
+        idToken: token,
+        companyId,
+        adminUid: adminInfo.uid,
+      });
+      if (!res.success) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({
+        title: adminInfo.isPending ? 'Convite cancelado.' : 'Admin removido.',
+        description: 'A empresa esta sem admin. Convide outro abaixo.',
+      });
+      setConfirmRemoveAdmin(false);
+      setAdminInfo(null);
+    } finally {
+      setIsRemovingAdmin(false);
+    }
   }
 
   // Tags historicas "Concluido"
@@ -599,7 +605,6 @@ export default function MasterCompanyBillingPage() {
     { id: 'thoughtleader', label: 'Thought Leader' },
     { id: 'design', label: 'Design' },
     { id: 'admin', label: 'Admin' },
-    { id: 'danger', label: 'Zona de Perigo' },
     { id: 'historico', label: 'Historico' },
   ];
   const activeSectionId = useScrollSpy(sections.map((s) => s.id));
@@ -793,7 +798,14 @@ export default function MasterCompanyBillingPage() {
 
             {/* Secao: Platform — agrupa cards Status + Parceiro + Trial + Beta */}
             <section id="platform" className="scroll-mt-20 space-y-6">
-              <h2 className="sr-only">Modulo Platform</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Plano Platform</h2>
+                {billing && (
+                  <Badge variant={statusBadgeVariant(billing.platform.status)}>
+                    {statusLabel(billing.platform.status)}
+                  </Badge>
+                )}
+              </div>
 
               {/* Card 1: Status dos Modulos (read-only) */}
         <Card>
@@ -1023,39 +1035,18 @@ export default function MasterCompanyBillingPage() {
           </CardContent>
         </Card>
 
-        {/* Card Seats Platform */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Seats Platform</CardTitle>
-            <CardDescription>
-              Numero de licencas Platform contratadas. Minimo 5.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-3">
-              <div className="space-y-1.5 flex-1 max-w-xs">
-                <Label htmlFor="platform-seats">Quantidade</Label>
-                <Input
-                  id="platform-seats"
-                  type="number"
-                  min={5}
-                  value={editLicenses}
-                  onChange={(e) => setEditLicenses(Number(e.target.value))}
-                />
-              </div>
-              <Button onClick={handleSaveSeatsPlatform} disabled={isSavingSeatsPlatform}>
-                {isSavingSeatsPlatform && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar seats Platform
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
             </section>
 
             {/* Secao: Thought Leader */}
             <section id="thoughtleader" className="scroll-mt-20 space-y-6">
-              <h2 className="sr-only">Modulo Thought Leader</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Plano Thought Leader</h2>
+                {billing && (
+                  <Badge variant={statusBadgeVariant(billing.tl.status)}>
+                    {statusLabel(billing.tl.status)}
+                  </Badge>
+                )}
+              </div>
 
         {/* Card 5: Plano Thought Leader (cobrado fora da plataforma) */}
         <Card>
@@ -1124,35 +1115,6 @@ export default function MasterCompanyBillingPage() {
           </CardContent>
         </Card>
 
-        {/* Card Seats TL */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Seats Thought Leader</CardTitle>
-            <CardDescription>
-              Numero de licencas TL contratadas (0-50). Cada seat habilita um executivo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-3">
-              <div className="space-y-1.5 flex-1 max-w-xs">
-                <Label htmlFor="tl-seats">Quantidade</Label>
-                <Input
-                  id="tl-seats"
-                  type="number"
-                  min={0}
-                  max={50}
-                  value={editTLLicenses}
-                  onChange={(e) => setEditTLLicenses(Number(e.target.value))}
-                />
-              </div>
-              <Button onClick={handleSaveSeatsTL} disabled={isSavingSeatsTL}>
-                {isSavingSeatsTL && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar seats TL
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
             </section>
 
             {/* Secao: Design (placeholder — nao tem card dedicado ainda alem do status) */}
@@ -1212,9 +1174,24 @@ export default function MasterCompanyBillingPage() {
             <section id="admin" className="scroll-mt-20">
               <Card>
                 <CardHeader>
-                  <CardTitle>Admin da Empresa</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    Admin da Empresa
+                    {adminInfo && (
+                      <Badge
+                        variant={adminInfo.isPending ? 'secondary' : 'default'}
+                        className="text-[11px]"
+                      >
+                        {adminInfo.isPending ? 'Convite pendente' : 'Ativo'}
+                      </Badge>
+                    )}
+                    {!adminInfo && !isLoadingAdmin && (
+                      <Badge variant="outline" className="text-[11px]">
+                        Sem admin
+                      </Badge>
+                    )}
+                  </CardTitle>
                   <CardDescription>
-                    Visivel apenas para o master. Email e mascarado por privacidade.
+                    Cada empresa tem no maximo um admin. Pode ficar sem admin temporariamente.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1224,7 +1201,7 @@ export default function MasterCompanyBillingPage() {
                       Carregando admin...
                     </div>
                   ) : adminInfo ? (
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 rounded-md border bg-muted/20 p-4">
                         <div>
                           <Label className="text-xs text-muted-foreground">Nome</Label>
@@ -1235,9 +1212,13 @@ export default function MasterCompanyBillingPage() {
                           <p className="text-sm font-mono mt-1">{adminInfo.emailMasked}</p>
                         </div>
                         <div>
-                          <Label className="text-xs text-muted-foreground">Ultimo login</Label>
+                          <Label className="text-xs text-muted-foreground">
+                            {adminInfo.isPending ? 'Status' : 'Ultimo login'}
+                          </Label>
                           <p className="text-sm mt-1">
-                            {adminInfo.lastLoginAtISO
+                            {adminInfo.isPending
+                              ? 'Aguardando primeiro acesso'
+                              : adminInfo.lastLoginAtISO
                               ? new Date(adminInfo.lastLoginAtISO).toLocaleString('pt-BR', {
                                   day: '2-digit',
                                   month: '2-digit',
@@ -1249,15 +1230,79 @@ export default function MasterCompanyBillingPage() {
                           </p>
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Para trocar o admin, exclua o usuario na area de Usuarios e convide outro.
-                      </p>
+
+                      {adminInfo.isPending && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900 p-3 text-xs text-amber-900 dark:text-amber-100">
+                          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                          <p>
+                            Convite enviado mas o admin ainda nao acessou. Reenvie o
+                            convite se o link expirou ou cancele para convidar outro.
+                          </p>
+                        </div>
+                      )}
+
+                      {confirmRemoveAdmin ? (
+                        <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                          <p className="text-sm">
+                            {adminInfo.isPending
+                              ? 'Cancelar o convite deste admin?'
+                              : 'Remover este admin? A empresa ficara sem admin.'}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setConfirmRemoveAdmin(false)}
+                              disabled={isRemovingAdmin}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={handleRemoveAdmin}
+                              disabled={isRemovingAdmin}
+                            >
+                              {isRemovingAdmin && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                              Confirmar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          {adminInfo.isPending && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleResendInvite}
+                              disabled={isResendingInvite}
+                            >
+                              {isResendingInvite ? (
+                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                              ) : (
+                                <Send className="mr-2 h-3 w-3" />
+                              )}
+                              Reenviar convite
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => setConfirmRemoveAdmin(true)}
+                          >
+                            <Trash2 className="mr-2 h-3 w-3" />
+                            {adminInfo.isPending ? 'Cancelar convite' : 'Remover admin'}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-4">
                       <div className="rounded-md border border-dashed p-4 text-center">
+                        <Mail className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
                         <p className="text-sm text-muted-foreground">
-                          Esta empresa ainda nao tem admin. Convide um abaixo.
+                          Esta empresa nao tem admin. Convide um abaixo.
                         </p>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1293,29 +1338,6 @@ export default function MasterCompanyBillingPage() {
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </section>
-
-            {/* Secao: Zona de Perigo (placeholder — PR 6) */}
-            <section id="danger" className="scroll-mt-20">
-              <Card className="border-destructive/40">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-destructive">
-                    Zona de Perigo
-                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
-                      <Construction className="h-3 w-3" />
-                      Em construcao
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    Acoes destrutivas que afetam permanentemente a empresa.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Em breve: exclusao da empresa com confirmacao dupla.
-                  </p>
                 </CardContent>
               </Card>
             </section>

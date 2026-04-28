@@ -7,9 +7,17 @@
 'use server';
 
 import { requireMaster } from '@/lib/auth-guard';
-import { db as adminDb } from '@/lib/firebase-admin';
+import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { appendActivityLog } from '@/lib/billing/activity-log';
 import type { BillingActionResult } from './billing';
+
+/** Mascara email pra activity log (joao@x.com -> jo***@x.com). */
+function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) return '???';
+  const [local, domain] = email.split('@');
+  if (local.length <= 2) return `${local}***@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
 
 export interface SaveCompanyIdentityInput {
   idToken: string;
@@ -135,6 +143,100 @@ export async function saveCompanyIdentity(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido.';
+    return { success: false, error: message };
+  }
+}
+
+export interface DeleteCompanyAdminInput {
+  idToken: string;
+  companyId: string;
+  /** uid do admin a remover. Tem que pertencer a empresa indicada. */
+  adminUid: string;
+}
+
+/**
+ * Remove o admin de uma empresa. Usado tanto para "cancelar convite"
+ * (admin nunca logou) quanto para "trocar admin" (admin ativo).
+ *
+ * Faz:
+ *  - Valida master + que adminUid pertence a companyId com role='admin'
+ *  - Deleta usuario do Firebase Auth (best-effort se ja nao existir)
+ *  - Deleta subcolecoes do user doc
+ *  - Deleta o user doc
+ *  - Limpa companies.{id}.adminProfile
+ *  - Loga em activity log (admin.invited com summary "removido")
+ *
+ * Empresa pode ficar sem admin: e' estado valido. Listagem ja mostra
+ * "adminPending" pra empresas sem admin.
+ */
+export async function deleteCompanyAdmin(
+  input: DeleteCompanyAdminInput,
+): Promise<BillingActionResult<{ removed: true }>> {
+  if (!adminAuth) {
+    return { success: false, error: 'Servico de autenticacao indisponivel.' };
+  }
+
+  try {
+    const master = await requireMaster(input.idToken);
+
+    if (!input.companyId || !input.adminUid) {
+      return { success: false, error: 'companyId e adminUid obrigatorios.' };
+    }
+
+    // Verifica que o uid e admin desta empresa.
+    const userDoc = await adminDb.collection('users').doc(input.adminUid).get();
+    if (!userDoc.exists) {
+      return { success: false, error: 'Admin nao encontrado.' };
+    }
+    const userData = userDoc.data() ?? {};
+    if (userData.role !== 'admin' || userData.companyId !== input.companyId) {
+      return { success: false, error: 'Usuario nao e admin desta empresa.' };
+    }
+
+    const adminEmail = (userData.profile?.email as string | undefined)
+      || (userData.email as string | undefined)
+      || '';
+
+    // Deleta do Firebase Auth (tolerante a not-found).
+    try {
+      await adminAuth.deleteUser(input.adminUid);
+    } catch (authErr: unknown) {
+      const e = authErr as { code?: string; message?: string };
+      if (e?.code !== 'auth/user-not-found') {
+        console.error('[deleteCompanyAdmin] auth delete falhou:', e?.message);
+      }
+    }
+
+    // Limpa subcolecoes + doc.
+    const userRef = adminDb.collection('users').doc(input.adminUid);
+    const subcollections = await userRef.listCollections();
+    for (const subcol of subcollections) {
+      const docs = await subcol.listDocuments();
+      for (const d of docs) {
+        await d.delete();
+      }
+    }
+    await userRef.delete();
+
+    // Zera adminProfile na empresa pra listagem voltar a marcar adminPending=true.
+    await adminDb.collection('companies').doc(input.companyId).update({
+      adminProfile: null,
+    });
+
+    // Activity log.
+    await appendActivityLog(input.companyId, {
+      kind: 'admin.invited',
+      actorRole: 'master',
+      actorUid: master.uid,
+      summary: adminEmail
+        ? `Admin removido (${maskEmail(adminEmail)})`
+        : 'Admin removido',
+    });
+
+    return { success: true, data: { removed: true } };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Erro desconhecido.';
+    console.error('[deleteCompanyAdmin] erro:', message);
     return { success: false, error: message };
   }
 }
