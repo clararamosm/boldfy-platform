@@ -46,9 +46,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, ArrowLeft, CheckCircle2, Users, Mic, Palette, CreditCard } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Users, Mic, Palette, CreditCard, Construction } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { useScrollSpy } from '@/hooks/use-scroll-spy';
 import { getAuthToken } from '@/lib/auth-client';
 import {
   getCompanyBilling,
@@ -312,6 +313,19 @@ export default function MasterCompanyBillingPage() {
     });
   }
 
+  // Sections para a sticky TOC (ordem = ordem visual da pagina).
+  // Cada uma corresponde a um <section id="..."> no <main> abaixo.
+  const sections: { id: string; label: string }[] = [
+    { id: 'identidade', label: 'Identidade' },
+    { id: 'platform', label: 'Platform' },
+    { id: 'thoughtleader', label: 'Thought Leader' },
+    { id: 'design', label: 'Design' },
+    { id: 'admin', label: 'Admin' },
+    { id: 'danger', label: 'Zona de Perigo' },
+    { id: 'historico', label: 'Historico' },
+  ];
+  const activeSectionId = useScrollSpy(sections.map((s) => s.id));
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -326,8 +340,8 @@ export default function MasterCompanyBillingPage() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <div className="container max-w-4xl py-8 space-y-6">
-        <div>
+      <div className="container max-w-7xl py-8">
+        <div className="mb-6">
           <Link
             href="/master/empresas"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
@@ -336,15 +350,71 @@ export default function MasterCompanyBillingPage() {
             Voltar para empresas
           </Link>
           <h1 className="mt-2 text-2xl font-bold">
-            Billing — {companyName || companyId}
+            Gerenciar — {companyName || companyId}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Configure o plano, parceiros e ativacao especial. Toda mudanca e aplicada
-            ao clicar em &quot;Salvar alteracoes&quot; no fim da pagina.
+            Identidade, modulos de cobranca, admin e historico de atividade da empresa.
           </p>
         </div>
 
-        {/* Card 1: Status dos Modulos (read-only) */}
+        <div className="flex gap-8">
+          {/* Sticky TOC — desktop only */}
+          <aside className="hidden lg:block w-56 shrink-0">
+            <nav className="sticky top-20 space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-2">
+                Nesta pagina
+              </p>
+              {sections.map((s) => {
+                const isActive = activeSectionId === s.id;
+                return (
+                  <a
+                    key={s.id}
+                    href={`#${s.id}`}
+                    className={
+                      'block rounded-md px-2 py-1.5 text-sm transition-colors ' +
+                      (isActive
+                        ? 'bg-muted font-medium text-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')
+                    }
+                  >
+                    {s.label}
+                  </a>
+                );
+              })}
+            </nav>
+          </aside>
+
+          {/* Main content */}
+          <main className="flex-1 min-w-0 space-y-6">
+            {/* Secao: Identidade (placeholder — PR 5 implementa) */}
+            <section id="identidade" className="scroll-mt-20">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Identidade
+                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
+                      <Construction className="h-3 w-3" />
+                      Em construcao
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Logo, nome, idioma, ID e data de criacao. Substitui o dialog
+                    &quot;Editar Empresa&quot; da listagem.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Em breve nesta secao: editar logo, nome e idioma da empresa.
+                  </p>
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Secao: Platform — agrupa cards Status + Parceiro + Trial + Beta */}
+            <section id="platform" className="scroll-mt-20 space-y-6">
+              <h2 className="sr-only">Modulo Platform</h2>
+
+              {/* Card 1: Status dos Modulos (read-only) */}
         <Card>
           <CardHeader>
             <CardTitle>Status dos Modulos</CardTitle>
@@ -572,6 +642,12 @@ export default function MasterCompanyBillingPage() {
           </CardContent>
         </Card>
 
+            </section>
+
+            {/* Secao: Thought Leader */}
+            <section id="thoughtleader" className="scroll-mt-20 space-y-6">
+              <h2 className="sr-only">Modulo Thought Leader</h2>
+
         {/* Card 5: Plano Thought Leader (cobrado fora da plataforma) */}
         <Card>
           <CardHeader>
@@ -639,6 +715,32 @@ export default function MasterCompanyBillingPage() {
           </CardContent>
         </Card>
 
+            </section>
+
+            {/* Secao: Design (placeholder — nao tem card dedicado ainda alem do status) */}
+            <section id="design" className="scroll-mt-20">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Design
+                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
+                      <Construction className="h-3 w-3" />
+                      Em construcao
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Pack selector dedicado para o modulo Design.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Por enquanto, o status do Design aparece no card &quot;Status dos Modulos&quot;
+                    acima. Configuracao de pack via Stripe direto.
+                  </p>
+                </CardContent>
+              </Card>
+            </section>
+
         {/* Notas internas + botao unico Salvar */}
         <Card>
           <CardContent className="space-y-4 pt-6">
@@ -667,6 +769,79 @@ export default function MasterCompanyBillingPage() {
         <p className="text-xs text-muted-foreground text-center">
           Todas as mudancas sao logadas no Firestore com o UID do master que executou.
         </p>
+
+            {/* Secao: Admin (placeholder — PR 6) */}
+            <section id="admin" className="scroll-mt-20">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Admin da Empresa
+                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
+                      <Construction className="h-3 w-3" />
+                      Em construcao
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Informacoes do admin atual e convite quando ainda nao ha admin.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Em breve: nome, email mascarado, ultimo login, e form de convite
+                    quando a empresa ainda nao tem admin.
+                  </p>
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Secao: Zona de Perigo (placeholder — PR 6) */}
+            <section id="danger" className="scroll-mt-20">
+              <Card className="border-destructive/40">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-destructive">
+                    Zona de Perigo
+                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
+                      <Construction className="h-3 w-3" />
+                      Em construcao
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Acoes destrutivas que afetam permanentemente a empresa.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Em breve: exclusao da empresa com confirmacao dupla.
+                  </p>
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Secao: Historico (placeholder — PR 7) */}
+            <section id="historico" className="scroll-mt-20">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Historico
+                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
+                      <Construction className="h-3 w-3" />
+                      Em construcao
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Linha do tempo de eventos relevantes (billing, admin, pagamentos).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Em breve: tabela com todos os eventos registrados, ordenados
+                    do mais recente ao mais antigo.
+                  </p>
+                </CardContent>
+              </Card>
+            </section>
+          </main>
+        </div>
       </div>
     </div>
   );
