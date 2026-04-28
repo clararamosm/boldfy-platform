@@ -25,6 +25,8 @@ import { getAuthToken } from '@/lib/auth-client';
 import { inviteAdmin, inviteAdminToCompany } from '@/app/actions';
 import { deleteCompany } from '@/app/deleteCompanyAction';
 
+type MaybeFsTimestamp = { toDate?: () => Date } | string | null | undefined;
+
 type Company = {
     id: string;
     companyName: string;
@@ -39,6 +41,19 @@ type Company = {
         plan?: string;
         status?: string;
         trialEnd?: { toDate?: () => Date } | string | null;
+    };
+    /**
+     * Bloco real de billing (refactor billing-remove-enabled). Fonte de verdade
+     * pro status do modulo Platform na listagem. Opcional pra retrocompat com
+     * empresas antigas que ainda nao foram migradas.
+     */
+    billing?: {
+        isBetaTester?: boolean;
+        platform?: {
+            status?: 'disabled' | 'free' | 'pending' | 'active' | 'blocked';
+            trialEndsAt?: MaybeFsTimestamp;
+            freeTrialUnlimited?: boolean;
+        };
     };
     /** True when the admin has never logged in (no password set yet) */
     adminPending?: boolean;
@@ -259,45 +274,67 @@ export default function MasterEmpresasPage() {
     );
 
     const getStatusBadge = (company: Company) => {
-        const plan = company.subscription?.plan;
-        const trialEnd = company.subscription?.trialEnd;
+        // Fonte de verdade: billing.platform.status (refactor billing-remove-enabled).
+        // Os campos legados subscription.plan/trialEnd ja' nao sao mais populados
+        // pelo fluxo novo e foram removidos como referencia.
 
-        // Admin never logged in
+        // Regra 1: admin nunca logou (convite enviado, mas ainda nao aceito)
+        // Tem prioridade absoluta — independente do estado de billing.
         if (company.adminPending) {
             return <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">Pendente</Badge>;
         }
 
-        // Show trial with days remaining
-        if (plan === 'trial') {
-            let daysLeft = 0;
-            if (trialEnd) {
-                const end = typeof trialEnd === 'object' && trialEnd !== null && 'toDate' in trialEnd && typeof trialEnd.toDate === 'function'
-                    ? trialEnd.toDate()
-                    : new Date(trialEnd as string);
-                daysLeft = Math.max(0, Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-            }
-            return <Badge variant="secondary" className="bg-blue-100 text-blue-800">Teste ({daysLeft}d)</Badge>;
+        const platformStatus = company.billing?.platform?.status;
+        const isBetaTester = company.billing?.isBetaTester === true;
+        const isFreeUnlimited = company.billing?.platform?.freeTrialUnlimited === true;
+        const trialEndsAt = company.billing?.platform?.trialEndsAt;
+
+        // Regra 2: empresa sem bloco billing OU platform 'disabled' = aguardando
+        // primeiro login do admin pra disparar applyAdminFirstLogin.
+        if (!platformStatus || platformStatus === 'disabled') {
+            return <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-200">Desativado</Badge>;
         }
 
-        // Paid / Beta
-        if (plan === 'paid' || plan === 'beta') {
+        // Regra 3: parceiro Boldfy (free unlimited) — sem cobranca, sem prazo.
+        if (platformStatus === 'free' && isFreeUnlimited) {
+            return <Badge variant="default" className="bg-purple-100 text-purple-800 border-purple-200">Parceiro</Badge>;
+        }
+
+        // Regra 4: trial ativo — calcula dias restantes a partir de billing.platform.trialEndsAt.
+        if (platformStatus === 'free') {
+            let daysLeft: number | null = null;
+            if (trialEndsAt) {
+                const end = typeof trialEndsAt === 'object' && trialEndsAt !== null && 'toDate' in trialEndsAt && typeof trialEndsAt.toDate === 'function'
+                    ? trialEndsAt.toDate()
+                    : new Date(trialEndsAt as string);
+                if (!Number.isNaN(end.getTime())) {
+                    daysLeft = Math.max(0, Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+                }
+            }
+            const label = daysLeft !== null ? `Teste (${daysLeft}d)` : 'Teste';
+            return <Badge variant="secondary" className="bg-blue-100 text-blue-800">{label}</Badge>;
+        }
+
+        // Regra 5: aguardando cadastro de cartao (cron promoveu free -> pending).
+        if (platformStatus === 'pending') {
+            return <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">Aguardando pagto</Badge>;
+        }
+
+        // Regra 6: pagante — distingue beta (-30%) de pleno.
+        if (platformStatus === 'active') {
+            if (isBetaTester) {
+                return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Pagante (Beta)</Badge>;
+            }
             return <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Pagante</Badge>;
         }
 
-        // Canceled
-        if (plan === 'canceled') {
-            return <Badge variant="destructive">Cancelado</Badge>;
+        // Regra 7: deadline de cartao venceu — cobranca falhou ou nunca veio.
+        if (platformStatus === 'blocked') {
+            return <Badge variant="destructive">Bloqueado</Badge>;
         }
 
-        // Fallback to legacy status field
-        switch (company.status) {
-            case 'Ativa':
-                return <Badge variant="default">Ativa</Badge>;
-            case 'Inativa':
-                return <Badge variant="destructive">Inativa</Badge>;
-            default:
-                return <Badge variant="outline">{company.status}</Badge>;
-        }
+        // Fallback ultra-defensivo: status desconhecido (nunca deveria cair aqui).
+        return <Badge variant="outline">{platformStatus}</Badge>;
     };
 
   const handleEditCompanyOpen = (company: Company) => {
