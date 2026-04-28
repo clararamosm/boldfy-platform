@@ -79,6 +79,27 @@ const ptBR = {
       authMissing: 'Token de autenticação ausente.',
       tooManyResetAttempts: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.',
     },
+    firstAccess: {
+      title: 'Crie sua senha',
+      subtitle: 'Defina uma senha para acessar a plataforma pela primeira vez.',
+      verifying: 'Verificando o seu link...',
+      newPassword: 'Nova senha',
+      confirmPassword: 'Confirme a senha',
+      passwordPlaceholder: 'Mínimo 8 caracteres',
+      createPassword: 'Criar senha e entrar',
+      creating: 'Criando senha...',
+      passwordHint: 'Use no mínimo 8 caracteres.',
+      goToLogin: 'Ir para o login',
+      errors: {
+        missingCode: 'Link inválido. Solicite um novo convite ao seu administrador.',
+        expiredCode: 'Este link expirou. Peça ao seu administrador para reenviar o convite.',
+        invalidCode: 'Link inválido ou já utilizado. Peça um novo convite.',
+        weakPassword: 'A senha precisa ter pelo menos 8 caracteres.',
+        mismatch: 'As senhas não coincidem.',
+        confirmFailed: 'Não foi possível salvar a senha. Tente novamente.',
+        autoLoginFailed: 'Senha criada, mas falhou o login automático. Vá para a tela de login.',
+      },
+    },
   },
 
   // ══════════════════════════════════════════════

@@ -35,6 +35,40 @@ function getInviteBaseUrl() {
   return process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br';
 }
 
+/**
+ * Extrai o oobCode da URL de reset que o Firebase Admin SDK retorna.
+ * O Admin SDK so devolve a URL inteira (apontando pro authDomain do
+ * projeto), entao precisamos parsear pra montar a nossa propria pagina
+ * de criacao de senha.
+ *
+ * Retorna null se nao for possivel parsear — caller deve cair pro link
+ * original do Firebase como fallback seguro.
+ */
+function extractOobCode(firebaseLink: string): string | null {
+  try {
+    const url = new URL(firebaseLink);
+    return url.searchParams.get('oobCode');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Constroi a URL da nossa pagina de primeiro acesso/criacao de senha,
+ * que roda na mesma origem que o /login — assim o navegador consegue
+ * oferecer autofill da senha recem criada.
+ *
+ * Fallback: se nao conseguir extrair o oobCode (formato inesperado),
+ * devolve o proprio link do Firebase.
+ */
+function buildPrimeiroAcessoUrl(firebaseLink: string, email: string): string {
+  const oobCode = extractOobCode(firebaseLink);
+  if (!oobCode) return firebaseLink;
+  const base = getInviteBaseUrl();
+  const params = new URLSearchParams({ oobCode, email });
+  return `${base}/primeiro-acesso?${params.toString()}`;
+}
+
 async function sendInvitationEmail({ to, name, companyName, role, resetLink, locale = 'pt-BR' }: {
   to: string;
   name: string;
@@ -317,7 +351,8 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
     );
 
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
+    const firebaseLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
+    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, adminEmail);
     sendInvitationEmail({
       to: adminEmail,
       name: adminName,
@@ -407,7 +442,8 @@ export async function inviteAdminToCompany(
     );
 
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const resetLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
+    const firebaseLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
+    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, adminEmail);
     sendInvitationEmail({
       to: adminEmail,
       name: adminName,
@@ -529,7 +565,8 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     }
 
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
     sendInvitationEmail({
       to: email,
       name: name,
@@ -654,7 +691,8 @@ export async function inviteStrategist(prevState: InviteStrategistState, formDat
     });
 
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
     sendInvitationEmail({
       to: email,
       name,
@@ -930,7 +968,8 @@ export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, f
     });
 
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
     sendInvitationEmail({
       to: email,
       name,
@@ -1064,7 +1103,8 @@ export async function invitePendingThoughtLeader(
 
     // 6. Send invitation email
     const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
     sendInvitationEmail({
       to: email,
       name: placeholderData.name,
@@ -1284,7 +1324,8 @@ export async function resendInvite(
 
     // Generate fresh password reset link and send email
     const loginUrl = getInviteBaseUrl() + '/login';
-    const resetLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
+    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
 
     await sendInvitationEmail({
       to: email,

@@ -81,6 +81,27 @@ const en: Dictionary = {
       authMissing: 'Authentication token missing.',
       tooManyResetAttempts: 'Too many attempts. Wait a few minutes and try again.',
     },
+    firstAccess: {
+      title: 'Create your password',
+      subtitle: 'Set a password to access the platform for the first time.',
+      verifying: 'Verifying your link...',
+      newPassword: 'New password',
+      confirmPassword: 'Confirm password',
+      passwordPlaceholder: 'Minimum 8 characters',
+      createPassword: 'Create password and sign in',
+      creating: 'Creating password...',
+      passwordHint: 'Use at least 8 characters.',
+      goToLogin: 'Go to login',
+      errors: {
+        missingCode: 'Invalid link. Ask your administrator for a new invitation.',
+        expiredCode: 'This link has expired. Ask your administrator to resend the invitation.',
+        invalidCode: 'Invalid or already used link. Request a new invitation.',
+        weakPassword: 'Password must be at least 8 characters long.',
+        mismatch: 'Passwords do not match.',
+        confirmFailed: 'Could not save password. Please try again.',
+        autoLoginFailed: 'Password created, but auto sign-in failed. Go to the login screen.',
+      },
+    },
   },
 
   // ══════════════════════════════════════════════
