@@ -3,7 +3,7 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { requireSelf, requireAuth, requireActiveSubscription } from '@/lib/auth-guard';
+import { requireSelf, requireAuth } from '@/lib/auth-guard';
 import { requireActiveModuleByRole } from '@/lib/billing/module-gate';
 import { fetchPostMetricsBatch, isTokenExpired, refreshAccessToken, buildConnectionData, type LinkedInConnection } from '@/lib/linkedin';
 
@@ -34,7 +34,8 @@ export async function createScheduledPost(
 ): Promise<{ success?: boolean; postId?: string; error?: string }> {
   try {
     const user = await requireSelf(idToken, userId);
-    await requireActiveSubscription(user);
+    // requireActiveModuleByRole ja cobre billing.* (modular). Legacy subscription
+    // foi removida do gate para evitar dupla checagem em fluxos diferentes.
     await requireActiveModuleByRole(user);
     if (!data.caption.trim()) return { error: 'A legenda não pode estar vazia.' };
     if (!data.scheduledFor) return { error: 'Data de agendamento é obrigatória.' };
