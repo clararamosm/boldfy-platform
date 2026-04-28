@@ -3,9 +3,8 @@
 
 import React, { useState, useEffect, useRef, useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { db, storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, getDocs, getDoc, deleteDoc, doc, updateDoc, orderBy, query, where, writeBatch } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, getDoc, doc, orderBy, query, where } from 'firebase/firestore';
 import { Header } from "@/components/dashboard/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, PlusCircle, LogIn, Loader2, Pencil, Trash2, Globe, Mail, CreditCard } from "lucide-react";
+import { MoreHorizontal, PlusCircle, LogIn, Loader2, Trash2, Globe, Settings2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -22,7 +21,7 @@ import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { getAuthToken } from '@/lib/auth-client';
-import { inviteAdmin, inviteAdminToCompany } from '@/app/actions';
+import { inviteAdmin } from '@/app/actions';
 import { deleteCompany } from '@/app/deleteCompanyAction';
 
 type MaybeFsTimestamp = { toDate?: () => Date } | string | null | undefined;
@@ -135,20 +134,8 @@ export default function MasterEmpresasPage() {
     const [strategistMap, setStrategistMap] = useState<Record<string, StrategistInfo>>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [editingCompany, setEditingCompany] = useState<Company | null>(null);
-    const [editCompanyName, setEditCompanyName] = useState("");
-    const [editLicenses, setEditLicenses] = useState(0);
-    const [editTLLicenses, setEditTLLicenses] = useState(0);
-    const [isEditCompanyOpen, setIsEditCompanyOpen] = useState(false);
-    const [editLogoUrl, setEditLogoUrl] = useState<string | undefined>(undefined);
-    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-    const logoInputRef = useRef<HTMLInputElement>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmDeleteName, setConfirmDeleteName] = useState("");
-    const [inviteAdminCompany, setInviteAdminCompany] = useState<Company | null>(null);
-    const [inviteAdminName, setInviteAdminName] = useState('');
-    const [inviteAdminEmail, setInviteAdminEmail] = useState('');
-    const [isInvitingAdmin, setIsInvitingAdmin] = useState(false);
     const [cachedToken, setCachedToken] = useState('');
     const formRef = useRef<HTMLFormElement>(null);
 
@@ -253,19 +240,6 @@ export default function MasterEmpresasPage() {
         fetchCompanies();
     }, []);
     
-     const handleToggleStatus = async (company: Company) => {
-        const newStatus = company.status === 'Ativa' ? 'Inativa' : 'Ativa';
-        try {
-            const companyDoc = doc(db, "companies", company.id);
-            await updateDoc(companyDoc, { status: newStatus });
-            toast({ title: `Status da empresa alterado para ${newStatus}` });
-            fetchCompanies();
-        } catch (error) {
-            console.error("Error toggling company status:", error);
-            toast({ variant: 'destructive', title: 'Erro ao alterar status da empresa.' });
-        }
-    };
-
     const addCompanyButton = (
         <Button size="sm">
             <PlusCircle className="mr-2 h-4 w-4" />
@@ -336,80 +310,6 @@ export default function MasterEmpresasPage() {
         // Fallback ultra-defensivo: status desconhecido (nunca deveria cair aqui).
         return <Badge variant="outline">{platformStatus}</Badge>;
     };
-
-  const handleEditCompanyOpen = (company: Company) => {
-    setEditingCompany(company);
-    setEditCompanyName(company.companyName);
-    setEditLicenses(company.licenses);
-    setEditTLLicenses(company.tlLicenses || 0);
-    setEditLogoUrl(company.logoUrl);
-    setInviteAdminName('');
-    setInviteAdminEmail('');
-    setIsEditCompanyOpen(true);
-  };
-
-  const handleLogoUpload = async (file: File) => {
-    if (!editingCompany || !file) return;
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      toast({ variant: 'destructive', title: 'Use PNG, JPG ou WEBP.' });
-      return;
-    }
-    setIsUploadingLogo(true);
-    try {
-      const ext = file.name.split('.').pop() || 'png';
-      const storageRef = ref(storage, `companies/${editingCompany.id}/logo.${ext}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      setEditLogoUrl(url);
-    } catch {
-      toast({ variant: 'destructive', title: 'Erro ao fazer upload do logo.' });
-    } finally {
-      setIsUploadingLogo(false);
-    }
-  };
-
-  const handleSaveCompanyEdit = async () => {
-    if (!editingCompany) return;
-    try {
-      await updateDoc(doc(db, "companies", editingCompany.id), {
-        companyName: editCompanyName,
-        licenses: editLicenses,
-        tlLicenses: editTLLicenses,
-        ...(editLogoUrl !== undefined && { logoUrl: editLogoUrl }),
-      });
-      toast({ title: "Empresa atualizada com sucesso!" });
-      setIsEditCompanyOpen(false);
-      setEditingCompany(null);
-      fetchCompanies();
-    } catch (error) {
-      toast({ variant: "destructive", title: "Erro ao atualizar empresa." });
-    }
-  };
-
-  const handleInviteAdminToCompany = async () => {
-    const targetCompany = inviteAdminCompany || editingCompany;
-    if (!targetCompany) return;
-    setIsInvitingAdmin(true);
-    try {
-      const token = await getAuthToken();
-      const result = await inviteAdminToCompany(token, targetCompany.id, inviteAdminName, inviteAdminEmail);
-      if (result.error) {
-        toast({ variant: 'destructive', title: 'Erro', description: result.error });
-      } else {
-        toast({ title: 'Admin convidado com sucesso!', description: 'O admin receberá um e-mail para criar sua senha.' });
-        setInviteAdminCompany(null);
-        setInviteAdminName('');
-        setInviteAdminEmail('');
-        setIsEditCompanyOpen(false);
-        fetchCompanies();
-      }
-    } catch {
-      toast({ variant: 'destructive', title: 'Erro ao convidar admin.' });
-    } finally {
-      setIsInvitingAdmin(false);
-    }
-  };
 
   const handleDeleteCompanyConfirm = (company: Company) => {
     setConfirmDeleteId(company.id);
@@ -546,17 +446,10 @@ export default function MasterEmpresasPage() {
                                                 <DropdownMenuItem asChild disabled={company.status === 'Inativa'}>
                                                     <Link href={`/admin/dashboard?companyId=${company.id}`}><LogIn className="mr-2 h-4 w-4" />Visualizar Ambiente</Link>
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleToggleStatus(company)}>
-                                                    {company.status === 'Ativa' ? 'Desativar' : 'Ativar'}
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleEditCompanyOpen(company)}>
-                                                  <Pencil className="mr-2 h-4 w-4" />
-                                                  Editar Empresa
-                                                </DropdownMenuItem>
                                                 <DropdownMenuItem asChild>
                                                     <Link href={`/master/empresas/${company.id}/billing`}>
-                                                        <CreditCard className="mr-2 h-4 w-4" />
-                                                        Billing
+                                                        <Settings2 className="mr-2 h-4 w-4" />
+                                                        Gerenciar
                                                     </Link>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteCompanyConfirm(company)}>
@@ -574,112 +467,6 @@ export default function MasterEmpresasPage() {
                 </div>
             </CardContent>
         </Card>
-      {/* Edit Company Dialog */}
-      <ActionDialog
-        open={isEditCompanyOpen}
-        onOpenChange={setIsEditCompanyOpen}
-        title="Editar Empresa"
-        description="Altere o nome e as licenças da empresa."
-      >
-        <div className="space-y-4 py-4">
-          {/* Logo */}
-          <div className="space-y-2">
-            <Label>Logo da Empresa</Label>
-            <div className="flex items-center gap-4">
-              <Avatar className="h-16 w-16 border">
-                {editLogoUrl ? (
-                  <AvatarImage src={editLogoUrl} alt="Logo" />
-                ) : null}
-                <AvatarFallback className="bg-muted text-muted-foreground text-lg">
-                  {editCompanyName?.substring(0, 2).toUpperCase() || 'EM'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col gap-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => logoInputRef.current?.click()}
-                  disabled={isUploadingLogo}
-                >
-                  {isUploadingLogo ? (
-                    <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Enviando...</>
-                  ) : editLogoUrl ? 'Trocar Logo' : 'Upload Logo'}
-                </Button>
-                <p className="text-[11px] text-muted-foreground">PNG, JPG ou WEBP</p>
-              </div>
-              <input
-                ref={logoInputRef}
-                type="file"
-                className="hidden"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleLogoUpload(file);
-                  e.target.value = '';
-                }}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="editCompanyName">Nome da Empresa</Label>
-            <Input
-              id="editCompanyName"
-              value={editCompanyName}
-              onChange={(e) => setEditCompanyName(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="editLicenses">Licenças (Colaboradores)</Label>
-            <Input
-              id="editLicenses"
-              type="number"
-              min={1}
-              value={editLicenses}
-              onChange={(e) => setEditLicenses(Number(e.target.value))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="editTLLicenses">Licenças Thought Leader</Label>
-            <Input
-              id="editTLLicenses"
-              type="number"
-              min={0}
-              value={editTLLicenses}
-              onChange={(e) => setEditTLLicenses(Number(e.target.value))}
-            />
-            <p className="text-xs text-muted-foreground">Assentos para Content Full-Service.</p>
-          </div>
-          <Button onClick={handleSaveCompanyEdit} className="w-full">
-            Salvar Alterações
-          </Button>
-          {/* Invite Admin section — only when company has no admin */}
-          {editingCompany?.adminPending && (
-            <div className="border-t pt-4 mt-4 space-y-3">
-              <div>
-                <p className="text-sm font-medium">Convidar Admin</p>
-                <p className="text-xs text-muted-foreground">Esta empresa ainda não tem um administrador. Preencha os dados abaixo para enviar o convite.</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="invAdminName">Nome do Admin</Label>
-                <Input id="invAdminName" placeholder="Ex: João Silva" value={inviteAdminName} onChange={(e) => setInviteAdminName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="invAdminEmail">E-mail do Admin</Label>
-                <Input id="invAdminEmail" type="email" placeholder="admin@empresa.com" value={inviteAdminEmail} onChange={(e) => setInviteAdminEmail(e.target.value)} />
-              </div>
-              <Button
-                variant="secondary"
-                onClick={() => { setInviteAdminCompany(editingCompany); handleInviteAdminToCompany(); }}
-                disabled={isInvitingAdmin || !inviteAdminName || !inviteAdminEmail}
-                className="w-full"
-              >
-                {isInvitingAdmin ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando...</> : <><Mail className="mr-2 h-4 w-4" /> Enviar Convite ao Admin</>}
-              </Button>
-            </div>
-          )}
-        </div>
-      </ActionDialog>
-
       {/* Confirm Delete Dialog */}
       <ActionDialog
         open={!!confirmDeleteId}
