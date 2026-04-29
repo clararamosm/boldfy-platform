@@ -83,13 +83,20 @@ function parsePercentage(val: unknown): number {
 }
 
 /**
- * Normaliza URL do LinkedIn para comparação
- * "linkedin.com/feed/update/urn:li:activity:745..." → "urn:li:activity:745..."
+ * Normaliza URL do LinkedIn para comparação.
+ * Extrai apenas o ID numérico do post, independente do prefixo URN:
+ *   - XLSX exporta:  "urn:li:activity:1234567890"
+ *   - API retorna:   "urn:li:share:1234567890"
+ * Ambos normalizam para "1234567890" — garantindo o match.
  */
 export function normalizeLinkedInUrl(url: string): string {
   if (!url) return '';
-  const match = url.match(/urn:li:activity:\d+/);
-  return match ? match[0] : url.trim();
+  // Captura o ID numérico de qualquer variante: urn:li:activity:XXX, urn:li:share:XXX, etc.
+  const urnMatch = url.match(/urn:li:[^:]+:(\d+)/);
+  if (urnMatch) return urnMatch[1];
+  // Fallback: últimos dígitos contínuos da URL (ex: /posts/123456/)
+  const numMatch = url.match(/(\d{8,})\/?$/);
+  return numMatch ? numMatch[1] : url.trim();
 }
 
 /**

@@ -3,6 +3,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { requireAuth, requireStrategistForTL } from '@/lib/auth-guard';
 import { ai } from '@/ai/genkit';
+import { normalizeLinkedInUrl } from '@/lib/linkedin-xlsx-parser';
 import type {
   LinkedInSnapshot,
   ParsedLinkedInData,
@@ -83,9 +84,9 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
       const d = doc.data();
       const url = d.linkedinPostUrl as string | undefined;
       if (!url) continue;
-      // Extrair urn:li:activity:XXXXX para normalização
-      const match = url.match(/urn:li:activity:\d+/);
-      const key = match ? match[0] : url.trim();
+      // Normaliza para o ID numérico — compatível com urn:li:share (API) e urn:li:activity (XLSX)
+      const key = normalizeLinkedInUrl(url);
+      if (!key) continue;
       pipelineMap[key] = {
         postId: doc.id,
         caption: d.caption ?? d.title,
@@ -100,8 +101,7 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
     // Enriquecer cada top post
     function enrichList(posts: typeof data.topPostsByEngagement) {
       return posts.map(post => {
-        const match = post.url.match(/urn:li:activity:\d+/);
-        const key = match ? match[0] : post.url.trim();
+        const key = normalizeLinkedInUrl(post.url);
         const enrichment = pipelineMap[key];
         if (!enrichment) return post;
         return { ...post, ...enrichment };
@@ -257,7 +257,18 @@ export async function getLinkedInSnapshot(
 
     if (!doc.exists) return { snapshot: undefined };
 
-    return { snapshot: doc.data() as LinkedInSnapshot };
+    const snapshot = doc.data() as LinkedInSnapshot;
+
+    // Re-enriquecer automaticamente se há top posts sem caption e há posts no contentPipeline.
+    // Isso corrige snapshots salvos antes do fix de normalização de URL (urn:li:share vs activity).
+    const topPosts = [...(snapshot.topPostsByEngagement ?? []), ...(snapshot.topPostsByImpressions ?? [])];
+    const needsEnrich = topPosts.length > 0 && topPosts.every(p => !p.caption && !p.mediaUrl);
+    if (needsEnrich) {
+      // Fire-and-forget: não bloqueia o retorno, mas melhora na próxima leitura
+      enrichSnapshotWithPostData(userId, mesAno).catch(() => {});
+    }
+
+    return { snapshot };
   } catch (err) {
     console.error('[linkedin-analytics] getLinkedInSnapshot error:', err);
     return { error: 'Erro ao buscar snapshot.' };
