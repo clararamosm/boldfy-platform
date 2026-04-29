@@ -36,6 +36,7 @@ export default function ColaboradorAnalyticsPage() {
           role="colaborador"
           showActionPlan={false}
           showMediaValue={false}
+          showIcpScore={true}
           uploadPending={uploadPending}
         />
       </div>

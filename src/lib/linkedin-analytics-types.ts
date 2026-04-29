@@ -112,3 +112,17 @@ export type KpiDelta = {
   absolute: number;
   percentage: number;        // positivo = crescimento, negativo = queda
 } | null;                    // null = sem dados do período anterior
+
+// ICP-Fit Score — qualidade da audiência vs ICP definido no Brand Context
+export type IcpFitCategoryScore = {
+  category: string;          // ex: "Cargo", "Setor", "Tamanho da empresa"
+  score: number;             // 0-100
+  insight: string;           // uma linha explicando o score desta categoria
+};
+
+export type IcpFitScore = {
+  overall: number;           // 0-100
+  categories: IcpFitCategoryScore[];
+  summary: string;           // 2-3 frases resumindo o fit da audiência
+  computedAt: string;        // ISO timestamp
+};

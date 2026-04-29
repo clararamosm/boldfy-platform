@@ -108,6 +108,7 @@ export default function StrategistAnalyticsPage() {
           showActionPlan={true}
           readOnlyActionPlan={false}
           showMediaValue={false}
+          showIcpScore={true}
           uploadPending={false}
         />
       </main>

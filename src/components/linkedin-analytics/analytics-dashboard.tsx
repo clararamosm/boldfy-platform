@@ -15,6 +15,7 @@ import { FollowersMonthlyChart } from './followers-monthly-chart';
 import { TopPostsSection } from './top-posts-section';
 import { DemographicsPanel } from './demographics-panel';
 import { ActionPlanSection } from './action-plan-section';
+import { IcpFitScoreCard } from './icp-fit-score-card';
 import { XlsxUploadModal } from './xlsx-upload-modal';
 
 const MONTH_NAMES_PT: Record<string, string> = {
@@ -37,6 +38,8 @@ export interface AnalyticsDashboardProps {
   readOnlyActionPlan?: boolean;
   showMediaValue?: boolean;
   uploadPending?: boolean;
+  /** Exibir ICP-Fit Score card (só para TL e Colaborador quando há brand context configurado) */
+  showIcpScore?: boolean;
 }
 
 // Maps para os gráficos de tendência (inclui todos os snapshots — monthly + historical)
@@ -50,6 +53,7 @@ export function AnalyticsDashboard({
   uploadPending = false,
   showActionPlan = false,
   readOnlyActionPlan = true,
+  showIcpScore = false,
 }: AnalyticsDashboardProps) {
   // Meses com upload MONTHLY (aparecem no seletor e geram KPIs / top posts)
   const [monthlyMonths, setMonthlyMonths] = useState<string[]>([]);
@@ -279,6 +283,10 @@ export function AnalyticsDashboard({
           )}
 
           <DemographicsPanel demographics={snapshot.demographics} />
+
+          {showIcpScore && (
+            <IcpFitScoreCard userId={userId} mesAno={snapshot.mesAno} />
+          )}
 
           {showActionPlan && (
             <ActionPlanSection

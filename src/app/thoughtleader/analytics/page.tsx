@@ -37,6 +37,7 @@ export default function ThoughtLeaderAnalyticsPage() {
           showActionPlan={true}
           readOnlyActionPlan={true}
           showMediaValue={false}
+          showIcpScore={true}
           uploadPending={uploadPending}
         />
       </div>

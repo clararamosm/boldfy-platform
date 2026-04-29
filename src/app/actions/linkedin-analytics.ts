@@ -2,11 +2,13 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { requireAuth, requireStrategistForTL } from '@/lib/auth-guard';
+import { ai } from '@/ai/genkit';
 import type {
   LinkedInSnapshot,
   ParsedLinkedInData,
   AnalyticsUser,
   ActionPlanItem,
+  IcpFitScore,
 } from '@/lib/linkedin-analytics-types';
 
 // ---------------------------------------------------------------------------
@@ -396,5 +398,143 @@ export async function toggleActionPlanItem(
   } catch (err) {
     console.error('[linkedin-analytics] toggleActionPlanItem error:', err);
     return { error: 'Erro ao atualizar item.' };
+  }
+}
+
+/**
+ * Calcula o ICP-Fit Score para um TL com base nos dados demográficos do snapshot
+ * e no targetAudience definido no Brand Context da empresa.
+ *
+ * Retorna null para `score` se:
+ * - O TL não tem snapshots mensais
+ * - O Brand Context não tem targetAudience preenchido
+ */
+export async function getIcpFitScore(
+  idToken: string,
+  userId: string,
+  mesAno: string,
+): Promise<{ score?: IcpFitScore | null; noTargetAudience?: boolean; error?: string }> {
+  try {
+    await requireSnapshotAccess(idToken, userId);
+
+    // 1. Buscar snapshot mensal do período especificado
+    const snapDoc = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('linkedinSnapshots')
+      .doc(mesAno)
+      .get();
+
+    if (!snapDoc.exists) {
+      return { score: null };
+    }
+
+    const snapshot = snapDoc.data() as LinkedInSnapshot;
+
+    // 2. Buscar companyId e brandContext.targetAudience do usuário
+    const userDoc = await adminDb.collection('users').doc(userId).get();
+    if (!userDoc.exists) return { error: 'Usuário não encontrado.' };
+
+    const companyId = userDoc.data()?.companyId;
+    if (!companyId) return { score: null };
+
+    const compDoc = await adminDb.collection('companies').doc(companyId).get();
+    if (!compDoc.exists) return { score: null };
+
+    const brandContext = compDoc.data()?.brandContext || compDoc.data()?.branding || {};
+    const targetAudience: string = brandContext.targetAudience || '';
+
+    if (!targetAudience.trim()) {
+      return { score: null, noTargetAudience: true };
+    }
+
+    // 3. Preparar dados demográficos para o prompt
+    const demographics = snapshot.demographics ?? [];
+
+    // Agrupar por categoria
+    const byCategory: Record<string, Array<{ label: string; percentage: number }>> = {};
+    for (const d of demographics) {
+      if (!byCategory[d.category]) byCategory[d.category] = [];
+      byCategory[d.category].push({ label: d.label, percentage: d.percentage });
+    }
+
+    // Ordenar cada categoria por percentual desc, pegar top 8
+    const demoSummary = Object.entries(byCategory)
+      .map(([cat, items]) => {
+        const top = items
+          .sort((a, b) => b.percentage - a.percentage)
+          .slice(0, 8)
+          .map(i => `  ${i.label}: ${i.percentage}%`)
+          .join('\n');
+        return `${cat}:\n${top}`;
+      })
+      .join('\n\n');
+
+    // 4. Chamar IA para calcular score
+    const prompt = `Você é um especialista em estratégia de conteúdo B2B no LinkedIn.
+
+Analise o fit entre a audiência real de um perfil no LinkedIn e o ICP (Ideal Customer Profile) da empresa.
+
+## ICP da empresa (definido pelo time de estratégia):
+${targetAudience}
+
+## Audiência real do perfil (dados demográficos LinkedIn Analytics — mês ${mesAno}):
+${demoSummary || 'Dados demográficos não disponíveis.'}
+
+## Tarefa:
+Calcule um ICP-Fit Score de 0 a 100 avaliando o quanto a audiência real bate com o ICP definido.
+
+Considere:
+- Cargo/função: os cargos mais presentes batem com os decisores e influenciadores do ICP?
+- Setor: os setores presentes são os que a empresa quer atingir?
+- Tamanho da empresa: os tamanhos de empresa correspondem ao mercado-alvo?
+- Outros dados presentes (senioridade, localização etc.)
+
+Responda EXATAMENTE neste formato JSON (sem markdown, sem explicações extras):
+{
+  "overall": <número 0-100>,
+  "categories": [
+    { "category": "Cargo", "score": <0-100>, "insight": "<uma frase curta em português>" },
+    { "category": "Setor", "score": <0-100>, "insight": "<uma frase curta em português>" },
+    { "category": "Tamanho da empresa", "score": <0-100>, "insight": "<uma frase curta em português>" }
+  ],
+  "summary": "<2-3 frases em português descrevendo o fit geral e principais gaps/acertos>"
+}
+
+Seja realista e preciso. Use os dados reais disponíveis. Se uma categoria não tiver dados, score = 0 com insight explicando.`;
+
+    const { text } = await ai.generate(prompt);
+
+    // 5. Parse da resposta JSON
+    let parsed: { overall: number; categories: IcpFitScore['categories']; summary: string };
+    try {
+      // Remover possível markdown code fence
+      const clean = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+      parsed = JSON.parse(clean);
+    } catch {
+      console.error('[linkedin-analytics] getIcpFitScore JSON parse error. Response:', text);
+      return { error: 'Erro ao interpretar resposta da IA.' };
+    }
+
+    // Validar estrutura básica
+    if (typeof parsed.overall !== 'number' || !Array.isArray(parsed.categories)) {
+      return { error: 'Resposta da IA em formato inesperado.' };
+    }
+
+    const score: IcpFitScore = {
+      overall: Math.max(0, Math.min(100, Math.round(parsed.overall))),
+      categories: parsed.categories.map(c => ({
+        category: c.category,
+        score: Math.max(0, Math.min(100, Math.round(c.score))),
+        insight: c.insight,
+      })),
+      summary: parsed.summary,
+      computedAt: new Date().toISOString(),
+    };
+
+    return { score };
+  } catch (err) {
+    console.error('[linkedin-analytics] getIcpFitScore error:', err);
+    return { error: 'Erro ao calcular ICP-Fit Score.' };
   }
 }
