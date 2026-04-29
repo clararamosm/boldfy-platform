@@ -26,6 +26,10 @@ type WelcomePopupProps = {
   userName: string;
   companyName?: string;
   licensesCount?: number;
+  /** Chamado quando o usuário clica em "Fazer upload do histórico" na mensagem do popup */
+  onRequestUpload?: () => void;
+  /** true quando o upload histórico já foi concluído — desbloqueia o botão "Vamos lá!" */
+  historyUploaded?: boolean;
   onComplete: () => void;
 };
 
@@ -132,6 +136,41 @@ function WorkflowAnimation() {
   );
 }
 
+// ─── LinkedIn Analytics Tutorial Animation ───────────────────
+
+function LinkedInExportTutorial({ onUploadClick }: { onUploadClick: () => void }) {
+  return (
+    <div className="mt-3 space-y-3">
+      {/* Tutorial steps */}
+      <div className="bg-white/70 border border-primary/10 rounded-[12px] p-3 space-y-2">
+        <p className="text-xs font-bold text-foreground/80">Como exportar do LinkedIn Analytics:</p>
+        <div className="space-y-1.5 text-[11px] text-muted-foreground">
+          <div className="flex items-start gap-1.5">
+            <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">1</span>
+            <span>Abra o <a href="https://www.linkedin.com/analytics/creator/content/" target="_blank" rel="noopener noreferrer" className="text-primary underline font-medium">LinkedIn Analytics</a></span>
+          </div>
+          <div className="flex items-start gap-1.5">
+            <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">2</span>
+            <span>Selecione <strong>Personalizado</strong> e defina os últimos <strong>12 meses</strong></span>
+          </div>
+          <div className="flex items-start gap-1.5">
+            <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">3</span>
+            <span>Clique em <strong>Exportar</strong> → baixe o arquivo <code className="bg-muted px-1 rounded text-[10px]">.xlsx</code></span>
+          </div>
+        </div>
+      </div>
+      {/* Upload button */}
+      <button
+        onClick={onUploadClick}
+        className="w-full py-2.5 px-4 bg-gradient-to-r from-primary to-[#E875FF] text-white font-headline font-extrabold text-xs rounded-[10px] shadow-[0_2px_10px_rgba(205,80,241,.25)] hover:shadow-[0_4px_16px_rgba(205,80,241,.35)] hover:-translate-y-px transition-all flex items-center justify-center gap-2"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Fazer upload do histórico
+      </button>
+    </div>
+  );
+}
+
 // ─── Checklist items per role (for display in chat) ──────────
 
 const ADMIN_ITEMS = [
@@ -144,12 +183,13 @@ const ADMIN_ITEMS = [
 
 const COLAB_ITEMS = [
   'Conectar LinkedIn',
+  'Importar histórico LinkedIn',
   'Ver uma trilha',
   'Criar um post',
   'Completar uma missão',
 ];
 
-const TL_ITEMS = ['Conectar seu LinkedIn'];
+const TL_ITEMS = ['Conectar seu LinkedIn', 'Importar histórico LinkedIn'];
 
 // ─── Message builders ────────────────────────────────────────
 
@@ -228,7 +268,7 @@ function getAdminMessages(name: string, licenses: number): ChatMessage[] {
   ];
 }
 
-function getColaboradorMessages(name: string, company: string): ChatMessage[] {
+function getColaboradorMessages(name: string, company: string, onUploadClick: () => void): ChatMessage[] {
   return [
     {
       type: 'fai',
@@ -255,6 +295,15 @@ function getColaboradorMessages(name: string, company: string): ChatMessage[] {
       type: 'fai',
       content: (
         <>
+          Antes de começar, preciso do seu <strong>histórico do LinkedIn Analytics</strong>. Isso ativa os gráficos de evolução do seu perfil — e você verá sua evolução desde o início.
+          <LinkedInExportTutorial onUploadClick={onUploadClick} />
+        </>
+      ),
+    },
+    {
+      type: 'fai',
+      content: (
+        <>
           Preparei uns passos rápidos pra começar. Quando completar, você ganha:
           <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-50/50 border border-amber-200/30 text-amber-500 font-extrabold text-xs px-3 py-1.5 rounded-full mt-1">
             <Sparkles className="h-3.5 w-3.5" />+150 pontos!
@@ -273,7 +322,7 @@ function getColaboradorMessages(name: string, company: string): ChatMessage[] {
   ];
 }
 
-function getThoughtLeaderMessages(name: string): ChatMessage[] {
+function getThoughtLeaderMessages(name: string, onUploadClick: () => void): ChatMessage[] {
   return [
     {
       type: 'fai',
@@ -301,7 +350,16 @@ function getThoughtLeaderMessages(name: string): ChatMessage[] {
       type: 'fai',
       content: (
         <>
-          Pra começar, só preciso de uma coisa:
+          Pra ativar seu <strong>dashboard de Analytics</strong>, vou precisar do seu histórico do LinkedIn. Com ele, você já estreia com os gráficos de evolução do seu perfil desde o início.
+          <LinkedInExportTutorial onUploadClick={onUploadClick} />
+        </>
+      ),
+    },
+    {
+      type: 'fai',
+      content: (
+        <>
+          Pra começar, essas são suas etapas:
           <div className="mt-2 flex flex-col gap-1.5">
             {TL_ITEMS.map((item) => (
               <div key={item} className="flex items-center gap-2 text-xs font-medium text-foreground/80 bg-white/70 border border-primary/10 rounded-[10px] px-2.5 py-1.5">
@@ -324,16 +382,25 @@ export function WelcomePopup({
   userName,
   companyName = '',
   licensesCount = 5,
+  onRequestUpload,
+  historyUploaded = false,
   onComplete,
 }: WelcomePopupProps) {
   const [visibleCount, setVisibleCount] = useState(0);
   const messagesRef = useRef<HTMLDivElement>(null);
 
+  // Roles que precisam do upload histórico no welcome (TL e Colaborador)
+  const needsHistoricalUpload = role === 'thoughtleader' || role === 'colaborador';
+
+  const handleUploadClick = () => {
+    onRequestUpload?.();
+  };
+
   const messages = role === 'admin'
     ? getAdminMessages(userName, licensesCount)
     : role === 'colaborador'
-    ? getColaboradorMessages(userName, companyName)
-    : getThoughtLeaderMessages(userName);
+    ? getColaboradorMessages(userName, companyName, handleUploadClick)
+    : getThoughtLeaderMessages(userName, handleUploadClick);
 
   // Progressive message reveal
   useEffect(() => {
@@ -369,6 +436,11 @@ export function WelcomePopup({
   }, [visibleCount]);
 
   const allVisible = visibleCount >= messages.length;
+
+  // Botão "Vamos lá!" só fica habilitado quando:
+  // - Todas as mensagens foram reveladas (allVisible)
+  // - Para TL e Colaborador: também precisa ter feito o upload histórico
+  const canProceed = allVisible && (!needsHistoricalUpload || historyUploaded);
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
@@ -447,10 +519,16 @@ export function WelcomePopup({
         </div>
 
         {/* CTA Button */}
-        <div className="px-6 py-4 border-t bg-background/50">
+        <div className="px-6 py-4 border-t bg-background/50 space-y-2">
+          {/* Hint quando o upload ainda não foi feito */}
+          {allVisible && needsHistoricalUpload && !historyUploaded && (
+            <p className="text-center text-xs text-muted-foreground">
+              Faça o upload do histórico para continuar ↑
+            </p>
+          )}
           <button
             onClick={onComplete}
-            disabled={!allVisible}
+            disabled={!canProceed}
             className="w-full py-3.5 px-6 bg-gradient-to-r from-primary to-[#E875FF] text-white font-headline font-extrabold text-sm rounded-[14px] shadow-[0_4px_16px_rgba(205,80,241,.3)] hover:shadow-[0_8px_24px_rgba(205,80,241,.4)] hover:-translate-y-px transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_16px_rgba(205,80,241,.3)]"
           >
             Vamos lá! →

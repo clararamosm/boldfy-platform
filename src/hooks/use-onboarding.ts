@@ -88,6 +88,12 @@ const COLABORADOR_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
     href: '/colaborador/configuracoes',
   },
   {
+    id: 'upload-linkedin-history',
+    label: 'Importar histórico LinkedIn',
+    description: 'Faça upload dos últimos 12 meses para ativar os gráficos',
+    href: '/colaborador/analytics',
+  },
+  {
     id: 'view-trail',
     label: 'Ver uma trilha',
     description: 'Explore o conteúdo disponível',
@@ -113,6 +119,12 @@ const THOUGHTLEADER_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
     label: 'Conectar seu LinkedIn',
     description: 'Vincule sua conta do LinkedIn',
     href: '/thoughtleader/configuracoes',
+  },
+  {
+    id: 'upload-linkedin-history',
+    label: 'Importar histórico LinkedIn',
+    description: 'Faça upload dos últimos 12 meses para ativar os gráficos',
+    href: '/thoughtleader/analytics',
   },
 ];
 

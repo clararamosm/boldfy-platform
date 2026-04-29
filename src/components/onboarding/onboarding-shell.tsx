@@ -5,13 +5,14 @@
 
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { useOnboarding, type OnboardingRole } from '@/hooks/use-onboarding';
+import { useOnboarding, completeOnboardingItem, type OnboardingRole } from '@/hooks/use-onboarding';
 import { WelcomePopup } from './welcome-popup';
 import { FaiWidget } from './fai-widget';
 import { PageTooltip } from './page-tooltip';
+import { XlsxUploadModal } from '@/components/linkedin-analytics/xlsx-upload-modal';
 
 type OnboardingShellProps = {
   role: OnboardingRole;
@@ -121,6 +122,22 @@ export function OnboardingShell({
   const pathname = usePathname();
   const ob = useOnboarding(user?.uid, role);
 
+  // Modal de upload histórico (aberto pelo WelcomePopup)
+  const [historicalUploadOpen, setHistoricalUploadOpen] = useState(false);
+
+  // Upload histórico concluído = item 'upload-linkedin-history' no checklist
+  const historyUploaded = ob.state.completedItems.includes('upload-linkedin-history');
+
+  const handleRequestUpload = useCallback(() => {
+    setHistoricalUploadOpen(true);
+  }, []);
+
+  const handleHistoricalUploadSuccess = useCallback(async () => {
+    setHistoricalUploadOpen(false);
+    // Marcar item de onboarding como concluído
+    await completeOnboardingItem(user?.uid, 'upload-linkedin-history');
+  }, [user?.uid]);
+
   const tooltipDefs = useMemo(() => getTooltipsForRole(role), [role]);
   const settingsHref = getSettingsHref(role);
 
@@ -174,8 +191,21 @@ export function OnboardingShell({
         userName={user?.name || ''}
         companyName={companyName}
         licensesCount={licensesCount}
+        onRequestUpload={handleRequestUpload}
+        historyUploaded={historyUploaded}
         onComplete={ob.markWelcomeSeen}
       />
+
+      {/* Modal de upload histórico — disparado pelo WelcomePopup */}
+      {(role === 'thoughtleader' || role === 'colaborador') && user?.uid && (
+        <XlsxUploadModal
+          open={historicalUploadOpen}
+          onOpenChange={setHistoricalUploadOpen}
+          userId={user.uid}
+          uploadType="historical"
+          onSuccess={handleHistoricalUploadSuccess}
+        />
+      )}
 
       {/* Page content (for admin, block unless welcome is seen) */}
       {role === 'admin' && !ob.state.welcomeSeen ? (
