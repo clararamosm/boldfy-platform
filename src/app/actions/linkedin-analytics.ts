@@ -373,6 +373,60 @@ export async function getCompanyAnalyticsUsers(
 }
 
 /**
+ * Deleta permanentemente um snapshot mensal do LinkedIn Analytics.
+ * Apenas o próprio usuário pode deletar seus snapshots.
+ * Atualiza linkedinSnapshotStatus.lastUploadMonth para o mês anterior disponível.
+ */
+export async function deleteLinkedInSnapshot(
+  idToken: string,
+  userId: string,
+  mesAno: string,
+): Promise<{ success?: boolean; newLastMonth?: string | null; error?: string }> {
+  try {
+    const caller = await requireAuth(idToken);
+
+    // Apenas o próprio usuário pode deletar
+    if (caller.uid !== userId) {
+      return { error: 'Acesso negado: apenas o próprio usuário pode excluir seus uploads.' };
+    }
+
+    const snapshotRef = adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('linkedinSnapshots')
+      .doc(mesAno);
+
+    const existing = await snapshotRef.get();
+    if (!existing.exists) {
+      return { error: 'Snapshot não encontrado.' };
+    }
+
+    // Deletar o snapshot
+    await snapshotRef.delete();
+
+    // Buscar o mês mais recente que ainda existe para atualizar o status
+    const remaining = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('linkedinSnapshots')
+      .get();
+
+    const remainingMonths = remaining.docs.map(d => d.id).sort((a, b) => b.localeCompare(a));
+    const newLastMonth = remainingMonths[0] ?? null;
+
+    await adminDb.collection('users').doc(userId).update({
+      'linkedinSnapshotStatus.lastUploadMonth': newLastMonth ?? '',
+      'linkedinSnapshotStatus.lastUploadAt': new Date().toISOString(),
+    });
+
+    return { success: true, newLastMonth };
+  } catch (err) {
+    console.error('[linkedin-analytics] deleteLinkedInSnapshot error:', err);
+    return { error: 'Erro ao excluir snapshot. Tente novamente.' };
+  }
+}
+
+/**
  * Atualiza o plano de ação de um TL para o mês especificado.
  * Apenas estrategista com acesso ao TL pode chamar.
  */

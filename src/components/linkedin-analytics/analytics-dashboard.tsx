@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, History } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInSnapshot, getLinkedInSnapshotBatch, listLinkedInSnapshots } from '@/app/actions/linkedin-analytics';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
@@ -17,6 +18,7 @@ import { DemographicsPanel } from './demographics-panel';
 import { ActionPlanSection } from './action-plan-section';
 import { IcpFitScoreCard } from './icp-fit-score-card';
 import { XlsxUploadModal } from './xlsx-upload-modal';
+import { UploadHistoryModal } from './upload-history-modal';
 
 const MONTH_NAMES_PT: Record<string, string> = {
   '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
@@ -49,6 +51,7 @@ export function AnalyticsDashboard({
   userId,
   userName,
   userAvatarUrl,
+  role,
   showMediaValue = false,
   uploadPending = false,
   showActionPlan = false,
@@ -66,7 +69,11 @@ export function AnalyticsDashboard({
 
   const [loading, setLoading] = useState(true);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const isLoadingDataRef = useRef(false);
+
+  // O botão "Histórico" só aparece para o próprio usuário (role ≠ admin)
+  const canManageHistory = role !== 'admin';
 
   const loadData = useCallback(async (monthToSelect?: string) => {
     isLoadingDataRef.current = true;
@@ -171,6 +178,13 @@ export function AnalyticsDashboard({
     loadData(mesAno);
   }, [loadData]);
 
+  const handleDeleted = useCallback((deletedMesAno: string) => {
+    // Se o mês deletado era o selecionado, recarregar tudo (o loadData seleciona o mais recente)
+    // Caso contrário também recarrega para atualizar a lista de meses disponíveis
+    const reloadTo = selectedMonth !== deletedMesAno ? selectedMonth : undefined;
+    loadData(reloadTo);
+  }, [loadData, selectedMonth]);
+
   const MonthSelector = (
     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
       <SelectTrigger className="w-44">
@@ -215,6 +229,14 @@ export function AnalyticsDashboard({
           userId={userId}
           onSuccess={handleUploadSuccess}
         />
+        {canManageHistory && (
+          <UploadHistoryModal
+            open={historyModalOpen}
+            onOpenChange={setHistoryModalOpen}
+            userId={userId}
+            onDeleted={handleDeleted}
+          />
+        )}
       </div>
     );
   }
@@ -226,6 +248,21 @@ export function AnalyticsDashboard({
     <div className="space-y-6">
       {uploadPending && (
         <UploadPendingBanner onUploadClick={() => setUploadModalOpen(true)} />
+      )}
+
+      {/* Botão de histórico de uploads — apenas para o próprio usuário */}
+      {canManageHistory && (
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground hover:text-foreground text-xs"
+            onClick={() => setHistoryModalOpen(true)}
+          >
+            <History className="h-3.5 w-3.5" />
+            Histórico de uploads
+          </Button>
+        </div>
       )}
 
       {/* Header — só aparece se há snapshot mensal selecionado */}
@@ -316,6 +353,15 @@ export function AnalyticsDashboard({
         userId={userId}
         onSuccess={handleUploadSuccess}
       />
+
+      {canManageHistory && (
+        <UploadHistoryModal
+          open={historyModalOpen}
+          onOpenChange={setHistoryModalOpen}
+          userId={userId}
+          onDeleted={handleDeleted}
+        />
+      )}
     </div>
   );
 }
