@@ -150,11 +150,13 @@ export default function ThoughtLeaderCalendarioPage() {
   }, [activeTabPosts, statusFilter]);
 
   // ─── Posts only with scheduledFor — grouped by day ───────
+  // Posts postados sem scheduledFor usam publishedAt como fallback de data
   const postsByDay = useMemo(() => {
     const map = new Map<string, PipelinePost[]>();
     filteredPosts.forEach(post => {
-      if (!post.scheduledFor) return;
-      const dayKey = post.scheduledFor.substring(0, 10);
+      const dateRef = post.scheduledFor || (post.status === 'postado' ? post.publishedAt ?? null : null);
+      if (!dateRef) return;
+      const dayKey = dateRef.substring(0, 10);
       const existing = map.get(dayKey) || [];
       existing.push(post);
       map.set(dayKey, existing);
@@ -189,8 +191,13 @@ export default function ThoughtLeaderCalendarioPage() {
   }, [selectedDay, postsByDay]);
 
   // ─── Posts without a date (unscheduled) ─────────────────
+  // Posts postados sem scheduledFor usam publishedAt — não contam como sem data
   const unscheduledPosts = useMemo(() => {
-    return filteredPosts.filter(p => !p.scheduledFor);
+    return filteredPosts.filter(p => {
+      if (p.scheduledFor) return false;
+      if (p.status === 'postado' && p.publishedAt) return false;
+      return true;
+    });
   }, [filteredPosts]);
 
   // ─── Pagination for PostListTable ─────────────────────

@@ -158,9 +158,12 @@ export default function StrategistCalendarioPerfilPage() {
     }
   }, [tlId, companySlug, tlSlug, isCreating, router]);
 
-  // ─── Only posts with scheduledFor ──────
+  // ─── Posts with a placeable date ──────
+  // Posts postados sem scheduledFor usam publishedAt como fallback de data no calendário
   const scheduledPosts = useMemo(() => {
-    return posts.filter(p => p.scheduledFor);
+    return posts.filter(p =>
+      p.scheduledFor || (p.status === 'postado' && p.publishedAt)
+    );
   }, [posts]);
 
   // ─── Apply status filter ──────
@@ -170,11 +173,13 @@ export default function StrategistCalendarioPerfilPage() {
   }, [scheduledPosts, statusFilter]);
 
   // ─── Posts grouped by day ──────
+  // Posts postados sem scheduledFor usam publishedAt como fallback de data
   const postsByDay = useMemo(() => {
     const map = new Map<string, PipelinePost[]>();
     filteredPosts.forEach(post => {
-      if (!post.scheduledFor) return;
-      const dayKey = post.scheduledFor.substring(0, 10);
+      const dateRef = post.scheduledFor || (post.status === 'postado' ? post.publishedAt ?? null : null);
+      if (!dateRef) return;
+      const dayKey = dateRef.substring(0, 10);
       const existing = map.get(dayKey) || [];
       existing.push(post);
       map.set(dayKey, existing);

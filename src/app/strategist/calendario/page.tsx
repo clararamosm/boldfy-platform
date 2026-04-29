@@ -162,9 +162,12 @@ export default function StrategistCalendarioPage() {
   );
   const activeTabPosts = activeTab === 'em_producao' ? emProducaoPosts : postadosPosts;
 
-  // ─── Only posts with scheduledFor ──────
+  // ─── Only posts with a placeable date ──────
+  // Posts postados sem scheduledFor usam publishedAt como fallback de data no calendário
   const scheduledPosts = useMemo(() => {
-    return activeTabPosts.filter(p => p.scheduledFor);
+    return activeTabPosts.filter(p =>
+      p.scheduledFor || (p.status === 'postado' && p.publishedAt)
+    );
   }, [activeTabPosts]);
 
   // ─── Apply filters ──────
@@ -202,11 +205,13 @@ export default function StrategistCalendarioPage() {
   }, [scheduledPosts, companyFilter, tlFilter]);
 
   // ─── Posts grouped by day ──────
+  // Posts postados sem scheduledFor usam publishedAt como fallback de data
   const postsByDay = useMemo(() => {
     const map = new Map<string, CalendarPipelinePost[]>();
     filteredPosts.forEach(post => {
-      if (!post.scheduledFor) return;
-      const dayKey = post.scheduledFor.substring(0, 10);
+      const dateRef = post.scheduledFor || (post.status === 'postado' ? post.publishedAt ?? null : null);
+      if (!dateRef) return;
+      const dayKey = dateRef.substring(0, 10);
       const existing = map.get(dayKey) || [];
       existing.push(post);
       map.set(dayKey, existing);

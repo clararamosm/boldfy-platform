@@ -336,16 +336,31 @@ function parseAba4Demographics(sheet: XLSX.WorkSheet): LinkedInDemographic[] {
   const range = XLSX.utils.decode_range(sheet['!ref'] ?? 'A1');
   const rows: LinkedInDemographic[] = [];
 
+  // O LinkedIn exporta a coluna A (categoria) com merged cells — na prática a biblioteca
+  // XLSX preenche apenas a primeira célula do grupo; as demais ficam vazias.
+  // Também pode acontecer que a categoria seja omitida em linhas subsequentes do grupo.
+  // Solução: propagar a última categoria válida encontrada.
+  let lastCategory = '';
+
   // Linha 0 é cabeçalho — começa na 1
   for (let r = 1; r <= range.e.r; r++) {
     const rawCategory = cellStr(sheet, r, 0);
     const label = cellStr(sheet, r, 1);
     const pctRaw = cellRaw(sheet, r, 2);
 
+    // Linha completamente vazia — pular
     if (!rawCategory && !label) continue;
 
+    // Atualiza lastCategory apenas quando a coluna A tem conteúdo
+    if (rawCategory) {
+      lastCategory = rawCategory;
+    }
+
+    // Usa a categoria atual ou a última propagada
+    const effectiveCategory = rawCategory || lastCategory;
+
     rows.push({
-      category: normalizeDemographicCategory(rawCategory),
+      category: normalizeDemographicCategory(effectiveCategory),
       label,
       percentage: parsePercentage(pctRaw),
     });
