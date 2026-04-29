@@ -4,6 +4,7 @@
 import DOMPurify from 'dompurify';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkHighlight from '@/lib/remark-highlight';
 import type React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -114,7 +115,7 @@ export function ModuleRenderer({
           )}
         </div>
         <div
-          className="prose prose-sm max-w-none prose-p:mb-4 prose-h2:mt-8 prose-h2:mb-3 prose-h3:mt-6 prose-h3:mb-2 prose-hr:my-6 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r-lg [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:px-1 [&_mark]:rounded [&_svg]:max-w-full [&_svg]:mx-auto [&_svg]:block"
+          className="prose prose-base max-w-none prose-p:leading-relaxed prose-p:mb-5 prose-h1:text-2xl prose-h1:font-bold prose-h1:mt-10 prose-h1:mb-5 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-h4:text-base prose-h4:font-medium prose-h4:mt-4 prose-h4:mb-2 prose-li:mb-2 prose-ul:mb-5 prose-ol:mb-5 prose-hr:border-transparent prose-hr:my-8 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50 prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:rounded-r-lg prose-blockquote:not-italic [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:px-1 [&_mark]:rounded-sm [&_svg]:max-w-full [&_svg]:mx-auto [&_svg]:block [&_svg]:my-6"
           dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentModule.conteudo?.texto || `<p>${tp.contentUnavailable}</p>`, { ADD_TAGS: ['svg', 'path', 'rect', 'circle', 'line', 'text', 'g', 'defs', 'marker', 'polygon', 'polyline', 'ellipse', 'use', 'symbol', 'clipPath', 'linearGradient', 'radialGradient', 'stop', 'foreignObject'], ADD_ATTR: ['viewBox', 'xmlns', 'fill', 'stroke', 'stroke-width', 'd', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'x1', 'y1', 'x2', 'y2', 'points', 'transform', 'opacity', 'rx', 'ry', 'font-size', 'font-weight', 'text-anchor', 'dominant-baseline', 'marker-end', 'marker-start', 'refX', 'refY', 'markerWidth', 'markerHeight', 'orient', 'gradientUnits', 'offset', 'stop-color', 'stop-opacity', 'clip-path', 'href'] }) }}
         />
       </div>
@@ -204,8 +205,8 @@ export function ModuleRenderer({
               <Wrench className="h-6 w-6 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-amber-800 mb-2">{tp.practice}</p>
-                <div className="prose prose-sm max-w-none prose-p:text-sm prose-p:mb-3 prose-li:text-sm prose-strong:font-semibold prose-hr:my-4 prose-h2:text-base prose-h2:font-bold prose-h2:mt-5 prose-h2:mb-2 prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-4 prose-h3:mb-1 prose-blockquote:border-l-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:rounded-r [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:px-1 [&_mark]:rounded">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentModule.conteudo?.instrucao || tp.followInstructions}</ReactMarkdown>
+                <div className="prose prose-sm max-w-none prose-p:text-sm prose-p:leading-relaxed prose-p:mb-4 prose-li:text-sm prose-li:mb-1 prose-ul:mb-4 prose-ol:mb-4 prose-strong:font-semibold prose-hr:border-transparent prose-hr:my-5 prose-h1:text-lg prose-h1:font-bold prose-h1:mt-8 prose-h1:mb-4 prose-h2:text-base prose-h2:font-bold prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-5 prose-h3:mb-2 prose-h4:text-sm prose-h4:font-medium prose-h4:mt-3 prose-h4:mb-1 prose-blockquote:border-l-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r prose-blockquote:not-italic [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:px-1 [&_mark]:rounded-sm">
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkHighlight]}>{currentModule.conteudo?.instrucao || tp.followInstructions}</ReactMarkdown>
                 </div>
               </div>
             </div>
@@ -234,8 +235,8 @@ export function ModuleRenderer({
               <Target className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-blue-800 mb-2">{tp.contentMission}</p>
-                <div className="prose prose-sm max-w-none prose-p:text-sm prose-p:mb-3 prose-li:text-sm prose-strong:font-semibold prose-hr:my-4 prose-h2:text-base prose-h2:font-bold prose-h2:mt-5 prose-h2:mb-2 prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-4 prose-h3:mb-1 prose-blockquote:border-l-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:rounded-r [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:px-1 [&_mark]:rounded">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentModule.conteudo?.instrucao || ''}</ReactMarkdown>
+                <div className="prose prose-sm max-w-none prose-p:text-sm prose-p:leading-relaxed prose-p:mb-4 prose-li:text-sm prose-li:mb-1 prose-ul:mb-4 prose-ol:mb-4 prose-strong:font-semibold prose-hr:border-transparent prose-hr:my-5 prose-h1:text-lg prose-h1:font-bold prose-h1:mt-8 prose-h1:mb-4 prose-h2:text-base prose-h2:font-bold prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-5 prose-h3:mb-2 prose-h4:text-sm prose-h4:font-medium prose-h4:mt-3 prose-h4:mb-1 prose-blockquote:border-l-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r prose-blockquote:not-italic [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:px-1 [&_mark]:rounded-sm">
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkHighlight]}>{currentModule.conteudo?.instrucao || ''}</ReactMarkdown>
                 </div>
               </div>
             </div>
