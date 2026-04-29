@@ -50,6 +50,14 @@ export type LinkedInSnapshot = {
   uploadedAt: string;        // ISO timestamp
   uploadedBy: string;        // userId de quem fez upload
 
+  /**
+   * 'monthly'    — upload mês a mês (padrão). Alimenta KPIs, top posts, seletor de mês.
+   * 'historical' — upload retroativo de 12 meses feito no onboarding.
+   *                Alimenta apenas os gráficos de tendência. Não aparece no seletor
+   *                individual nem gera top posts.
+   */
+  uploadType?: 'monthly' | 'historical';
+
   period: {
     start: string;           // "YYYY-MM-DD"
     end: string;             // "YYYY-MM-DD"
@@ -81,6 +89,7 @@ export type LinkedInSnapshot = {
 };
 
 // Estrutura retornada pelo parser XLSX (antes de salvar no Firestore)
+// uploadType é opcional aqui e definido pelo modal no momento do upload
 export type ParsedLinkedInData = Omit<LinkedInSnapshot, 'uploadedAt' | 'uploadedBy' | 'actionPlan'>;
 
 // Status de upload no documento do usuário (users/{userId})

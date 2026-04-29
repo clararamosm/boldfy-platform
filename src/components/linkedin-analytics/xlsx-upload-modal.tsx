@@ -24,6 +24,8 @@ interface XlsxUploadModalProps {
   onOpenChange: (open: boolean) => void;
   userId: string;
   onSuccess?: (mesAno: string) => void;
+  /** 'monthly' (padrão) ou 'historical' para upload retroativo do onboarding */
+  uploadType?: 'monthly' | 'historical';
 }
 
 const MONTH_NAMES_PT: Record<string, string> = {
@@ -47,7 +49,7 @@ function formatDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess }: XlsxUploadModalProps) {
+export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess, uploadType = 'monthly' }: XlsxUploadModalProps) {
   const [state, setState] = useState<UploadState>({ status: 'idle' });
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -101,7 +103,9 @@ export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess }: XlsxU
     setState({ status: 'uploading' });
     try {
       const token = await getAuthToken();
-      const result = await uploadLinkedInSnapshot(token, userId, data, overwrite);
+      // Injeta o uploadType definido pelo contexto (onboarding → 'historical', regular → 'monthly')
+      const dataWithType: ParsedLinkedInData = { ...data, uploadType };
+      const result = await uploadLinkedInSnapshot(token, userId, dataWithType, overwrite);
 
       if (result.alreadyExists) {
         setState({ status: 'confirming_overwrite', data });
@@ -117,7 +121,7 @@ export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess }: XlsxU
     } catch {
       setState({ status: 'error', message: 'Erro inesperado. Tente novamente.' });
     }
-  }, [userId, onSuccess]);
+  }, [userId, onSuccess, uploadType]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -125,10 +129,14 @@ export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess }: XlsxU
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-blue-600" />
-            Upload do Relatório LinkedIn
+            {uploadType === 'historical'
+              ? 'Importar Histórico LinkedIn (12 meses)'
+              : 'Upload do Relatório LinkedIn'}
           </DialogTitle>
           <DialogDescription>
-            Exporte seus dados do LinkedIn Analytics (período mensal) e faça o upload aqui.
+            {uploadType === 'historical'
+              ? 'Exporte os últimos 12 meses do LinkedIn Analytics e faça o upload para ativar os gráficos de evolução.'
+              : 'Exporte seus dados do LinkedIn Analytics (período mensal) e faça o upload aqui.'}
           </DialogDescription>
         </DialogHeader>
 

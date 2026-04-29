@@ -10,7 +10,7 @@ import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
 import { AnalyticsHeader } from './analytics-header';
 import { UploadPendingBanner } from './upload-pending-banner';
 import { AnalyticsKpiCards } from './kpi-cards';
-import { ImpressionsWeeklyChart } from './impressions-weekly-chart';
+import { ImpressionsMonthlyChart } from './impressions-monthly-chart';
 import { FollowersMonthlyChart } from './followers-monthly-chart';
 import { TopPostsSection } from './top-posts-section';
 import { DemographicsPanel } from './demographics-panel';
@@ -39,6 +39,9 @@ export interface AnalyticsDashboardProps {
   uploadPending?: boolean;
 }
 
+// Maps para os gráficos de tendência (inclui todos os snapshots — monthly + historical)
+type TrendMap = Record<string, Pick<LinkedInSnapshot, 'mesAno' | 'totalNewFollowers' | 'totalImpressions'>>;
+
 export function AnalyticsDashboard({
   userId,
   userName,
@@ -48,43 +51,72 @@ export function AnalyticsDashboard({
   showActionPlan = false,
   readOnlyActionPlan = true,
 }: AnalyticsDashboardProps) {
-  const [availableMonths, setAvailableMonths] = useState<string[]>([]);
+  // Meses com upload MONTHLY (aparecem no seletor e geram KPIs / top posts)
+  const [monthlyMonths, setMonthlyMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [snapshot, setSnapshot] = useState<LinkedInSnapshot | null>(null);
   const [prevSnapshot, setPrevSnapshot] = useState<LinkedInSnapshot | null>(null);
-  const [allSnapshots, setAllSnapshots] = useState<Record<string, Pick<LinkedInSnapshot, 'mesAno' | 'totalNewFollowers'>>>({});
-  const [allDailyData, setAllDailyData] = useState<LinkedInSnapshot['dailyEngagement']>([]);
+
+  // Todos os snapshots (monthly + historical) — usados nos gráficos de tendência
+  const [trendSnapshots, setTrendSnapshots] = useState<TrendMap>({});
+
   const [loading, setLoading] = useState(true);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  // flag para evitar que o useEffect de troca de mês dispare durante loadData
   const isLoadingDataRef = useRef(false);
 
-  // Função central de carregamento — usada no mount e após upload
   const loadData = useCallback(async (monthToSelect?: string) => {
     isLoadingDataRef.current = true;
     setLoading(true);
     try {
       const token = await getAuthToken();
 
-      // 1. Listar meses disponíveis
+      // 1. Listar todos os meses disponíveis
       const { months: rawMonths, error: listError } = await listLinkedInSnapshots(token, userId);
       if (listError) console.error('[AnalyticsDashboard] listLinkedInSnapshots error:', listError);
-      const months = rawMonths ?? [];
-      setAvailableMonths(months);
+      const allMonths = rawMonths ?? [];
 
-      // 2. Determinar mês a exibir
-      const active = monthToSelect && months.includes(monthToSelect)
+      // 2. Buscar batch completo para separar monthly de historical
+      if (allMonths.length === 0) {
+        setMonthlyMonths([]);
+        setSelectedMonth('');
+        setSnapshot(null);
+        setPrevSnapshot(null);
+        setTrendSnapshots({});
+        return;
+      }
+
+      const { snapshots: batch } = await getLinkedInSnapshotBatch(token, userId, allMonths);
+
+      // 3. Separar meses monthly (seletor) dos históricos (só gráficos)
+      const monthly = allMonths.filter(m => (batch?.[m]?.uploadType ?? 'monthly') === 'monthly');
+      setMonthlyMonths(monthly);
+
+      // 4. Montar mapa de tendência com todos os snapshots
+      if (batch) {
+        const trendMap: TrendMap = {};
+        for (const [k, s] of Object.entries(batch)) {
+          trendMap[k] = {
+            mesAno: s.mesAno,
+            totalNewFollowers: s.totalNewFollowers,
+            totalImpressions: s.totalImpressions,
+          };
+        }
+        setTrendSnapshots(trendMap);
+      }
+
+      // 5. Determinar mês selecionado (só entre os monthly)
+      const active = monthToSelect && monthly.includes(monthToSelect)
         ? monthToSelect
-        : months[0] ?? '';
+        : monthly[0] ?? '';
       setSelectedMonth(active);
 
-      if (!active || months.length === 0) return;
+      if (!active) return;
 
-      // 3. Snapshot selecionado
+      // 6. Snapshot do mês selecionado
       const { snapshot: snap } = await getLinkedInSnapshot(token, userId, active);
       setSnapshot(snap ?? null);
 
-      // 4. Snapshot do mês anterior
+      // 7. Snapshot do mês anterior (só monthly)
       const [y, m] = active.split('-').map(Number);
       let prevY = y, prevM = m - 1;
       if (prevM < 1) { prevM = 12; prevY--; }
@@ -92,20 +124,6 @@ export function AnalyticsDashboard({
       const { snapshot: prev } = await getLinkedInSnapshot(token, userId, prevMesAno);
       setPrevSnapshot(prev ?? null);
 
-      // 5. Batch de todos os meses para os gráficos multi-mês
-      const { snapshots: batch } = await getLinkedInSnapshotBatch(token, userId, months);
-      if (batch) {
-        const followersMap: Record<string, Pick<LinkedInSnapshot, 'mesAno' | 'totalNewFollowers'>> = {};
-        for (const [k, s] of Object.entries(batch)) {
-          followersMap[k] = { mesAno: s.mesAno, totalNewFollowers: s.totalNewFollowers };
-        }
-        setAllSnapshots(followersMap);
-
-        const allDaily = months
-          .flatMap(mo => batch[mo]?.dailyEngagement ?? [])
-          .sort((a, b) => a.date.localeCompare(b.date));
-        setAllDailyData(allDaily);
-      }
     } catch (e) {
       console.error('[AnalyticsDashboard] loadData error:', e);
     } finally {
@@ -114,14 +132,12 @@ export function AnalyticsDashboard({
     }
   }, [userId]);
 
-  // Carregar na montagem
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Quando o usuário muda o mês manualmente (sem recarregar tudo)
+  // Troca de mês manual — só busca o snapshot, sem recarregar tudo
   useEffect(() => {
-    // Ignorar disparos causados pelo loadData (que já busca o snapshot)
     if (!selectedMonth || isLoadingDataRef.current) return;
 
     async function loadSelectedSnapshot() {
@@ -148,25 +164,22 @@ export function AnalyticsDashboard({
 
   const handleUploadSuccess = useCallback((mesAno: string) => {
     setUploadModalOpen(false);
-    // Recarregar tudo a partir do zero, forçando o mês recém-carregado
     loadData(mesAno);
   }, [loadData]);
 
-  // Month selector component
   const MonthSelector = (
     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
       <SelectTrigger className="w-44">
         <SelectValue placeholder="Selecionar mês" />
       </SelectTrigger>
       <SelectContent>
-        {availableMonths.map(m => (
+        {monthlyMonths.map(m => (
           <SelectItem key={m} value={m}>{formatMesAno(m)}</SelectItem>
         ))}
       </SelectContent>
     </Select>
   );
 
-  // Estado de loading inicial
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -175,8 +188,8 @@ export function AnalyticsDashboard({
     );
   }
 
-  // Estado vazio — sem nenhum mês disponível
-  if (availableMonths.length === 0) {
+  // Sem nenhum dado ainda
+  if (Object.keys(trendSnapshots).length === 0) {
     return (
       <div className="space-y-4">
         {uploadPending && (
@@ -202,15 +215,17 @@ export function AnalyticsDashboard({
     );
   }
 
+  // Tem dados históricos mas nenhum upload mensal ainda
+  const hasOnlyHistorical = monthlyMonths.length === 0;
+
   return (
     <div className="space-y-6">
-      {/* Banner de upload pendente */}
       {uploadPending && (
         <UploadPendingBanner onUploadClick={() => setUploadModalOpen(true)} />
       )}
 
-      {/* Header */}
-      {snapshot && (
+      {/* Header — só aparece se há snapshot mensal selecionado */}
+      {snapshot && !hasOnlyHistorical && (
         <AnalyticsHeader
           userName={userName}
           userAvatarUrl={userAvatarUrl}
@@ -221,16 +236,27 @@ export function AnalyticsDashboard({
         />
       )}
 
-      {!snapshot && (
+      {/* Sem snapshot mensal: título + seletor ou aviso de aguardando primeiro mês */}
+      {!snapshot && !hasOnlyHistorical && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">Sem dados para este mês.</p>
           {MonthSelector}
         </div>
       )}
 
-      {snapshot && (
+      {/* Gráficos de tendência — sempre visíveis quando há qualquer dado */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-xl border bg-card p-4">
+          <ImpressionsMonthlyChart snapshots={trendSnapshots} />
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <FollowersMonthlyChart snapshots={trendSnapshots} />
+        </div>
+      </div>
+
+      {/* KPIs, top posts, demográficos e plano — só quando há snapshot mensal */}
+      {snapshot && !hasOnlyHistorical && (
         <>
-          {/* KPI Cards */}
           <AnalyticsKpiCards
             totalImpressions={snapshot.totalImpressions}
             totalReach={snapshot.totalReach}
@@ -244,26 +270,16 @@ export function AnalyticsDashboard({
             prevPostsPublished={prevSnapshot?.totalPostsPublished}
           />
 
-          {/* Gráfico de impressões semanais */}
-          <div className="rounded-xl border bg-card p-4">
-            <ImpressionsWeeklyChart dailyData={allDailyData} />
-          </div>
+          {/* Top posts — só quando o snapshot mensal tem posts reais */}
+          {(snapshot.topPostsByEngagement.length > 0 || snapshot.topPostsByImpressions.length > 0) && (
+            <TopPostsSection
+              topByEngagement={snapshot.topPostsByEngagement}
+              topByImpressions={snapshot.topPostsByImpressions}
+            />
+          )}
 
-          {/* Gráfico de seguidores mensais */}
-          <div className="rounded-xl border bg-card p-4">
-            <FollowersMonthlyChart snapshots={allSnapshots} />
-          </div>
-
-          {/* Top posts */}
-          <TopPostsSection
-            topByEngagement={snapshot.topPostsByEngagement}
-            topByImpressions={snapshot.topPostsByImpressions}
-          />
-
-          {/* Dados demográficos */}
           <DemographicsPanel demographics={snapshot.demographics} />
 
-          {/* Plano de ação */}
           {showActionPlan && (
             <ActionPlanSection
               tlUserId={userId}
@@ -275,7 +291,19 @@ export function AnalyticsDashboard({
         </>
       )}
 
-      {/* Modal de upload */}
+      {/* Aviso quando só tem histórico — aguardando primeiro upload mensal */}
+      {hasOnlyHistorical && (
+        <div className="rounded-xl border border-dashed bg-muted/20 px-6 py-10 text-center space-y-2">
+          <p className="text-sm font-medium text-foreground/70">
+            Histórico importado ✓
+          </p>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+            Os gráficos acima já mostram sua evolução. Faça o upload do mês atual para
+            ver os KPIs e top posts detalhados.
+          </p>
+        </div>
+      )}
+
       <XlsxUploadModal
         open={uploadModalOpen}
         onOpenChange={setUploadModalOpen}
