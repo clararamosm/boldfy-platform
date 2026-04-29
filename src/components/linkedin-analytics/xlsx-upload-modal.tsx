@@ -3,20 +3,23 @@
 import { useState, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { parseLinkedInXlsx } from '@/lib/linkedin-xlsx-parser';
-import { uploadLinkedInSnapshot } from '@/app/actions/linkedin-analytics';
+import { parseLinkedInXlsx, parseLinkedInXlsxMulti } from '@/lib/linkedin-xlsx-parser';
+import { uploadLinkedInSnapshot, uploadLinkedInSnapshotBatch } from '@/app/actions/linkedin-analytics';
 import { getAuthToken } from '@/lib/auth-client';
 import type { ParsedLinkedInData } from '@/lib/linkedin-analytics-types';
+
+// ─── Types ────────────────────────────────────────────────────
 
 type UploadState =
   | { status: 'idle' }
   | { status: 'parsing' }
-  | { status: 'preview'; data: ParsedLinkedInData }
-  | { status: 'confirming_overwrite'; data: ParsedLinkedInData }
+  | { status: 'preview'; data: ParsedLinkedInData }                       // mês único
+  | { status: 'preview_multi'; snapshots: ParsedLinkedInData[] }          // multi-mês histórico
+  | { status: 'confirming_overwrite'; data: ParsedLinkedInData }          // sobrescrita mês único
   | { status: 'uploading' }
-  | { status: 'success'; mesAno: string }
+  | { status: 'success'; mesAno: string; monthCount?: number }            // sucesso (multi ou único)
   | { status: 'error'; message: string };
 
 interface XlsxUploadModalProps {
@@ -24,19 +27,31 @@ interface XlsxUploadModalProps {
   onOpenChange: (open: boolean) => void;
   userId: string;
   onSuccess?: (mesAno: string) => void;
-  /** 'monthly' (padrão) ou 'historical' para upload retroativo do onboarding */
+  /** 'monthly' (padrão) ou 'historical' para upload retroativo */
   uploadType?: 'monthly' | 'historical';
 }
 
+// ─── Helpers ──────────────────────────────────────────────────
+
 const MONTH_NAMES_PT: Record<string, string> = {
-  '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
-  '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
-  '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
+  '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
+  '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
+  '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez',
 };
 
 function formatMesAno(mesAno: string): string {
   const [year, month] = mesAno.split('-');
-  return `${MONTH_NAMES_PT[month] ?? month} ${year}`;
+  const monthNames: Record<string, string> = {
+    '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+    '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+    '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
+  };
+  return `${monthNames[month] ?? month} ${year}`;
+}
+
+function formatMesAnoShort(mesAno: string): string {
+  const [year, month] = mesAno.split('-');
+  return `${MONTH_NAMES_PT[month] ?? month}/${year.slice(2)}`;
 }
 
 function formatNumber(n: number): string {
@@ -49,7 +64,15 @@ function formatDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess, uploadType = 'monthly' }: XlsxUploadModalProps) {
+// ─── Component ────────────────────────────────────────────────
+
+export function XlsxUploadModal({
+  open,
+  onOpenChange,
+  userId,
+  onSuccess,
+  uploadType = 'monthly',
+}: XlsxUploadModalProps) {
   const [state, setState] = useState<UploadState>({ status: 'idle' });
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -79,13 +102,26 @@ export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess, uploadT
 
     try {
       const buffer = await file.arrayBuffer();
-      const data = parseLinkedInXlsx(buffer);
-      setState({ status: 'preview', data });
+
+      if (uploadType === 'historical') {
+        // Usar parser multi-mês para o histórico
+        const { snapshots, isMultiMonth } = parseLinkedInXlsxMulti(buffer);
+        if (isMultiMonth) {
+          setState({ status: 'preview_multi', snapshots });
+        } else {
+          // Arquivo de mês único mesmo sendo histórico
+          setState({ status: 'preview', data: snapshots[0] });
+        }
+      } else {
+        // Upload mensal normal — parser simples
+        const data = parseLinkedInXlsx(buffer);
+        setState({ status: 'preview', data });
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao ler o arquivo.';
       setState({ status: 'error', message: msg });
     }
-  }, []);
+  }, [uploadType]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -99,11 +135,11 @@ export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess, uploadT
     if (file) processFile(file);
   }, [processFile]);
 
+  // Upload único (mensal ou histórico de 1 mês)
   const handleConfirmUpload = useCallback(async (data: ParsedLinkedInData, overwrite = false) => {
     setState({ status: 'uploading' });
     try {
       const token = await getAuthToken();
-      // Injeta o uploadType definido pelo contexto (onboarding → 'historical', regular → 'monthly')
       const dataWithType: ParsedLinkedInData = { ...data, uploadType };
       const result = await uploadLinkedInSnapshot(token, userId, dataWithType, overwrite);
 
@@ -122,6 +158,27 @@ export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess, uploadT
       setState({ status: 'error', message: 'Erro inesperado. Tente novamente.' });
     }
   }, [userId, onSuccess, uploadType]);
+
+  // Upload em lote (histórico multi-mês) — sempre sobrescreve
+  const handleConfirmBatchUpload = useCallback(async (snapshots: ParsedLinkedInData[]) => {
+    setState({ status: 'uploading' });
+    try {
+      const token = await getAuthToken();
+      const snapshotsWithType = snapshots.map(s => ({ ...s, uploadType: 'historical' as const }));
+      const result = await uploadLinkedInSnapshotBatch(token, userId, snapshotsWithType);
+
+      if (result.error) {
+        setState({ status: 'error', message: result.error });
+        return;
+      }
+
+      const latestMonth = [...(result.savedMonths ?? [])].sort().reverse()[0] ?? '';
+      setState({ status: 'success', mesAno: latestMonth, monthCount: result.savedMonths?.length });
+      onSuccess?.(latestMonth);
+    } catch {
+      setState({ status: 'error', message: 'Erro inesperado. Tente novamente.' });
+    }
+  }, [userId, onSuccess]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -175,7 +232,7 @@ export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess, uploadT
           </div>
         )}
 
-        {/* PREVIEW */}
+        {/* PREVIEW — mês único */}
         {(state.status === 'preview' || state.status === 'confirming_overwrite') && (
           <div className="space-y-4">
             <div className="rounded-xl bg-green-50 border border-green-200 p-4 space-y-2">
@@ -221,11 +278,55 @@ export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess, uploadT
           </div>
         )}
 
+        {/* PREVIEW — multi-mês histórico */}
+        {state.status === 'preview_multi' && (
+          <div className="space-y-4">
+            <div className="rounded-xl bg-blue-50 border border-blue-200 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-blue-600" />
+                <p className="font-semibold text-blue-800 text-sm">
+                  {state.snapshots.length} meses encontrados
+                </p>
+              </div>
+              {/* Lista de meses em chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {state.snapshots.map(s => (
+                  <span
+                    key={s.mesAno}
+                    className="text-[11px] font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full"
+                  >
+                    {formatMesAnoShort(s.mesAno)}
+                  </span>
+                ))}
+              </div>
+              {/* Resumo do período */}
+              <p className="text-xs text-blue-600">
+                Período: {formatDate(state.snapshots[0]?.period.start)} – {formatDate(state.snapshots[state.snapshots.length - 1]?.period.end)}
+              </p>
+              <p className="text-xs text-blue-700 font-medium">
+                Os dados serão gravados mês a mês. Meses já existentes serão substituídos.
+              </p>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={reset}>
+                <X className="h-4 w-4 mr-1" />
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={() => handleConfirmBatchUpload(state.snapshots)}>
+                Importar {state.snapshots.length} meses
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* UPLOADING */}
         {state.status === 'uploading' && (
           <div className="flex flex-col items-center gap-3 py-10">
             <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            <p className="text-sm text-muted-foreground">Salvando dados...</p>
+            <p className="text-sm text-muted-foreground">
+              {uploadType === 'historical' ? 'Salvando histórico...' : 'Salvando dados...'}
+            </p>
           </div>
         )}
 
@@ -233,9 +334,16 @@ export function XlsxUploadModal({ open, onOpenChange, userId, onSuccess, uploadT
         {state.status === 'success' && (
           <div className="flex flex-col items-center gap-3 py-8">
             <CheckCircle2 className="h-10 w-10 text-green-500" />
-            <p className="font-semibold text-sm">Upload concluído!</p>
+            <p className="font-semibold text-sm">
+              {state.monthCount && state.monthCount > 1
+                ? `${state.monthCount} meses importados!`
+                : 'Upload concluído!'}
+            </p>
             <p className="text-xs text-muted-foreground text-center">
-              Os dados de <strong>{formatMesAno(state.mesAno)}</strong> foram salvos com sucesso.
+              {state.monthCount && state.monthCount > 1
+                ? `Os dados históricos foram salvos. Os gráficos já estão disponíveis.`
+                : <>Os dados de <strong>{formatMesAno(state.mesAno)}</strong> foram salvos com sucesso.</>
+              }
             </p>
             <Button size="sm" onClick={handleClose}>
               Ver dashboard

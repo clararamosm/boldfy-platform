@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, Users, TrendingUp, UserPlus, FileText, ArrowUp, ArrowDown } from 'lucide-react';
+import { Eye, Users, TrendingUp, UserPlus, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { KpiDelta } from '@/lib/linkedin-analytics-types';
 
@@ -62,13 +62,11 @@ interface AnalyticsKpiCardsProps {
   totalReach: number;
   totalEngagement: number;
   totalNewFollowers: number;
-  totalPostsPublished: number;
   // Valores do mês anterior (undefined = sem dados)
   prevImpressions?: number;
   prevReach?: number;
   prevEngagement?: number;
   prevNewFollowers?: number;
-  prevPostsPublished?: number;
 }
 
 export function AnalyticsKpiCards({
@@ -76,15 +74,13 @@ export function AnalyticsKpiCards({
   totalReach,
   totalEngagement,
   totalNewFollowers,
-  totalPostsPublished,
   prevImpressions,
   prevReach,
   prevEngagement,
   prevNewFollowers,
-  prevPostsPublished,
 }: AnalyticsKpiCardsProps) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <KpiCard
         label="Impressões"
         value={totalImpressions}
@@ -108,13 +104,6 @@ export function AnalyticsKpiCards({
         value={totalNewFollowers}
         delta={calcDelta(totalNewFollowers, prevNewFollowers)}
         icon={<UserPlus className="h-4 w-4" />}
-      />
-      <KpiCard
-        label="Posts"
-        value={totalPostsPublished}
-        delta={calcDelta(totalPostsPublished, prevPostsPublished)}
-        deltaLabel="posts"
-        icon={<FileText className="h-4 w-4" />}
       />
     </div>
   );

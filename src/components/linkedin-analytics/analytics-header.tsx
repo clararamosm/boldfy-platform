@@ -1,6 +1,6 @@
 'use client';
 
-import { Users, TrendingUp, TrendingDown } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown, FileText } from 'lucide-react';
 import { LINKEDIN_CPM_BRL } from '@/lib/constants';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
 
@@ -30,6 +30,8 @@ interface AnalyticsHeaderProps {
   prevSnapshot?: LinkedInSnapshot;
   showMediaValue?: boolean;   // apenas admin
   monthSelector: React.ReactNode;
+  /** Exibir contagem de posts publicados junto ao seletor de mês */
+  showPostsCount?: boolean;
 }
 
 export function AnalyticsHeader({
@@ -38,6 +40,7 @@ export function AnalyticsHeader({
   prevSnapshot,
   showMediaValue = false,
   monthSelector,
+  showPostsCount = true,
 }: AnalyticsHeaderProps) {
   const mediaValue = (snapshot.totalImpressions / 1000) * LINKEDIN_CPM_BRL;
 
@@ -87,8 +90,17 @@ export function AnalyticsHeader({
         )}
       </div>
 
-      {/* Direita: seletor de mês */}
-      <div className="shrink-0">
+      {/* Direita: posts publicados + seletor de mês */}
+      <div className="shrink-0 flex flex-col items-end gap-1.5">
+        {showPostsCount && snapshot.totalPostsPublished > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <FileText className="h-3.5 w-3.5" />
+            <span>
+              <strong className="text-foreground font-semibold">{snapshot.totalPostsPublished}</strong>
+              {' '}post{snapshot.totalPostsPublished !== 1 ? 's' : ''} publicado{snapshot.totalPostsPublished !== 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
         {monthSelector}
       </div>
     </div>

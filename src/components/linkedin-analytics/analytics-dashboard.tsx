@@ -266,12 +266,10 @@ export function AnalyticsDashboard({
             totalReach={snapshot.totalReach}
             totalEngagement={snapshot.totalEngagement}
             totalNewFollowers={snapshot.totalNewFollowers}
-            totalPostsPublished={snapshot.totalPostsPublished}
             prevImpressions={prevSnapshot?.totalImpressions}
             prevReach={prevSnapshot?.totalReach}
             prevEngagement={prevSnapshot?.totalEngagement}
             prevNewFollowers={prevSnapshot?.totalNewFollowers}
-            prevPostsPublished={prevSnapshot?.totalPostsPublished}
           />
 
           {/* Top posts — só quando o snapshot mensal tem posts reais */}

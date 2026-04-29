@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Loader2, RefreshCw, Target, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAuthToken } from '@/lib/auth-client';
@@ -86,7 +86,6 @@ export function IcpFitScoreCard({ userId, mesAno }: IcpFitScoreCardProps) {
   const [loading, setLoading] = useState(false);
   const [noTargetAudience, setNoTargetAudience] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasLoaded, setHasLoaded] = useState(false);
 
   const compute = useCallback(async () => {
     setLoading(true);
@@ -106,29 +105,14 @@ export function IcpFitScoreCard({ userId, mesAno }: IcpFitScoreCardProps) {
       setError('Erro inesperado. Tente novamente.');
     } finally {
       setLoading(false);
-      setHasLoaded(true);
     }
   }, [userId, mesAno]);
 
-  // Estado: não calculado ainda
-  if (!hasLoaded && !loading) {
-    return (
-      <div className="rounded-xl border bg-card p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Target className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold text-foreground">ICP-Fit Score</h3>
-          <span className="text-[10px] bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">IA</span>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Calcule o quanto sua audiência atual bate com o ICP definido no Brand Context.
-        </p>
-        <Button size="sm" onClick={compute} className="w-full">
-          <Target className="h-3.5 w-3.5 mr-1.5" />
-          Calcular ICP-Fit Score
-        </Button>
-      </div>
-    );
-  }
+  // Calcular automaticamente ao montar ou quando o mês muda
+  useEffect(() => {
+    compute();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, mesAno]);
 
   // Estado: calculando
   if (loading) {

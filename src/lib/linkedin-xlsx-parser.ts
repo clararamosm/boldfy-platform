@@ -60,11 +60,26 @@ function parseDatePtBR(val: unknown): string {
  */
 function parsePercentage(val: unknown): number {
   if (!val) return 0;
+
+  // Valor numérico direto do Excel (LinkedIn exporta como decimal: 0.12 = 12%)
+  if (typeof val === 'number') {
+    // Decimais entre 0 e 1 são frações — multiplicar por 100
+    if (val > 0 && val < 1) return Math.round(val * 1000) / 10; // preserva 1 casa decimal
+    if (val >= 1) return Math.round(val); // já está em 0-100
+    return 0;
+  }
+
   const str = String(val).trim().toLowerCase();
   if (str.includes('menos de 1') || str === '<1%') return 0.5;
+
+  const hasPercent = str.includes('%');
   const clean = str.replace('%', '').replace(',', '.').trim();
   const n = parseFloat(clean);
-  return isNaN(n) ? 0 : n;
+  if (isNaN(n)) return 0;
+
+  // String sem % e valor fracionário → multiplicar por 100
+  if (!hasPercent && n > 0 && n < 1) return Math.round(n * 1000) / 10;
+  return n;
 }
 
 /**
@@ -348,4 +363,99 @@ export function parseLinkedInXlsx(buffer: ArrayBuffer): ParsedLinkedInData {
     dailyNewFollowers,
     demographics,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Parser multi-mês (histórico de 12 meses)
+// ---------------------------------------------------------------------------
+
+/**
+ * Detecta se o arquivo contém múltiplos meses (export de 365 dias).
+ * Se sim, divide os dados diários por mês e retorna um snapshot por mês.
+ * Se não (export mensal normal), retorna um array com o snapshot único.
+ *
+ * Comportamento:
+ * - KPIs (impressões, seguidores, engajamento) são somados por mês
+ * - Demographics são iguais para todos os meses (snapshot geral do perfil)
+ * - Top posts são incluídos apenas no mês mais recente do conjunto
+ *   (são do período completo, não de meses individuais)
+ * - uploadType é definido pelo chamador (histórico → 'historical')
+ */
+export function parseLinkedInXlsxMulti(buffer: ArrayBuffer): {
+  snapshots: ParsedLinkedInData[];
+  isMultiMonth: boolean;
+} {
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: false });
+
+  if (workbook.SheetNames.length < 4) {
+    throw new Error('Arquivo inválido: esperadas pelo menos 4 abas no relatório do LinkedIn Analytics.');
+  }
+
+  const sheets = workbook.SheetNames.map(name => workbook.Sheets[name]);
+
+  // Parse de todas as abas
+  const dailyEngagement = parseAba1Engajamento(sheets[1]);
+  const { topPostsByEngagement, topPostsByImpressions } = parseAba2TopPosts(sheets[2]);
+  const { totalFollowers, dailyNewFollowers } = parseAba3Seguidores(sheets[3]);
+  const demographics = sheets[4] ? parseAba4Demographics(sheets[4]) : [];
+
+  // Detectar meses distintos nos dados diários
+  const allDates = [
+    ...dailyEngagement.map(d => d.date),
+    ...dailyNewFollowers.map(d => d.date),
+  ].filter(Boolean);
+
+  const uniqueMonths = [...new Set(allDates.map(d => d.substring(0, 7)))].sort();
+  const isMultiMonth = uniqueMonths.length > 1;
+
+  if (!uniqueMonths.length) {
+    throw new Error('Não foi possível identificar o mês de referência. Verifique se o arquivo é um export válido do LinkedIn Analytics.');
+  }
+
+  if (!isMultiMonth) {
+    // Arquivo de mês único — usar parser normal
+    const single = parseLinkedInXlsx(buffer);
+    return { snapshots: [single], isMultiMonth: false };
+  }
+
+  // Arquivo multi-mês — dividir por mês
+  const mostRecentMonth = uniqueMonths[uniqueMonths.length - 1];
+
+  const snapshots: ParsedLinkedInData[] = uniqueMonths.map(mesAno => {
+    // Dados diários deste mês
+    const engMonth = dailyEngagement.filter(d => d.date.startsWith(mesAno));
+    const follMonth = dailyNewFollowers.filter(d => d.date.startsWith(mesAno));
+
+    // KPIs agregados do mês
+    const totalEngagement = engMonth.reduce((s, d) => s + d.engagement, 0);
+    const totalImpressions = engMonth.reduce((s, d) => s + d.impressions, 0);
+    const totalNewFollowers = follMonth.reduce((s, d) => s + d.newFollowers, 0);
+
+    // Período do mês
+    const sortedDays = [...engMonth.map(d => d.date), ...follMonth.map(d => d.date)].sort();
+    const start = sortedDays[0] ?? `${mesAno}-01`;
+    const end = sortedDays[sortedDays.length - 1] ?? `${mesAno}-28`;
+
+    // Top posts apenas no mês mais recente (são do período inteiro)
+    const isLastMonth = mesAno === mostRecentMonth;
+
+    return {
+      mesAno,
+      period: { start, end },
+      totalImpressions,
+      totalReach: 0,         // não disponível por mês no export multi-mês
+      totalEngagement,
+      dailyEngagement: engMonth,
+      totalPostsPublished: isLastMonth ? [...topPostsByEngagement, ...topPostsByImpressions]
+        .filter((p, i, arr) => arr.findIndex(x => x.url === p.url) === i).length : 0,
+      topPostsByEngagement: isLastMonth ? topPostsByEngagement : [],
+      topPostsByImpressions: isLastMonth ? topPostsByImpressions : [],
+      totalFollowers,        // total atual (igual para todos os meses)
+      totalNewFollowers,
+      dailyNewFollowers: follMonth,
+      demographics,          // demographics são do snapshot atual — iguais para todos os meses
+    };
+  });
+
+  return { snapshots, isMultiMonth: true };
 }

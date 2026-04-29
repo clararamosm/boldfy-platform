@@ -178,6 +178,66 @@ export async function uploadLinkedInSnapshot(
 }
 
 /**
+ * Salva múltiplos snapshots de uma vez (upload histórico multi-mês).
+ * Retorna quais meses foram gravados e quais já existiam.
+ * Sempre sobrescreve — histórico é sempre substituído pelo dado mais recente.
+ */
+export async function uploadLinkedInSnapshotBatch(
+  idToken: string,
+  userId: string,
+  snapshots: ParsedLinkedInData[],
+): Promise<{ success?: boolean; savedMonths?: string[]; error?: string }> {
+  try {
+    const caller = await requireAuth(idToken);
+
+    if (caller.uid !== userId && caller.role !== 'master') {
+      return { error: 'Acesso negado: apenas o próprio usuário pode fazer upload.' };
+    }
+
+    if (!snapshots.length) {
+      return { error: 'Nenhum snapshot para salvar.' };
+    }
+
+    const savedMonths: string[] = [];
+    const now = new Date().toISOString();
+
+    // Gravar cada mês — sempre sobrescreve (histórico substitui, nunca faz média)
+    for (const snapshotData of snapshots) {
+      const { mesAno } = snapshotData;
+      const snapshotRef = adminDb
+        .collection('users')
+        .doc(userId)
+        .collection('linkedinSnapshots')
+        .doc(mesAno);
+
+      const snapshot: LinkedInSnapshot = {
+        ...snapshotData,
+        uploadedAt: now,
+        uploadedBy: caller.uid,
+      };
+
+      await snapshotRef.set(snapshot);
+      savedMonths.push(mesAno);
+    }
+
+    // Atualizar flag com o mês mais recente do lote
+    const latestMonth = [...savedMonths].sort().reverse()[0];
+    await adminDb.collection('users').doc(userId).update({
+      'linkedinSnapshotStatus.lastUploadMonth': latestMonth,
+      'linkedinSnapshotStatus.lastUploadAt': now,
+    });
+
+    // Enriquecimento do mês mais recente (top posts)
+    enrichSnapshotWithPostData(userId, latestMonth).catch(() => {});
+
+    return { success: true, savedMonths };
+  } catch (err) {
+    console.error('[linkedin-analytics] uploadLinkedInSnapshotBatch error:', err);
+    return { error: 'Erro ao salvar histórico. Tente novamente.' };
+  }
+}
+
+/**
  * Busca um snapshot mensal específico.
  */
 export async function getLinkedInSnapshot(
@@ -484,21 +544,30 @@ ${demoSummary || 'Dados demográficos não disponíveis.'}
 ## Tarefa:
 Calcule um ICP-Fit Score de 0 a 100 avaliando o quanto a audiência real bate com o ICP definido.
 
-Considere:
-- Cargo/função: os cargos mais presentes batem com os decisores e influenciadores do ICP?
-- Setor: os setores presentes são os que a empresa quer atingir?
-- Tamanho da empresa: os tamanhos de empresa correspondem ao mercado-alvo?
-- Outros dados presentes (senioridade, localização etc.)
+IMPORTANTE: Faça uma leitura CONTEXTUAL CRUZADA entre as categorias — não avalie cada uma de forma isolada.
+
+Exemplos de leitura contextual:
+- "Fundador" + empresa de "1-10 funcionários" = decisor solo de alta influência → peso elevado se o ICP busca PMEs
+- "Analista" ou "Especialista" + empresa grande = influenciador, não decisor final → relevante se o ICP inclui influenciadores
+- "Diretor" + setor fora do ICP = cargo ideal mas mercado errado → score médio
+- "Gerente" + senioridade "Sênior" = mais poder decisório do que "Gerente Júnior" mesmo com mesmo cargo
+- Volume alto de um setor não-alvo pode diluir o fit mesmo com cargos corretos
+
+Avalie:
+1. **Cargo × Senioridade** — o nível hierárquico real bate com os decisores e influenciadores do ICP? (Senioridade diferencia o poder de decisão mesmo para o mesmo título)
+2. **Setor** — os setores presentes são os que a empresa quer atingir?
+3. **Tamanho da empresa × Cargo** — o porte das empresas corresponde ao mercado-alvo? Um fundador em startup é diferente de um gerente em enterprise.
+4. **Leitura integrada** — considerando tudo junto, a audiência tende a ser decisores, influenciadores ou ruído para o ICP?
 
 Responda EXATAMENTE neste formato JSON (sem markdown, sem explicações extras):
 {
   "overall": <número 0-100>,
   "categories": [
-    { "category": "Cargo", "score": <0-100>, "insight": "<uma frase curta em português>" },
+    { "category": "Cargo & Senioridade", "score": <0-100>, "insight": "<uma frase curta em português cruzando cargo e nível de experiência>" },
     { "category": "Setor", "score": <0-100>, "insight": "<uma frase curta em português>" },
     { "category": "Tamanho da empresa", "score": <0-100>, "insight": "<uma frase curta em português>" }
   ],
-  "summary": "<2-3 frases em português descrevendo o fit geral e principais gaps/acertos>"
+  "summary": "<2-3 frases em português com a leitura contextual integrada: quem domina a audiência, se são decisores/influenciadores do ICP, e o principal gap ou acerto>"
 }
 
 Seja realista e preciso. Use os dados reais disponíveis. Se uma categoria não tiver dados, score = 0 com insight explicando.`;
