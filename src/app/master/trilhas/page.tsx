@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Plus, Pencil, Trash2, ChevronRight, BookOpen,
-  ArrowLeft, Loader2, FolderOpen,
+  ArrowLeft, Loader2, FolderOpen, Upload,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Sessao, Trilha, Modulo, TrilhaAnalytics } from '@/types/trilhas';
@@ -55,6 +55,11 @@ export default function MasterTrilhasPage() {
   // Analytics
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [analyticsTrail, setAnalyticsTrail] = useState<TrilhaAnalytics | null>(null);
+
+  // Import JSON
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importJson, setImportJson] = useState('');
+  const [importing, setImporting] = useState(false);
 
   // ============================================================
   // FIRESTORE: Load Sessions
@@ -242,6 +247,46 @@ export default function MasterTrilhasPage() {
   };
 
   // ============================================================
+  // IMPORT JSON
+  // ============================================================
+  const importTrail = async () => {
+    if (!selectedSession) return;
+    setImporting(true);
+    try {
+      const data = JSON.parse(importJson);
+      const trails = Array.isArray(data) ? data : [data];
+      for (const trail of trails) {
+        const { id: _id, criadaEm: _c, atualizadaEm: _a, sessionId: _s, ...rest } = trail;
+        const modulos = (rest.modulos || []).map((m: Modulo, i: number) =>
+          Object.fromEntries(Object.entries({ ...m, ordem: m.ordem ?? i }).filter(([, v]) => v !== undefined))
+        );
+        const { total, bonus } = calcPontuacao(modulos);
+        await addDoc(collection(db, `globalSessions/${selectedSession.id}/trails`), {
+          ...rest,
+          modulos,
+          sessionId: selectedSession.id,
+          pontuacaoTotal: total,
+          pontuacaoBonus: bonus,
+          ativa: rest.ativa ?? true,
+          isGlobal: true,
+          criadaEm: Timestamp.now(),
+          atualizadaEm: Timestamp.now(),
+        });
+      }
+      toast({ title: `${trails.length} trilha(s) importada(s) com sucesso!` });
+      setImportDialogOpen(false);
+      setImportJson('');
+      const updatedTrails = await loadTrails(selectedSession.id);
+      setTrails(updatedTrails);
+    } catch (err) {
+      console.error('Erro ao importar trilha:', err);
+      toast({ variant: 'destructive', title: 'Erro ao importar', description: err instanceof Error ? err.message : 'JSON inválido ou erro de rede' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  // ============================================================
   // RENDER: Sessions View
   // ============================================================
   const renderSessionsView = () => (
@@ -317,6 +362,9 @@ export default function MasterTrilhasPage() {
           <h2 className="text-2xl font-bold">{selectedSession?.titulo}</h2>
           <p className="text-muted-foreground">{selectedSession?.descricao}</p>
         </div>
+        <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+          <Upload className="w-4 h-4 mr-2" /> Importar JSON
+        </Button>
         <Button onClick={() => openTrailBuilder()} className="bg-purple-600 hover:bg-purple-700">
           <Plus className="w-4 h-4 mr-2" /> Nova Trilha
         </Button>
@@ -422,6 +470,38 @@ export default function MasterTrilhasPage() {
 
         {/* ANALYTICS DIALOG */}
         <AnalyticsDialog open={analyticsOpen} onOpenChange={setAnalyticsOpen} analytics={analyticsTrail} showTaxaConclusao />
+
+        {/* IMPORT JSON DIALOG */}
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Importar Trilha via JSON</DialogTitle>
+              <DialogDescription>
+                Cole o JSON de uma trilha (ou array de trilhas). Os módulos serão criados automaticamente na sessão <strong>{selectedSession?.titulo}</strong>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <Textarea
+                value={importJson}
+                onChange={e => setImportJson(e.target.value)}
+                placeholder={'{\n  "titulo": "Nome da trilha",\n  "descricao": "...",\n  "modulos": [...]\n}'}
+                className="font-mono text-xs min-h-[300px]"
+              />
+              <p className="text-xs text-muted-foreground">
+                Aceita um objeto JSON único ou um array <code>[...]</code> para importar várias trilhas de uma vez.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportJson(''); }}>
+                Cancelar
+              </Button>
+              <Button onClick={importTrail} disabled={importing || !importJson.trim()} className="bg-purple-600 hover:bg-purple-700">
+                {importing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                {importing ? 'Importando...' : 'Importar'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </>
   );
