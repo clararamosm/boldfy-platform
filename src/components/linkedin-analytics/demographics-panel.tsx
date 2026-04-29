@@ -119,6 +119,12 @@ function LocationRow({ itemsByKey }: { itemsByKey: Record<string, LinkedInDemogr
 
 // ─── Main component ──────────────────────────────────────────
 
+// Conjunto de todas as categorias conhecidas (para detectar desconhecidas)
+const KNOWN_CATEGORIES = new Set([
+  ...MAIN_CATEGORIES.map(c => c.key),
+  ...LOCATION_KEYS,
+]);
+
 export function DemographicsPanel({ demographics }: DemographicsPanelProps) {
   if (!demographics.length) return null;
 
@@ -134,6 +140,19 @@ export function DemographicsPanel({ demographics }: DemographicsPanelProps) {
     .filter(c => grouped[c.key]?.length)
     .map(c => ({ ...c, items: grouped[c.key] }));
 
+  // Categorias extras: presentes nos dados mas não no config (fallback p/ variações de idioma)
+  const EXTRA_COLORS = ['#8b5cf6', '#f59e0b', '#14b8a6', '#f43f5e'];
+  const extraCharts = Object.keys(grouped)
+    .filter(k => !KNOWN_CATEGORIES.has(k) && grouped[k].length > 0)
+    .map((k, i) => ({
+      key: k,
+      label: k,
+      color: EXTRA_COLORS[i % EXTRA_COLORS.length],
+      items: grouped[k],
+    }));
+
+  const allCharts = [...mainCharts, ...extraCharts];
+
   // Verifica se tem dados de localização
   const hasLocation = LOCATION_KEYS.some(k => grouped[k]?.length);
 
@@ -141,10 +160,10 @@ export function DemographicsPanel({ demographics }: DemographicsPanelProps) {
     <div className="space-y-3">
       <h3 className="text-sm font-semibold text-foreground">Audiência</h3>
 
-      {/* Linha principal: Cargo, Setor, Tamanho, Senioridade — 2 col mobile, 4 col desktop */}
-      {mainCharts.length > 0 && (
+      {/* Grid de cards: categorias conhecidas + desconhecidas — 2 col mobile, 4 col desktop */}
+      {allCharts.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {mainCharts.map(chart => (
+          {allCharts.map(chart => (
             <CategoryChart
               key={chart.key}
               label={chart.label}

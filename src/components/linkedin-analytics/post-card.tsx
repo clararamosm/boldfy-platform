@@ -99,13 +99,11 @@ export function PostCard({ post, metric }: PostCardProps) {
               </span>
             )}
           </div>
-          {/* Caption truncada */}
-          {post.caption ? (
+          {/* Caption truncada — só exibe se disponível */}
+          {post.caption && (
             <p className="text-xs text-foreground/80 line-clamp-2 leading-relaxed">
               {post.caption}
             </p>
-          ) : (
-            <p className="text-xs text-muted-foreground italic">Post sem legenda identificada</p>
           )}
         </div>
       </div>

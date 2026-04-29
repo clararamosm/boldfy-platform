@@ -281,20 +281,64 @@ function parseAba3Seguidores(sheet: XLSX.WorkSheet): {
   return { totalFollowers, totalNewFollowers, dailyNewFollowers };
 }
 
+/**
+ * Normaliza o nome da categoria para o padrão PT-BR usado no DemographicsPanel.
+ * O LinkedIn exporta em PT-BR para contas em português, mas pode variar.
+ * Mapa de aliases: chave = variações possíveis (lower), valor = nome canônico.
+ */
+const CATEGORY_ALIASES: Record<string, string> = {
+  // Cargo
+  'cargo': 'Cargo',
+  'function': 'Cargo',
+  'job function': 'Cargo',
+  'job title': 'Cargo',
+  'função': 'Cargo',
+  // Setor
+  'setor': 'Setor',
+  'industry': 'Setor',
+  'indústria': 'Setor',
+  'industria': 'Setor',
+  // Tamanho da empresa
+  'tamanho da empresa': 'Tamanho da empresa',
+  'company size': 'Tamanho da empresa',
+  'porte da empresa': 'Tamanho da empresa',
+  // Senioridade
+  'senioridade': 'Senioridade',
+  'seniority': 'Senioridade',
+  'experience': 'Senioridade',
+  'nível hierárquico': 'Senioridade',
+  'nivel hierarquico': 'Senioridade',
+  // Localização
+  'localização': 'Localização',
+  'localizacao': 'Localização',
+  'location': 'Localização',
+  'país': 'País',
+  'pais': 'País',
+  'country': 'País',
+  'região': 'Região',
+  'regiao': 'Região',
+  'region': 'Região',
+};
+
+function normalizeDemographicCategory(raw: string): string {
+  const lower = raw.toLowerCase().trim();
+  return CATEGORY_ALIASES[lower] ?? raw; // mantém o original se não tem alias
+}
+
 function parseAba4Demographics(sheet: XLSX.WorkSheet): LinkedInDemographic[] {
   const range = XLSX.utils.decode_range(sheet['!ref'] ?? 'A1');
   const rows: LinkedInDemographic[] = [];
 
   // Linha 0 é cabeçalho — começa na 1
   for (let r = 1; r <= range.e.r; r++) {
-    const category = cellStr(sheet, r, 0);
+    const rawCategory = cellStr(sheet, r, 0);
     const label = cellStr(sheet, r, 1);
     const pctRaw = cellRaw(sheet, r, 2);
 
-    if (!category && !label) continue;
+    if (!rawCategory && !label) continue;
 
     rows.push({
-      category,
+      category: normalizeDemographicCategory(rawCategory),
       label,
       percentage: parsePercentage(pctRaw),
     });

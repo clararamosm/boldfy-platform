@@ -147,19 +147,26 @@ export function AnalyticsDashboard({
         setTrendSnapshots(trendMap);
       }
 
-      // 5. Determinar mês selecionado (só entre os monthly)
-      const active = monthToSelect && monthly.includes(monthToSelect)
+      // 5. Determinar mês selecionado
+      // Preferência: monthly mais recente → qualquer snapshot mais recente
+      const activeMonthly = monthToSelect && monthly.includes(monthToSelect)
         ? monthToSelect
         : monthly[0] ?? '';
-      setSelectedMonth(active);
+      // Se não tem nenhum monthly, usa o mês mais recente de qualquer tipo (para prevSnapshot)
+      const active = activeMonthly || allMonths[0] || '';
+      setSelectedMonth(activeMonthly); // seletor de mês só reflete monthly
 
       if (!active) return;
 
-      // 6. Snapshot do mês selecionado
-      const { snapshot: snap } = await getLinkedInSnapshot(token, userId, active);
-      setSnapshot(snap ?? null);
+      // 6. Snapshot do mês ativo (pode ser monthly ou historical, para carregar o prevSnapshot)
+      if (activeMonthly) {
+        const { snapshot: snap } = await getLinkedInSnapshot(token, userId, activeMonthly);
+        setSnapshot(snap ?? null);
+      } else {
+        setSnapshot(null); // sem monthly → sem KPIs/top posts, mas ainda busca prevSnapshot
+      }
 
-      // 7. Snapshot do mês anterior (só monthly)
+      // 7. Snapshot do mês anterior — busca em qualquer tipo (monthly OU historical)
       const [y, m] = active.split('-').map(Number);
       let prevY = y, prevM = m - 1;
       if (prevM < 1) { prevM = 12; prevY--; }
@@ -279,9 +286,9 @@ export function AnalyticsDashboard({
     };
   }, [monthlyInRange, trendSnapshots]);
 
-  // Para o delta vs período anterior (só exibe quando preset = 1M)
-  // Usa os valores do prevSnapshot que já está carregado
-  const showPeriodDelta = periodPreset === '1M';
+  // Delta vs mês anterior ao anchor — sempre mostra quando há prevSnapshot disponível
+  // (o prevSnapshot é o mês calendário imediatamente anterior ao anchorMonth)
+  const showPeriodDelta = true;
 
   // Quando o período muda, atualiza o snapshot exibido para anchor
   useEffect(() => {
