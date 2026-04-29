@@ -28,6 +28,7 @@ import {
     Building2,
     BookOpen,
     FileText,
+    BarChart2,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LinkedInBadge } from '@/components/ui/linkedin-badge';
@@ -237,6 +238,18 @@ export function StrategistSidebarNav() {
                                                                     <Link href={`/strategist/estrategia?c=${company.slug}&tl=${tl.slug}`}>
                                                                         <FileText className="h-3 w-3" />
                                                                         <span>Estratégia</span>
+                                                                    </Link>
+                                                                </SidebarMenuSubButton>
+                                                            </SidebarMenuSubItem>
+                                                            <SidebarMenuSubItem>
+                                                                <SidebarMenuSubButton
+                                                                    asChild
+                                                                    size="sm"
+                                                                    isActive={isActive('/strategist/analytics', company.slug, tl.slug)}
+                                                                >
+                                                                    <Link href={`/strategist/analytics?c=${company.slug}&tl=${tl.slug}`}>
+                                                                        <BarChart2 className="h-3 w-3" />
+                                                                        <span>Analytics</span>
                                                                     </Link>
                                                                 </SidebarMenuSubButton>
                                                             </SidebarMenuSubItem>

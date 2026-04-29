@@ -14,6 +14,7 @@ import { ImpressionsWeeklyChart } from './impressions-weekly-chart';
 import { FollowersMonthlyChart } from './followers-monthly-chart';
 import { TopPostsSection } from './top-posts-section';
 import { DemographicsPanel } from './demographics-panel';
+import { ActionPlanSection } from './action-plan-section';
 import { XlsxUploadModal } from './xlsx-upload-modal';
 
 const MONTH_NAMES_PT: Record<string, string> = {
@@ -44,6 +45,8 @@ export function AnalyticsDashboard({
   userAvatarUrl,
   showMediaValue = false,
   uploadPending = false,
+  showActionPlan = false,
+  readOnlyActionPlan = true,
 }: AnalyticsDashboardProps) {
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('');
@@ -241,6 +244,16 @@ export function AnalyticsDashboard({
 
           {/* Dados demográficos */}
           <DemographicsPanel demographics={snapshot.demographics} />
+
+          {/* Plano de ação */}
+          {showActionPlan && (
+            <ActionPlanSection
+              tlUserId={userId}
+              mesAno={snapshot.mesAno}
+              actionPlan={snapshot.actionPlan}
+              canEdit={!readOnlyActionPlan}
+            />
+          )}
         </>
       )}
 
