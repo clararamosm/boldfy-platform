@@ -184,7 +184,7 @@ export function useTrailPlayer(trailId: string) {
         pontuacaoBase: m.pontuacaoBase,
         pontuacaoBonus: m.pontuacaoBonus,
         questoes: m.questoes,
-        instrucao: m.instrucaoCard,
+        instrucao: m.instrucaoCard || m.missaoGatilho?.instrucoes,
         exemplos: m.missaoGatilho?.exemplos,
       },
     }));

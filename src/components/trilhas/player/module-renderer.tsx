@@ -2,6 +2,7 @@
 'use client';
 
 import DOMPurify from 'dompurify';
+import ReactMarkdown from 'react-markdown';
 import type React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -202,7 +203,9 @@ export function ModuleRenderer({
               <Wrench className="h-6 w-6 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-amber-800 mb-2">{tp.practice}</p>
-                <p className="text-sm whitespace-pre-wrap">{currentModule.conteudo?.instrucao || tp.followInstructions}</p>
+                <div className="prose prose-sm max-w-none prose-p:text-sm prose-li:text-sm prose-strong:font-semibold prose-hr:my-3">
+                  <ReactMarkdown>{currentModule.conteudo?.instrucao || tp.followInstructions}</ReactMarkdown>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -230,7 +233,9 @@ export function ModuleRenderer({
               <Target className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-blue-800 mb-2">{tp.contentMission}</p>
-                <p className="text-sm whitespace-pre-wrap">{currentModule.conteudo?.instrucao || ''}</p>
+                <div className="prose prose-sm max-w-none prose-p:text-sm prose-li:text-sm prose-strong:font-semibold prose-hr:my-3">
+                  <ReactMarkdown>{currentModule.conteudo?.instrucao || ''}</ReactMarkdown>
+                </div>
               </div>
             </div>
             {currentModule.conteudo?.exemplos && (
