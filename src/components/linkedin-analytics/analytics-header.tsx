@@ -1,7 +1,6 @@
 'use client';
 
 import { Users, TrendingUp, TrendingDown, FileText } from 'lucide-react';
-import { LINKEDIN_CPM_BRL } from '@/lib/constants';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
 
 const MONTH_NAMES_PT: Record<string, string> = {
@@ -19,16 +18,12 @@ function formatNumber(n: number): string {
   return n.toLocaleString('pt-BR');
 }
 
-function formatCurrency(n: number): string {
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-}
-
 interface AnalyticsHeaderProps {
   userName?: string;
   userAvatarUrl?: string;
   snapshot: LinkedInSnapshot;
   prevSnapshot?: LinkedInSnapshot;
-  showMediaValue?: boolean;   // apenas admin
+  showMediaValue?: boolean;   // mantido por compatibilidade, não utilizado
   monthSelector: React.ReactNode;
   /** Exibir contagem de posts publicados junto ao seletor de mês */
   showPostsCount?: boolean;
@@ -38,11 +33,9 @@ export function AnalyticsHeader({
   userName,
   snapshot,
   prevSnapshot,
-  showMediaValue = false,
   monthSelector,
   showPostsCount = true,
 }: AnalyticsHeaderProps) {
-  const mediaValue = (snapshot.totalImpressions / 1000) * LINKEDIN_CPM_BRL;
 
   const followerDelta = prevSnapshot
     ? snapshot.totalNewFollowers - prevSnapshot.totalNewFollowers
@@ -82,12 +75,7 @@ export function AnalyticsHeader({
           </div>
         )}
 
-        {/* Valor de mídia — apenas admin */}
-        {showMediaValue && (
-          <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-3 py-1.5 w-fit">
-            💰 Valor de Mídia: {formatCurrency(mediaValue)}
-          </div>
-        )}
+        {/* Valor de mídia movido para dentro do card de Impressões em kpi-cards.tsx */}
       </div>
 
       {/* Direita: posts publicados + seletor de mês */}

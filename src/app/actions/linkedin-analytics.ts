@@ -91,8 +91,8 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
         postId: doc.id,
         caption: d.caption ?? d.title,
         mediaUrl: d.mediaUrl,
-        format: d.format,
-        pillar: d.pillar,
+        format: d.formato,         // Firestore field is 'formato' (not 'format')
+        pillar: d.contentPillar,   // Firestore field is 'contentPillar' (not 'pillar')
       };
     }
 

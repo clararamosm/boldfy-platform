@@ -12,13 +12,15 @@ interface KpiCardProps {
   formatValue?: (n: number) => string;
   deltaLabel?: string; // ex: "posts" para delta absoluto
   className?: string;
+  /** Sub-linha adicional abaixo do valor (ex: valor de mídia) */
+  subLine?: React.ReactNode;
 }
 
 function formatNumber(n: number): string {
   return n.toLocaleString('pt-BR');
 }
 
-function KpiCard({ label, value, delta, icon, formatValue, deltaLabel, className }: KpiCardProps) {
+function KpiCard({ label, value, delta, icon, formatValue, deltaLabel, className, subLine }: KpiCardProps) {
   const displayValue = formatValue ? formatValue(value) : formatNumber(value);
 
   return (
@@ -28,6 +30,7 @@ function KpiCard({ label, value, delta, icon, formatValue, deltaLabel, className
         <span className="text-muted-foreground/60">{icon}</span>
       </div>
       <div className="text-2xl font-bold tracking-tight">{displayValue}</div>
+      {subLine}
       {delta !== null && delta !== undefined && (
         <div className={cn(
           'flex items-center gap-1 text-xs font-medium',
@@ -57,6 +60,10 @@ export function calcDelta(current: number, previous: number | undefined): KpiDel
   return { absolute: current - previous, percentage: pct };
 }
 
+function formatCurrency(n: number): string {
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+}
+
 interface AnalyticsKpiCardsProps {
   totalImpressions: number;
   totalReach: number;
@@ -67,6 +74,9 @@ interface AnalyticsKpiCardsProps {
   prevReach?: number;
   prevEngagement?: number;
   prevNewFollowers?: number;
+  /** Valor de mídia equivalente — exibido dentro do card de Impressões (apenas admin) */
+  showMediaValue?: boolean;
+  mediaValue?: number;
 }
 
 export function AnalyticsKpiCards({
@@ -78,7 +88,15 @@ export function AnalyticsKpiCards({
   prevReach,
   prevEngagement,
   prevNewFollowers,
+  showMediaValue = false,
+  mediaValue,
 }: AnalyticsKpiCardsProps) {
+  const mediaSubLine = showMediaValue && mediaValue !== undefined ? (
+    <div className="flex items-center gap-1 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-md px-2 py-0.5 w-fit -mt-0.5">
+      💰 {formatCurrency(mediaValue)}
+    </div>
+  ) : undefined;
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       <KpiCard
@@ -86,6 +104,7 @@ export function AnalyticsKpiCards({
         value={totalImpressions}
         delta={calcDelta(totalImpressions, prevImpressions)}
         icon={<Eye className="h-4 w-4" />}
+        subLine={mediaSubLine}
       />
       <KpiCard
         label="Alcance"
