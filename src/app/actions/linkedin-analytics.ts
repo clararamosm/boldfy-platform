@@ -8,7 +8,6 @@ import type {
   AnalyticsUser,
   ActionPlanItem,
 } from '@/lib/linkedin-analytics-types';
-import { FieldValue, FieldPath } from 'firebase-admin/firestore';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -252,10 +251,10 @@ export async function listLinkedInSnapshots(
       .collection('users')
       .doc(userId)
       .collection('linkedinSnapshots')
-      .orderBy(FieldPath.documentId(), 'desc')
       .get();
 
-    const months = snap.docs.map(d => d.id);
+    // Ordenar descrescente no cliente — YYYY-MM ordena lexicograficamente, dispensa índice
+    const months = snap.docs.map(d => d.id).sort((a, b) => b.localeCompare(a));
     return { months };
   } catch (err) {
     console.error('[linkedin-analytics] listLinkedInSnapshots error:', err);

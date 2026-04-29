@@ -67,7 +67,8 @@ export function AnalyticsDashboard({
       const token = await getAuthToken();
 
       // 1. Listar meses disponíveis
-      const { months: rawMonths } = await listLinkedInSnapshots(token, userId);
+      const { months: rawMonths, error: listError } = await listLinkedInSnapshots(token, userId);
+      if (listError) console.error('[AnalyticsDashboard] listLinkedInSnapshots error:', listError);
       const months = rawMonths ?? [];
       setAvailableMonths(months);
 
