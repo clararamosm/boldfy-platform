@@ -28,31 +28,7 @@ import {
   deleteLinkedInSnapshot,
 } from '@/app/actions/linkedin-analytics';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
-
-// ─── Helpers ──────────────────────────────────────────────────
-
-const MONTH_NAMES_PT: Record<string, string> = {
-  '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
-  '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
-  '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
-};
-
-function formatMesAno(mesAno: string): string {
-  const [year, month] = mesAno.split('-');
-  return `${MONTH_NAMES_PT[month] ?? month} ${year}`;
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  } catch {
-    return iso;
-  }
-}
+import { formatMesAno, formatDate } from '@/lib/linkedin-analytics-utils';
 
 // ─── Types ────────────────────────────────────────────────────
 

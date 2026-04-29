@@ -3,6 +3,7 @@
 import { ExternalLink, Eye, TrendingUp, Calendar, FileText, Image, LayoutGrid, Video, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LinkedInTopPost } from '@/lib/linkedin-analytics-types';
+import { formatCompactNumber, formatDate } from '@/lib/linkedin-analytics-utils';
 
 interface PostCardProps {
   post: LinkedInTopPost;
@@ -30,18 +31,6 @@ const FORMAT_ICONS: Record<string, React.ReactNode> = {
   video: <Video className="h-3 w-3" />,
   vídeo: <Video className="h-3 w-3" />,
 };
-
-function formatDate(iso: string): string {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
-}
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return n.toLocaleString('pt-BR');
-}
 
 // Gera uma cor de pilar determinística a partir do nome
 function pillarColor(pillar: string): string {
@@ -112,11 +101,11 @@ export function PostCard({ post, metric }: PostCardProps) {
       <div className="flex items-center gap-3 text-xs text-muted-foreground border-t pt-2">
         <span className={cn('flex items-center gap-1 font-medium', metric === 'engagement' ? 'text-foreground' : '')}>
           <TrendingUp className="h-3 w-3" />
-          {formatNumber(post.engagement)}
+          {formatCompactNumber(post.engagement)}
         </span>
         <span className={cn('flex items-center gap-1 font-medium', metric === 'impressions' ? 'text-foreground' : '')}>
           <Eye className="h-3 w-3" />
-          {formatNumber(post.impressions)}
+          {formatCompactNumber(post.impressions)}
         </span>
         <span className="flex items-center gap-1 ml-auto">
           <Calendar className="h-3 w-3" />

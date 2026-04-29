@@ -2,30 +2,13 @@
 
 import { Users, TrendingUp, TrendingDown, FileText } from 'lucide-react';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
-
-const MONTH_NAMES_PT: Record<string, string> = {
-  '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
-  '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
-  '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
-};
-
-function formatMesAno(mesAno: string): string {
-  const [, month] = mesAno.split('-');
-  return MONTH_NAMES_PT[month] ?? mesAno;
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString('pt-BR');
-}
+import { formatMesAno, formatNumber } from '@/lib/linkedin-analytics-utils';
 
 interface AnalyticsHeaderProps {
   userName?: string;
-  userAvatarUrl?: string;
   snapshot: LinkedInSnapshot;
   prevSnapshot?: LinkedInSnapshot;
-  showMediaValue?: boolean;   // mantido por compatibilidade, não utilizado
   monthSelector: React.ReactNode;
-  /** Exibir contagem de posts publicados junto ao seletor de mês */
   showPostsCount?: boolean;
 }
 
@@ -36,7 +19,6 @@ export function AnalyticsHeader({
   monthSelector,
   showPostsCount = true,
 }: AnalyticsHeaderProps) {
-
   const followerDelta = prevSnapshot
     ? snapshot.totalNewFollowers - prevSnapshot.totalNewFollowers
     : null;
@@ -74,8 +56,6 @@ export function AnalyticsHeader({
             </span>
           </div>
         )}
-
-        {/* Valor de mídia movido para dentro do card de Impressões em kpi-cards.tsx */}
       </div>
 
       {/* Direita: posts publicados + seletor de mês */}

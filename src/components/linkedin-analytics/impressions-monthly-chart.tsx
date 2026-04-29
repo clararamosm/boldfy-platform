@@ -2,55 +2,25 @@
 
 import { useMemo } from 'react';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
 import { LINKEDIN_CPM_BRL } from '@/lib/constants';
+import { MONTH_NAMES_PT, formatCompactNumber, formatCurrency } from '@/lib/linkedin-analytics-utils';
+import { buildMonthBars, ChartXAxisTick, type MonthBarBase } from './chart-shared';
 
 interface ImpressionsMonthlyChartProps {
-  // Record<"YYYY-MM", snapshot> — inclui tanto historical quanto monthly
   snapshots: Record<string, Pick<LinkedInSnapshot, 'mesAno' | 'totalImpressions'>>;
-  /** Exibir valor de mídia equivalente no tooltip (apenas admin) */
+  /** Exibir valor de mídia equivalente no tooltip — apenas admin */
   showMediaValue?: boolean;
 }
 
-const MONTH_ABBR_PT: Record<string, string> = {
-  '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
-  '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
-  '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez',
-};
-
-const MONTH_FULL_PT: Record<string, string> = {
-  '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
-  '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
-  '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
-};
-
-interface MonthBar {
-  mesAno: string;
-  label: string;
-  year: string;
+interface MonthBar extends MonthBarBase {
   impressions: number;
-  hasData: boolean;
 }
 
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
-  return String(n);
-}
+// ─── Tooltip customizado ──────────────────────────────────────
 
-function formatCurrency(n: number): string {
-  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
-}
-
-// Tooltip customizado para o gráfico de impressões
 interface CustomTooltipProps {
   active?: boolean;
   payload?: Array<{ value: number }>;
@@ -63,17 +33,16 @@ function CustomTooltip({ active, payload, label, bars, showMediaValue }: CustomT
   if (!active || !payload?.length || !label) return null;
 
   const bar = bars.find(b => b.mesAno === label);
-  if (!bar || !bar.hasData) return null;
+  if (!bar?.hasData) return null;
 
   const impressions = payload[0].value;
   const [year, month] = label.split('-');
-  const monthName = MONTH_FULL_PT[month] ?? month;
   const mediaValue = (impressions / 1000) * LINKEDIN_CPM_BRL;
 
   return (
     <div className="bg-popover border border-border rounded-xl shadow-lg p-3 text-xs min-w-[180px]">
       <p className="font-semibold text-foreground mb-2 text-[13px]">
-        {monthName} {year}
+        {MONTH_NAMES_PT[month] ?? month} {year}
       </p>
       <div className="flex items-center justify-between gap-4">
         <span className="text-muted-foreground">Impressões</span>
@@ -83,9 +52,7 @@ function CustomTooltip({ active, payload, label, bars, showMediaValue }: CustomT
       </div>
       {showMediaValue && (
         <div className="flex items-center justify-between gap-4 mt-1.5 pt-1.5 border-t border-border">
-          <span className="text-muted-foreground flex items-center gap-1">
-            💰 Valor de mídia
-          </span>
+          <span className="text-muted-foreground">💰 Valor de mídia</span>
           <span className="font-bold text-purple-600 tabular-nums">
             {formatCurrency(mediaValue)}
           </span>
@@ -95,33 +62,15 @@ function CustomTooltip({ active, payload, label, bars, showMediaValue }: CustomT
   );
 }
 
+// ─── Componente principal ─────────────────────────────────────
+
 export function ImpressionsMonthlyChart({ snapshots, showMediaValue = false }: ImpressionsMonthlyChartProps) {
   const bars = useMemo<MonthBar[]>(() => {
     const sortedKeys = Object.keys(snapshots).sort();
-    if (!sortedKeys.length) return [];
-
-    const first = sortedKeys[0];
-    const last = sortedKeys[sortedKeys.length - 1];
-
-    const result: MonthBar[] = [];
-    let [cy, cm] = first.split('-').map(Number);
-    const [ey, em] = last.split('-').map(Number);
-
-    while (cy < ey || (cy === ey && cm <= em)) {
-      const mesAno = `${cy}-${String(cm).padStart(2, '0')}`;
-      const snap = snapshots[mesAno];
-      result.push({
-        mesAno,
-        label: MONTH_ABBR_PT[String(cm).padStart(2, '0')] ?? String(cm),
-        year: String(cy),
-        impressions: snap?.totalImpressions ?? 0,
-        hasData: !!snap,
-      });
-      cm++;
-      if (cm > 12) { cm = 1; cy++; }
-    }
-
-    return result;
+    return buildMonthBars(sortedKeys).map(base => ({
+      ...base,
+      impressions: snapshots[base.mesAno]?.totalImpressions ?? 0,
+    }));
   }, [snapshots]);
 
   if (!bars.length) {
@@ -131,25 +80,6 @@ export function ImpressionsMonthlyChart({ snapshots, showMediaValue = false }: I
       </div>
     );
   }
-
-  const CustomXAxisTick = ({ x, y, payload }: { x?: number; y?: number; payload?: { value: string } }) => {
-    const bar = bars.find(b => b.mesAno === payload?.value);
-    if (!bar) return null;
-    const idx = bars.indexOf(bar);
-    const showYear = idx === 0 || bars[idx - 1]?.year !== bar.year;
-    return (
-      <g transform={`translate(${x},${y})`}>
-        {showYear && (
-          <text x={0} y={-8} textAnchor="middle" fontSize={10} fill="#64748b" fontWeight={600}>
-            {bar.year}
-          </text>
-        )}
-        <text x={0} y={12} textAnchor="middle" fontSize={10} fill={bar.hasData ? '#475569' : '#cbd5e1'}>
-          {bar.label}
-        </text>
-      </g>
-    );
-  };
 
   return (
     <div className="space-y-1">
@@ -161,13 +91,13 @@ export function ImpressionsMonthlyChart({ snapshots, showMediaValue = false }: I
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis
                 dataKey="mesAno"
-                tick={<CustomXAxisTick />}
+                tick={<ChartXAxisTick bars={bars} />}
                 axisLine={false}
                 tickLine={false}
                 height={32}
               />
               <YAxis
-                tickFormatter={formatNumber}
+                tickFormatter={formatCompactNumber}
                 axisLine={false}
                 tickLine={false}
                 tick={{ fontSize: 10, fill: '#94a3b8' }}
@@ -177,12 +107,7 @@ export function ImpressionsMonthlyChart({ snapshots, showMediaValue = false }: I
                 content={<CustomTooltip bars={bars} showMediaValue={showMediaValue} />}
                 cursor={{ fill: 'hsl(var(--muted)/0.5)', radius: 4 }}
               />
-              <Bar
-                dataKey="impressions"
-                fill="#3b82f6"
-                radius={[3, 3, 0, 0]}
-                opacity={0.85}
-              />
+              <Bar dataKey="impressions" fill="#3b82f6" radius={[3, 3, 0, 0]} opacity={0.85} />
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInSnapshot, getLinkedInSnapshotBatch, listLinkedInSnapshots } from '@/app/actions/linkedin-analytics';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
+import { MONTH_NAMES_PT, formatMesAno } from '@/lib/linkedin-analytics-utils';
 
 import { AnalyticsHeader } from './analytics-header';
 import { UploadPendingBanner } from './upload-pending-banner';
@@ -21,20 +22,10 @@ import { IcpFitScoreCard } from './icp-fit-score-card';
 import { XlsxUploadModal } from './xlsx-upload-modal';
 import { UploadHistoryModal } from './upload-history-modal';
 
-const MONTH_NAMES_PT: Record<string, string> = {
-  '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
-  '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
-  '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
-};
-
-function formatMesAno(mesAno: string): string {
-  const [year, month] = mesAno.split('-');
-  return `${MONTH_NAMES_PT[month] ?? month} ${year}`;
-}
-
 export interface AnalyticsDashboardProps {
   userId: string;
   userName?: string;
+  /** Avatar URL aceito para compatibilidade — atualmente não exibido no header */
   userAvatarUrl?: string;
   role: 'thoughtleader' | 'colaborador' | 'strategist' | 'admin';
   showActionPlan?: boolean;
@@ -73,7 +64,6 @@ function subtractMonths(from: string, months: number): string {
 export function AnalyticsDashboard({
   userId,
   userName,
-  userAvatarUrl,
   role,
   showMediaValue = false,
   uploadPending = false,
@@ -286,9 +276,7 @@ export function AnalyticsDashboard({
     };
   }, [monthlyInRange, trendSnapshots]);
 
-  // Delta vs mês anterior ao anchor — sempre mostra quando há prevSnapshot disponível
-  // (o prevSnapshot é o mês calendário imediatamente anterior ao anchorMonth)
-  const showPeriodDelta = true;
+  // Delta vs mês anterior ao anchor — sempre exibido quando há prevSnapshot
 
   // Quando o período muda, atualiza o snapshot exibido para anchor
   useEffect(() => {
@@ -472,10 +460,8 @@ export function AnalyticsDashboard({
         {snapshot && !hasOnlyHistorical ? (
           <AnalyticsHeader
             userName={userName}
-            userAvatarUrl={userAvatarUrl}
             snapshot={snapshot}
             prevSnapshot={prevSnapshot ?? undefined}
-            showMediaValue={showMediaValue}
             monthSelector={ControlsBar}
           />
         ) : (
@@ -506,10 +492,10 @@ export function AnalyticsDashboard({
             totalReach={periodKpis.totalReach}
             totalEngagement={periodKpis.totalEngagement}
             totalNewFollowers={periodKpis.totalNewFollowers}
-            prevImpressions={showPeriodDelta ? prevSnapshot?.totalImpressions : undefined}
-            prevReach={showPeriodDelta ? prevSnapshot?.totalReach : undefined}
-            prevEngagement={showPeriodDelta ? prevSnapshot?.totalEngagement : undefined}
-            prevNewFollowers={showPeriodDelta ? prevSnapshot?.totalNewFollowers : undefined}
+            prevImpressions={prevSnapshot?.totalImpressions}
+            prevReach={prevSnapshot?.totalReach}
+            prevEngagement={prevSnapshot?.totalEngagement}
+            prevNewFollowers={prevSnapshot?.totalNewFollowers}
           />
         )}
       </div>
