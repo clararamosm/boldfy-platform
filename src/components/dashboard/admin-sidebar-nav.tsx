@@ -146,6 +146,7 @@ export function AdminSidebarNav() {
               { href: '/admin/trilhas', icon: BookOpen, title: t.nav.trails },
               { href: '/admin/recompensas', icon: Gift, title: t.nav.rewards },
               { href: '/admin/biblioteca', icon: Library, title: t.nav.library },
+              { href: '/admin/analytics/colaboradores', icon: BarChart2, title: 'Analytics' },
             ]}
           />
 
@@ -155,7 +156,7 @@ export function AdminSidebarNav() {
             icon={Users}
             defaultOpen={true}
             items={[
-              { href: '/admin/analytics', icon: BarChart2, title: 'Analytics' },
+              { href: '/admin/analytics/thought-leaders', icon: BarChart2, title: 'Analytics' },
             ]}
           />
 

@@ -325,10 +325,13 @@ export async function listLinkedInSnapshots(
 }
 
 /**
- * Retorna todos os usuários da empresa que publicam no LinkedIn (para filtro do /admin/analytics).
+ * Retorna usuários da empresa que publicam no LinkedIn (para filtro do /admin/analytics).
+ * Se `filterRole` for informado, retorna apenas aquele papel.
+ * Sem filtro → retorna todos (thoughtleaders + colaboradores).
  */
 export async function getCompanyAnalyticsUsers(
   idToken: string,
+  filterRole?: 'thoughtleader' | 'colaborador',
 ): Promise<{ users?: AnalyticsUser[]; error?: string }> {
   try {
     const caller = await requireAuth(idToken);
@@ -340,10 +343,12 @@ export async function getCompanyAnalyticsUsers(
     const companyId = caller.companyId;
     if (!companyId) return { error: 'Admin sem empresa associada.' };
 
+    const roles = filterRole ? [filterRole] : ['thoughtleader', 'colaborador'];
+
     const snap = await adminDb
       .collection('users')
       .where('companyId', '==', companyId)
-      .where('role', 'in', ['thoughtleader', 'colaborador'])
+      .where('role', 'in', roles)
       .get();
 
     const users: AnalyticsUser[] = snap.docs.map(doc => {
@@ -357,11 +362,8 @@ export async function getCompanyAnalyticsUsers(
       };
     });
 
-    // Ordenar: TLs primeiro, depois colaboradores; dentro de cada grupo, alfabético
-    users.sort((a, b) => {
-      if (a.role !== b.role) return a.role === 'thoughtleader' ? -1 : 1;
-      return a.name.localeCompare(b.name, 'pt-BR');
-    });
+    // Ordenar alfabético por nome dentro do grupo
+    users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
     return { users };
   } catch (err) {
