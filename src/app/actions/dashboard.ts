@@ -269,12 +269,15 @@ export async function getAdminDashboardData(
 
     const icpPromises = allUsersSnap.docs.map(async (userDoc) => {
       const d = userDoc.data();
-      // Buscar o snapshot do mês corrente ou o mais recente disponível
+      // Buscar todos os snapshots e ordenar no cliente (IDs são YYYY-MM — lexicográfico = cronológico)
       const snapshotsRef = adminDb.collection('users').doc(userDoc.id).collection('linkedinSnapshots');
-      const latestSnap = await snapshotsRef.orderBy('__name__', 'desc').limit(1).get();
-      if (latestSnap.empty) return;
+      const allSnaps = await snapshotsRef.get();
+      if (allSnaps.empty) return;
 
-      const snapData = latestSnap.docs[0].data();
+      // Ordenar descrescente e pegar o mais recente
+      const sorted = allSnaps.docs.sort((a, b) => b.id.localeCompare(a.id));
+      const latestDoc = sorted[0];
+      const snapData = latestDoc.data();
       const icpScore = snapData?.icpFitScore?.overall as number | undefined;
       if (typeof icpScore !== 'number') return;
 
@@ -283,7 +286,7 @@ export async function getAdminDashboardData(
         name: d.name || d.profile?.name || 'Sem nome',
         avatarUrl: d.profile?.avatarUrl || d.avatarUrl,
         icpScore,
-        mesAno: latestSnap.docs[0].id,
+        mesAno: latestDoc.id,
       });
     });
     await Promise.all(icpPromises);
