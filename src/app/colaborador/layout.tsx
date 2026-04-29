@@ -58,6 +58,10 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
         );
     }
 
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    const lastUploadMonth = (user as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus?.lastUploadMonth;
+    const uploadPending = !lastUploadMonth || lastUploadMonth < currentMonth;
+
     const sidebarContent = (
         <>
             <SidebarHeader>
@@ -67,7 +71,7 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
             </SidebarHeader>
             <SidebarContent>
-                <ColaboradorSidebarNav />
+                <ColaboradorSidebarNav uploadPending={uploadPending} />
             </SidebarContent>
             <SidebarFooter>
                 <LinkedInSidebarBox tokenStatus={tokenStatus} />

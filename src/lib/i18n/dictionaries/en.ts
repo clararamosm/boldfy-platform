@@ -152,6 +152,7 @@ const en: Dictionary = {
     strategists: 'Strategists',
     thoughtLeaders: 'Thought Leaders',
     contentPipeline: 'Content Pipeline',
+    analytics: 'Analytics',
   },
 
   // ══════════════════════════════════════════════

@@ -2,13 +2,17 @@
 
 import { useMemo } from 'react';
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, Zap, Newspaper, CalendarDays, UserSearch } from "lucide-react";
+import { BookOpen, Gift, LayoutDashboard, Library, Sparkles, Zap, Newspaper, CalendarDays, UserSearch, BarChart2 } from "lucide-react";
 import { usePathname } from 'next/navigation';
 import { Header } from './header';
 import { useUnreadFeed } from '@/hooks/use-unread-feed';
 import { useT } from '@/lib/i18n/context';
 
-export function ColaboradorSidebarNav() {
+interface ColaboradorSidebarNavProps {
+    uploadPending?: boolean;
+}
+
+export function ColaboradorSidebarNav({ uploadPending = false }: ColaboradorSidebarNavProps) {
     const t = useT();
     const { count } = useUnreadFeed();
 
@@ -23,6 +27,12 @@ export function ColaboradorSidebarNav() {
             { title: t.nav.calendar, href: "/colaborador/calendario", icon: CalendarDays },
             { title: t.nav.linkedinFeed, href: "/colaborador/linkedin-feed", icon: Newspaper },
             { title: t.nav.linkedinLeads, href: "/colaborador/linkedin-leads", icon: UserSearch, badge: t.nav.comingSoon, disabled: true },
+            {
+                title: 'Analytics',
+                href: "/colaborador/analytics",
+                icon: BarChart2,
+                ...(uploadPending ? { badge: 'Upload', badgeVariant: 'danger' as const } : {}),
+            },
         ];
         return items.map(item => {
             if (item.href === '/colaborador/linkedin-feed' && count > 0) {
@@ -30,7 +40,7 @@ export function ColaboradorSidebarNav() {
             }
             return item;
         });
-    }, [count, t]);
+    }, [count, t, uploadPending]);
 
     return <SidebarNav items={navItems} />;
 }

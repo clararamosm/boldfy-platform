@@ -54,6 +54,11 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
         );
     }
 
+    // Calcular se o TL tem upload pendente do mês atual
+    const currentMonth = new Date().toISOString().substring(0, 7);
+    const lastUploadMonth = (user as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus?.lastUploadMonth;
+    const uploadPending = !lastUploadMonth || lastUploadMonth < currentMonth;
+
     const sidebarContent = (
         <>
             <SidebarHeader>
@@ -63,7 +68,7 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
                 </div>
             </SidebarHeader>
             <SidebarContent>
-                <ThoughtLeaderSidebarNav />
+                <ThoughtLeaderSidebarNav uploadPending={uploadPending} />
             </SidebarContent>
             <SidebarFooter>
                 <LinkedInSidebarBox tokenStatus={tokenStatus} />

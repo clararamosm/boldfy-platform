@@ -150,6 +150,7 @@ const ptBR = {
     strategists: 'Estrategistas',
     thoughtLeaders: 'Thought Leaders',
     contentPipeline: 'Pipeline de Conteúdo',
+    analytics: 'Analytics',
   },
 
   // ══════════════════════════════════════════════
