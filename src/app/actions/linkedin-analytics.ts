@@ -603,6 +603,11 @@ Seja realista e preciso. Use os dados reais disponíveis. Se uma categoria não 
       computedAt: new Date().toISOString(),
     };
 
+    // Persistir o score no snapshot para que o dashboard possa ler sem recalcular
+    await snapDoc.ref.update({ icpFitScore: score }).catch(() => {
+      // Falha silenciosa — o score ainda é retornado corretamente
+    });
+
     return { score };
   } catch (err) {
     console.error('[linkedin-analytics] getIcpFitScore error:', err);

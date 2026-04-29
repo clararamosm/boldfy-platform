@@ -1,12 +1,13 @@
 // src/app/admin/dashboard/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Users, Trophy, Gift, Target, BookOpen, TrendingUp, Lock,
+  Users, Trophy, Target, BookOpen, TrendingUp, Lock,
   ChevronUp, ChevronDown, Minus, Award, BarChart3, Activity,
+  Linkedin, FileText, CheckCircle2, UserCheck, Gift,
 } from "lucide-react";
 import { CoinIcon } from "@/components/coin-icon";
 import { Button } from '@/components/ui/button';
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth-client';
-import { getAdminDashboardData, type DashboardData } from '@/app/actions/dashboard';
+import { getAdminDashboardData, type DashboardData, type TopCollaboratorByIcp } from '@/app/actions/dashboard';
 import { useAuth } from '@/contexts/auth-context';
 import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
@@ -196,6 +197,67 @@ function DashboardSkeleton() {
   );
 }
 
+// ─── Funnel Chart ────────────────────────────────────────────────
+function FunnelStep({
+  icon: Icon,
+  label,
+  count,
+  total,
+  color,
+}: {
+  icon: React.ElementType;
+  label: string;
+  count: number;
+  total: number;
+  color: string;
+}) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="flex items-center gap-1.5 text-muted-foreground font-medium">
+          <Icon className="h-3.5 w-3.5" />
+          {label}
+        </span>
+        <span className="font-bold text-foreground tabular-nums">
+          {count} <span className="font-normal text-muted-foreground">({pct}%)</span>
+        </span>
+      </div>
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FunnelChart({
+  invited, activated, linkedIn, posted, watchedTrail,
+}: {
+  invited: number;
+  activated: number;
+  linkedIn: number;
+  posted: number;
+  watchedTrail: number;
+}) {
+  const steps = [
+    { icon: Users,        label: 'Convidados',              count: invited,      color: '#6366f1' },
+    { icon: UserCheck,    label: 'Ativaram a conta',        count: activated,    color: '#8b5cf6' },
+    { icon: Linkedin,     label: 'Conectaram o LinkedIn',   count: linkedIn,     color: '#0ea5e9' },
+    { icon: FileText,     label: 'Publicaram conteúdo',     count: posted,       color: '#10b981' },
+    { icon: CheckCircle2, label: 'Assistiram uma trilha',   count: watchedTrail, color: '#f59e0b' },
+  ];
+  return (
+    <div className="space-y-3 pt-1">
+      {steps.map(step => (
+        <FunnelStep key={step.label} {...step} total={invited} />
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Component ─────────────────────────────────────────────────
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -321,41 +383,45 @@ export default function AdminDashboardPage() {
 
         {/* ─── BLOCO 1: KPIs de topo ─────────────────────────────────── */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {/* Card 1: Valor equivalente (COMING SOON) */}
-          <ComingSoonOverlay message={t.adminDashboard.comingSoonOverlay}>
-            <Card className="border-purple-200 dark:border-purple-900/50">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{t.adminDashboard.equivalentValue}</CardTitle>
-                <TrendingUp className="h-4 w-4 text-purple-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                  {formatCurrency(data.estimatedValue)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t.adminDashboard.estimateCollaborators.replace('{count}', String(data.activeCollaborators))}
-                </p>
-              </CardContent>
-            </Card>
-          </ComingSoonOverlay>
+          {/* Card 1: Earned Media — real se tiver snapshots, estimado se não */}
+          <Card className="border-purple-200 dark:border-purple-900/50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Earned Media</CardTitle>
+              <TrendingUp className="h-4 w-4 text-purple-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                {formatCurrency(data.realEarnedMedia > 0 ? data.realEarnedMedia : data.estimatedValue)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {data.realEarnedMedia > 0
+                  ? 'Baseado nos extracts do mês atual'
+                  : `Estimativa: ${data.activeCollaborators} colaboradores`
+                }
+              </p>
+            </CardContent>
+          </Card>
 
-          {/* Card 2: Impressões (COMING SOON) */}
-          <ComingSoonOverlay message={t.adminDashboard.comingSoonOverlay}>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{t.adminDashboard.impressionsGenerated}</CardTitle>
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{formatNumber(data.estimatedImpressions)}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t.adminDashboard.impressionsCost}
-                </p>
-              </CardContent>
-            </Card>
-          </ComingSoonOverlay>
+          {/* Card 2: Impressões — real se tiver snapshots, estimado se não */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Impressões Geradas</CardTitle>
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {formatNumber(data.realImpressions > 0 ? data.realImpressions : data.estimatedImpressions)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {data.realImpressions > 0
+                  ? 'Soma de todos os perfis — mês atual'
+                  : 'Estimativa (R$300 CPM)'
+                }
+              </p>
+            </CardContent>
+          </Card>
 
-          {/* Card 3: Colaboradores ativos (WORKS) */}
+          {/* Card 3: Colaboradores ativos */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{t.adminDashboard.activeCollaborators}</CardTitle>
@@ -390,7 +456,7 @@ export default function AdminDashboardPage() {
           </ComingSoonOverlay>
         </div>
 
-        {/* ─── BLOCO 2: Gráfico + Donut ──────────────────────────────── */}
+        {/* ─── BLOCO 2: Gráfico + Funil ──────────────────────────────── */}
         <div className="grid gap-6 md:grid-cols-[3fr_2fr]">
           {/* Evolução mensal (COMING SOON) */}
           <ComingSoonOverlay message={t.adminDashboard.availableWithLinkedinTrack}>
@@ -403,7 +469,6 @@ export default function AdminDashboardPage() {
                 <CardDescription>{t.adminDashboard.monthlyEvolution}</CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Placeholder chart */}
                 <div className="flex items-end gap-2 h-40 px-2">
                   {[25, 35, 42, 50, 58, 65].map((h, i) => (
                     <div key={i} className="flex-1 flex flex-col items-center gap-1">
@@ -418,55 +483,23 @@ export default function AdminDashboardPage() {
             </Card>
           </ComingSoonOverlay>
 
-          {/* Engajamento donut */}
+          {/* Funil de engajamento no programa */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Activity className="h-5 w-5 text-muted-foreground" />
-                {t.adminDashboard.engagement}
+                Engajamento no Programa
               </CardTitle>
-              <CardDescription>{t.adminDashboard.activityDistribution}</CardDescription>
+              <CardDescription>Jornada de ativação dos colaboradores</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-center py-2">
-                {/* Simple donut using CSS */}
-                <div className="relative h-40 w-40">
-                  <svg viewBox="0 0 36 36" className="h-40 w-40 -rotate-90">
-                    {/* Inactive */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#E8D8F5" strokeWidth="3"
-                      strokeDasharray={`${100} ${0}`} strokeDashoffset="0" className="dark:stroke-purple-900/40" />
-                    {/* Pending */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#CD50F1" strokeWidth="3"
-                      strokeDasharray={`${data.activeCollaborators > 0 ? ((data.activeCollaborators - data.collaboratorsWithActivity) / data.activeCollaborators * 100) : 0} ${100}`}
-                      strokeDashoffset={`-${data.activeCollaborators > 0 ? (data.collaboratorsWithActivity / data.activeCollaborators * 100) : 0}`} />
-                    {/* Active */}
-                    <circle cx="18" cy="18" r="15.915" fill="none" stroke="#9840AD" strokeWidth="3"
-                      strokeDasharray={`${data.activeCollaborators > 0 ? (data.collaboratorsWithActivity / data.activeCollaborators * 100) : 0} ${100}`}
-                      strokeDashoffset="0" />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-bold">{data.activeCollaborators}</span>
-                    <span className="text-[10px] text-muted-foreground">{t.adminDashboard.collaborators}</span>
-                  </div>
-                </div>
-              </div>
-              {/* Legend */}
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-2 text-xs">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#9840AD]" />
-                  {t.adminDashboard.engaged.replace('{count}', String(data.collaboratorsWithActivity))}
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#CD50F1]" />
-                  {t.adminDashboard.noActivity.replace('{count}', String(data.activeCollaborators - data.collaboratorsWithActivity))}
-                </span>
-                {data.totalLicenses > data.activeCollaborators && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#E8D8F5] dark:bg-purple-900/40" />
-                    {t.adminDashboard.inactive.replace('{count}', String(data.totalLicenses - data.activeCollaborators))}
-                  </span>
-                )}
-              </div>
+              <FunnelChart
+                invited={data.funnelInvited}
+                activated={data.funnelActivated}
+                linkedIn={data.funnelLinkedIn}
+                posted={data.funnelPosted}
+                watchedTrail={data.funnelWatchedTrail}
+              />
             </CardContent>
           </Card>
         </div>
@@ -537,9 +570,9 @@ export default function AdminDashboardPage() {
           />
         )}
 
-        {/* ─── BLOCO 5: Leaderboard + Saúde ──────────────────────────── */}
+        {/* ─── BLOCO 5: Rankings ──────────────────────────────────────── */}
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Top 5 */}
+          {/* Top Colaboradores por pontos */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -558,7 +591,7 @@ export default function AdminDashboardPage() {
                   {data.topCollaborators.map((collab, index) => (
                     <div key={collab.id} className="flex items-center gap-3">
                       <div className={`
-                        flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold
+                        flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold shrink-0
                         ${index === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
                           index === 1 ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' :
                           index === 2 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
@@ -566,7 +599,7 @@ export default function AdminDashboardPage() {
                       `}>
                         {index + 1}
                       </div>
-                      <Avatar className="h-8 w-8">
+                      <Avatar className="h-8 w-8 shrink-0">
                         <AvatarFallback className="text-xs">
                           {collab.name.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
@@ -587,35 +620,79 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Saúde do programa */}
+          {/* Top por ICP-Fit */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Activity className="h-5 w-5 text-muted-foreground" />
-                {t.adminDashboard.programHealth}
+                <Target className="h-5 w-5 text-muted-foreground" />
+                Top por ICP-Fit
               </CardTitle>
+              <CardDescription>Maior fit de audiência com o ICP — mês mais recente</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
+              {data.topCollaboratorsByIcp.length === 0 ? (
+                <div className="text-center py-6 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Nenhum score calculado ainda.
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">
+                    O score ICP-Fit é calculado automaticamente ao abrir o Analytics de cada perfil.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {data.topCollaboratorsByIcp.map((collab, index) => {
+                    const scoreColor = collab.icpScore >= 70 ? 'text-emerald-600' : collab.icpScore >= 45 ? 'text-amber-500' : 'text-red-500';
+                    const scoreBg = collab.icpScore >= 70 ? 'bg-emerald-50 border-emerald-200' : collab.icpScore >= 45 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
+                    return (
+                      <div key={collab.id} className="flex items-center gap-3">
+                        <div className={`
+                          flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold shrink-0
+                          ${index === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                            index === 1 ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' :
+                            index === 2 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                            'bg-muted text-muted-foreground'}
+                        `}>
+                          {index + 1}
+                        </div>
+                        <Avatar className="h-8 w-8 shrink-0">
+                          <AvatarFallback className="text-xs">
+                            {collab.name.substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{collab.name}</p>
+                          <p className="text-[11px] text-muted-foreground">{collab.mesAno}</p>
+                        </div>
+                        <div className={`shrink-0 border rounded-full px-2.5 py-0.5 text-xs font-bold ${scoreBg} ${scoreColor}`}>
+                          {collab.icpScore}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ─── BLOCO 6: Saúde do programa ─────────────────────────────── */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="h-5 w-5 text-muted-foreground" />
+              {t.adminDashboard.programHealth}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <HealthBar label={t.adminDashboard.healthAdhesion} value={adhesionRate} thresholdGreen={70} thresholdOrange={40} />
               <HealthBar label={t.adminDashboard.healthMissionsWeek} value={missionCompletionRate} thresholdGreen={60} thresholdOrange={30} />
               <HealthBar label={t.adminDashboard.healthTrailsProgress} value={trailProgressRate} thresholdGreen={50} thresholdOrange={25} />
               <HealthBar label={t.adminDashboard.healthRewardsRedeemed} value={redemptionRate} thresholdGreen={30} thresholdOrange={15} />
-
-              {/* Custo por impressão (COMING SOON) */}
-              <ComingSoonOverlay message={t.common.comingSoon}>
-                <div className="mt-2 rounded-lg bg-muted/50 p-4">
-                  <p className="text-xs text-muted-foreground">{t.adminDashboard.costPerImpression}</p>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="text-xl font-bold text-primary">R$ 0,13</span>
-                    <span className="text-xs text-muted-foreground">
-                      {t.adminDashboard.costComparison}
-                    </span>
-                  </div>
-                </div>
-              </ComingSoonOverlay>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </>
   );

@@ -3,14 +3,24 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { requireAdmin, requireMaster } from '@/lib/auth-guard';
+import { LINKEDIN_CPM_BRL } from '@/lib/constants';
 
 // ─── Types ──────────────────────────────────────────────────────
 
 export type TopCollaborator = {
   id: string;
   name: string;
+  avatarUrl?: string;
   points: number;
   missionsCompleted: number;
+};
+
+export type TopCollaboratorByIcp = {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  icpScore: number;   // 0-100
+  mesAno: string;     // snapshot mais recente
 };
 
 export type DashboardData = {
@@ -29,8 +39,18 @@ export type DashboardData = {
   rewardsRedeemed: number;
   totalPointsRedeemed: number;
   topCollaborators: TopCollaborator[];
+  topCollaboratorsByIcp: TopCollaboratorByIcp[];
   estimatedImpressions: number;
   estimatedValue: number;
+  // Dados reais do LinkedIn (snapshots do mês corrente)
+  realImpressions: number;
+  realEarnedMedia: number;
+  // Funil de engajamento
+  funnelInvited: number;      // total de licenças usadas (colaboradores cadastrados)
+  funnelActivated: number;    // ativaram conta (criaram login = activeCollaborators)
+  funnelLinkedIn: number;     // conectaram o LinkedIn (têm accessToken válido)
+  funnelPosted: number;       // publicaram pelo menos 1 conteúdo histórico
+  funnelWatchedTrail: number; // assistiram pelo menos 1 trilha
 };
 
 type PeriodRange = {
@@ -76,11 +96,18 @@ export async function getAdminDashboardData(
     const prevEnd = new Date(periodRange.prevEnd);
 
     // ─── 1. Parallel top-level fetches ────────────────────────
-    const [companyDoc, collabSnap, missionsSnap, submissionsSnap, trailsSnap, rewardsSnap, rescuesSnap] = await Promise.all([
+    // Busca colaboradores E todos os usuários da empresa (TLs + colaboradores) para LinkedIn
+    const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
+
+    const [companyDoc, collabSnap, allUsersSnap, missionsSnap, submissionsSnap, trailsSnap, rewardsSnap, rescuesSnap] = await Promise.all([
       adminDb.collection('companies').doc(companyId).get(),
       adminDb.collection('users')
         .where('companyId', '==', companyId)
         .where('role', '==', 'colaborador')
+        .get(),
+      adminDb.collection('users')
+        .where('companyId', '==', companyId)
+        .where('role', 'in', ['colaborador', 'thoughtleader'])
         .get(),
       adminDb.collection('companies').doc(companyId).collection('missions').get(),
       adminDb.collection('companies').doc(companyId).collection('missionSubmissions').get(),
@@ -94,14 +121,24 @@ export async function getAdminDashboardData(
     // ─── 2. Collaborators ─────────────────────────────────────
     const activeCollaborators = collabSnap.size;
     let collaboratorsWithActivity = 0;
-    const collabMap = new Map<string, { name: string; points: number; missionsCompleted: number }>();
+    let funnelLinkedIn = 0;
+    const collabMap = new Map<string, {
+      name: string;
+      avatarUrl?: string;
+      points: number;
+      missionsCompleted: number;
+    }>();
 
     collabSnap.docs.forEach(d => {
       const data = d.data();
       const points = data.points || 0;
       if (points > 0) collaboratorsWithActivity++;
+      // LinkedIn conectado: tem accessToken na linkedinConnection
+      const conn = data.linkedinConnection as Record<string, unknown> | undefined;
+      if (conn?.accessToken) funnelLinkedIn++;
       collabMap.set(d.id, {
         name: data.name || data.profile?.name || 'Sem nome',
+        avatarUrl: data.profile?.avatarUrl || data.avatarUrl,
         points,
         missionsCompleted: 0,
       });
@@ -139,26 +176,38 @@ export async function getAdminDashboardData(
       return data.active === true || data.ativa === true;
     }).length;
 
-    // ─── 5. Trail progress + Points history (N+1 → parallel with Admin SDK) ──
-    // Admin SDK bypasses Firestore rules, so no permission issues
+    // ─── 5. Trail progress + Points history + Posts (subcoleções, paralelas) ──
     let trailsStarted = 0;
     let trailsCompleted = 0;
     let totalPointsDistributed = 0;
     let prevPointsDistributed = 0;
+    let funnelPosted = 0;
+    let funnelWatchedTrail = 0;
 
     const subcollectionPromises = collabSnap.docs.map(async (collabDoc) => {
-      // Fetch both subcollections in parallel per user
-      const [progressSnap, histSnap] = await Promise.all([
-        adminDb.collection('users').doc(collabDoc.id).collection('trailProgress').get(),
-        adminDb.collection('users').doc(collabDoc.id).collection('pointsHistory').get(),
+      const uid = collabDoc.id;
+      const [progressSnap, histSnap, pipelineSnap, scheduledSnap] = await Promise.all([
+        adminDb.collection('users').doc(uid).collection('trailProgress').get(),
+        adminDb.collection('users').doc(uid).collection('pointsHistory').get(),
+        // Posts via contentPipeline (status=postado)
+        adminDb.collection('users').doc(uid).collection('contentPipeline')
+          .where('status', '==', 'postado').limit(1).get(),
+        // Posts via scheduledPosts (status=published)
+        adminDb.collection('users').doc(uid).collection('scheduledPosts')
+          .where('status', '==', 'published').limit(1).get(),
       ]);
 
       // Trail progress
+      let userStarted = 0;
+      let userCompleted = 0;
       progressSnap.docs.forEach(pd => {
         const pData = pd.data();
-        if (pData.concluida || pData.status === 'completed') trailsCompleted++;
-        else trailsStarted++;
+        if (pData.concluida || pData.status === 'completed') userCompleted++;
+        else userStarted++;
       });
+      trailsCompleted += userCompleted;
+      trailsStarted += userStarted;
+      if (userStarted + userCompleted > 0) funnelWatchedTrail++;
 
       // Points history
       histSnap.docs.forEach(hd => {
@@ -168,6 +217,9 @@ export async function getAdminDashboardData(
           if (isInRange(hData.date, prevStart, prevEnd)) prevPointsDistributed += hData.points || 0;
         }
       });
+
+      // Postou pelo menos 1 conteúdo histórico
+      if (!pipelineSnap.empty || !scheduledSnap.empty) funnelPosted++;
     });
 
     await Promise.all(subcollectionPromises);
@@ -184,13 +236,63 @@ export async function getAdminDashboardData(
       }
     });
 
-    // ─── 7. Top 5 ─────────────────────────────────────────────
+    // ─── 7. Top 5 por pontos ──────────────────────────────────
     const topCollaborators = Array.from(collabMap.entries())
       .map(([id, c]) => ({ id, ...c }))
       .sort((a, b) => b.points - a.points)
       .slice(0, 5);
 
-    // ─── 8. Estimated impressions ─────────────────────────────
+    // ─── 8. Impressões reais do mês corrente (todos os usuários da empresa) ──
+    // Soma snapshots LinkedIn do mês atual de TLs + colaboradores
+    let realImpressions = 0;
+
+    const linkedinSnapshotPromises = allUsersSnap.docs.map(async (userDoc) => {
+      const snapDoc = await adminDb
+        .collection('users').doc(userDoc.id)
+        .collection('linkedinSnapshots').doc(currentMonth)
+        .get();
+      if (snapDoc.exists) {
+        const snapData = snapDoc.data();
+        realImpressions += (snapData?.totalImpressions as number) || 0;
+      }
+    });
+    await Promise.all(linkedinSnapshotPromises);
+
+    const realEarnedMedia = (realImpressions / 1000) * LINKEDIN_CPM_BRL;
+
+    // ─── 9. Top 5 por ICP-Fit ─────────────────────────────────
+    // Busca o snapshot mais recente de cada usuário (TL + colaborador) e extrai o ICP score se existir
+    // O ICP score não é calculado aqui (seria muito caro); em vez disso buscamos scores já
+    // persistidos em snapshots. Se não tiver, o card aparece vazio (será calculado quando o admin
+    // acessar a página de analytics individual).
+    const icpEntries: Array<{ id: string; name: string; avatarUrl?: string; icpScore: number; mesAno: string }> = [];
+
+    const icpPromises = allUsersSnap.docs.map(async (userDoc) => {
+      const d = userDoc.data();
+      // Buscar o snapshot do mês corrente ou o mais recente disponível
+      const snapshotsRef = adminDb.collection('users').doc(userDoc.id).collection('linkedinSnapshots');
+      const latestSnap = await snapshotsRef.orderBy('__name__', 'desc').limit(1).get();
+      if (latestSnap.empty) return;
+
+      const snapData = latestSnap.docs[0].data();
+      const icpScore = snapData?.icpFitScore?.overall as number | undefined;
+      if (typeof icpScore !== 'number') return;
+
+      icpEntries.push({
+        id: userDoc.id,
+        name: d.name || d.profile?.name || 'Sem nome',
+        avatarUrl: d.profile?.avatarUrl || d.avatarUrl,
+        icpScore,
+        mesAno: latestSnap.docs[0].id,
+      });
+    });
+    await Promise.all(icpPromises);
+
+    const topCollaboratorsByIcp = icpEntries
+      .sort((a, b) => b.icpScore - a.icpScore)
+      .slice(0, 5);
+
+    // ─── 10. Estimated impressions (fallback se não tiver snapshots) ──
     const estimatedImpressions = activeCollaborators * 3000;
     const estimatedValue = estimatedImpressions * CPM_UNIT;
 
@@ -211,8 +313,16 @@ export async function getAdminDashboardData(
         rewardsRedeemed,
         totalPointsRedeemed,
         topCollaborators,
+        topCollaboratorsByIcp,
         estimatedImpressions,
         estimatedValue,
+        realImpressions,
+        realEarnedMedia,
+        funnelInvited: companyData?.licenses || activeCollaborators,
+        funnelActivated: activeCollaborators,
+        funnelLinkedIn,
+        funnelPosted,
+        funnelWatchedTrail,
       },
     };
   } catch (error) {

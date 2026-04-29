@@ -86,6 +86,9 @@ export type LinkedInSnapshot = {
 
   // Plano de ação — preenchido pela estrategista após upload (apenas TL)
   actionPlan?: ActionPlan;
+
+  // ICP-Fit Score — calculado on-demand e persistido para evitar recálculos
+  icpFitScore?: IcpFitScore;
 };
 
 // Estrutura retornada pelo parser XLSX (antes de salvar no Firestore)
