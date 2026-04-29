@@ -69,6 +69,7 @@ export function AnalyticsDashboard({
 
   const [loading, setLoading] = useState(true);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [historicalModalOpen, setHistoricalModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const isLoadingDataRef = useRef(false);
 
@@ -175,6 +176,7 @@ export function AnalyticsDashboard({
 
   const handleUploadSuccess = useCallback((mesAno: string) => {
     setUploadModalOpen(false);
+    setHistoricalModalOpen(false);
     loadData(mesAno);
   }, [loadData]);
 
@@ -209,26 +211,76 @@ export function AnalyticsDashboard({
   // Sem nenhum dado ainda
   if (Object.keys(trendSnapshots).length === 0) {
     return (
-      <div className="space-y-4">
-        {uploadPending && (
-          <UploadPendingBanner
-            onUploadClick={() => setUploadModalOpen(true)}
-            dismissible={false}
-          />
-        )}
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
-          <p className="text-sm font-medium">Nenhum dado disponível ainda.</p>
-          <p className="text-xs text-muted-foreground max-w-sm">
-            Faça o upload do relatório do LinkedIn Analytics para visualizar seu dashboard.
-            Para ter histórico desde o início, exporte os últimos 12 meses.
+      <div className="space-y-6">
+        {/* Mensagem central */}
+        <div className="flex flex-col items-center justify-center pt-12 pb-6 gap-2 text-center">
+          <p className="text-base font-semibold">Nenhum dado disponível ainda.</p>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            Para ativar o seu Analytics, faça o export dos seus dados do LinkedIn.
           </p>
         </div>
+
+        {/* Cards de ação */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto w-full">
+          {/* Card — Histórico 12 meses (opção recomendada) */}
+          <button
+            onClick={() => setHistoricalModalOpen(true)}
+            className="group relative flex flex-col items-start gap-3 rounded-xl border-2 border-blue-200 bg-blue-50/60 p-5 text-left transition-all hover:border-blue-400 hover:bg-blue-50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            <span className="absolute right-3 top-3 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+              Recomendado
+            </span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 group-hover:bg-blue-200">
+              {/* Ícone calendário */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-sm text-foreground">Importar histórico (12 meses)</p>
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                Exporte os últimos 365 dias do LinkedIn Analytics. Os meses são separados automaticamente e os gráficos de evolução ficam disponíveis imediatamente.
+              </p>
+            </div>
+          </button>
+
+          {/* Card — Upload mensal */}
+          <button
+            onClick={() => setUploadModalOpen(true)}
+            className="group flex flex-col items-start gap-3 rounded-xl border-2 border-muted bg-muted/20 p-5 text-left transition-all hover:border-muted-foreground/40 hover:bg-muted/40 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:bg-muted-foreground/20">
+              {/* Ícone upload */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-sm text-foreground">Upload do mês atual</p>
+              <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                Já tem histórico importado ou quer começar do mês corrente? Faça o export do período mensal e importe aqui.
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {/* Modal histórico */}
+        <XlsxUploadModal
+          open={historicalModalOpen}
+          onOpenChange={setHistoricalModalOpen}
+          userId={userId}
+          onSuccess={handleUploadSuccess}
+          uploadType="historical"
+        />
+
+        {/* Modal mensal */}
         <XlsxUploadModal
           open={uploadModalOpen}
           onOpenChange={setUploadModalOpen}
           userId={userId}
           onSuccess={handleUploadSuccess}
         />
+
         {canManageHistory && (
           <UploadHistoryModal
             open={historyModalOpen}
@@ -352,6 +404,14 @@ export function AnalyticsDashboard({
         onOpenChange={setUploadModalOpen}
         userId={userId}
         onSuccess={handleUploadSuccess}
+      />
+
+      <XlsxUploadModal
+        open={historicalModalOpen}
+        onOpenChange={setHistoricalModalOpen}
+        userId={userId}
+        onSuccess={handleUploadSuccess}
+        uploadType="historical"
       />
 
       {canManageHistory && (

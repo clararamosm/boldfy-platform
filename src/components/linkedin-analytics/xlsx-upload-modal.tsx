@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2, X, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { parseLinkedInXlsx, parseLinkedInXlsxMulti } from '@/lib/linkedin-xlsx-parser';
+import { parseLinkedInXlsxMulti } from '@/lib/linkedin-xlsx-parser';
 import { uploadLinkedInSnapshot, uploadLinkedInSnapshotBatch } from '@/app/actions/linkedin-analytics';
 import { getAuthToken } from '@/lib/auth-client';
 import type { ParsedLinkedInData } from '@/lib/linkedin-analytics-types';
@@ -103,19 +103,17 @@ export function XlsxUploadModal({
     try {
       const buffer = await file.arrayBuffer();
 
-      if (uploadType === 'historical') {
-        // Usar parser multi-mês para o histórico
-        const { snapshots, isMultiMonth } = parseLinkedInXlsxMulti(buffer);
-        if (isMultiMonth) {
-          setState({ status: 'preview_multi', snapshots });
-        } else {
-          // Arquivo de mês único mesmo sendo histórico
-          setState({ status: 'preview', data: snapshots[0] });
-        }
+      // Sempre usar o parser multi-mês — ele auto-detecta se há 1 ou N meses no arquivo.
+      // Se vier multi-mês → histórico (independente do uploadType da prop).
+      // Se vier single-mês → respeita o uploadType passado pelo pai.
+      const { snapshots, isMultiMonth } = parseLinkedInXlsxMulti(buffer);
+
+      if (isMultiMonth) {
+        // Arquivo com múltiplos meses: sempre trata como histórico
+        setState({ status: 'preview_multi', snapshots });
       } else {
-        // Upload mensal normal — parser simples
-        const data = parseLinkedInXlsx(buffer);
-        setState({ status: 'preview', data });
+        // Arquivo de mês único: usa o uploadType da prop (monthly ou historical)
+        setState({ status: 'preview', data: { ...snapshots[0], uploadType } });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao ler o arquivo.';
