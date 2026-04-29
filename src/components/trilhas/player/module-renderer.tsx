@@ -243,11 +243,13 @@ export function ModuleRenderer({
             {currentModule.conteudo?.exemplos && (
               <div className="bg-blue-50 rounded-lg p-4">
                 <p className="text-xs font-semibold text-blue-700 uppercase mb-2">{tp.examples}</p>
-                <p className="text-sm whitespace-pre-wrap">
+                <div className="space-y-2">
                   {Array.isArray(currentModule.conteudo.exemplos)
-                    ? currentModule.conteudo.exemplos.join('\n')
-                    : currentModule.conteudo.exemplos}
-                </p>
+                    ? currentModule.conteudo.exemplos.map((ex: string, i: number) => (
+                        <p key={i} className="text-sm text-blue-800 italic">{ex}</p>
+                      ))
+                    : <p className="text-sm text-blue-800 italic">{currentModule.conteudo.exemplos}</p>}
+                </div>
               </div>
             )}
           </CardContent>
