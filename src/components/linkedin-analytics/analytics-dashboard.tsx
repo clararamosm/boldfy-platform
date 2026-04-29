@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth-client';
@@ -56,83 +56,100 @@ export function AnalyticsDashboard({
   const [allDailyData, setAllDailyData] = useState<LinkedInSnapshot['dailyEngagement']>([]);
   const [loading, setLoading] = useState(true);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  // flag para evitar que o useEffect de troca de mês dispare durante loadData
+  const isLoadingDataRef = useRef(false);
 
-  // Carregar lista de meses disponíveis
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const token = await getAuthToken();
-        const result = await listLinkedInSnapshots(token, userId);
-        const months = result.months ?? [];
-        setAvailableMonths(months);
-        if (months.length > 0) setSelectedMonth(months[0]); // mais recente primeiro
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
+  // Função central de carregamento — usada no mount e após upload
+  const loadData = useCallback(async (monthToSelect?: string) => {
+    isLoadingDataRef.current = true;
+    setLoading(true);
+    try {
+      const token = await getAuthToken();
+
+      // 1. Listar meses disponíveis
+      const { months: rawMonths } = await listLinkedInSnapshots(token, userId);
+      const months = rawMonths ?? [];
+      setAvailableMonths(months);
+
+      // 2. Determinar mês a exibir
+      const active = monthToSelect && months.includes(monthToSelect)
+        ? monthToSelect
+        : months[0] ?? '';
+      setSelectedMonth(active);
+
+      if (!active || months.length === 0) return;
+
+      // 3. Snapshot selecionado
+      const { snapshot: snap } = await getLinkedInSnapshot(token, userId, active);
+      setSnapshot(snap ?? null);
+
+      // 4. Snapshot do mês anterior
+      const [y, m] = active.split('-').map(Number);
+      let prevY = y, prevM = m - 1;
+      if (prevM < 1) { prevM = 12; prevY--; }
+      const prevMesAno = `${prevY}-${String(prevM).padStart(2, '0')}`;
+      const { snapshot: prev } = await getLinkedInSnapshot(token, userId, prevMesAno);
+      setPrevSnapshot(prev ?? null);
+
+      // 5. Batch de todos os meses para os gráficos multi-mês
+      const { snapshots: batch } = await getLinkedInSnapshotBatch(token, userId, months);
+      if (batch) {
+        const followersMap: Record<string, Pick<LinkedInSnapshot, 'mesAno' | 'totalNewFollowers'>> = {};
+        for (const [k, s] of Object.entries(batch)) {
+          followersMap[k] = { mesAno: s.mesAno, totalNewFollowers: s.totalNewFollowers };
+        }
+        setAllSnapshots(followersMap);
+
+        const allDaily = months
+          .flatMap(mo => batch[mo]?.dailyEngagement ?? [])
+          .sort((a, b) => a.date.localeCompare(b.date));
+        setAllDailyData(allDaily);
       }
+    } catch (e) {
+      console.error('[AnalyticsDashboard] loadData error:', e);
+    } finally {
+      setLoading(false);
+      isLoadingDataRef.current = false;
     }
-    load();
   }, [userId]);
 
-  // Carregar snapshot selecionado + anterior + batch para gráficos
+  // Carregar na montagem
   useEffect(() => {
-    if (!selectedMonth) return;
+    loadData();
+  }, [loadData]);
 
-    async function loadSnapshot() {
+  // Quando o usuário muda o mês manualmente (sem recarregar tudo)
+  useEffect(() => {
+    // Ignorar disparos causados pelo loadData (que já busca o snapshot)
+    if (!selectedMonth || isLoadingDataRef.current) return;
+
+    async function loadSelectedSnapshot() {
       try {
         const token = await getAuthToken();
 
-        // Snapshot selecionado
         const { snapshot: snap } = await getLinkedInSnapshot(token, userId, selectedMonth);
         setSnapshot(snap ?? null);
 
-        // Snapshot do mês anterior
         const [y, m] = selectedMonth.split('-').map(Number);
         let prevY = y, prevM = m - 1;
         if (prevM < 1) { prevM = 12; prevY--; }
         const prevMesAno = `${prevY}-${String(prevM).padStart(2, '0')}`;
         const { snapshot: prev } = await getLinkedInSnapshot(token, userId, prevMesAno);
         setPrevSnapshot(prev ?? null);
-
-        // Batch de todos os meses para os gráficos multi-mês
-        if (availableMonths.length > 0) {
-          const { snapshots: batch } = await getLinkedInSnapshotBatch(token, userId, availableMonths);
-          if (batch) {
-            // Para o gráfico de seguidores: apenas totalNewFollowers
-            const followersMap: Record<string, Pick<LinkedInSnapshot, 'mesAno' | 'totalNewFollowers'>> = {};
-            for (const [k, s] of Object.entries(batch)) {
-              followersMap[k] = { mesAno: s.mesAno, totalNewFollowers: s.totalNewFollowers };
-            }
-            setAllSnapshots(followersMap);
-
-            // Para o gráfico de impressões: concatenar dailyEngagement de todos os meses
-            const allDaily = availableMonths
-              .flatMap(m => batch[m]?.dailyEngagement ?? [])
-              .sort((a, b) => a.date.localeCompare(b.date));
-            setAllDailyData(allDaily);
-          }
-        }
       } catch (e) {
-        console.error(e);
+        console.error('[AnalyticsDashboard] loadSelectedSnapshot error:', e);
       }
     }
 
-    loadSnapshot();
-  }, [selectedMonth, userId, availableMonths]);
+    loadSelectedSnapshot();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMonth]);
 
   const handleUploadSuccess = useCallback((mesAno: string) => {
     setUploadModalOpen(false);
-    // Recarregar lista de meses
-    getAuthToken().then(token =>
-      listLinkedInSnapshots(token, userId).then(result => {
-        const months = result.months ?? [];
-        setAvailableMonths(months);
-        setSelectedMonth(mesAno);
-      })
-    );
-  }, [userId]);
+    // Recarregar tudo a partir do zero, forçando o mês recém-carregado
+    loadData(mesAno);
+  }, [loadData]);
 
   // Month selector component
   const MonthSelector = (
