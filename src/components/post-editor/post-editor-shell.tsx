@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAuthToken } from '@/lib/auth-client';
 import { useAuth } from '@/contexts/auth-context';
-import { getPostWithAccess, savePostWithVersion, getPostComments, getPostVersions, addBotComment, validateForceSchedule } from '@/app/actions/post-editor';
+import { getPostWithAccess, savePostWithVersion, getPostComments, getPostVersions, addBotComment, addAdjustmentComment, validateForceSchedule } from '@/app/actions/post-editor';
 import { updatePipelinePost } from '@/app/actions/content-pipeline';
 import { useToast } from '@/hooks/use-toast';
 import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
@@ -407,6 +407,15 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
       const result = await requestPipelineAdjustment(token, postId, rejectFeedback.trim());
       if (result.success) {
         setPost(prev => prev ? { ...prev, status: 'ajuste' as PipelineStatus, tlFeedback: rejectFeedback.trim() } : prev);
+
+        // Also add the feedback as a visible comment in the sidebar (tagged as adjustment)
+        const commentResult = await addAdjustmentComment(token, tlId, postId, rejectFeedback.trim());
+        if (commentResult.comment) {
+          setComments(prev => [...prev, commentResult.comment!]);
+          // Open comments sidebar so the TL/strategist sees the feedback immediately
+          setShowComments(true);
+        }
+
         setRejectDialogOpen(false);
         setRejectFeedback('');
         toast({ title: 'Ajuste solicitado', description: 'O estrategista será notificado.' });
@@ -416,7 +425,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     } finally {
       setApprovalLoading(false);
     }
-  }, [post, postId, rejectFeedback, toast]);
+  }, [post, postId, tlId, rejectFeedback, setComments, toast]);
 
   // ---- Copy shareable link ----
   const canShareLink = user?.role === 'strategist' || user?.role === 'thoughtleader' || user?.role === 'master';

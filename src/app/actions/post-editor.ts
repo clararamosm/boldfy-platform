@@ -6,7 +6,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { requireAuth } from '@/lib/auth-guard';
 import { isTokenExpired } from '@/lib/linkedin';
 import type { LinkedInConnection } from '@/lib/linkedin';
-import type { PostComment, PostVersion } from '@/lib/post-editor-types';
+import type { PostComment, PostVersion, CommentAttachment } from '@/lib/post-editor-types';
 import type { PipelinePost } from '@/app/actions/content-pipeline';
 
 // ---- Auth Helper: shared access for strategist + TL ----
@@ -406,6 +406,108 @@ export async function deletePostComment(
     return { success: true };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Erro ao deletar comentário.';
+    return { error: msg };
+  }
+}
+
+// ---- Add Comment With Attachments ----
+// The client uploads files to Firebase Storage directly (same pattern as post-media-section),
+// then passes the resolved attachment metadata here to be persisted in Firestore.
+
+export async function addPostCommentWithAttachments(
+  idToken: string,
+  tlUserId: string,
+  postId: string,
+  content: string,
+  attachments: CommentAttachment[],
+  anchor?: PostComment['anchor']
+): Promise<{ success?: boolean; error?: string; comment?: PostComment }> {
+  try {
+    const user = await requirePostAccess(idToken, tlUserId);
+
+    // Allow comment with attachments even if content is empty (attachment-only comment)
+    if (!content.trim() && attachments.length === 0) {
+      return { error: 'Comentário não pode ser vazio.' };
+    }
+
+    const postRef = adminDb
+      .collection('users')
+      .doc(tlUserId)
+      .collection('contentPipeline')
+      .doc(postId);
+
+    const postDoc = await postRef.get();
+    if (!postDoc.exists) return { error: 'Post não encontrado.' };
+
+    const now = new Date().toISOString();
+    const commentRef = postRef.collection('comments').doc();
+
+    const commentData: Omit<PostComment, 'id'> = {
+      authorId: user.uid,
+      authorName: user.name || 'Usuário',
+      authorRole: (user.role === 'thoughtleader' || user.role === 'colaborador') ? 'thoughtleader' : 'strategist',
+      content: content.trim(),
+      resolved: false,
+      createdAt: now,
+      updatedAt: now,
+      attachments: attachments.length > 0 ? attachments : undefined,
+      anchor: anchor || null,
+    };
+
+    await commentRef.set(commentData);
+
+    const comment: PostComment = { id: commentRef.id, ...commentData };
+    return { success: true, comment };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Erro ao adicionar comentário.';
+    return { error: msg };
+  }
+}
+
+// ---- Add Adjustment Comment (TL "Pedir Ajuste" → automatic comment with tag) ----
+// Called alongside requestPipelineAdjustment so the feedback is visible in the sidebar.
+
+export async function addAdjustmentComment(
+  idToken: string,
+  tlUserId: string,
+  postId: string,
+  feedback: string
+): Promise<{ success?: boolean; error?: string; comment?: PostComment }> {
+  try {
+    const user = await requirePostAccess(idToken, tlUserId);
+
+    if (!feedback.trim()) return { error: 'Feedback de ajuste não pode ser vazio.' };
+
+    const postRef = adminDb
+      .collection('users')
+      .doc(tlUserId)
+      .collection('contentPipeline')
+      .doc(postId);
+
+    const postDoc = await postRef.get();
+    if (!postDoc.exists) return { error: 'Post não encontrado.' };
+
+    const now = new Date().toISOString();
+    const commentRef = postRef.collection('comments').doc();
+
+    const commentData: Omit<PostComment, 'id'> = {
+      authorId: user.uid,
+      authorName: user.name || 'Usuário',
+      authorRole: 'thoughtleader',
+      content: feedback.trim(),
+      resolved: false,
+      createdAt: now,
+      updatedAt: now,
+      commentType: 'adjustment',
+      anchor: null,
+    };
+
+    await commentRef.set(commentData);
+
+    const comment: PostComment = { id: commentRef.id, ...commentData };
+    return { success: true, comment };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Erro ao registrar feedback de ajuste.';
     return { error: msg };
   }
 }

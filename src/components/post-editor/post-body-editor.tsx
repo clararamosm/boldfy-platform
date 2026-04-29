@@ -319,14 +319,34 @@ export function PostBodyEditor({
   // ─── Read-only mode ──────────────────────────────────
 
   if (!canEdit) {
-    // Convert plain text \n to <br> for display, then sanitize
-    const displayValue = (value || '').includes('<') ? value : (value || '').replace(/\n/g, '<br>');
-    const sanitized = DOMPurify.sanitize(displayValue, {
-      ALLOWED_TAGS: ['b', 'i', 'u', 'strong', 'em', 'span', 'br', 'p', 'div', 'mark', 'font'],
-      ALLOWED_ATTR: ['style', 'color', 'class', 'data-comment-id'],
-    });
+    // Render plain text preserving whitespace/newlines.
+    // If the value contains legacy HTML tags, strip them first so we always
+    // work with plain text — then we render via whitespace-pre-wrap which
+    // correctly preserves \n line breaks and special chars like →, ←, ↔.
+    const isHtml = /<[a-z][\s\S]*>/i.test(value || '');
+    let plainText = value || '';
+    if (isHtml) {
+      // Strip HTML: convert block-level closing tags → \n, strip remaining tags
+      plainText = plainText
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(?:div|p|li|h[1-6])>/gi, '\n')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
 
-    if (!sanitized) {
+    // For inline comment highlights we still need a DOM-mutable container.
+    // We build a sanitized HTML version only for highlight rendering, but the
+    // TEXT content we display via whitespace-pre-wrap so newlines are preserved.
+    const hasAnchors = comments.some(c => !c.resolved && c.anchor && c.anchor.field === 'caption');
+
+    if (!plainText) {
       return (
         <div className="text-sm text-muted-foreground italic py-4">
           Nenhum conteúdo ainda.
@@ -334,38 +354,85 @@ export function PostBodyEditor({
       );
     }
 
+    // When there are anchors we need dangerouslySetInnerHTML so DOM highlight
+    // manipulation works. We convert \n → <br> but wrap in a span with
+    // white-space:pre-wrap so the browser still word-wraps normally.
+    // When there are NO anchors, we use a plain <pre>-style div — simpler and safer.
+    if (hasAnchors) {
+      // Convert \n to <br> for dangerouslySetInnerHTML anchor mode
+      const htmlWithBreaks = plainText.replace(/\n/g, '<br>');
+      const sanitized = DOMPurify.sanitize(htmlWithBreaks, {
+        ALLOWED_TAGS: ['b', 'i', 'u', 'strong', 'em', 'span', 'br', 'mark'],
+        ALLOWED_ATTR: ['style', 'color', 'class', 'data-comment-id'],
+      });
+
+      return (
+        <div className="relative py-4">
+          {/* Inline highlight styles */}
+          <style>{`
+            .inline-highlight {
+              background-color: rgb(243 232 255);
+              border-radius: 2px;
+              cursor: pointer;
+              transition: background-color 0.15s;
+              padding: 1px 0;
+            }
+            .inline-highlight:hover { background-color: rgb(233 213 255); }
+            .inline-highlight--active {
+              background-color: rgb(233 213 255);
+              box-shadow: 0 0 0 1px rgb(216 180 254);
+            }
+            .inline-highlight--temp {
+              background-color: rgb(219 234 254);
+              border-radius: 2px;
+              padding: 1px 0;
+            }
+          `}</style>
+          <div
+            ref={containerRef}
+            className="text-sm leading-relaxed select-text"
+            style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+            dangerouslySetInnerHTML={{ __html: sanitized }}
+            onMouseUp={handleMouseUp}
+            onClick={handleClick}
+          />
+
+          {/* Selection popup — "Comentar" button */}
+          {selectionPopup && (
+            <div
+              className="selection-popup absolute z-50 -translate-x-1/2 -translate-y-full"
+              style={{ left: selectionPopup.x, top: selectionPopup.y }}
+            >
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={handleCommentClick}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium shadow-lg hover:opacity-90 transition-opacity whitespace-nowrap"
+              >
+                <MessageSquareQuote className="h-3.5 w-3.5" />
+                Comentar
+              </button>
+              <div className="flex justify-center">
+                <div className="w-2.5 h-2.5 bg-foreground rotate-45 -mt-1.5" />
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // No anchors — pure plain text render (whitespace-pre-wrap, no DOMPurify needed)
     return (
       <div className="relative py-4">
-        {/* Inline highlight styles */}
-        <style>{`
-          .inline-highlight {
-            background-color: rgb(243 232 255); /* purple-100 */
-            border-radius: 2px;
-            cursor: pointer;
-            transition: background-color 0.15s;
-            padding: 1px 0;
-          }
-          .inline-highlight:hover {
-            background-color: rgb(233 213 255); /* purple-200 */
-          }
-          .inline-highlight--active {
-            background-color: rgb(233 213 255); /* purple-200 */
-            box-shadow: 0 0 0 1px rgb(216 180 254); /* purple-300 */
-          }
-          .inline-highlight--temp {
-            background-color: rgb(219 234 254); /* blue-100 */
-            border-radius: 2px;
-            padding: 1px 0;
-          }
-        `}</style>
-
         <div
           ref={containerRef}
-          className="prose prose-sm max-w-none select-text"
-          dangerouslySetInnerHTML={{ __html: sanitized }}
+          className="text-sm leading-relaxed select-text"
+          style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
           onMouseUp={handleMouseUp}
           onClick={handleClick}
-        />
+        >
+          {plainText}
+        </div>
 
         {/* Selection popup — "Comentar" button */}
         {selectionPopup && (
@@ -375,14 +442,13 @@ export function PostBodyEditor({
           >
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()} // Prevent stealing focus/selection
+              onMouseDown={(e) => e.preventDefault()}
               onClick={handleCommentClick}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-medium shadow-lg hover:opacity-90 transition-opacity whitespace-nowrap"
             >
               <MessageSquareQuote className="h-3.5 w-3.5" />
               Comentar
             </button>
-            {/* Arrow */}
             <div className="flex justify-center">
               <div className="w-2.5 h-2.5 bg-foreground rotate-45 -mt-1.5" />
             </div>
