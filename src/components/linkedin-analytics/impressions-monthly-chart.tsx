@@ -11,16 +11,25 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
+import { LINKEDIN_CPM_BRL } from '@/lib/constants';
 
 interface ImpressionsMonthlyChartProps {
   // Record<"YYYY-MM", snapshot> — inclui tanto historical quanto monthly
   snapshots: Record<string, Pick<LinkedInSnapshot, 'mesAno' | 'totalImpressions'>>;
+  /** Exibir valor de mídia equivalente no tooltip (apenas admin) */
+  showMediaValue?: boolean;
 }
 
 const MONTH_ABBR_PT: Record<string, string> = {
   '01': 'Jan', '02': 'Fev', '03': 'Mar', '04': 'Abr',
   '05': 'Mai', '06': 'Jun', '07': 'Jul', '08': 'Ago',
   '09': 'Set', '10': 'Out', '11': 'Nov', '12': 'Dez',
+};
+
+const MONTH_FULL_PT: Record<string, string> = {
+  '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+  '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+  '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
 };
 
 interface MonthBar {
@@ -37,7 +46,56 @@ function formatNumber(n: number): string {
   return String(n);
 }
 
-export function ImpressionsMonthlyChart({ snapshots }: ImpressionsMonthlyChartProps) {
+function formatCurrency(n: number): string {
+  return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+}
+
+// Tooltip customizado para o gráfico de impressões
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{ value: number }>;
+  label?: string;
+  bars: MonthBar[];
+  showMediaValue: boolean;
+}
+
+function CustomTooltip({ active, payload, label, bars, showMediaValue }: CustomTooltipProps) {
+  if (!active || !payload?.length || !label) return null;
+
+  const bar = bars.find(b => b.mesAno === label);
+  if (!bar || !bar.hasData) return null;
+
+  const impressions = payload[0].value;
+  const [year, month] = label.split('-');
+  const monthName = MONTH_FULL_PT[month] ?? month;
+  const mediaValue = (impressions / 1000) * LINKEDIN_CPM_BRL;
+
+  return (
+    <div className="bg-popover border border-border rounded-xl shadow-lg p-3 text-xs min-w-[180px]">
+      <p className="font-semibold text-foreground mb-2 text-[13px]">
+        {monthName} {year}
+      </p>
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-muted-foreground">Impressões</span>
+        <span className="font-bold text-blue-600 tabular-nums">
+          {impressions.toLocaleString('pt-BR')}
+        </span>
+      </div>
+      {showMediaValue && (
+        <div className="flex items-center justify-between gap-4 mt-1.5 pt-1.5 border-t border-border">
+          <span className="text-muted-foreground flex items-center gap-1">
+            💰 Valor de mídia
+          </span>
+          <span className="font-bold text-purple-600 tabular-nums">
+            {formatCurrency(mediaValue)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ImpressionsMonthlyChart({ snapshots, showMediaValue = false }: ImpressionsMonthlyChartProps) {
   const bars = useMemo<MonthBar[]>(() => {
     const sortedKeys = Object.keys(snapshots).sort();
     if (!sortedKeys.length) return [];
@@ -116,12 +174,8 @@ export function ImpressionsMonthlyChart({ snapshots }: ImpressionsMonthlyChartPr
                 width={40}
               />
               <Tooltip
-                formatter={(value: number) => [value.toLocaleString('pt-BR'), 'Impressões']}
-                labelFormatter={(label: string) => {
-                  const bar = bars.find(b => b.mesAno === label);
-                  return bar ? `${bar.label} ${bar.year}` : label;
-                }}
-                contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                content={<CustomTooltip bars={bars} showMediaValue={showMediaValue} />}
+                cursor={{ fill: 'hsl(var(--muted)/0.5)', radius: 4 }}
               />
               <Bar
                 dataKey="impressions"

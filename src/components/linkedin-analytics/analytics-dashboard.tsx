@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils';
 import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInSnapshot, getLinkedInSnapshotBatch, listLinkedInSnapshots } from '@/app/actions/linkedin-analytics';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
-import { LINKEDIN_CPM_BRL } from '@/lib/constants';
 
 import { AnalyticsHeader } from './analytics-header';
 import { UploadPendingBanner } from './upload-pending-banner';
@@ -287,11 +286,6 @@ export function AnalyticsDashboard({
     };
   }, [monthlyInRange, trendSnapshots]);
 
-  // Valor de mídia acumulado do período (admin only)
-  const periodMediaValue = showMediaValue
-    ? (periodKpis.totalImpressions / 1000) * LINKEDIN_CPM_BRL
-    : undefined;
-
   // Delta vs mês anterior ao anchor — sempre mostra quando há prevSnapshot disponível
   // (o prevSnapshot é o mês calendário imediatamente anterior ao anchorMonth)
   const showPeriodDelta = true;
@@ -498,7 +492,7 @@ export function AnalyticsDashboard({
         {/* Gráficos de tendência — sempre visíveis quando há qualquer dado */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-xl border bg-background p-4">
-            <ImpressionsMonthlyChart snapshots={filteredTrendSnapshots} />
+            <ImpressionsMonthlyChart snapshots={filteredTrendSnapshots} showMediaValue={showMediaValue} />
           </div>
           <div className="rounded-xl border bg-background p-4">
             <FollowersMonthlyChart snapshots={filteredTrendSnapshots} />
@@ -516,8 +510,6 @@ export function AnalyticsDashboard({
             prevReach={showPeriodDelta ? prevSnapshot?.totalReach : undefined}
             prevEngagement={showPeriodDelta ? prevSnapshot?.totalEngagement : undefined}
             prevNewFollowers={showPeriodDelta ? prevSnapshot?.totalNewFollowers : undefined}
-            showMediaValue={showMediaValue}
-            mediaValue={periodMediaValue}
           />
         )}
       </div>
