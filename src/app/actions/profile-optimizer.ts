@@ -502,8 +502,8 @@ async function processPdfInBackground(
             ? {
                 featuredItems: enriched.featuredItems.map((f) => ({
                   title: f.title,
-                  url: f.url ?? undefined,
-                  imageUrl: f.imageUrl ?? undefined,
+                  ...(f.url != null ? { url: f.url } : {}),
+                  ...(f.imageUrl != null ? { imageUrl: f.imageUrl } : {}),
                 })),
               }
             : {}),
@@ -1003,7 +1003,15 @@ async function enrichProfileFromScreenshotInBackground(
     const mergedCurrent = {
       ...currentData,
       ...(enriched.topSkills.length > 0 ? { topSkills: enriched.topSkills } : {}),
-      ...(enriched.featuredItems.length > 0 ? { featuredItems: enriched.featuredItems } : {}),
+      ...(enriched.featuredItems.length > 0
+        ? {
+            featuredItems: enriched.featuredItems.map((f) => ({
+              title: f.title,
+              ...(f.url != null ? { url: f.url } : {}),
+              ...(f.imageUrl != null ? { imageUrl: f.imageUrl } : {}),
+            })),
+          }
+        : {}),
       ...(enriched.headline ? { headline: enriched.headline } : {}),
       ...(enriched.about ? { about: enriched.about } : {}),
     };
