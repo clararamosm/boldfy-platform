@@ -104,23 +104,22 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
         // Match preciso via ID numérico do LinkedIn — compatível com urn:li:share e urn:li:activity
         const key = normalizeLinkedInUrl(url);
         console.log(`[enrich] pipeline doc=${doc.id} linkedinPostUrl="${url}" normalized="${key}"`);
-        if (key) {
-          urlMap[key] = entry;
-          continue;
-        }
+        if (key) urlMap[key] = entry;
       } else {
-        console.log(`[enrich] pipeline doc=${doc.id} sem linkedinPostUrl — tentando fallback por publishedAt`);
+        console.log(`[enrich] pipeline doc=${doc.id} sem linkedinPostUrl`);
       }
 
-      // Fallback: indexar por data de publicação (YYYY-MM-DD) para posts sem URL
+      // Sempre indexa por data também — fallback quando urn:li:activity (XLSX) ≠ urn:li:share (API)
+      // Os dois tipos têm IDs numéricos diferentes para o mesmo post, então o URL match pode falhar.
+      // O fallback por data é o único mecanismo confiável nesses casos.
       const publishedAt = d.publishedAt as string | undefined;
       if (publishedAt && publishedAt.startsWith(mesAno)) {
         const dayKey = publishedAt.substring(0, 10);
-        console.log(`[enrich] pipeline doc=${doc.id} publishedAt=${publishedAt} → fallback dateMap[${dayKey}]`);
+        console.log(`[enrich] pipeline doc=${doc.id} publishedAt=${publishedAt} → dateMap[${dayKey}]`);
         if (!dateMap[dayKey]) dateMap[dayKey] = [];
         dateMap[dayKey].push(entry);
       } else {
-        console.log(`[enrich] pipeline doc=${doc.id} publishedAt="${publishedAt}" não cobre mesAno=${mesAno} — sem match`);
+        console.log(`[enrich] pipeline doc=${doc.id} publishedAt="${publishedAt}" fora do mesAno=${mesAno}`);
       }
     }
 
@@ -142,19 +141,21 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
           return { ...post, ...byUrl };
         }
 
-        // 2. Fallback: se o post ainda não tem caption/mediaUrl, tentar match por data
-        // (só aplica se há exatamente 1 post do pipeline naquela data — evita match errado)
+        // 2. Fallback por data — quando urn:li:activity (XLSX) ≠ urn:li:share (API)
+        // esses dois tipos têm IDs numéricos distintos, impossibilitando URL match.
+        // Usa a data do post como chave secundária.
         if (!post.caption && !post.mediaUrl && post.date) {
           const candidates = dateMap[post.date];
           if (candidates?.length === 1) {
-            console.log(`[enrich] ✓ date match: post.date="${post.date}" → postId=${candidates[0].postId}`);
+            console.log(`[enrich] ✓ date match (único): post.date="${post.date}" → postId=${candidates[0].postId}`);
             return { ...post, ...candidates[0] };
           }
           if (candidates && candidates.length > 1) {
-            console.log(`[enrich] ✗ date ambíguo: post.date="${post.date}" tem ${candidates.length} candidatos — sem match`);
-          } else {
-            console.log(`[enrich] ✗ sem match: post.url="${post.url}" date="${post.date}" — chave normalizada="${key}"`);
+            // Múltiplos posts no mesmo dia — pega o primeiro (melhor esforço)
+            console.log(`[enrich] ~ date match (ambíguo, pegando primeiro): post.date="${post.date}" tem ${candidates.length} candidatos → postId=${candidates[0].postId}`);
+            return { ...post, ...candidates[0] };
           }
+          console.log(`[enrich] ✗ sem match: post.url="${post.url}" date="${post.date}" — nenhum candidato`);
         }
 
         return post;
