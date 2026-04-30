@@ -383,18 +383,9 @@ Retorne APENAS o JSON, sem markdown, sem explicações.`;
 // ---------------------------------------------------------------------------
 
 async function extractTextFromPdfBuffer(buffer: Buffer): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
-  const doc = await loadingTask.promise;
-  let text = '';
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    text += content.items.map((item: any) => ('str' in item ? item.str : '')).join(' ') + '\n';
-  }
-  return text;
+  const { extractText } = await import('unpdf');
+  const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
+  return Array.isArray(text) ? text.join('\n') : (text as string);
 }
 
 // ---------------------------------------------------------------------------
