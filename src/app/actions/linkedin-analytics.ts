@@ -59,12 +59,8 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
     if (!snap.exists) return;
 
     const data = snap.data() as LinkedInSnapshot;
-    const allTopPosts = [
-      ...(data.topPostsByEngagement ?? []),
-      ...(data.topPostsByImpressions ?? []),
-    ];
 
-    // Buscar todos os posts do contentPipeline com linkedinPostUrl
+    // Buscar todos os posts do contentPipeline com status postado
     const pipelineSnap = await adminDb
       .collection('users')
       .doc(userId)
@@ -72,39 +68,67 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
       .where('status', '==', 'postado')
       .get();
 
-    const pipelineMap: Record<string, {
+    if (pipelineSnap.empty) return;
+
+    type EnrichmentEntry = {
       postId: string;
       caption?: string;
       mediaUrl?: string;
       format?: string;
       pillar?: string;
-    }> = {};
+    };
+
+    // Mapa primário: ID numérico do LinkedIn (via linkedinPostUrl) → enrichment
+    const urlMap: Record<string, EnrichmentEntry> = {};
+
+    // Mapa secundário: posts do mesmo mês sem linkedinPostUrl (fallback por data)
+    const dateMap: Record<string, EnrichmentEntry[]> = {};
 
     for (const doc of pipelineSnap.docs) {
       const d = doc.data();
-      const url = d.linkedinPostUrl as string | undefined;
-      if (!url) continue;
-      // Normaliza para o ID numérico — compatível com urn:li:share (API) e urn:li:activity (XLSX)
-      const key = normalizeLinkedInUrl(url);
-      if (!key) continue;
-      pipelineMap[key] = {
+      const entry: EnrichmentEntry = {
         postId: doc.id,
-        caption: d.caption ?? d.title,
-        mediaUrl: d.mediaUrl,
-        format: d.formato,         // Firestore field is 'formato' (not 'format')
-        pillar: d.contentPillar,   // Firestore field is 'contentPillar' (not 'pillar')
+        caption: (d.caption as string | undefined) ?? (d.title as string | undefined),
+        mediaUrl: d.mediaUrl as string | undefined,
+        format: d.formato as string | undefined,
+        pillar: d.contentPillar as string | undefined,
       };
+
+      const url = d.linkedinPostUrl as string | undefined;
+      if (url) {
+        // Match preciso via ID numérico do LinkedIn — compatível com urn:li:share e urn:li:activity
+        const key = normalizeLinkedInUrl(url);
+        if (key) {
+          urlMap[key] = entry;
+          continue;
+        }
+      }
+
+      // Fallback: indexar por data de publicação (YYYY-MM-DD) para posts sem URL
+      const publishedAt = d.publishedAt as string | undefined;
+      if (publishedAt && publishedAt.startsWith(mesAno)) {
+        const dayKey = publishedAt.substring(0, 10);
+        if (!dateMap[dayKey]) dateMap[dayKey] = [];
+        dateMap[dayKey].push(entry);
+      }
     }
 
-    if (Object.keys(pipelineMap).length === 0) return;
-
-    // Enriquecer cada top post
+    // Enriquecer cada top post — prioridade: match por URL > match por data
     function enrichList(posts: typeof data.topPostsByEngagement) {
-      return posts.map(post => {
+      return (posts ?? []).map(post => {
+        // 1. Match exato por ID numérico do LinkedIn
         const key = normalizeLinkedInUrl(post.url);
-        const enrichment = pipelineMap[key];
-        if (!enrichment) return post;
-        return { ...post, ...enrichment };
+        const byUrl = key ? urlMap[key] : undefined;
+        if (byUrl) return { ...post, ...byUrl };
+
+        // 2. Fallback: se o post ainda não tem caption/mediaUrl, tentar match por data
+        // (só aplica se há exatamente 1 post do pipeline naquela data — evita match errado)
+        if (!post.caption && !post.mediaUrl && post.date) {
+          const candidates = dateMap[post.date];
+          if (candidates?.length === 1) return { ...post, ...candidates[0] };
+        }
+
+        return post;
       });
     }
 
@@ -259,10 +283,11 @@ export async function getLinkedInSnapshot(
 
     const snapshot = doc.data() as LinkedInSnapshot;
 
-    // Re-enriquecer automaticamente se há top posts sem caption e há posts no contentPipeline.
-    // Isso corrige snapshots salvos antes do fix de normalização de URL (urn:li:share vs activity).
+    // Re-enriquecer automaticamente se há top posts sem caption/mediaUrl.
+    // Usa `some` em vez de `every` — re-tenta sempre que ao menos 1 post ainda não foi enriquecido,
+    // garantindo que posts parcialmente enriquecidos também recebam seus dados.
     const topPosts = [...(snapshot.topPostsByEngagement ?? []), ...(snapshot.topPostsByImpressions ?? [])];
-    const needsEnrich = topPosts.length > 0 && topPosts.every(p => !p.caption && !p.mediaUrl);
+    const needsEnrich = topPosts.length > 0 && topPosts.some(p => !p.caption && !p.mediaUrl);
     if (needsEnrich) {
       // Fire-and-forget: não bloqueia o retorno, mas melhora na próxima leitura
       enrichSnapshotWithPostData(userId, mesAno).catch(() => {});
