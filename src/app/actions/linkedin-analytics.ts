@@ -567,6 +567,30 @@ export async function deleteLinkedInSnapshot(
     // Deletar o snapshot
     await snapshotRef.delete();
 
+    // Limpar campos analytics dos posts do contentPipeline que vieram deste snapshot.
+    // Sem isso, métricas "fantasma" do upload deletado continuariam aparecendo no
+    // Calendário e Feed mesmo após a remoção do snapshot.
+    const pipelineSnap = await adminDb
+      .collection('users')
+      .doc(userId)
+      .collection('contentPipeline')
+      .where('analyticsUpdatedAt', '!=', null)
+      .get();
+
+    if (!pipelineSnap.empty) {
+      const { FieldValue } = await import('firebase-admin/firestore');
+      const clearWrites = pipelineSnap.docs.map(doc =>
+        doc.ref.update({
+          analyticsImpressions: FieldValue.delete(),
+          analyticsReactions:   FieldValue.delete(),
+          analyticsEngagement:  FieldValue.delete(),
+          analyticsUpdatedAt:   FieldValue.delete(),
+        })
+      );
+      await Promise.all(clearWrites);
+      console.log(`[deleteSnapshot] limpou métricas de ${clearWrites.length} posts no contentPipeline`);
+    }
+
     // Buscar o mês mais recente que ainda existe para atualizar o status
     const remaining = await adminDb
       .collection('users')

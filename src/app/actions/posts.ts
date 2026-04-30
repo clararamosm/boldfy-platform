@@ -417,12 +417,12 @@ export async function markFeedAsRead(
  * Groups posts by userId, fetches each user's token, and batch-fetches
  * metrics from the LinkedIn socialMetadata API.
  *
- * Returns a map of postId -> { reactions, comments }.
+ * Returns a map of postId -> { reactions }.
  */
 export async function getFeedPostMetrics(
   idToken: string,
   posts: Array<{ id: string; userId: string; linkedinPostId?: string }>,
-): Promise<{ metrics: Record<string, { reactions: number; comments: number }>; error?: string }> {
+): Promise<{ metrics: Record<string, { reactions: number }>; error?: string }> {
   try {
     await requireAuth(idToken);
 
@@ -438,7 +438,7 @@ export async function getFeedPostMetrics(
       byUser.set(p.userId, arr);
     }
 
-    const result: Record<string, { reactions: number; comments: number }> = {};
+    const result: Record<string, { reactions: number }> = {};
 
     // Process each user's posts in parallel
     const userPromises = Array.from(byUser.entries()).map(async ([userId, userPosts]) => {
@@ -486,7 +486,6 @@ export async function getFeedPostMetrics(
           if (m) {
             result[post.id] = {
               reactions: m.totalReactions || 0,
-              comments: m.comments || 0,
             };
           }
         }
