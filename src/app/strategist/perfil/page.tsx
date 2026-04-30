@@ -180,15 +180,14 @@ function ProfileOptimizerEditor({
       if (result.error) throw new Error(result.error);
 
       toast({ description: 'PDF enviado! Processando perfil...' });
-      setProfile((prev) => ({
-        current: prev?.current ?? null,
-        suggestions: prev?.suggestions ?? null,
-        edited: prev?.edited ?? null,
-        editedAt: prev?.editedAt ?? null,
+      setProfile({
+        current: null,
+        suggestions: null,
+        edited: null,
+        editedAt: null,
         status: 'processing',
-        publishedAt: prev?.publishedAt ?? null,
-      }));
-      await fetchProfile();
+        publishedAt: null,
+      });
     } catch (err) {
       toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao enviar PDF.' });
     } finally {

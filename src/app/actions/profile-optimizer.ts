@@ -460,10 +460,14 @@ async function getRecentPostCaptions(tlUserId: string): Promise<string[]> {
 async function processPdfInBackground(tlUserId: string, pdfBuffer: Buffer): Promise<void> {
   const docRef = profileDocRef(tlUserId);
   try {
-    // Salvar PDF no Storage
-    const bucket = adminStorage.bucket();
-    const file = bucket.file(`linkedinProfiles/${tlUserId}/profile.pdf`);
-    await file.save(pdfBuffer, { contentType: 'application/pdf' });
+    // Salvar PDF no Storage (opcional — não bloqueia o processamento se Storage não estiver configurado)
+    try {
+      const bucket = adminStorage.bucket();
+      const file = bucket.file(`linkedinProfiles/${tlUserId}/profile.pdf`);
+      await file.save(pdfBuffer, { contentType: 'application/pdf' });
+    } catch (storageErr) {
+      console.warn('[profile-optimizer] Storage indisponível, continuando sem salvar PDF:', storageErr);
+    }
 
     // Extrair texto do PDF via pdfjs-dist
     const pdfText = await extractTextFromPdfBuffer(pdfBuffer);
