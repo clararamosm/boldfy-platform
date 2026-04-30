@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/dashboard/header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Upload, User, CheckCircle2, RotateCcw, Send, Trash2 } from 'lucide-react';
+import { Loader2, Upload, User, CheckCircle2, RotateCcw, Send, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth-client';
 import {
   uploadProfilePdf,
@@ -117,7 +117,6 @@ function ProfileOptimizerEditor({
   tlAvatarUrl?: string;
 }) {
   const { toast } = useToast();
-  const pdfInputRef = useRef<HTMLInputElement>(null);
   const screenshotInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<LinkedInProfileOptimization | null>(null);
@@ -171,8 +170,7 @@ function ProfileOptimizerEditor({
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [profile?.status, tlId]);
 
-  async function handleUpload() {
-    const pdfFile = pdfInputRef.current?.files?.[0];
+  async function handleUpload(pdfFile: File, screenshotFile: File | null, additionalContext: string) {
     if (!pdfFile || pdfFile.type !== 'application/pdf') {
       toast({ variant: 'destructive', description: 'Envie um arquivo PDF.' });
       return;
@@ -190,17 +188,24 @@ function ProfileOptimizerEditor({
       // Converter print para base64 se existir
       let screenshotBase64: string | undefined;
       let screenshotMimeType: string | undefined;
-      if (pendingScreenshot) {
-        const ssBuffer = await pendingScreenshot.arrayBuffer();
+      if (screenshotFile) {
+        const ssBuffer = await screenshotFile.arrayBuffer();
         screenshotBase64 = Buffer.from(ssBuffer).toString('base64');
-        screenshotMimeType = pendingScreenshot.type;
+        screenshotMimeType = screenshotFile.type;
       }
 
       const token = await getAuthToken();
-      const result = await uploadProfilePdf(token, tlId, pdfBase64, screenshotBase64, screenshotMimeType);
+      const result = await uploadProfilePdf(
+        token,
+        tlId,
+        pdfBase64,
+        screenshotBase64,
+        screenshotMimeType,
+        additionalContext.trim() || undefined,
+      );
       if (result.error) throw new Error(result.error);
 
-      toast({ description: pendingScreenshot
+      toast({ description: screenshotFile
         ? 'PDF + print enviados! Processando perfil...'
         : 'PDF enviado! Processando perfil...' });
 
@@ -217,7 +222,6 @@ function ProfileOptimizerEditor({
       toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao enviar.' });
     } finally {
       setUploading(false);
-      if (pdfInputRef.current) pdfInputRef.current.value = '';
       if (screenshotInputRef.current) screenshotInputRef.current.value = '';
     }
   }
@@ -307,7 +311,6 @@ function ProfileOptimizerEditor({
               )}
             </div>
             <UploadForm
-              pdfInputRef={pdfInputRef}
               screenshotInputRef={screenshotInputRef}
               pendingScreenshot={pendingScreenshot}
               onPendingScreenshot={setPendingScreenshot}
@@ -350,7 +353,6 @@ function ProfileOptimizerEditor({
               </a>
             </div>
             <UploadForm
-              pdfInputRef={pdfInputRef}
               screenshotInputRef={screenshotInputRef}
               pendingScreenshot={pendingScreenshot}
               onPendingScreenshot={setPendingScreenshot}
@@ -430,31 +432,14 @@ function ProfileOptimizerEditor({
             {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
             Começar de novo
           </Button>
-          {/* Re-upload */}
-          <div>
-            <input
-              ref={pdfInputRef}
-              type="file"
-              accept="application/pdf"
-              className="hidden"
-              onChange={(e) => {
-                // Apenas seleciona — não dispara upload ainda
-                // O usuário pode querer adicionar print antes de enviar
-                // O upload é disparado pelo próprio UploadForm inline abaixo
-                if (e.target.files?.[0]) handleUpload();
-              }}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2"
-              onClick={() => pdfInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-              Re-enviar PDF
-            </Button>
-          </div>
+          {/* Re-upload — botão que abre o formulário inline */}
+          <ReUploadButton
+            screenshotInputRef={screenshotInputRef}
+            pendingScreenshot={pendingScreenshot}
+            onPendingScreenshot={setPendingScreenshot}
+            onUpload={handleUpload}
+            uploading={uploading}
+          />
           {/* Salvar rascunho */}
           <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
@@ -505,6 +490,8 @@ function ProfileOptimizerEditor({
               onChange={setEditedSuggestions}
               onAvatarUrl={setProfileAvatarUrl}
               onBannerUrl={setProfileBannerUrl}
+              existingAvatarUrl={profileAvatarUrl}
+              existingBannerUrl={profileBannerUrl}
             />
           </div>
 
@@ -526,31 +513,35 @@ function ProfileOptimizerEditor({
   );
 }
 
-// ── Componente de upload unificado PDF + print ────────────────────────────────
+// ── Tipos compartilhados dos formulários de upload ────────────────────────────
+
+type UploadHandler = (pdf: File, screenshot: File | null, context: string) => void;
+
+// ── Componente de upload unificado PDF + print + contexto ─────────────────────
 
 function UploadForm({
-  pdfInputRef,
   screenshotInputRef,
   pendingScreenshot,
   onPendingScreenshot,
   onUpload,
   uploading,
 }: {
-  pdfInputRef: { current: HTMLInputElement | null };
   screenshotInputRef: { current: HTMLInputElement | null };
   pendingScreenshot: File | null;
   onPendingScreenshot: (f: File | null) => void;
-  onUpload: () => void;
+  onUpload: UploadHandler;
   uploading: boolean;
 }) {
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const [pendingPdf, setPendingPdf] = useState<File | null>(null);
+  const [context, setContext] = useState('');
 
   return (
     <div className="w-full max-w-sm space-y-3">
       {/* PDF — obrigatório */}
       <div>
         <input
-          ref={pdfInputRef as React.RefObject<HTMLInputElement>}
+          ref={pdfInputRef}
           type="file"
           accept="application/pdf"
           className="hidden"
@@ -602,10 +593,29 @@ function UploadForm({
         </button>
       </div>
 
+      {/* Contexto adicional — opcional */}
+      <div>
+        <textarea
+          value={context}
+          onChange={(e) => setContext(e.target.value)}
+          disabled={uploading}
+          placeholder="Contexto adicional (opcional) — ex: &quot;Clara é conhecida por Branding e tem podcast semanal&quot;"
+          rows={3}
+          className={cn(
+            'w-full text-xs border rounded-lg px-3 py-2 resize-none transition-colors placeholder:text-muted-foreground/60',
+            'border-gray-200 hover:border-violet-300 focus:border-violet-400 focus:outline-none bg-gray-50',
+            uploading && 'opacity-50 cursor-not-allowed',
+          )}
+        />
+        <p className="text-[11px] text-muted-foreground mt-0.5">
+          A IA usa isso para não remover competências e temas pelos quais o TL é reconhecido.
+        </p>
+      </div>
+
       {/* Botão de envio — só aparece com PDF selecionado */}
       {pendingPdf && !uploading && (
         <Button
-          onClick={onUpload}
+          onClick={() => onUpload(pendingPdf, pendingScreenshot, context)}
           className="w-full gap-2"
         >
           <Upload className="h-4 w-4" />
@@ -617,6 +627,56 @@ function UploadForm({
         <div className="flex items-center justify-center gap-2 text-sm text-violet-600 py-1">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span>Enviando e processando...</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Botão de re-upload (modo ready/published) — abre formulário inline ────────
+
+function ReUploadButton({
+  screenshotInputRef,
+  pendingScreenshot,
+  onPendingScreenshot,
+  onUpload,
+  uploading,
+}: {
+  screenshotInputRef: { current: HTMLInputElement | null };
+  pendingScreenshot: File | null;
+  onPendingScreenshot: (f: File | null) => void;
+  onUpload: UploadHandler;
+  uploading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-2"
+        onClick={() => setOpen((v) => !v)}
+        disabled={uploading}
+      >
+        {uploading ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <RotateCcw className="h-3.5 w-3.5" />
+        )}
+        Re-enviar PDF
+        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+      </Button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 z-20 bg-white border rounded-xl shadow-xl p-4 w-80">
+          <UploadForm
+            screenshotInputRef={screenshotInputRef}
+            pendingScreenshot={pendingScreenshot}
+            onPendingScreenshot={onPendingScreenshot}
+            onUpload={(pdf, ss, ctx) => { onUpload(pdf, ss, ctx); setOpen(false); }}
+            uploading={uploading}
+          />
         </div>
       )}
     </div>

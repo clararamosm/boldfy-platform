@@ -15,9 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sparkles, ChevronDown, ChevronUp, ImagePlus, X, CheckSquare, Camera, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { recalculateAlignmentScore, uploadProfileImage, uploadProfileScreenshot } from '@/app/actions/profile-optimizer';
+import { recalculateAlignmentScore, uploadProfileImage } from '@/app/actions/profile-optimizer';
 import { getAuthToken } from '@/lib/auth-client';
-import { AlignmentScoreBadge } from './alignment-score-badge';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProfileEditorProps {
@@ -28,9 +27,12 @@ interface ProfileEditorProps {
   onChange: (updated: LinkedInProfileSuggestions) => void;
   onAvatarUrl?: (url: string) => void;
   onBannerUrl?: (url: string) => void;
+  // URLs já existentes no Firestore (para mostrar preview inicial)
+  existingAvatarUrl?: string | null;
+  existingBannerUrl?: string | null;
 }
 
-export function ProfileEditor({ initial, aiSuggestions, currentProfile, tlUserId, onChange, onAvatarUrl, onBannerUrl }: ProfileEditorProps) {
+export function ProfileEditor({ initial, aiSuggestions, currentProfile, tlUserId, onChange, onAvatarUrl, onBannerUrl, existingAvatarUrl, existingBannerUrl }: ProfileEditorProps) {
   const [data, setData] = useState<LinkedInProfileSuggestions>(initial);
   const [alignment, setAlignment] = useState<ProfileSemanticAlignment>(initial.semanticAlignment);
   const [scoreLoading, setScoreLoading] = useState(false);
@@ -80,12 +82,6 @@ export function ProfileEditor({ initial, aiSuggestions, currentProfile, tlUserId
 
   return (
     <div className="space-y-4">
-      {/* Score badge — deixa claro que é do perfil otimizado */}
-      <AlignmentScoreBadge alignment={alignment} showIssues={true} />
-      {scoreLoading && (
-        <p className="text-xs text-muted-foreground animate-pulse">Recalculando score...</p>
-      )}
-
       {/* Gap Analysis como checklist */}
       {gapItems.length > 0 && (
         <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
@@ -106,8 +102,14 @@ export function ProfileEditor({ initial, aiSuggestions, currentProfile, tlUserId
         </div>
       )}
 
-      {/* Fotos & Print */}
-      <PhotosPanel tlUserId={tlUserId} onAvatarUrl={onAvatarUrl} onBannerUrl={onBannerUrl} />
+      {/* Fotos */}
+      <PhotosPanel
+        tlUserId={tlUserId}
+        onAvatarUrl={onAvatarUrl}
+        onBannerUrl={onBannerUrl}
+        existingAvatarUrl={existingAvatarUrl}
+        existingBannerUrl={existingBannerUrl}
+      />
 
       {/* Abas */}
       <Tabs defaultValue="headline">
@@ -262,14 +264,24 @@ export function ProfileEditor({ initial, aiSuggestions, currentProfile, tlUserId
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Remove markdown básico (negrito, itálico) de uma string */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')   // **bold**
+    .replace(/\*(.+?)\*/g, '$1')        // *italic*
+    .replace(/__(.+?)__/g, '$1')        // __bold__
+    .replace(/_(.+?)_/g, '$1')          // _italic_
+    .trim();
+}
+
 /** Converte o texto do gapAnalysis em array de itens (por número ou por parágrafo) */
 function parseGapAnalysis(text: string): string[] {
   if (!text) return [];
   // Tenta split por padrão "1. ", "2. " etc
   const numbered = text.split(/\n?\d+\.\s+/).filter(Boolean);
-  if (numbered.length > 1) return numbered.map((s) => s.trim());
+  if (numbered.length > 1) return numbered.map((s) => stripMarkdown(s));
   // Fallback: split por newlines duplos ou simples
-  return text.split(/\n{1,2}/).map((s) => s.trim()).filter(Boolean);
+  return text.split(/\n{1,2}/).map((s) => stripMarkdown(s)).filter(Boolean);
 }
 
 // ── Componentes auxiliares ───────────────────────────────────────────────────
@@ -470,22 +482,27 @@ function PhotosPanel({
   tlUserId,
   onAvatarUrl,
   onBannerUrl,
+  existingAvatarUrl,
+  existingBannerUrl,
 }: {
   tlUserId: string;
   onAvatarUrl?: (url: string) => void;
   onBannerUrl?: (url: string) => void;
+  existingAvatarUrl?: string | null;
+  existingBannerUrl?: string | null;
 }) {
   const { toast } = useToast();
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
-  const screenshotInputRef = useRef<HTMLInputElement>(null);
 
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
-  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(existingAvatarUrl ?? null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(existingBannerUrl ?? null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
-  const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
+
+  // Atualizar preview quando as props externas mudarem (ex: fetchProfile após reload)
+  useEffect(() => { if (existingAvatarUrl) setAvatarPreview(existingAvatarUrl); }, [existingAvatarUrl]);
+  useEffect(() => { if (existingBannerUrl) setBannerPreview(existingBannerUrl); }, [existingBannerUrl]);
 
   async function handleImageUpload(
     file: File,
@@ -511,28 +528,11 @@ function PhotosPanel({
     }
   }
 
-  async function handleScreenshot(file: File) {
-    setUploadingScreenshot(true);
-    try {
-      const buffer = await file.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString('base64');
-      const token = await getAuthToken();
-      const result = await uploadProfileScreenshot(token, tlUserId, base64, file.type);
-      if (result.error) throw new Error(result.error);
-      setScreenshotPreview(URL.createObjectURL(file));
-      toast({ description: 'Print enviado! A IA está extraindo as competências e destaques...' });
-    } catch (err) {
-      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao enviar print.' });
-    } finally {
-      setUploadingScreenshot(false);
-    }
-  }
-
   return (
     <div className="rounded-lg border p-4 space-y-4">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fotos & Print do perfil</p>
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fotos do perfil</p>
 
-      {/* Linha 1: Foto de perfil + Banner (assets novos/otimizados) */}
+      {/* Foto de perfil + Banner */}
       <div className="grid grid-cols-2 gap-3">
         {/* Avatar */}
         <div className="space-y-1.5">
@@ -597,42 +597,6 @@ function PhotosPanel({
         </div>
       </div>
 
-      {/* Linha 2: Print do perfil atual (para IA extrair dados) */}
-      <div className="space-y-1.5">
-        <Label className="text-xs">
-          Print do perfil atual{' '}
-          <span className="text-muted-foreground">(a IA extrai as 5 competências fixadas e os cards de Destaque)</span>
-        </Label>
-        <div
-          className={cn(
-            'relative rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition-colors',
-            screenshotPreview ? 'border-transparent h-40' : 'h-16 border-gray-200 hover:border-violet-300 bg-gray-50',
-          )}
-          onClick={() => screenshotInputRef.current?.click()}
-        >
-          {screenshotPreview ? (
-            <>
-              <img src={screenshotPreview} alt="Print" className="h-full w-full object-cover object-top" />
-              <button type="button" className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/50 text-white flex items-center justify-center"
-                onClick={(e) => { e.stopPropagation(); setScreenshotPreview(null); }}>
-                <X className="h-3 w-3" />
-              </button>
-            </>
-          ) : uploadingScreenshot ? (
-            <div className="flex items-center gap-2 text-violet-500 text-xs">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Enviando e analisando...</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-muted-foreground text-xs">
-              <Camera className="h-4 w-4" />
-              <span>Enviar print do perfil atual (do topo até os Destaques)</span>
-            </div>
-          )}
-          <input ref={screenshotInputRef} type="file" accept="image/jpeg,image/png,image/jpg" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleScreenshot(f); }} />
-        </div>
-      </div>
     </div>
   );
 }

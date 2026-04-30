@@ -31,20 +31,27 @@ Fórmula: [Resultado claro / Problema que resolve] | [Cargo/Papel] | [Palavras-c
 - PROIBIDO: Buzzwords ("Visionário", "Inovador", "Apaixonado"), cargos isolados ("CEO", "Empreendedor"), promessas vagas ("Ajudando empresas a crescer")
 
 ## 2. SEÇÃO SOBRE
-Estrutura obrigatória:
-1. Gancho/Problema: problema real de negócios que o TL resolve
-2. Metodologia/Palavras-chave: termos técnicos específicos do nicho
-3. Prova/Resultados: casos reais, números concretos — sem adjetivos vazios
+Estrutura obrigatória (nesta ordem):
+1. Statement de abertura: 1 frase de impacto sobre o problema ou ponto de vista único do TL (NÃO começa com "Eu")
+2. Apresentação: "Sou [Nome], [papel] na/na [empresa/contexto]." — 1–2 frases apresentando quem é, o que faz e onde
+3. Background e prova: experiências relevantes, números reais, empresas conhecidas — sem adjetivos vazios
 4. Pilares de conteúdo: mencionar explicitamente os 2–3 tópicos sobre os quais o TL escreve no LinkedIn
-5. CTA: convidar o público-alvo a seguir o perfil
-- Formatação: parágrafos curtos (máx 3–4 frases), sem blocos corridos. Primeira pessoa.
-- PROIBIDO: texto corrido, narrativa vaga, buzzwords, omitir os pilares de conteúdo
+5. CTA: 1 frase convidando o público a seguir
+
+Formatação OBRIGATÓRIA:
+- LEITURA FLUIDA: misture parágrafos curtos (1–3 linhas) com listas curtas (→ ou •) quando listar 3+ itens
+- NÃO use blocos de texto longos e carregados — máx 3–4 frases por parágrafo
+- Use \n\n entre cada bloco/parágrafo
+- Primeira pessoa em todo o texto
+- PROIBIDO: texto corrido sem respiro, narrativa vaga, buzzwords, omitir os pilares de conteúdo, começar com "Eu"
 
 ## 3. COMPETÊNCIAS
 - Sempre 5 (máximo do LinkedIn)
-- Prioridade única: espelhar os pilares de conteúdo. Competência fora do nicho = penalidade.
+- Distribuição ideal: 2 competências mais amplas (reconhecimento de marca) + 3 mais nichadas (semântica de algoritmo)
+- As 3 nichadas devem espelhar diretamente os pilares de conteúdo do TL
+- As 2 amplas podem ser a área principal que a pessoa é conhecida por (ex: "Branding", "Marketing de Conteúdo")
 - Idioma: mesma língua dos posts e do ICP
-- REMOVER: competências genéricas ("Marketing", "Liderança"), de carreiras passadas sem relação com nicho atual
+- NUNCA remover uma competência central pela qual o TL é conhecido no mercado — verifique o contexto adicional
 
 ## 4. EXPERIÊNCIAS
 Estrutura: [Contexto breve] → [Ação concreta] → [Resultado em número]
@@ -59,13 +66,15 @@ Estrutura: [Contexto breve] → [Ação concreta] → [Resultado em número]
 - Título pode ser reescrito para ser mais atrativo.
 
 ## 6. GAP ANALYSIS
-- Tom: direto, diagnóstico técnico, sem rodeios
+- Tom: direto, diagnóstico técnico, sem rodeios — texto puro, SEM markdown (sem **, sem *, sem #)
 - Priorizar por impacto no algoritmo, não por facilidade de correção
 - Erros críticos: (1) Identity Mismatch — perfil fala de X, posts falam de Y; (2) Cargo atual em branco
 
 ## 7. REGRAS GERAIS
 - SEMPRE: usar pilares de conteúdo como bússola semântica
+- SEMPRE: respeitar o contexto adicional fornecido — ele contém informações sobre como a pessoa é conhecida no mercado
 - NUNCA: buzzwords, linguagem corporativa engessada, texto genérico, inventar números
+- NUNCA: usar markdown (**, *, #) em nenhum campo de texto — apenas texto puro
 - Teste: "Isso poderia ser de qualquer outro profissional, ou é claramente desta pessoa neste nicho?"
 `;
 
@@ -279,6 +288,7 @@ async function generateSuggestions(
   brandContext: Record<string, unknown>,
   recentPostCaptions: string[],
   bestPracticesText: string,
+  additionalContext?: string,
 ): Promise<LinkedInProfileSuggestions> {
   const contentPillars: string[] = Array.isArray(brandContext.approvedTopics)
     ? (brandContext.approvedTopics as string[])
@@ -313,7 +323,7 @@ ${current.experiences
 
 ## POSTS RECENTES (últimos ${recentPostCaptions.length})
 ${recentPostCaptions.slice(0, 12).map((c, i) => `${i + 1}. ${c.slice(0, 200)}`).join('\n')}
-
+${additionalContext ? `\n## CONTEXTO ADICIONAL SOBRE O TL\n${additionalContext}\n\nEste contexto deve ser respeitado integralmente — não remova competências, temas ou projetos pelos quais o TL é reconhecido no mercado.\n` : ''}
 ## TAREFA
 Gere sugestões de otimização para cada seção seguindo as regras do 360Brew acima.
 - Para cada experiência: decida se 'keep' (já está ótima), 'rewrite' (precisa de reescrita) ou 'add_impact' (precisa só de números/impacto).
@@ -453,6 +463,7 @@ async function processPdfInBackground(
   pdfBuffer: Buffer,
   screenshotBase64?: string,
   screenshotMimeType?: string,
+  additionalContext?: string,
 ): Promise<void> {
   const docRef = profileDocRef(tlUserId);
   console.log(`[profile-optimizer] Iniciando processamento para ${tlUserId}, buffer size: ${pdfBuffer.length}`);
@@ -549,6 +560,7 @@ async function processPdfInBackground(
       brandContext,
       recentCaptions,
       bestPracticesText,
+      additionalContext,
     );
     console.log('[profile-optimizer] Prompt 2 concluído, score:', suggestions.semanticAlignment?.score);
 
@@ -584,6 +596,7 @@ export async function uploadProfilePdf(
   pdfBase64: string,
   screenshotBase64?: string,
   screenshotMimeType?: string,
+  additionalContext?: string,
 ): Promise<{ success?: boolean; error?: string }> {
   try {
     await requireProfileAccess(idToken, tlUserId);
@@ -613,7 +626,7 @@ export async function uploadProfilePdf(
     }
 
     // Disparar processamento em background (não await)
-    processPdfInBackground(tlUserId, pdfBuffer, screenshotBase64, screenshotMimeType).catch((err) =>
+    processPdfInBackground(tlUserId, pdfBuffer, screenshotBase64, screenshotMimeType, additionalContext).catch((err) =>
       console.error('[profile-optimizer] processPdfInBackground error:', err),
     );
 
