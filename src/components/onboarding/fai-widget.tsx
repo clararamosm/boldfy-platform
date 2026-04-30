@@ -1,6 +1,7 @@
 // src/components/onboarding/fai-widget.tsx
 // Floating Fai button with mini popup showing checklist progress.
 // Always visible during onboarding. Click to toggle popup.
+// When all items are completed, shows TourCompleteAnimation before the parent unmounts.
 
 'use client';
 
@@ -9,6 +10,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Check } from 'lucide-react';
 import type { OnboardingChecklistItem } from '@/hooks/use-onboarding';
+import { TourCompleteAnimation } from './tour-complete-animation';
 
 type FaiWidgetProps = {
   checklist: OnboardingChecklistItem[];
@@ -28,10 +30,25 @@ export function FaiWidget({
   settingsHref,
 }: FaiWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const prevCompletedRef = useRef(completedCount);
 
   const pendingCount = totalCount - completedCount;
+
+  // Trigger completion animation when all items are just completed
+  useEffect(() => {
+    if (
+      visible &&
+      totalCount > 0 &&
+      completedCount === totalCount &&
+      prevCompletedRef.current < totalCount
+    ) {
+      setShowCompletion(true);
+    }
+    prevCompletedRef.current = completedCount;
+  }, [completedCount, totalCount, visible]);
 
   // Close popup on outside click
   useEffect(() => {
@@ -49,6 +66,15 @@ export function FaiWidget({
   if (!visible) return null;
 
   return (
+    <>
+      {/* Checklist completion confetti celebration */}
+      {showCompletion && (
+        <TourCompleteAnimation
+          variant="checklist"
+          onDone={() => setShowCompletion(false)}
+        />
+      )}
+
     <div ref={popupRef} className="fixed bottom-6 right-6 z-[60]">
       {/* Popup */}
       {isOpen && (
@@ -128,5 +154,6 @@ export function FaiWidget({
         )}
       </div>
     </div>
+    </>
   );
 }

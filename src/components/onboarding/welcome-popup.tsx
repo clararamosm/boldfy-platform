@@ -184,26 +184,17 @@ const ADMIN_ITEMS = [
 ];
 
 const COLAB_ITEMS = [
-  'Dashboard → seus pontos, missões e ranking',
-  'Calendário → sua pauta de posts',
-  'Assistente → IA que escreve com a sua voz',
-  'LinkedIn Feed → o que seus colegas publicam',
-  'Analytics → suas métricas de desempenho',
-  'Biblioteca → conteúdos e assets de marca',
-  'Marca Pessoal → sua voz e seus pilares',
-  'Missões → desafios que geram pontos',
-  'Recompensas → troque pontos por prêmios',
-  'Trilhas → aprenda e ganhe pontos',
+  'Começar uma trilha',
+  'Usar uma ideia de conteúdo',
+  'Agendar um conteúdo',
+  'Fazer uma compra na loja',
+  'Completar uma missão',
 ];
 
 const TL_ITEMS = [
-  'Backlog → revise e aprove seus posts',
-  'Calendário → veja sua pauta',
-  'LinkedIn Feed → acompanhe seus colegas',
-  'Analytics → seu dashboard de análise',
-  'Perfil do LinkedIn → perfil conectado',
-  'Estratégia → sua estratégia de conteúdo',
-  'Manual de Marca → seu guia de voz',
+  'Aprovar um conteúdo',
+  'Publicar seu primeiro post',
+  'Comentar em um post',
 ];
 
 // ─── Message builders ────────────────────────────────────────
@@ -346,7 +337,7 @@ function getColaboradorMessages(name: string, company: string, onUploadClick: ()
       type: 'fai',
       content: (
         <>
-          Preparei uns passos rápidos pra começar. Quando completar, você ganha:
+          Vou te mostrar a plataforma agora! Depois, preparei <strong>5 ações</strong> pra você completar. Quando terminar, você ganha:
           <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-50/50 border border-amber-200/30 text-amber-500 font-extrabold text-xs px-3 py-1.5 rounded-full mt-1">
             <Sparkles className="h-3.5 w-3.5" />+150 pontos!
           </div>
@@ -410,7 +401,7 @@ function getThoughtLeaderMessages(name: string, onUploadClick: () => void, onLin
       type: 'fai',
       content: (
         <>
-          Vou te apresentar cada parte da plataforma. Conforme você explora, vai completando essas etapas:
+          Vou te mostrar a plataforma agora! Depois, preparei <strong>3 ações</strong> pra você começar de verdade:
           <div className="mt-2 flex flex-col gap-1.5">
             {TL_ITEMS.map((item) => (
               <div key={item} className="flex items-center gap-2 text-xs font-medium text-foreground/80 bg-white/70 border border-primary/10 rounded-[10px] px-2.5 py-1.5">

@@ -1,7 +1,7 @@
 // src/hooks/use-onboarding.ts
 // Real-time onboarding status hook.
 // Reads/writes onboarding state from user doc in Firestore.
-// Each role has its own checklist items that get tracked.
+// Each role has its own tour steps (pages to visit) and checklist items (actions to take).
 
 'use client';
 
@@ -21,12 +21,21 @@ export type OnboardingChecklistItem = {
   completed: boolean;
 };
 
+// A single stop in the guided page tour
+export type TourStep = {
+  id: string;
+  href: string;           // Route to navigate to
+  menuLabel: string;      // Label shown in the menu (for "Clique aqui" balloon)
+  pageDescription: string; // Short description shown in the page tooltip
+};
+
 export type OnboardingState = {
   welcomeSeen: boolean;           // Has the user seen the welcome popup?
-  checklistCompleted: boolean;    // All items done?
-  completedItems: string[];       // IDs of completed items
-  dismissedTooltips: string[];    // IDs of tooltips the user clicked "Entendi!" on
-  tooltipStep: number;            // Current tooltip step (0 = not started)
+  tourCompleted: boolean;         // Has the user completed the page tour? (session-only, not persisted)
+  checklistCompleted: boolean;    // All action items done?
+  completedItems: string[];       // IDs of completed action checklist items
+  dismissedTooltips: string[];    // IDs of admin tooltips the user clicked "Entendi!" on
+  tooltipStep: number;            // Current admin tooltip step (0 = not started)
   completedAt?: number;           // Timestamp when all items were completed
 };
 
@@ -39,13 +48,134 @@ export type OnboardingData = {
   loading: boolean;
   // Actions
   markWelcomeSeen: () => Promise<void>;
+  markTourCompleted: () => void;  // Session-only — no Firestore write
   markItemCompleted: (itemId: string) => Promise<void>;
   dismissTooltipForItem: (itemId: string) => Promise<void>;
   advanceTooltip: () => Promise<void>;
   dismissTooltips: () => Promise<void>;
 };
 
-// ─── Checklist definitions per role ──────────────────────────
+// ─── Tour step definitions per role ──────────────────────────
+// These drive the guided page tour (chat → tour → checklist).
+
+export const COLABORADOR_TOUR_STEPS: TourStep[] = [
+  {
+    id: 'tour-dashboard',
+    href: '/colaborador/dashboard',
+    menuLabel: 'Dashboard',
+    pageDescription: 'Aqui você acompanha seus pontos, missões ativas, progresso nas trilhas e o ranking da empresa. Tudo num lugar só.',
+  },
+  {
+    id: 'tour-trilhas',
+    href: '/colaborador/trilhas',
+    menuLabel: 'Trilhas',
+    pageDescription: 'Conteúdos de aprendizado sobre LinkedIn, marca pessoal e posicionamento. Cada trilha concluída vale pontos!',
+  },
+  {
+    id: 'tour-missoes',
+    href: '/colaborador/missoes',
+    menuLabel: 'Missões',
+    pageDescription: 'Complete desafios, acumule pontos e suba no ranking. Cada missão concluída te aproxima das recompensas!',
+  },
+  {
+    id: 'tour-recompensas',
+    href: '/colaborador/recompensas',
+    menuLabel: 'Recompensas',
+    pageDescription: 'Troque seus pontos por prêmios reais. Quanto mais você publica e engaja, mais pontos acumula!',
+  },
+  {
+    id: 'tour-biblioteca',
+    href: '/colaborador/biblioteca',
+    menuLabel: 'Biblioteca',
+    pageDescription: 'Aqui ficam os conteúdos gerados pela IA e os assets de marca da empresa — imagens e materiais prontos pra usar nos seus posts.',
+  },
+  {
+    id: 'tour-assistente',
+    href: '/colaborador/assistente',
+    menuLabel: 'Assistente',
+    pageDescription: 'Sua IA que escreve posts com a sua voz. Não é template genérico — é conteúdo que parece você. Use os créditos pra gerar quantos quiser!',
+  },
+  {
+    id: 'tour-calendario',
+    href: '/colaborador/calendario',
+    menuLabel: 'Calendário',
+    pageDescription: 'Veja toda a sua pauta de posts organizada por data — fácil de acompanhar o que está agendado e quando vai publicar.',
+  },
+  {
+    id: 'tour-linkedin-feed',
+    href: '/colaborador/linkedin-feed',
+    menuLabel: 'LinkedIn Feed',
+    pageDescription: 'Veja o que seus colegas estão publicando — ótimo pra se inspirar, engajar e manter o time conectado.',
+  },
+  {
+    id: 'tour-analytics',
+    href: '/colaborador/analytics',
+    menuLabel: 'Analytics',
+    pageDescription: 'Acompanhe suas métricas de desempenho no LinkedIn. Faça o upload do extrato uma vez por mês — a gente te lembra por e-mail!',
+  },
+  {
+    id: 'tour-marca-pessoal',
+    href: '/colaborador/marca-pessoal',
+    menuLabel: 'Marca Pessoal',
+    pageDescription: 'Defina sua voz, seus pilares de conteúdo e sua proposta de valor. É daqui que a IA aprende a escrever do seu jeito.',
+  },
+];
+
+export const THOUGHTLEADER_TOUR_STEPS: TourStep[] = [
+  {
+    id: 'tour-backlog',
+    href: '/thoughtleader/backlog',
+    menuLabel: 'Backlog',
+    pageDescription: 'Aqui você revisa e aprova os posts que a equipe de estratégia preparou pra você. Tudo organizado, pronto pra publicar com 1 clique.',
+  },
+  {
+    id: 'tour-calendario',
+    href: '/thoughtleader/calendario',
+    menuLabel: 'Calendário',
+    pageDescription: 'Visualize toda a sua pauta de conteúdo organizada por data — fica fácil ver o que está agendado e quando vai publicar.',
+  },
+  {
+    id: 'tour-linkedin-feed',
+    href: '/thoughtleader/linkedin-feed',
+    menuLabel: 'LinkedIn Feed',
+    pageDescription: 'Aqui você acompanha o que seus colegas estão publicando no LinkedIn — ótimo pra se inspirar e engajar com o time.',
+  },
+  {
+    id: 'tour-analytics',
+    href: '/thoughtleader/analytics',
+    menuLabel: 'Analytics',
+    pageDescription: 'Seu dashboard completo de análise de desempenho. Pra alimentá-lo, faça o upload do extrato do LinkedIn Analytics uma vez por mês.',
+  },
+  {
+    id: 'tour-perfil',
+    href: '/thoughtleader/perfil',
+    menuLabel: 'Perfil LinkedIn',
+    pageDescription: 'Aqui você vê o perfil conectado e pode gerenciar a autorização de publicação.',
+  },
+  {
+    id: 'tour-estrategia',
+    href: '/thoughtleader/estrategia',
+    menuLabel: 'Estratégia',
+    pageDescription: 'Aqui fica documentada toda a sua estratégia de conteúdo — pilares, tópicos e posicionamento definidos pela equipe.',
+  },
+  {
+    id: 'tour-manual',
+    href: '/thoughtleader/manual',
+    menuLabel: 'Manual de Marca',
+    pageDescription: 'Seu guia completo de voz, personalidade e identidade de marca. A base de tudo que a equipe produz pra você.',
+  },
+];
+
+export function getTourStepsForRole(role: OnboardingRole): TourStep[] {
+  switch (role) {
+    case 'colaborador': return COLABORADOR_TOUR_STEPS;
+    case 'thoughtleader': return THOUGHTLEADER_TOUR_STEPS;
+    default: return [];
+  }
+}
+
+// ─── Action checklist definitions per role ──────────────────
+// Shown in the FaiWidget after the tour is completed.
 
 const ADMIN_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
   {
@@ -82,109 +212,55 @@ const ADMIN_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
 
 const COLABORADOR_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
   {
-    id: 'visit-dashboard',
-    label: 'Dashboard',
-    description: 'Seu painel com pontos, missões, trilhas e ranking',
-    href: '/colaborador/dashboard',
+    id: 'start-trail',
+    label: 'Começar uma trilha',
+    description: 'Acesse e inicie sua primeira trilha de aprendizado',
+    href: '/colaborador/trilhas',
   },
   {
-    id: 'visit-calendario',
-    label: 'Calendário',
-    description: 'Sua pauta de posts organizada por data',
-    href: '/colaborador/calendario',
-  },
-  {
-    id: 'visit-assistente',
-    label: 'Assistente',
-    description: 'IA que escreve posts com a sua voz',
+    id: 'use-content-idea',
+    label: 'Usar uma ideia de conteúdo',
+    description: 'Gere seu primeiro post com o Assistente',
     href: '/colaborador/assistente',
   },
   {
-    id: 'visit-linkedin-feed',
-    label: 'LinkedIn Feed',
-    description: 'Feed dos seus colegas no LinkedIn',
-    href: '/colaborador/linkedin-feed',
+    id: 'schedule-content',
+    label: 'Agendar um conteúdo',
+    description: 'Agende um post no seu calendário',
+    href: '/colaborador/calendario',
   },
   {
-    id: 'visit-analytics',
-    label: 'Analytics',
-    description: 'Suas métricas de desempenho no LinkedIn',
-    href: '/colaborador/analytics',
-  },
-  {
-    id: 'visit-biblioteca',
-    label: 'Biblioteca',
-    description: 'Conteúdos gerados pela IA e assets de marca',
-    href: '/colaborador/biblioteca',
-  },
-  {
-    id: 'visit-marca-pessoal',
-    label: 'Marca Pessoal',
-    description: 'Sua voz, pilares e identidade de conteúdo',
-    href: '/colaborador/marca-pessoal',
-  },
-  {
-    id: 'visit-missoes',
-    label: 'Missões',
-    description: 'Desafios que geram pontos e recompensas',
-    href: '/colaborador/missoes',
-  },
-  {
-    id: 'visit-recompensas',
-    label: 'Recompensas',
-    description: 'Loja onde você troca pontos por prêmios reais',
+    id: 'buy-reward',
+    label: 'Fazer uma compra na loja',
+    description: 'Troque seus pontos por uma recompensa',
     href: '/colaborador/recompensas',
   },
   {
-    id: 'visit-trilhas',
-    label: 'Trilhas',
-    description: 'Conteúdos de aprendizado sobre LinkedIn e marca',
-    href: '/colaborador/trilhas',
+    id: 'complete-mission',
+    label: 'Completar uma missão',
+    description: 'Conclua sua primeira missão',
+    href: '/colaborador/missoes',
   },
 ];
 
 const THOUGHTLEADER_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
   {
-    id: 'visit-backlog',
-    label: 'Backlog',
-    description: 'Onde você revisa e aprova os posts da equipe',
+    id: 'approve-content',
+    label: 'Aprovar um conteúdo',
+    description: 'Revise e aprove um post no Backlog',
     href: '/thoughtleader/backlog',
   },
   {
-    id: 'visit-calendario',
-    label: 'Calendário',
-    description: 'Visão da sua pauta em forma de calendário',
-    href: '/thoughtleader/calendario',
+    id: 'publish-post',
+    label: 'Publicar seu primeiro post',
+    description: 'Publique um post diretamente pela plataforma',
+    href: '/thoughtleader/backlog',
   },
   {
-    id: 'visit-linkedin-feed',
-    label: 'LinkedIn Feed',
-    description: 'Onde você acompanha o conteúdo dos seus colegas',
+    id: 'comment-post',
+    label: 'Comentar em um post',
+    description: 'Engaje com o conteúdo dos seus colegas no Feed',
     href: '/thoughtleader/linkedin-feed',
-  },
-  {
-    id: 'visit-analytics',
-    label: 'Analytics',
-    description: 'Seu dashboard de análise de desempenho',
-    href: '/thoughtleader/analytics',
-  },
-  {
-    id: 'visit-perfil',
-    label: 'Perfil do LinkedIn',
-    description: 'Veja o perfil conectado e gerencie a conexão',
-    href: '/thoughtleader/perfil',
-  },
-  {
-    id: 'visit-estrategia',
-    label: 'Estratégia',
-    description: 'Onde você vê sua estratégia de conteúdo',
-    href: '/thoughtleader/estrategia',
-  },
-  {
-    id: 'visit-manual',
-    label: 'Manual de Marca',
-    description: 'Seu guia de voz e identidade de marca',
-    href: '/thoughtleader/manual',
   },
 ];
 
@@ -200,6 +276,7 @@ function getChecklistForRole(role: OnboardingRole) {
 
 const DEFAULT_STATE: OnboardingState = {
   welcomeSeen: false,
+  tourCompleted: false,   // session-only, always starts false
   checklistCompleted: false,
   completedItems: [],
   dismissedTooltips: [],
@@ -235,14 +312,15 @@ export function useOnboarding(
       const data = snap.data();
       const ob = (data.onboarding as Partial<OnboardingState>) || {};
 
-      setState({
+      setState((prev) => ({
         welcomeSeen: ob.welcomeSeen ?? false,
+        tourCompleted: prev.tourCompleted, // session-only — keep in-memory value
         checklistCompleted: ob.checklistCompleted ?? false,
         completedItems: ob.completedItems ?? [],
         dismissedTooltips: (ob.dismissedTooltips as string[]) ?? [],
         tooltipStep: ob.tooltipStep ?? 0,
         completedAt: ob.completedAt as number | undefined,
-      });
+      }));
       setLoading(false);
     }, () => {
       setLoading(false);
@@ -268,12 +346,17 @@ export function useOnboarding(
     try {
       await updateDoc(doc(db, 'users', uid), {
         'onboarding.welcomeSeen': true,
-        'onboarding.tooltipStep': 1, // Start tooltips after welcome
+        'onboarding.tooltipStep': 1,
       });
     } catch (err) {
       console.error('Failed to mark welcome as seen:', err);
     }
   }, [uid]);
+
+  // Tour is session-only — no Firestore write. If user closes browser, tour restarts.
+  const markTourCompleted = useCallback(() => {
+    setState((prev) => ({ ...prev, tourCompleted: true }));
+  }, []);
 
   const markItemCompleted = useCallback(async (itemId: string) => {
     if (!uid) return;
@@ -340,6 +423,7 @@ export function useOnboarding(
     totalCount,
     loading,
     markWelcomeSeen,
+    markTourCompleted,
     markItemCompleted,
     dismissTooltipForItem,
     advanceTooltip,
@@ -347,13 +431,16 @@ export function useOnboarding(
   };
 }
 
-// ─── Exported checklist definitions (for server-side or static use) ──
-export { ADMIN_CHECKLIST, COLABORADOR_CHECKLIST, THOUGHTLEADER_CHECKLIST, getChecklistForRole };
+// ─── Exported definitions (for static/server use) ──
+export {
+  ADMIN_CHECKLIST,
+  COLABORADOR_CHECKLIST,
+  THOUGHTLEADER_CHECKLIST,
+  getChecklistForRole,
+};
 
 // ─── Standalone helper (no hook needed) ─────────────────────
 // Call this from any component after a successful action to auto-complete a checklist item.
-// It reads the current onboarding state, checks if the item needs completing,
-// and updates Firestore directly. Safe to call multiple times (idempotent).
 
 export async function completeOnboardingItem(uid: string | undefined, itemId: string) {
   if (!uid) return;
@@ -366,16 +453,14 @@ export async function completeOnboardingItem(uid: string | undefined, itemId: st
     const ob = (data.onboarding as Partial<OnboardingState>) || {};
     const completedItems = ob.completedItems ?? [];
 
-    // Already completed
-    if (completedItems.includes(itemId)) return;
+    if (completedItems.includes(itemId)) return; // Already completed
 
-    // Determine total items for this user's role
     const role = data.role as string;
     let totalItems = 0;
     if (role === 'admin') totalItems = ADMIN_CHECKLIST.length;
     else if (role === 'colaborador') totalItems = COLABORADOR_CHECKLIST.length;
     else if (role === 'thoughtleader') totalItems = THOUGHTLEADER_CHECKLIST.length;
-    else return; // Unknown role
+    else return;
 
     const newCompleted = [...completedItems, itemId];
     const allDone = newCompleted.length >= totalItems;
@@ -386,7 +471,6 @@ export async function completeOnboardingItem(uid: string | undefined, itemId: st
       ...(allDone ? { 'onboarding.completedAt': Date.now() } : {}),
     });
   } catch (err) {
-    // Silent fail — onboarding is non-critical
     console.error('Failed to complete onboarding item:', err);
   }
 }

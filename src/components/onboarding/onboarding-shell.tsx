@@ -1,17 +1,23 @@
 // src/components/onboarding/onboarding-shell.tsx
 // Orchestrator component that manages the entire onboarding flow.
-// Wraps children and renders WelcomePopup, FaiWidget, and PageTooltip.
+// Wraps children and renders WelcomePopup, PageTour, FaiWidget, and PageTooltip.
 // Added to each role's layout, after subscription gate.
+//
+// Flow:
+//   [1] WelcomePopup  — shown on first login (all roles)
+//   [2] PageTour      — guided tour of the platform pages (TL + Colaborador only)
+//   [3] FaiWidget     — action checklist widget (all roles; TL+Colab only after tour)
 
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { useOnboarding, completeOnboardingItem, type OnboardingRole } from '@/hooks/use-onboarding';
+import { useOnboarding, completeOnboardingItem, getTourStepsForRole, type OnboardingRole } from '@/hooks/use-onboarding';
 import { WelcomePopup } from './welcome-popup';
 import { FaiWidget } from './fai-widget';
 import { PageTooltip } from './page-tooltip';
+import { PageTour } from './page-tour';
 import { XlsxUploadModal } from '@/components/linkedin-analytics/xlsx-upload-modal';
 import { getLinkedInAuthUrl } from '@/app/actions/linkedin';
 import { getAuthToken } from '@/lib/auth-client';
@@ -23,13 +29,13 @@ type OnboardingShellProps = {
   children: React.ReactNode;
 };
 
-// ─── Tooltip definitions per route ────────────────────────────
-// Maps pathname patterns to tooltip messages + the checklist item they relate to.
+// ─── Tooltip definitions (Admin only) ────────────────────────
+// TL and Colaborador use the PageTour instead.
 
 type TooltipDef = {
-  pathPattern: string;     // Pathname to match (startsWith)
+  pathPattern: string;
   message: React.ReactNode;
-  checklistItemId: string; // The checklist item ID this tooltip relates to
+  checklistItemId: string;
 };
 
 const ADMIN_TOOLTIPS: TooltipDef[] = [
@@ -60,105 +66,6 @@ const ADMIN_TOOLTIPS: TooltipDef[] = [
   },
 ];
 
-const COLAB_TOOLTIPS: TooltipDef[] = [
-  {
-    pathPattern: '/colaborador/dashboard',
-    message: <><strong>Este é o seu Dashboard.</strong> Aqui você acompanha seus pontos, missões ativas, progresso nas trilhas e o ranking da empresa. Tudo num lugar só.</>,
-    checklistItemId: 'visit-dashboard',
-  },
-  {
-    pathPattern: '/colaborador/calendario',
-    message: <><strong>Este é o seu Calendário.</strong> Veja toda a sua pauta de posts organizada por data — fácil de acompanhar o que está agendado e quando vai publicar.</>,
-    checklistItemId: 'visit-calendario',
-  },
-  {
-    pathPattern: '/colaborador/assistente',
-    message: <><strong>Este é o Assistente.</strong> Sua IA que escreve posts com a sua voz. Não é template genérico — é conteúdo que parece você. Use os créditos pra gerar quantos quiser!</>,
-    checklistItemId: 'visit-assistente',
-  },
-  {
-    pathPattern: '/colaborador/linkedin-feed',
-    message: <><strong>Este é o LinkedIn Feed.</strong> Veja o que seus colegas estão publicando — ótimo pra se inspirar, engajar e manter o time conectado.</>,
-    checklistItemId: 'visit-linkedin-feed',
-  },
-  {
-    pathPattern: '/colaborador/analytics',
-    message: <><strong>Este é o seu Analytics.</strong> Acompanhe suas métricas de desempenho no LinkedIn. Pra manter os gráficos atualizados, faça o upload do extrato do LinkedIn Analytics uma vez por mês — fique tranquilo, a gente te manda um lembrete por e-mail!</>,
-    checklistItemId: 'visit-analytics',
-  },
-  {
-    pathPattern: '/colaborador/biblioteca',
-    message: <><strong>Esta é a Biblioteca.</strong> Aqui ficam os conteúdos gerados pela IA e os assets de marca da empresa — imagens, templates e materiais prontos pra usar nos seus posts.</>,
-    checklistItemId: 'visit-biblioteca',
-  },
-  {
-    pathPattern: '/colaborador/marca-pessoal',
-    message: <><strong>Esta é a sua Marca Pessoal.</strong> Defina sua voz, seus pilares de conteúdo e sua proposta de valor. É daqui que a IA aprende a escrever do seu jeito.</>,
-    checklistItemId: 'visit-marca-pessoal',
-  },
-  {
-    pathPattern: '/colaborador/missoes',
-    message: <><strong>Estas são as Missões.</strong> Complete desafios, acumule pontos e suba no ranking. Cada missão concluída te aproxima das recompensas!</>,
-    checklistItemId: 'visit-missoes',
-  },
-  {
-    pathPattern: '/colaborador/recompensas',
-    message: <><strong>Esta é a loja de Recompensas.</strong> Troque seus pontos por prêmios reais. Quanto mais você publica e engaja, mais pontos acumula!</>,
-    checklistItemId: 'visit-recompensas',
-  },
-  {
-    pathPattern: '/colaborador/trilhas',
-    message: <><strong>Estas são as Trilhas.</strong> Conteúdos de aprendizado sobre LinkedIn, marca pessoal e posicionamento. Cada trilha concluída vale pontos!</>,
-    checklistItemId: 'visit-trilhas',
-  },
-];
-
-const TL_TOOLTIPS: TooltipDef[] = [
-  {
-    pathPattern: '/thoughtleader/backlog',
-    message: <><strong>Este é o seu Backlog.</strong> Aqui você revisa e aprova os posts que a equipe de estratégia preparou pra você. Tudo organizado, pronto pra publicar com 1 clique.</>,
-    checklistItemId: 'visit-backlog',
-  },
-  {
-    pathPattern: '/thoughtleader/calendario',
-    message: <><strong>Este é o seu Calendário.</strong> Visualize toda a sua pauta de conteúdo organizada por data — fica fácil ver o que está agendado e quando vai publicar.</>,
-    checklistItemId: 'visit-calendario',
-  },
-  {
-    pathPattern: '/thoughtleader/linkedin-feed',
-    message: <><strong>Este é o LinkedIn Feed.</strong> Aqui você acompanha o que seus colegas estão publicando no LinkedIn — ótimo pra se inspirar e engajar com o time.</>,
-    checklistItemId: 'visit-linkedin-feed',
-  },
-  {
-    pathPattern: '/thoughtleader/analytics',
-    message: <><strong>Este é o seu Analytics.</strong> Seu dashboard completo de análise de desempenho. Pra alimentá-lo, faça o upload do extrato do LinkedIn Analytics uma vez por mês.</>,
-    checklistItemId: 'visit-analytics',
-  },
-  {
-    pathPattern: '/thoughtleader/perfil',
-    message: <><strong>Este é o Perfil do LinkedIn.</strong> Aqui você vê o perfil conectado e pode gerenciar a autorização de publicação.</>,
-    checklistItemId: 'visit-perfil',
-  },
-  {
-    pathPattern: '/thoughtleader/estrategia',
-    message: <><strong>Esta é a sua Estratégia.</strong> Aqui fica documentada toda a sua estratégia de conteúdo — pilares, tópicos e posicionamento definidos pela equipe.</>,
-    checklistItemId: 'visit-estrategia',
-  },
-  {
-    pathPattern: '/thoughtleader/manual',
-    message: <><strong>Este é o Manual de Marca.</strong> Seu guia completo de voz, personalidade e identidade de marca. A base de tudo que a equipe produz pra você.</>,
-    checklistItemId: 'visit-manual',
-  },
-];
-
-function getTooltipsForRole(role: OnboardingRole): TooltipDef[] {
-  switch (role) {
-    case 'admin': return ADMIN_TOOLTIPS;
-    case 'colaborador': return COLAB_TOOLTIPS;
-    case 'thoughtleader': return TL_TOOLTIPS;
-  }
-}
-
 function getSettingsHref(role: OnboardingRole): string {
   switch (role) {
     case 'admin': return '/admin/configuracoes';
@@ -182,7 +89,6 @@ export function OnboardingShell({
   // Modal de upload histórico (aberto pelo WelcomePopup)
   const [historicalUploadOpen, setHistoricalUploadOpen] = useState(false);
 
-  // Upload histórico concluído = item 'upload-linkedin-history' no checklist
   const historyUploaded = ob.state.completedItems.includes('upload-linkedin-history');
 
   const handleRequestUpload = useCallback(() => {
@@ -204,60 +110,55 @@ export function OnboardingShell({
 
   const handleHistoricalUploadSuccess = useCallback(async () => {
     setHistoricalUploadOpen(false);
-    // Marcar item de onboarding como concluído
     await completeOnboardingItem(user?.uid, 'upload-linkedin-history');
   }, [user?.uid]);
 
-  const tooltipDefs = useMemo(() => getTooltipsForRole(role), [role]);
   const settingsHref = getSettingsHref(role);
+  const tourSteps = useMemo(() => getTourStepsForRole(role), [role]);
+  const hasTour = tourSteps.length > 0; // true for TL and Colaborador
 
-  // Find tooltip for current page — only if not already dismissed and not completed
+  // Tour visibility: shown after welcome, before checklist, session-only
+  const showTour = ob.state.welcomeSeen && !ob.state.tourCompleted && !ob.state.checklistCompleted && hasTour;
+
+  // FaiWidget: shown after tour (or immediately for admin), while checklist is incomplete
+  const showFaiWidget = ob.state.welcomeSeen &&
+    (!hasTour || ob.state.tourCompleted) &&
+    !ob.state.checklistCompleted;
+
+  // ─── Admin page tooltip logic (unchanged) ─────────────────
   const currentTooltip = useMemo(() => {
-    if (ob.state.checklistCompleted) return null; // All done
+    if (role !== 'admin') return null;
+    if (ob.state.checklistCompleted) return null;
 
-    const match = tooltipDefs.find((t) => pathname.startsWith(t.pathPattern));
+    const match = ADMIN_TOOLTIPS.find((t) => pathname.startsWith(t.pathPattern));
     if (!match) return null;
-
-    // Don't show if the user already clicked "Entendi!" for this tooltip
     if (ob.state.dismissedTooltips.includes(match.checklistItemId)) return null;
-
-    // Don't show if the checklist item is already completed (action was done)
     if (ob.state.completedItems.includes(match.checklistItemId)) return null;
 
     return match;
-  }, [ob.state.checklistCompleted, ob.state.dismissedTooltips, ob.state.completedItems, tooltipDefs, pathname]);
+  }, [role, ob.state.checklistCompleted, ob.state.dismissedTooltips, ob.state.completedItems, pathname]);
 
-  // Handler for "Entendi!" — for TL and colaborador: marks item as completed + dismisses tooltip
-  // Visiting the page + reading the tooltip is enough — no further action required
   const handleTooltipDismiss = useCallback(async () => {
     if (!currentTooltip) return;
-    if (role === 'thoughtleader' || role === 'colaborador') {
-      await ob.markItemCompleted(currentTooltip.checklistItemId);
-    }
     await ob.dismissTooltipForItem(currentTooltip.checklistItemId);
-  }, [currentTooltip, ob, role]);
+  }, [currentTooltip, ob]);
 
-  // Find the single checklist item for this page
   const currentChecklistItem = useMemo(() => {
     if (!currentTooltip) return undefined;
     return ob.checklist.find(c => c.id === currentTooltip.checklistItemId);
   }, [currentTooltip, ob.checklist]);
 
-  // Current step is the index+1 of completed items (for progress display)
-  const completedStepCount = ob.completedCount;
-  const totalTooltipSteps = ob.totalCount;
-
   // Don't show anything while loading
   if (ob.loading) return <>{children}</>;
 
-  // If onboarding is fully completed, just render children
+  // If fully completed (and welcome seen), just render children
   if (ob.state.checklistCompleted && ob.state.welcomeSeen) {
     return <>{children}</>;
   }
 
   return (
     <>
-      {/* Welcome Popup — shown once on first login */}
+      {/* [1] Welcome Popup — shown once on first login */}
       <WelcomePopup
         open={!ob.state.welcomeSeen}
         role={role}
@@ -283,28 +184,37 @@ export function OnboardingShell({
 
       {/* Page content (for admin, block unless welcome is seen) */}
       {role === 'admin' && !ob.state.welcomeSeen ? (
-        <div className="min-h-[60vh]" /> // Empty space behind popup
+        <div className="min-h-[60vh]" />
       ) : (
         children
       )}
 
-      {/* Floating Fai Widget — visible while checklist is incomplete */}
+      {/* [2] Page Tour — TL and Colaborador only, after welcome, before checklist */}
+      {showTour && (
+        <PageTour
+          steps={tourSteps}
+          onComplete={ob.markTourCompleted}
+          onSkip={ob.markTourCompleted}
+        />
+      )}
+
+      {/* [3] Floating Fai Widget — visible after tour (or immediately for admin) */}
       <FaiWidget
         checklist={ob.checklist}
         progress={ob.progress}
         completedCount={ob.completedCount}
         totalCount={ob.totalCount}
-        visible={ob.state.welcomeSeen && !ob.state.checklistCompleted}
+        visible={showFaiWidget}
         settingsHref={settingsHref}
       />
 
-      {/* Page Tooltip — shows contextual help per page (only the relevant item) */}
+      {/* Admin-only Page Tooltip — contextual help per page */}
       {currentTooltip && (
         <PageTooltip
           message={currentTooltip.message}
           checklistItem={currentChecklistItem}
-          currentStep={completedStepCount + 1}
-          totalSteps={totalTooltipSteps}
+          currentStep={ob.completedCount + 1}
+          totalSteps={ob.totalCount}
           onDismiss={handleTooltipDismiss}
           visible={ob.state.welcomeSeen && !ob.state.checklistCompleted}
         />
