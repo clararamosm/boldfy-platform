@@ -22,6 +22,7 @@ import type {
   LinkedInProfileSuggestions,
 } from '@/lib/linkedin-analytics-types';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export default function StrategistPerfilPage() {
   const searchParams = useSearchParams();
@@ -436,14 +437,12 @@ function ProfileOptimizerEditor({
               type="file"
               accept="application/pdf"
               className="hidden"
-              onChange={handleUpload}
-            />
-            <input
-              ref={screenshotInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/jpg"
-              className="hidden"
-              onChange={(e) => setPendingScreenshot(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                // Apenas seleciona — não dispara upload ainda
+                // O usuário pode querer adicionar print antes de enviar
+                // O upload é disparado pelo próprio UploadForm inline abaixo
+                if (e.target.files?.[0]) handleUpload();
+              }}
             />
             <Button
               variant="outline"
@@ -544,6 +543,8 @@ function UploadForm({
   onUpload: () => void;
   uploading: boolean;
 }) {
+  const [pendingPdf, setPendingPdf] = useState<File | null>(null);
+
   return (
     <div className="w-full max-w-sm space-y-3">
       {/* PDF — obrigatório */}
@@ -553,17 +554,22 @@ function UploadForm({
           type="file"
           accept="application/pdf"
           className="hidden"
-          onChange={onUpload}
+          onChange={(e) => setPendingPdf(e.target.files?.[0] ?? null)}
         />
-        <Button
+        <button
+          type="button"
           onClick={() => pdfInputRef.current?.click()}
           disabled={uploading}
-          variant="outline"
-          className="w-full gap-2"
+          className={cn(
+            'w-full text-sm border rounded-lg px-3 py-2.5 flex items-center justify-center gap-2 transition-colors',
+            pendingPdf
+              ? 'border-violet-300 bg-violet-50 text-violet-700 font-medium'
+              : 'border-gray-200 hover:border-violet-300 text-muted-foreground hover:text-violet-600 bg-gray-50',
+          )}
         >
-          <Upload className="h-4 w-4" />
-          Selecionar PDF do perfil
-        </Button>
+          <Upload className="h-4 w-4 shrink-0" />
+          {pendingPdf ? pendingPdf.name : 'Selecionar PDF do perfil'}
+        </button>
         <p className="text-[11px] text-muted-foreground mt-1 text-center">
           Exporte no LinkedIn: Perfil → Mais → Salvar como PDF
         </p>
@@ -581,14 +587,31 @@ function UploadForm({
         <button
           type="button"
           onClick={() => screenshotInputRef.current?.click()}
-          className="w-full text-xs text-muted-foreground border border-dashed rounded-lg px-3 py-2 hover:border-violet-300 hover:text-violet-600 transition-colors flex items-center justify-center gap-1.5"
+          disabled={uploading}
+          className={cn(
+            'w-full text-xs border border-dashed rounded-lg px-3 py-2 flex items-center justify-center gap-1.5 transition-colors',
+            pendingScreenshot
+              ? 'border-violet-300 bg-violet-50 text-violet-700'
+              : 'border-gray-200 hover:border-violet-300 text-muted-foreground hover:text-violet-600',
+          )}
         >
-          <Upload className="h-3.5 w-3.5" />
+          <Upload className="h-3.5 w-3.5 shrink-0" />
           {pendingScreenshot
-            ? `Print selecionado: ${pendingScreenshot.name}`
-            : '+ Adicionar print do perfil (opcional — melhora extração de competências e destaque)'}
+            ? pendingScreenshot.name
+            : '+ Print do perfil (opcional — melhora competências e destaque)'}
         </button>
       </div>
+
+      {/* Botão de envio — só aparece com PDF selecionado */}
+      {pendingPdf && !uploading && (
+        <Button
+          onClick={onUpload}
+          className="w-full gap-2"
+        >
+          <Upload className="h-4 w-4" />
+          {pendingScreenshot ? 'Analisar PDF + print' : 'Analisar PDF'}
+        </Button>
+      )}
 
       {uploading && (
         <div className="flex items-center justify-center gap-2 text-sm text-violet-600 py-1">
