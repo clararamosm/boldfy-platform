@@ -506,7 +506,7 @@ export interface SaveMasterBillingFormInput {
   // (`invoice.paid`) seta automaticamente quando a 1a fatura do Platform e paga.
   // TL cobrado fora da plataforma (contrato direto)
   tlBilledOutsidePlatform: boolean;
-  tlExecutives?: 1 | 2 | 3 | 4 | 5;
+  tlExecutives?: number;
   tlFrequency?: 2 | 3 | 4;
   // Notas (opcional)
   notes?: string;
@@ -569,7 +569,7 @@ export interface SetTLBilledOutsidePlatformInput {
   idToken: string;
   companyId: string;
   enabled: boolean;
-  executives?: 1 | 2 | 3 | 4 | 5;
+  executives?: number;
   frequency?: 2 | 3 | 4;
 }
 

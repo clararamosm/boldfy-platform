@@ -548,14 +548,10 @@ export default function MasterCompanyBillingPage() {
     }
 
     if (tlOutsideEnabled) {
-      if (
-        !Number.isInteger(tlOutsideExecutives) ||
-        tlOutsideExecutives < 1 ||
-        tlOutsideExecutives > 5
-      ) {
+      if (!Number.isInteger(tlOutsideExecutives) || tlOutsideExecutives < 1) {
         toast({
           title: 'Numero de executivos invalido',
-          description: 'Informe um numero inteiro entre 1 e 5.',
+          description: 'Informe um numero inteiro maior ou igual a 1.',
           variant: 'destructive',
         });
         return;
@@ -571,9 +567,7 @@ export default function MasterCompanyBillingPage() {
         isBetaTester,
         betaDurationMonths: isBetaTester ? betaDurationMonths : null,
         tlBilledOutsidePlatform: tlOutsideEnabled,
-        tlExecutives: tlOutsideEnabled
-          ? (tlOutsideExecutives as 1 | 2 | 3 | 4 | 5)
-          : undefined,
+        tlExecutives: tlOutsideEnabled ? tlOutsideExecutives : undefined,
         tlFrequency: tlOutsideEnabled ? tlOutsideFrequency : undefined,
       });
       if (!res.success || !res.data) {
@@ -1066,12 +1060,11 @@ export default function MasterCompanyBillingPage() {
             {tlOutsideEnabled && (
               <div className="grid gap-4 md:grid-cols-2 rounded-lg border p-4">
                 <div className="space-y-2">
-                  <Label htmlFor="tlOutsideExecutives">Numero de executivos (1 a 5)</Label>
+                  <Label htmlFor="tlOutsideExecutives">Numero de executivos</Label>
                   <Input
                     id="tlOutsideExecutives"
                     type="number"
                     min={1}
-                    max={5}
                     step={1}
                     value={tlOutsideExecutives}
                     onChange={(e) => setTlOutsideExecutives(Number(e.target.value))}

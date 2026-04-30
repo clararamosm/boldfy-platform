@@ -507,7 +507,7 @@ export async function applyAdminFirstLogin(
 export interface SetTLBilledOutsidePlatformRuleInput {
   companyId: string;
   enabled: boolean;
-  executives?: 1 | 2 | 3 | 4 | 5;
+  executives?: number;
   frequency?: 2 | 3 | 4;
 }
 
@@ -531,8 +531,8 @@ export function validateTLBilledOutsidePlatformInput(
   }
 
   const execsNum = Number(raw.executives);
-  if (!Number.isInteger(execsNum) || execsNum < 1 || execsNum > 5) {
-    throw new Error('executives deve ser inteiro entre 1 e 5.');
+  if (!Number.isInteger(execsNum) || execsNum < 1) {
+    throw new Error('executives deve ser inteiro maior ou igual a 1.');
   }
   const freqNum = Number(raw.frequency);
   if (freqNum !== 2 && freqNum !== 3 && freqNum !== 4) {
@@ -542,7 +542,7 @@ export function validateTLBilledOutsidePlatformInput(
   return {
     companyId,
     enabled: true,
-    executives: execsNum as 1 | 2 | 3 | 4 | 5,
+    executives: execsNum,
     frequency: freqNum as 2 | 3 | 4,
   };
 }
@@ -672,7 +672,7 @@ export interface SaveMasterBillingInput {
   betaDurationMonths?: number;
   // Plano TL
   tlBilledOutsidePlatform: boolean;
-  tlExecutives?: 1 | 2 | 3 | 4 | 5;
+  tlExecutives?: number;
   tlFrequency?: 2 | 3 | 4;
   // Notas
   notes?: string;
@@ -712,18 +712,18 @@ export function validateSaveMasterBillingInput(input: unknown): SaveMasterBillin
 
   const tlBilledOutsidePlatform = raw.tlBilledOutsidePlatform === true;
 
-  let tlExecutives: 1 | 2 | 3 | 4 | 5 | undefined;
+  let tlExecutives: number | undefined;
   let tlFrequency: 2 | 3 | 4 | undefined;
   if (tlBilledOutsidePlatform) {
     const e = Number(raw.tlExecutives);
-    if (!Number.isInteger(e) || e < 1 || e > 5) {
-      throw new Error('tlExecutives deve ser inteiro entre 1 e 5.');
+    if (!Number.isInteger(e) || e < 1) {
+      throw new Error('tlExecutives deve ser inteiro maior ou igual a 1.');
     }
     const f = Number(raw.tlFrequency);
     if (f !== 2 && f !== 3 && f !== 4) {
       throw new Error('tlFrequency deve ser 2, 3 ou 4.');
     }
-    tlExecutives = e as 1 | 2 | 3 | 4 | 5;
+    tlExecutives = e;
     tlFrequency = f as 2 | 3 | 4;
   }
 
@@ -897,6 +897,8 @@ export async function applySaveMasterBilling(
         frequency: input.tlFrequency,
         seats: input.tlExecutives,
       };
+      // Sincroniza campo root usado pela listagem de empresas.
+      updates['tlLicenses'] = input.tlExecutives;
     } else {
       updates['billing.tl'] = defaults.tl;
     }
@@ -930,6 +932,8 @@ export async function applySaveMasterBilling(
       updates['billing.tl.frequency'] = input.tlFrequency;
       updates['billing.tl.seats'] = input.tlExecutives;
       updates['billing.tl.firstPaymentDeadline'] = FieldValue.delete();
+      // Sincroniza campo root usado pela listagem de empresas.
+      updates['tlLicenses'] = input.tlExecutives;
     } else {
       updates['billing.tl.billedOutsidePlatform'] = FieldValue.delete();
       // So mexe no status TL se ele estava como billedOutsidePlatform antes
@@ -937,6 +941,8 @@ export async function applySaveMasterBilling(
       if (existingBilling.tl?.billedOutsidePlatform === true) {
         updates['billing.tl.status'] = 'disabled';
         updates['billing.tl.active'] = false;
+        // Zera o campo root tambem quando TL e desativado.
+        updates['tlLicenses'] = 0;
       }
     }
   }
