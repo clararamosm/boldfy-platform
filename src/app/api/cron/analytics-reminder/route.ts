@@ -30,17 +30,17 @@ function isFirstBusinessDayOfMonth(date: Date): boolean {
   const day = date.getDate();
   const dayOfWeek = date.getDay(); // 0=Dom, 1=Seg, ..., 6=Sáb
 
-  // Só verifica nos 3 primeiros dias do mês (o 1º dia útil cai sempre entre dias 1–3)
+  // O 1º dia útil cai sempre entre os dias 1 e 3 do mês
   if (day > 3) return false;
 
-  // Dia 1: é dia útil se for Seg–Sex
+  // Dia 1: é o 1º dia útil se for Seg–Sex
   if (day === 1 && dayOfWeek >= 1 && dayOfWeek <= 5) return true;
 
-  // Dia 2: é o 1º dia útil se dia 1 foi Sábado (dayOfWeek===1 → hoje é segunda)
-  if (day === 2 && dayOfWeek === 1) return true; // dia 1 foi domingo
+  // Dia 2: é o 1º dia útil apenas se dia 1 foi Domingo (dayOfWeek===1 → hoje é segunda)
+  if (day === 2 && dayOfWeek === 1) return true; // dia 1 = domingo → 2ª é o 1º útil
 
-  // Dia 3: é o 1º dia útil se dias 1 e 2 foram fim de semana (hoje é segunda)
-  if (day === 3 && dayOfWeek === 1) return true; // dias 1–2 foram sab+dom
+  // Dia 3: é o 1º dia útil apenas se dia 1 foi Sábado (dia 1 = sáb, dia 2 = dom, dia 3 = seg)
+  if (day === 3 && dayOfWeek === 1) return true; // dias 1–2 = sáb+dom → 3ª é o 1º útil
 
   return false;
 }

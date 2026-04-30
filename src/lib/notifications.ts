@@ -453,8 +453,12 @@ export async function notifyMonthlyAnalyticsReminder({
                          border-radius: 50%; font-size: 11px; font-weight: 700;
                          margin-right: 10px; flex-shrink: 0;">1</span>
             <span style="font-size: 14px; color: #374151; line-height: 1.5;">
-              Acesse o <strong>LinkedIn</strong> e vá em
-              <strong>Analytics → Desempenho do conteúdo</strong>
+              Acesse o
+              <a href="https://www.linkedin.com/analytics/creator/content/"
+                 style="color: #9333ea; font-weight: 600; text-decoration: none;">
+                LinkedIn Analytics
+              </a>
+              e vá em <strong>Desempenho do conteúdo</strong>
             </span>
           </td>
         </tr>
