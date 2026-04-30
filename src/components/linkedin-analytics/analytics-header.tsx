@@ -1,6 +1,6 @@
 'use client';
 
-import { Users, TrendingUp, TrendingDown, FileText } from 'lucide-react';
+import { Users, TrendingUp, TrendingDown } from 'lucide-react';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
 import { formatMesAno, formatNumber } from '@/lib/linkedin-analytics-utils';
 
@@ -9,7 +9,6 @@ interface AnalyticsHeaderProps {
   snapshot: LinkedInSnapshot;
   prevSnapshot?: LinkedInSnapshot;
   monthSelector: React.ReactNode;
-  showPostsCount?: boolean;
 }
 
 export function AnalyticsHeader({
@@ -17,7 +16,6 @@ export function AnalyticsHeader({
   snapshot,
   prevSnapshot,
   monthSelector,
-  showPostsCount = true,
 }: AnalyticsHeaderProps) {
   const followerDelta = prevSnapshot
     ? snapshot.totalNewFollowers - prevSnapshot.totalNewFollowers
@@ -58,17 +56,8 @@ export function AnalyticsHeader({
         )}
       </div>
 
-      {/* Direita: posts publicados + seletor de mês */}
+      {/* Direita: seletor de mês */}
       <div className="shrink-0 flex flex-col items-end gap-1.5">
-        {showPostsCount && snapshot.totalPostsPublished > 0 && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <FileText className="h-3.5 w-3.5" />
-            <span>
-              <strong className="text-foreground font-semibold">{snapshot.totalPostsPublished}</strong>
-              {' '}post{snapshot.totalPostsPublished !== 1 ? 's' : ''} publicado{snapshot.totalPostsPublished !== 1 ? 's' : ''}
-            </span>
-          </div>
-        )}
         {monthSelector}
       </div>
     </div>
