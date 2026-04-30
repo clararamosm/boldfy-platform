@@ -9,7 +9,6 @@ import { CalendarSkeleton } from '@/components/calendar/calendar-skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { getPipelinePosts, resolveSlugs, updatePipelinePost, deletePipelinePost, type PipelinePost, type PipelineStatus } from '@/app/actions/content-pipeline';
-import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
 import {
   ChevronLeft,
   ChevronRight,
@@ -62,9 +61,6 @@ export default function StrategistCalendarioPerfilPage() {
   // ─── Drag & drop state ──────
   const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
-
-  // LinkedIn metrics map: postId → { reactions, comments }
-  const [metricsMap, setMetricsMap] = useState<Map<string, { reactions: number; comments: number }>>(new Map());
 
   // ─── Resolve slugs to IDs ──────
   useEffect(() => {
@@ -419,29 +415,24 @@ export default function StrategistCalendarioPerfilPage() {
                     onDragLeave={() => { if (dragOverDay === dayKey) setDragOverDay(null); }}
                     onDrop={() => handleDrop(dayKey)}
                   >
-                    {dayPosts.slice(0, 3).map(post => {
-                      const m = metricsMap.get(post.id);
-                      return (
-                        <CalendarPostCard
-                          key={post.id}
-                          post={{
-                            ...post,
-                            title: post.title || 'Sem título',
-                            tlUserId: tlId || undefined,
-                            tlName,
-                          }}
-                          statusConfig={getCardConfig(post.status)}
-                          onClick={() => handlePostClick(post)}
-                          showProfile={false}
-                          draggable
-                          onDragStart={(e) => handleDragStart(post, e)}
-                          onDragEnd={handleDragEnd}
-                          isDragging={draggedPostId === post.id}
-                          reactions={m?.reactions}
-                          comments={m?.comments}
-                        />
-                      );
-                    })}
+                    {dayPosts.slice(0, 3).map(post => (
+                      <CalendarPostCard
+                        key={post.id}
+                        post={{
+                          ...post,
+                          title: post.title || 'Sem título',
+                          tlUserId: tlId || undefined,
+                          tlName,
+                        }}
+                        statusConfig={getCardConfig(post.status)}
+                        onClick={() => handlePostClick(post)}
+                        showProfile={false}
+                        draggable
+                        onDragStart={(e) => handleDragStart(post, e)}
+                        onDragEnd={handleDragEnd}
+                        isDragging={draggedPostId === post.id}
+                      />
+                    ))}
                     {dayPosts.length > 3 && (
                       <div className="text-[10px] text-muted-foreground px-1 font-medium">
                         +{dayPosts.length - 3} mais
@@ -468,18 +459,6 @@ export default function StrategistCalendarioPerfilPage() {
           }}
           onDeletePost={handleDeletePost}
         />
-
-        {/* LinkedIn Performance — dedicated to this TL */}
-        {tlId && (
-          <div className="mt-6">
-            <LinkedInPerformance
-              userId={tlId}
-              hideIfNotConnected={false}
-              callerRole="strategist"
-              onMetricsLoaded={setMetricsMap}
-            />
-          </div>
-        )}
 
       </main>
     </>

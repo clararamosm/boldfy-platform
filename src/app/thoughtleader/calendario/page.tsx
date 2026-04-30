@@ -15,7 +15,6 @@ import { getStatusConfig, buildGetStatusLabel } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 import { PostListTable } from '@/components/calendar/post-list-table';
-import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
 import { cn } from '@/lib/utils';
 import {
   ChevronLeft,
@@ -75,9 +74,6 @@ export default function ThoughtLeaderCalendarioPage() {
   // Drag & drop state
   const [draggedPostId, setDraggedPostId] = useState<string | null>(null);
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
-
-  // LinkedIn metrics map: postId → { reactions, comments }
-  const [metricsMap, setMetricsMap] = useState<Map<string, { reactions: number; comments: number }>>(new Map());
 
   const getStatusLabel = buildGetStatusLabel(t);
 
@@ -377,35 +373,29 @@ export default function ThoughtLeaderCalendarioPage() {
                     onDrop={() => handleDrop(dayKey)}
                     minHeight="min-h-[100px]"
                   >
-                    {dayPosts.slice(0, 3).map(post => {
-                      const m = metricsMap.get(post.id);
-                      return (
-                        <CalendarPostCard
-                          key={post.id}
-                          post={{
-                            id: post.id,
-                            title: post.title,
-                            caption: post.caption,
-                            scheduledFor: post.scheduledFor,
-                            status: post.status,
-                            etapa: post.etapa,
-                            formato: post.formato,
-                            contentPillar: post.contentPillar,
-                            // Métricas do XLSX enrichment — exibidas quando não há dados da API
-                            analyticsReactions: post.analyticsReactions,
-                            analyticsImpressions: post.analyticsImpressions,
-                          }}
-                          statusConfig={getCardConfig(post.status)}
-                          draggable={post.status !== 'postado'}
-                          onDragStart={(e) => handleDragStart(post, e)}
-                          onDragEnd={handleDragEnd}
-                          isDragging={draggedPostId === post.id}
-                          onClick={() => navigateToPost(post.id)}
-                          // API em tempo real tem prioridade sobre dados do XLSX
-                          reactions={m?.reactions}
-                        />
-                      );
-                    })}
+                    {dayPosts.slice(0, 3).map(post => (
+                      <CalendarPostCard
+                        key={post.id}
+                        post={{
+                          id: post.id,
+                          title: post.title,
+                          caption: post.caption,
+                          scheduledFor: post.scheduledFor,
+                          status: post.status,
+                          etapa: post.etapa,
+                          formato: post.formato,
+                          contentPillar: post.contentPillar,
+                          analyticsReactions: post.analyticsReactions,
+                          analyticsImpressions: post.analyticsImpressions,
+                        }}
+                        statusConfig={getCardConfig(post.status)}
+                        draggable={post.status !== 'postado'}
+                        onDragStart={(e) => handleDragStart(post, e)}
+                        onDragEnd={handleDragEnd}
+                        isDragging={draggedPostId === post.id}
+                        onClick={() => navigateToPost(post.id)}
+                      />
+                    ))}
                     {dayPosts.length > 3 && (
                       <div className="text-[10px] text-muted-foreground px-1">
                         +{dayPosts.length - 3}
@@ -573,12 +563,6 @@ export default function ThoughtLeaderCalendarioPage() {
           </div>
         )}
 
-        {/* LinkedIn Performance */}
-        {userId && (
-          <div className="mt-6">
-            <LinkedInPerformance userId={userId} onMetricsLoaded={setMetricsMap} />
-          </div>
-        )}
       </main>
     </>
   );

@@ -47,13 +47,6 @@ interface CalendarPostCardProps {
   onDragEnd?: (e: React.DragEvent) => void;
   isDragging?: boolean;
   className?: string;
-  /**
-   * LinkedIn reactions — override para dados da API em tempo real (LinkedIn Performance).
-   * Se não fornecido, usa post.analyticsReactions (dados do XLSX upload).
-   */
-  reactions?: number;
-  /** @deprecated use post.analyticsImpressions — mantido para compatibilidade */
-  comments?: number;
 }
 
 export const CalendarPostCard = React.memo(function CalendarPostCard({
@@ -66,15 +59,13 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
   onDragEnd,
   isDragging = false,
   className,
-  reactions: reactionsProp,
-  comments,
 }: CalendarPostCardProps) {
   const time = post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : '';
   const showTime = !!time && time !== '00:00';
   const displayTitle = post.title || post.caption?.slice(0, 40) || 'Sem titulo';
 
-  // Prioridade: props externas (API em tempo real) > campos do pipeline (XLSX enrichment)
-  const reactions = reactionsProp ?? post.analyticsReactions;
+  // Métricas vêm exclusivamente do XLSX enrichment (analyticsReactions / analyticsImpressions)
+  const reactions = post.analyticsReactions;
   const impressions = post.analyticsImpressions;
   const isPublished = post.status === 'postado' || post.status === 'published';
   const hasMetrics = isPublished && (reactions != null || impressions != null);
