@@ -64,9 +64,6 @@ export default function ThoughtLeaderCalendarioPage() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
-  // Tab state: "em_producao" vs "postados"
-  const [activeTab, setActiveTab] = useState<'em_producao' | 'postados'>('em_producao');
-
   // Pagination state
   const [pageSize, setPageSize] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
@@ -132,22 +129,17 @@ export default function ThoughtLeaderCalendarioPage() {
     fetchPosts();
   }, [fetchPosts]);
 
-  // ─── Posts by tab ────────────────────────────────────────
-  const emProducaoPosts = useMemo(() =>
-    posts.filter(p => p.status !== 'postado' && p.status !== 'arquivado'),
+  // ─── Todos os posts exceto arquivados ────────────────────
+  const activePosts = useMemo(() =>
+    posts.filter(p => p.status !== 'arquivado'),
     [posts]
   );
-  const postadosPosts = useMemo(() =>
-    posts.filter(p => p.status === 'postado'),
-    [posts]
-  );
-  const activeTabPosts = activeTab === 'em_producao' ? emProducaoPosts : postadosPosts;
 
   // ─── Filter posts ────────────────────────────────────────
   const filteredPosts = useMemo(() => {
-    if (statusFilter === 'all') return activeTabPosts;
-    return activeTabPosts.filter(p => p.status === statusFilter);
-  }, [activeTabPosts, statusFilter]);
+    if (statusFilter === 'all') return activePosts;
+    return activePosts.filter(p => p.status === statusFilter);
+  }, [activePosts, statusFilter]);
 
   // ─── Posts only with scheduledFor — grouped by day ───────
   // Posts postados sem scheduledFor usam publishedAt como fallback de data
@@ -166,13 +158,13 @@ export default function ThoughtLeaderCalendarioPage() {
 
   // ─── Status counts ──────────────────────────────────────
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: activeTabPosts.length };
+    const counts: Record<string, number> = { all: activePosts.length };
     for (const s of FILTER_STATUSES) counts[s] = 0;
-    activeTabPosts.forEach(p => {
+    activePosts.forEach(p => {
       if (p.status in counts) counts[p.status]++;
     });
     return counts;
-  }, [activeTabPosts]);
+  }, [activePosts]);
 
   // ─── Calendar days ──────────────────────────────────────
   const calendarDays = useMemo(() => {
@@ -311,24 +303,6 @@ export default function ThoughtLeaderCalendarioPage() {
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
-        </div>
-
-        {/* Tabs: Em produção / Já postados */}
-        <div className="flex gap-2">
-          <Button
-            variant={activeTab === 'em_producao' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setActiveTab('em_producao'); setStatusFilter('all'); setCurrentPage(1); }}
-          >
-            {t.contentPipeline.tabEmProducao} ({emProducaoPosts.length})
-          </Button>
-          <Button
-            variant={activeTab === 'postados' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setActiveTab('postados'); setStatusFilter('all'); setCurrentPage(1); }}
-          >
-            {t.contentPipeline.tabPostados} ({postadosPosts.length})
-          </Button>
         </div>
 
         {/* Status filters */}

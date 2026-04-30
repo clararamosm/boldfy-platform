@@ -61,8 +61,6 @@ export default function StrategistCalendarioPage() {
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [tlFilter, setTlFilter] = useState<string>('all');
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'em_producao' | 'postados'>('em_producao');
 
   // Pagination state
   const [pageSize, setPageSize] = useState(20);
@@ -151,24 +149,19 @@ export default function StrategistCalendarioPage() {
     }
   }, [companyFilter, filteredTlOptions, tlFilter]);
 
-  // ─── Posts by tab ──────
-  const emProducaoPosts = useMemo(() =>
-    allPosts.filter(p => p.status !== 'postado' && p.status !== 'arquivado'),
+  // ─── Todos os posts exceto arquivados ──────
+  const activePosts = useMemo(() =>
+    allPosts.filter(p => p.status !== 'arquivado'),
     [allPosts]
   );
-  const postadosPosts = useMemo(() =>
-    allPosts.filter(p => p.status === 'postado'),
-    [allPosts]
-  );
-  const activeTabPosts = activeTab === 'em_producao' ? emProducaoPosts : postadosPosts;
 
   // ─── Only posts with a placeable date ──────
   // Posts postados sem scheduledFor usam publishedAt como fallback de data no calendário
   const scheduledPosts = useMemo(() => {
-    return activeTabPosts.filter(p =>
+    return activePosts.filter(p =>
       p.scheduledFor || (p.status === 'postado' && p.publishedAt)
     );
-  }, [activeTabPosts]);
+  }, [activePosts]);
 
   // ─── Apply filters ──────
   const filteredPosts = useMemo(() => {
@@ -190,8 +183,8 @@ export default function StrategistCalendarioPage() {
   // ─── Status counts ──────
   const statusCounts = useMemo(() => {
     const base = companyFilter === 'all' && tlFilter === 'all'
-      ? scheduledPosts
-      : scheduledPosts.filter(p => {
+      ? activePosts
+      : activePosts.filter(p => {
           if (companyFilter !== 'all' && p.companyId !== companyFilter) return false;
           if (tlFilter !== 'all' && p.tlUserId !== tlFilter) return false;
           return true;
@@ -202,7 +195,7 @@ export default function StrategistCalendarioPage() {
       counts[p.status] = (counts[p.status] || 0) + 1;
     });
     return counts;
-  }, [scheduledPosts, companyFilter, tlFilter]);
+  }, [activePosts, companyFilter, tlFilter]);
 
   // ─── Posts grouped by day ──────
   // Posts postados sem scheduledFor usam publishedAt como fallback de data
@@ -409,24 +402,6 @@ export default function StrategistCalendarioPage() {
             </div>
           </div>
 
-          {/* Tabs: Em produção / Já postados */}
-          <div className="flex gap-2">
-            <Button
-              variant={activeTab === 'em_producao' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => { setActiveTab('em_producao'); setStatusFilter('all'); setCurrentPage(1); }}
-            >
-              Em produção ({emProducaoPosts.length})
-            </Button>
-            <Button
-              variant={activeTab === 'postados' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => { setActiveTab('postados'); setStatusFilter('all'); setCurrentPage(1); }}
-            >
-              Já postados ({postadosPosts.length})
-            </Button>
-          </div>
-
           {/* Status filters */}
           <div className="flex flex-wrap items-center gap-2">
             {statusFilterButtons.map(f => {
@@ -507,9 +482,9 @@ export default function StrategistCalendarioPage() {
             </div>
           </div>
 
-          {/* Post list table — filtered by tab + company + pagination */}
+          {/* Post list table — filtered by company + TL + pagination */}
           {(() => {
-            const tablePosts = activeTabPosts
+            const tablePosts = activePosts
               .filter(p => {
                 if (companyFilter !== 'all' && p.companyId !== companyFilter) return false;
                 if (tlFilter !== 'all' && p.tlUserId !== tlFilter) return false;
