@@ -303,7 +303,28 @@ function getColaboradorMessages(name: string, company: string, onUploadClick: ()
       type: 'fai',
       content: (
         <>
-          Antes de começar, preciso do seu <strong>histórico do LinkedIn Analytics</strong>. Isso ativa os gráficos de evolução do seu perfil — e você verá sua evolução desde o início.
+          Antes de tudo, você precisa <strong>conectar seu perfil do LinkedIn</strong>. É por lá que a IA vai publicar os posts no seu nome — sem isso, nada rola!
+          <div className="mt-3 bg-white/70 border border-primary/10 rounded-[12px] p-3 space-y-1.5">
+            <p className="text-xs font-bold text-foreground/80">Como conectar:</p>
+            <div className="text-[11px] text-muted-foreground space-y-1">
+              <div className="flex items-start gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">1</span>
+                <span>Vá em <strong>Configurações</strong> no menu lateral</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">2</span>
+                <span>Clique em <strong>Conectar LinkedIn</strong> e autorize o acesso</span>
+              </div>
+            </div>
+          </div>
+        </>
+      ),
+    },
+    {
+      type: 'fai',
+      content: (
+        <>
+          Agora preciso do seu <strong>histórico do LinkedIn Analytics</strong>. Isso ativa os gráficos de evolução do seu perfil — e você verá sua evolução desde o início.
           <LinkedInExportTutorial onUploadClick={onUploadClick} />
         </>
       ),
