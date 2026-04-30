@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import { Clock, User, Heart, MessageCircle } from 'lucide-react';
+import { Clock, User, Heart, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,9 @@ export type CalendarCardPost = {
   etapa?: string;
   formato?: string;
   contentPillar?: string;
+  // Métricas do LinkedIn Analytics (preenchidas pelo enrichment do XLSX upload)
+  analyticsReactions?: number;
+  analyticsImpressions?: number;
   // Strategist-specific
   tlUserId?: string;
   tlName?: string;
@@ -44,8 +47,12 @@ interface CalendarPostCardProps {
   onDragEnd?: (e: React.DragEvent) => void;
   isDragging?: boolean;
   className?: string;
-  /** LinkedIn engagement — shown only when post is published (status=postado) */
+  /**
+   * LinkedIn reactions — override para dados da API em tempo real (LinkedIn Performance).
+   * Se não fornecido, usa post.analyticsReactions (dados do XLSX upload).
+   */
   reactions?: number;
+  /** @deprecated use post.analyticsImpressions — mantido para compatibilidade */
   comments?: number;
 }
 
@@ -59,12 +66,18 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
   onDragEnd,
   isDragging = false,
   className,
-  reactions,
+  reactions: reactionsProp,
   comments,
 }: CalendarPostCardProps) {
   const time = post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : '';
   const showTime = !!time && time !== '00:00';
   const displayTitle = post.title || post.caption?.slice(0, 40) || 'Sem titulo';
+
+  // Prioridade: props externas (API em tempo real) > campos do pipeline (XLSX enrichment)
+  const reactions = reactionsProp ?? post.analyticsReactions;
+  const impressions = post.analyticsImpressions;
+  const isPublished = post.status === 'postado' || post.status === 'published';
+  const hasMetrics = isPublished && (reactions != null || impressions != null);
 
   return (
     <button
@@ -121,7 +134,7 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
       )}
 
       {/* Time + Engagement (for published posts) */}
-      {(showTime || ((post.status === 'postado' || post.status === 'published') && reactions != null)) && (
+      {(showTime || hasMetrics) && (
         <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
           {showTime && (
             <>
@@ -129,16 +142,20 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
               <span>{time}</span>
             </>
           )}
-          {(post.status === 'postado' || post.status === 'published') && reactions != null && (
+          {hasMetrics && (
             <span className="ml-auto flex items-center gap-1.5">
-              <span className="flex items-center gap-0.5 text-rose-500">
-                <Heart className="h-2.5 w-2.5" />
-                {reactions}
-              </span>
-              {comments != null && (
-                <span className="flex items-center gap-0.5 text-blue-500">
-                  <MessageCircle className="h-2.5 w-2.5" />
-                  {comments}
+              {reactions != null && (
+                <span className="flex items-center gap-0.5 text-rose-500">
+                  <Heart className="h-2.5 w-2.5" />
+                  {reactions.toLocaleString('pt-BR')}
+                </span>
+              )}
+              {impressions != null && (
+                <span className="flex items-center gap-0.5 text-sky-500">
+                  <Eye className="h-2.5 w-2.5" />
+                  {impressions >= 1000
+                    ? `${(impressions / 1000).toFixed(1)}k`
+                    : impressions.toLocaleString('pt-BR')}
                 </span>
               )}
             </span>

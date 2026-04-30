@@ -186,7 +186,15 @@ function parseAba1Engajamento(sheet: XLSX.WorkSheet): LinkedInDailyEngagement[] 
   return rows;
 }
 
-function parseAba2TopPosts(sheet: XLSX.WorkSheet): {
+/**
+ * Filtra posts da aba 2 pelo mês de referência do export.
+ * A aba "Publicações mais em alta" pode conter posts de qualquer época —
+ * precisamos considerar apenas os publicados no mês do export.
+ *
+ * @param mesAno - "YYYY-MM" inferido das abas de engajamento/seguidores.
+ *                 Se vazio, nenhum filtro é aplicado (comportamento legado).
+ */
+function parseAba2TopPosts(sheet: XLSX.WorkSheet, mesAno: string): {
   topPostsByEngagement: LinkedInTopPost[];
   topPostsByImpressions: LinkedInTopPost[];
   totalPostsPublished: number;
@@ -194,7 +202,8 @@ function parseAba2TopPosts(sheet: XLSX.WorkSheet): {
   const range = XLSX.utils.decode_range(sheet['!ref'] ?? 'A1');
   const byEngagement: LinkedInTopPost[] = [];
   const byImpressions: LinkedInTopPost[] = [];
-  const seenUrls = new Set<string>();
+  // Conta apenas posts do mês do export (ou todos se mesAno vazio)
+  const seenUrlsThisMonth = new Set<string>();
 
   // Tabela esquerda: cols 0-2 (URL | Data | Engajamento)
   // Tabela direita: cols 4-6 (URL | Data | Impressões)
@@ -207,14 +216,18 @@ function parseAba2TopPosts(sheet: XLSX.WorkSheet): {
 
     if (urlEng && urlEng.includes('linkedin')) {
       const date = parseDatePtBR(dateEngRaw);
-      const normalized = normalizeLinkedInUrl(urlEng);
-      seenUrls.add(normalized);
-      byEngagement.push({
-        url: urlEng,
-        date,
-        engagement: parseNumberPtBR(engRaw),
-        impressions: 0, // preenchido depois se possível
-      });
+      // Só inclui se a data bate com o mês do export (ou se mesAno não foi inferido)
+      const belongsToMonth = !mesAno || date.startsWith(mesAno);
+      if (belongsToMonth) {
+        const normalized = normalizeLinkedInUrl(urlEng);
+        seenUrlsThisMonth.add(normalized);
+        byEngagement.push({
+          url: urlEng,
+          date,
+          engagement: parseNumberPtBR(engRaw),
+          impressions: 0, // preenchido depois se possível
+        });
+      }
     }
 
     // Tabela direita
@@ -224,14 +237,17 @@ function parseAba2TopPosts(sheet: XLSX.WorkSheet): {
 
     if (urlImp && urlImp.includes('linkedin')) {
       const date = parseDatePtBR(dateImpRaw);
-      const normalized = normalizeLinkedInUrl(urlImp);
-      seenUrls.add(normalized);
-      byImpressions.push({
-        url: urlImp,
-        date,
-        engagement: 0,
-        impressions: parseNumberPtBR(impRaw),
-      });
+      const belongsToMonth = !mesAno || date.startsWith(mesAno);
+      if (belongsToMonth) {
+        const normalized = normalizeLinkedInUrl(urlImp);
+        seenUrlsThisMonth.add(normalized);
+        byImpressions.push({
+          url: urlImp,
+          date,
+          engagement: 0,
+          impressions: parseNumberPtBR(impRaw),
+        });
+      }
     }
   }
 
@@ -250,7 +266,8 @@ function parseAba2TopPosts(sheet: XLSX.WorkSheet): {
   return {
     topPostsByEngagement: byEngagement.slice(0, 3),
     topPostsByImpressions: byImpressions.slice(0, 3),
-    totalPostsPublished: seenUrls.size,
+    // Conta posts únicos publicados no mês (union das duas tabelas)
+    totalPostsPublished: seenUrlsThisMonth.size,
   };
 }
 
@@ -410,16 +427,12 @@ export function parseLinkedInXlsx(buffer: ArrayBuffer): ParsedLinkedInData {
   const dailyEngagement = parseAba1Engajamento(sheets[1]);
   const totalEngagement = dailyEngagement.reduce((sum, d) => sum + d.engagement, 0);
 
-  // Aba 2 — Top posts
-  const { topPostsByEngagement, topPostsByImpressions, totalPostsPublished } = parseAba2TopPosts(sheets[2]);
-
-  // Aba 3 — Seguidores
+  // Aba 3 — Seguidores (precisa das datas para inferir mesAno antes do parse da aba 2)
   const { totalFollowers, totalNewFollowers, dailyNewFollowers } = parseAba3Seguidores(sheets[3]);
 
-  // Aba 4 — Dados demográficos (opcional)
-  const demographics = sheets[4] ? parseAba4Demographics(sheets[4]) : [];
-
-  // Inferir mesAno e período
+  // Inferir mesAno ANTES de parsear a aba 2, para filtrar top posts apenas do mês do export.
+  // A aba "Publicações mais em alta" pode conter posts de qualquer época — sem esse filtro,
+  // posts de outros meses entrariam no count de postsPublicados e na lista de top posts.
   const allDates = [
     ...dailyEngagement.map(d => d.date),
     ...dailyNewFollowers.map(d => d.date),
@@ -427,13 +440,19 @@ export function parseLinkedInXlsx(buffer: ArrayBuffer): ParsedLinkedInData {
 
   const mesAno = inferMesAno(allDates);
 
-  const sortedDates = [...allDates].sort();
-  const start = sortedDates[0] ?? '';
-  const end = sortedDates[sortedDates.length - 1] ?? '';
-
   if (!mesAno) {
     throw new Error('Não foi possível identificar o mês de referência. Verifique se o arquivo é um export válido do LinkedIn Analytics.');
   }
+
+  // Aba 2 — Top posts (filtrado pelo mesAno inferido acima)
+  const { topPostsByEngagement, topPostsByImpressions, totalPostsPublished } = parseAba2TopPosts(sheets[2], mesAno);
+
+  // Aba 4 — Dados demográficos (opcional)
+  const demographics = sheets[4] ? parseAba4Demographics(sheets[4]) : [];
+
+  const sortedDates = [...allDates].sort();
+  const start = sortedDates[0] ?? '';
+  const end = sortedDates[sortedDates.length - 1] ?? '';
 
   return {
     mesAno,
@@ -482,7 +501,6 @@ export function parseLinkedInXlsxMulti(buffer: ArrayBuffer): {
 
   // Parse de todas as abas
   const dailyEngagement = parseAba1Engajamento(sheets[1]);
-  const { topPostsByEngagement, topPostsByImpressions } = parseAba2TopPosts(sheets[2]);
   const { totalFollowers, dailyNewFollowers } = parseAba3Seguidores(sheets[3]);
   const demographics = sheets[4] ? parseAba4Demographics(sheets[4]) : [];
 
@@ -494,6 +512,15 @@ export function parseLinkedInXlsxMulti(buffer: ArrayBuffer): {
 
   const uniqueMonths = [...new Set(allDates.map(d => d.substring(0, 7)))].sort();
   const isMultiMonth = uniqueMonths.length > 1;
+
+  // Top posts da aba 2 — filtrar pelo mês mais recente do export
+  // (a aba "Publicações mais em alta" representa o período mais recente)
+  const mostRecentMonthInferred = uniqueMonths[uniqueMonths.length - 1] ?? '';
+  const {
+    topPostsByEngagement,
+    topPostsByImpressions,
+    totalPostsPublished: totalPostsPublishedLastMonth,
+  } = parseAba2TopPosts(sheets[2], mostRecentMonthInferred);
 
   if (!uniqueMonths.length) {
     throw new Error('Não foi possível identificar o mês de referência. Verifique se o arquivo é um export válido do LinkedIn Analytics.');
@@ -533,8 +560,7 @@ export function parseLinkedInXlsxMulti(buffer: ArrayBuffer): {
       totalReach: 0,         // não disponível por mês no export multi-mês
       totalEngagement,
       dailyEngagement: engMonth,
-      totalPostsPublished: isLastMonth ? [...topPostsByEngagement, ...topPostsByImpressions]
-        .filter((p, i, arr) => arr.findIndex(x => x.url === p.url) === i).length : 0,
+      totalPostsPublished: isLastMonth ? totalPostsPublishedLastMonth : 0,
       topPostsByEngagement: isLastMonth ? topPostsByEngagement : [],
       topPostsByImpressions: isLastMonth ? topPostsByImpressions : [],
       totalFollowers,        // total atual (igual para todos os meses)

@@ -130,7 +130,9 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
     console.log(`[enrich] top post keys (normalized): ${JSON.stringify([...new Set(topUrls)])}`);
     console.log(`[enrich] urlMap keys: ${JSON.stringify(Object.keys(urlMap))}`);
 
-    // Enriquecer cada top post — prioridade: match por URL > match por data
+    // Enriquecer cada top post — prioridade: match por URL > match por data.
+    // Sempre tenta enriquecer (mesmo que já tenha caption) para garantir que
+    // format e pillar sejam preenchidos quando disponíveis no pipeline.
     function enrichList(posts: typeof data.topPostsByEngagement) {
       return (posts ?? []).map(post => {
         // 1. Match exato por ID numérico do LinkedIn
@@ -143,8 +145,9 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
 
         // 2. Fallback por data — quando urn:li:activity (XLSX) ≠ urn:li:share (API)
         // esses dois tipos têm IDs numéricos distintos, impossibilitando URL match.
-        // Usa a data do post como chave secundária.
-        if (!post.caption && !post.mediaUrl && post.date) {
+        // Roda sempre que não temos postId (independente de caption/mediaUrl),
+        // pois o objetivo é garantir que format e pillar sejam sempre preenchidos.
+        if (!post.postId && post.date) {
           const candidates = dateMap[post.date];
           if (candidates?.length === 1) {
             console.log(`[enrich] ✓ date match (único): post.date="${post.date}" → postId=${candidates[0].postId}`);
@@ -162,12 +165,45 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
       });
     }
 
+    const enrichedByEngagement = enrichList(data.topPostsByEngagement ?? []);
+    const enrichedByImpressions = enrichList(data.topPostsByImpressions ?? []);
+
     await snapshotRef.update({
-      topPostsByEngagement: enrichList(data.topPostsByEngagement ?? []),
-      topPostsByImpressions: enrichList(data.topPostsByImpressions ?? []),
+      topPostsByEngagement: enrichedByEngagement,
+      topPostsByImpressions: enrichedByImpressions,
     });
 
     console.log(`[enrich] snapshot ${mesAno} atualizado com sucesso`);
+
+    // Write-back: salva métricas (impressões, reactions, engajamento) de volta no contentPipeline
+    // para que os cards do calendário possam exibir ❤️ e 👁️ sem precisar de outra query.
+    // Usa a union das duas listas para ter o conjunto mais completo possível.
+    const analyticsNow = new Date().toISOString();
+    const pipelineMetrics: Record<string, { impressions: number; reactions: number; engagement: number }> = {};
+
+    for (const post of [...enrichedByEngagement, ...enrichedByImpressions]) {
+      if (!post.postId) continue;
+      const existing = pipelineMetrics[post.postId];
+      pipelineMetrics[post.postId] = {
+        impressions: Math.max(existing?.impressions ?? 0, post.impressions ?? 0),
+        reactions:   Math.max(existing?.reactions ?? 0, post.engagement ?? 0),
+        engagement:  Math.max(existing?.engagement ?? 0, post.engagement ?? 0),
+      };
+    }
+
+    if (Object.keys(pipelineMetrics).length > 0) {
+      const pipelineRef = adminDb.collection('users').doc(userId).collection('contentPipeline');
+      const writes = Object.entries(pipelineMetrics).map(([postId, m]) =>
+        pipelineRef.doc(postId).update({
+          analyticsImpressions: m.impressions,
+          analyticsReactions:   m.reactions,
+          analyticsEngagement:  m.engagement,
+          analyticsUpdatedAt:   analyticsNow,
+        })
+      );
+      await Promise.all(writes);
+      console.log(`[enrich] write-back: ${writes.length} posts no contentPipeline atualizados com métricas`);
+    }
   } catch (err) {
     // Falha silenciosa — o snapshot já está salvo e é válido sem o enriquecimento
     console.error('[linkedin-analytics] enrichSnapshotWithPostData error:', err);

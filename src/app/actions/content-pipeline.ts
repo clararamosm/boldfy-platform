@@ -53,6 +53,11 @@ export type PipelinePost = {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  // Métricas do LinkedIn Analytics (preenchidas pelo enrichment do XLSX)
+  analyticsImpressions?: number;
+  analyticsReactions?: number;
+  analyticsEngagement?: number;
+  analyticsUpdatedAt?: string; // ISO timestamp da última vez que as métricas foram atualizadas
 };
 
 type ActionResult = {

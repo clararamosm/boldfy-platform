@@ -10,13 +10,14 @@ import { MONTH_NAMES_PT, formatCompactNumber, formatCurrency } from '@/lib/linke
 import { buildMonthBars, ChartXAxisTick, type MonthBarBase } from './chart-shared';
 
 interface ImpressionsMonthlyChartProps {
-  snapshots: Record<string, Pick<LinkedInSnapshot, 'mesAno' | 'totalImpressions'>>;
+  snapshots: Record<string, Pick<LinkedInSnapshot, 'mesAno' | 'totalImpressions' | 'totalPostsPublished'>>;
   /** Exibir valor de mídia equivalente no tooltip — apenas admin */
   showMediaValue?: boolean;
 }
 
 interface MonthBar extends MonthBarBase {
   impressions: number;
+  postsPublished: number;
 }
 
 // ─── Tooltip customizado ──────────────────────────────────────
@@ -38,18 +39,37 @@ function CustomTooltip({ active, payload, label, bars, showMediaValue }: CustomT
   const impressions = payload[0].value;
   const [year, month] = label.split('-');
   const mediaValue = (impressions / 1000) * LINKEDIN_CPM_BRL;
+  const impPerPost = bar.postsPublished > 0
+    ? Math.round(impressions / bar.postsPublished).toLocaleString('pt-BR')
+    : null;
 
   return (
-    <div className="bg-popover border border-border rounded-xl shadow-lg p-3 text-xs min-w-[180px]">
+    <div className="bg-popover border border-border rounded-xl shadow-lg p-3 text-xs min-w-[190px]">
       <p className="font-semibold text-foreground mb-2 text-[13px]">
         {MONTH_NAMES_PT[month] ?? month} {year}
       </p>
       <div className="flex items-center justify-between gap-4">
-        <span className="text-muted-foreground">Impressões</span>
+        <span className="text-muted-foreground">👁️ Impressões</span>
         <span className="font-bold text-blue-600 tabular-nums">
           {impressions.toLocaleString('pt-BR')}
         </span>
       </div>
+      {bar.postsPublished > 0 && (
+        <div className="flex items-center justify-between gap-4 mt-1">
+          <span className="text-muted-foreground">📝 Posts publicados</span>
+          <span className="font-semibold text-foreground tabular-nums">
+            {bar.postsPublished}
+          </span>
+        </div>
+      )}
+      {impPerPost && (
+        <div className="flex items-center justify-between gap-4 mt-1">
+          <span className="text-muted-foreground">Média por post</span>
+          <span className="font-semibold text-foreground tabular-nums">
+            {impPerPost}
+          </span>
+        </div>
+      )}
       {showMediaValue && (
         <div className="flex items-center justify-between gap-4 mt-1.5 pt-1.5 border-t border-border">
           <span className="text-muted-foreground">💰 Valor de mídia</span>
@@ -70,6 +90,7 @@ export function ImpressionsMonthlyChart({ snapshots, showMediaValue = false }: I
     return buildMonthBars(sortedKeys).map(base => ({
       ...base,
       impressions: snapshots[base.mesAno]?.totalImpressions ?? 0,
+      postsPublished: snapshots[base.mesAno]?.totalPostsPublished ?? 0,
     }));
   }, [snapshots]);
 

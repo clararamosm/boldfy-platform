@@ -39,7 +39,7 @@ export interface AnalyticsDashboardProps {
 // Maps para os gráficos de tendência (inclui todos os snapshots — monthly + historical)
 // Inclui todos os campos de KPI para poder somar no período
 type TrendMap = Record<string, Pick<LinkedInSnapshot,
-  'mesAno' | 'totalNewFollowers' | 'totalImpressions' | 'totalReach' | 'totalEngagement' | 'uploadType'
+  'mesAno' | 'totalNewFollowers' | 'totalImpressions' | 'totalReach' | 'totalEngagement' | 'uploadType' | 'totalPostsPublished'
 >>;
 
 type PeriodPreset = '1M' | '3M' | '6M' | '1A' | 'custom';
@@ -132,6 +132,7 @@ export function AnalyticsDashboard({
             totalReach: s.totalReach,
             totalEngagement: s.totalEngagement,
             uploadType: s.uploadType,
+            totalPostsPublished: s.totalPostsPublished,
           };
         }
         setTrendSnapshots(trendMap);

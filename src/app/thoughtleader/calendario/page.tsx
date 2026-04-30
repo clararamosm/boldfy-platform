@@ -391,6 +391,9 @@ export default function ThoughtLeaderCalendarioPage() {
                             etapa: post.etapa,
                             formato: post.formato,
                             contentPillar: post.contentPillar,
+                            // Métricas do XLSX enrichment — exibidas quando não há dados da API
+                            analyticsReactions: post.analyticsReactions,
+                            analyticsImpressions: post.analyticsImpressions,
                           }}
                           statusConfig={getCardConfig(post.status)}
                           draggable={post.status !== 'postado'}
@@ -398,8 +401,8 @@ export default function ThoughtLeaderCalendarioPage() {
                           onDragEnd={handleDragEnd}
                           isDragging={draggedPostId === post.id}
                           onClick={() => navigateToPost(post.id)}
+                          // API em tempo real tem prioridade sobre dados do XLSX
                           reactions={m?.reactions}
-                          comments={m?.comments}
                         />
                       );
                     })}
