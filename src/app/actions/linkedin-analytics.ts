@@ -81,46 +81,55 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
       mediaUrl?: string;
       format?: string;
       pillar?: string;
+      publishedAt?: string; // ISO completo — usado para ordenar candidatos em colisão de data
     };
 
     // Mapa primário: ID numérico do LinkedIn (via linkedinPostUrl) → enrichment
     const urlMap: Record<string, EnrichmentEntry> = {};
 
-    // Mapa secundário: posts do mesmo mês sem linkedinPostUrl (fallback por data)
+    // Mapa secundário: fallback por data de publicação (YYYY-MM-DD) → candidatos ordenados por publishedAt
+    // Necessário porque urn:li:activity (XLSX) e urn:li:share (API) têm IDs numéricos distintos
+    // para o mesmo post — o URL match sempre falha entre essas duas fontes.
     const dateMap: Record<string, EnrichmentEntry[]> = {};
 
     for (const doc of pipelineSnap.docs) {
       const d = doc.data();
+      const publishedAt = d.publishedAt as string | undefined;
       const entry: EnrichmentEntry = {
         postId: doc.id,
         caption: (d.caption as string | undefined) ?? (d.title as string | undefined),
         mediaUrl: d.mediaUrl as string | undefined,
         format: d.formato as string | undefined,
         pillar: d.contentPillar as string | undefined,
+        publishedAt,
       };
 
       const url = d.linkedinPostUrl as string | undefined;
       if (url) {
         // Match preciso via ID numérico do LinkedIn — compatível com urn:li:share e urn:li:activity
         const key = normalizeLinkedInUrl(url);
-        console.log(`[enrich] pipeline doc=${doc.id} linkedinPostUrl="${url}" normalized="${key}"`);
+        console.log(`[enrich] pipeline doc=${doc.id} linkedinPostUrl="${url}" normalized="${key}" publishedAt="${publishedAt}"`);
         if (key) urlMap[key] = entry;
       } else {
-        console.log(`[enrich] pipeline doc=${doc.id} sem linkedinPostUrl`);
+        console.log(`[enrich] pipeline doc=${doc.id} sem linkedinPostUrl publishedAt="${publishedAt}"`);
       }
 
-      // Sempre indexa por data também — fallback quando urn:li:activity (XLSX) ≠ urn:li:share (API)
-      // Os dois tipos têm IDs numéricos diferentes para o mesmo post, então o URL match pode falhar.
-      // O fallback por data é o único mecanismo confiável nesses casos.
-      const publishedAt = d.publishedAt as string | undefined;
+      // Sempre indexa por data também (mesmo que tenha URL) — o URL match falha entre
+      // urn:li:activity (XLSX) e urn:li:share (API) pois os IDs numéricos diferem.
       if (publishedAt && publishedAt.startsWith(mesAno)) {
         const dayKey = publishedAt.substring(0, 10);
-        console.log(`[enrich] pipeline doc=${doc.id} publishedAt=${publishedAt} → dateMap[${dayKey}]`);
+        console.log(`[enrich] pipeline doc=${doc.id} → dateMap[${dayKey}]`);
         if (!dateMap[dayKey]) dateMap[dayKey] = [];
         dateMap[dayKey].push(entry);
       } else {
         console.log(`[enrich] pipeline doc=${doc.id} publishedAt="${publishedAt}" fora do mesAno=${mesAno}`);
       }
+    }
+
+    // Ordenar cada bucket do dateMap por publishedAt crescente (primeiro post do dia primeiro).
+    // Isso torna o desempate posicional determinístico.
+    for (const dayKey of Object.keys(dateMap)) {
+      dateMap[dayKey].sort((a, b) => (a.publishedAt ?? '').localeCompare(b.publishedAt ?? ''));
     }
 
     const topUrls = [
@@ -131,34 +140,40 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
     console.log(`[enrich] urlMap keys: ${JSON.stringify(Object.keys(urlMap))}`);
 
     // Enriquecer cada top post — prioridade: match por URL > match por data.
-    // Sempre tenta enriquecer (mesmo que já tenha caption) para garantir que
-    // format e pillar sejam preenchidos quando disponíveis no pipeline.
-    function enrichList(posts: typeof data.topPostsByEngagement) {
+    // Sempre re-enriquece (sem checar postId existente) para permitir correção de matches errados.
+    // usedPostIds é passado por referência para evitar que dois posts diferentes do mesmo dia
+    // peguem o mesmo candidato — mas é resetado entre listas independentes (eng vs imp).
+    function enrichList(
+      posts: typeof data.topPostsByEngagement,
+      usedPostIds = new Set<string>(),
+    ) {
       return (posts ?? []).map(post => {
         // 1. Match exato por ID numérico do LinkedIn
         const key = normalizeLinkedInUrl(post.url);
         const byUrl = key ? urlMap[key] : undefined;
         if (byUrl) {
           console.log(`[enrich] ✓ URL match: post.url="${post.url}" → postId=${byUrl.postId}`);
+          usedPostIds.add(byUrl.postId);
           return { ...post, ...byUrl };
         }
 
-        // 2. Fallback por data — quando urn:li:activity (XLSX) ≠ urn:li:share (API)
-        // esses dois tipos têm IDs numéricos distintos, impossibilitando URL match.
-        // Roda sempre que não temos postId (independente de caption/mediaUrl),
-        // pois o objetivo é garantir que format e pillar sejam sempre preenchidos.
-        if (!post.postId && post.date) {
+        // 2. Fallback por data — urn:li:activity (XLSX) ≠ urn:li:share (API), IDs distintos.
+        // Quando há múltiplos candidatos no mesmo dia, usa o primeiro ainda não utilizado
+        // (candidatos já ordenados por publishedAt crescente → primeiro = mais cedo no dia).
+        if (post.date) {
           const candidates = dateMap[post.date];
-          if (candidates?.length === 1) {
-            console.log(`[enrich] ✓ date match (único): post.date="${post.date}" → postId=${candidates[0].postId}`);
-            return { ...post, ...candidates[0] };
+          if (candidates?.length) {
+            const available = candidates.filter(c => !usedPostIds.has(c.postId));
+            if (available.length) {
+              const chosen = available[0];
+              usedPostIds.add(chosen.postId);
+              console.log(`[enrich] ✓ date match${candidates.length > 1 ? ` (${available.length}/${candidates.length} disponíveis)` : ''}: post.date="${post.date}" → postId=${chosen.postId}`);
+              return { ...post, ...chosen };
+            }
+            console.log(`[enrich] ✗ date match: post.date="${post.date}" todos os ${candidates.length} candidatos já foram usados`);
+          } else {
+            console.log(`[enrich] ✗ sem match: post.url="${post.url}" date="${post.date}" — nenhum candidato no dateMap`);
           }
-          if (candidates && candidates.length > 1) {
-            // Múltiplos posts no mesmo dia — pega o primeiro (melhor esforço)
-            console.log(`[enrich] ~ date match (ambíguo, pegando primeiro): post.date="${post.date}" tem ${candidates.length} candidatos → postId=${candidates[0].postId}`);
-            return { ...post, ...candidates[0] };
-          }
-          console.log(`[enrich] ✗ sem match: post.url="${post.url}" date="${post.date}" — nenhum candidato`);
         }
 
         return post;
