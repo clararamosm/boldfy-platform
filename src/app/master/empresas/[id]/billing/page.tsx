@@ -37,7 +37,6 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -146,8 +145,6 @@ export default function MasterCompanyBillingPage() {
   const [tlOutsideExecutives, setTlOutsideExecutives] = useState<number>(1);
   const [tlOutsideFrequency, setTlOutsideFrequency] = useState<2 | 3 | 4>(2);
 
-  // Form state — Notas
-  const [notes, setNotes] = useState('');
 
   // Activity log state — carregado independente do billing pra nao travar pagina
   const [logEntries, setLogEntries] = useState<ActivityLogEntry[]>([]);
@@ -226,7 +223,6 @@ export default function MasterCompanyBillingPage() {
         }
 
         setBilling(res.data);
-        setNotes(res.data.notes ?? '');
 
         // Hidrata Plano Platform
         const trialDur = res.data.platform.trialDurationDays;
@@ -579,7 +575,6 @@ export default function MasterCompanyBillingPage() {
           ? (tlOutsideExecutives as 1 | 2 | 3 | 4 | 5)
           : undefined,
         tlFrequency: tlOutsideEnabled ? tlOutsideFrequency : undefined,
-        notes: notes || undefined,
       });
       if (!res.success || !res.data) {
         toast({
@@ -1050,15 +1045,7 @@ export default function MasterCompanyBillingPage() {
 
         {/* Card 5: Plano Thought Leader (cobrado fora da plataforma) */}
         <Card>
-          <CardHeader>
-            <CardTitle>Plano Thought Leader</CardTitle>
-            <CardDescription>
-              Use quando a empresa paga o modulo TL por fora da Boldfy (contrato direto,
-              sem Stripe). O modulo fica ativo, os TLs tem acesso, e nada e cobrado pela
-              plataforma.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 pt-6">
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <Label htmlFor="tlOutsideEnabled" className="text-base">
@@ -1118,53 +1105,33 @@ export default function MasterCompanyBillingPage() {
             </section>
 
             {/* Secao: Design (placeholder — nao tem card dedicado ainda alem do status) */}
-            <section id="design" className="scroll-mt-20">
+            <section id="design" className="scroll-mt-20 space-y-6">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">Design</h2>
+                <Badge variant="outline" className="gap-1 text-[11px] font-normal">
+                  <Construction className="h-3 w-3" />
+                  Em construcao
+                </Badge>
+              </div>
+
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    Design
-                    <Badge variant="outline" className="gap-1 text-[11px] font-normal">
-                      <Construction className="h-3 w-3" />
-                      Em construcao
-                    </Badge>
-                  </CardTitle>
-                  <CardDescription>
-                    Pack selector dedicado para o modulo Design.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   <p className="text-sm text-muted-foreground">
-                    Por enquanto, o status do Design aparece no card &quot;Status dos Modulos&quot;
-                    acima. Configuracao de pack via Stripe direto.
+                    Pack selector dedicado para o modulo Design. Por enquanto, o status do
+                    Design aparece no card &quot;Status dos Modulos&quot; acima. Configuracao de
+                    pack via Stripe direto.
                   </p>
                 </CardContent>
               </Card>
             </section>
 
-        {/* Notas internas + botao unico Salvar */}
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notas internas (apenas Master)</Label>
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ex: Contrato direto, TL cobrado externamente."
-                maxLength={1000}
-                disabled={isSaving}
-                rows={3}
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <Button onClick={handleSaveAll} disabled={isSaving}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar alteracoes
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Botao global Salvar — fora de qualquer card para deixar claro que salva a pagina toda */}
+        <div className="flex justify-end">
+          <Button onClick={handleSaveAll} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar alteracoes
+          </Button>
+        </div>
 
         <p className="text-xs text-muted-foreground text-center">
           Todas as mudancas sao logadas no Firestore com o UID do master que executou.
