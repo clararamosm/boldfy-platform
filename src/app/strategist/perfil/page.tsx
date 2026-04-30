@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/dashboard/header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,15 +14,36 @@ import {
   publishProfile,
   resetProfile,
 } from '@/app/actions/profile-optimizer';
-import { ProfileEditor } from '@/components/profile-optimizer/profile-editor';
 import { ProfilePreview } from '@/components/profile-optimizer/profile-preview';
+import { ProfileEditablePreview } from '@/components/profile-optimizer/profile-editable-preview';
 import { AlignmentScoreBadge } from '@/components/profile-optimizer/alignment-score-badge';
 import type {
   LinkedInProfileOptimization,
   LinkedInProfileSuggestions,
+  LinkedInProfileCurrent,
 } from '@/lib/linkedin-analytics-types';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+// ---------------------------------------------------------------------------
+// Helper — converter current para formato de preview read-only
+// ---------------------------------------------------------------------------
+
+function currentToPreview(current: LinkedInProfileCurrent): LinkedInProfileSuggestions {
+  return {
+    headline: current.headline,
+    about: current.about,
+    topSkills: current.topSkills,
+    experiences: current.experiences.map((e) => ({ ...e, action: 'keep' as const })),
+    featuredItems: current.featuredItems.map((f) => ({ ...f, action: 'keep' as const, rationale: '' })),
+    semanticAlignment: { score: 0, passesAudit: false, issues: [] },
+    editedAt: '',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Página raiz — resolve slugs e delega para o editor
+// ---------------------------------------------------------------------------
 
 export default function StrategistPerfilPage() {
   const searchParams = useSearchParams();
@@ -34,7 +55,6 @@ export default function StrategistPerfilPage() {
   const [tlAvatarUrl, setTlAvatarUrl] = useState<string | undefined>();
   const [isResolving, setIsResolving] = useState(false);
 
-  // Resolver slug → ID
   useEffect(() => {
     if (!companySlug || !tlSlug) { setTlId(null); return; }
     const resolve = async () => {
@@ -43,8 +63,10 @@ export default function StrategistPerfilPage() {
         const token = await getAuthToken();
         const { resolveSlugs } = await import('@/app/actions/content-pipeline');
         const result = await resolveSlugs(token, companySlug, tlSlug);
-        if (result.tlId) { setTlId(result.tlId); setTlName(result.tlName ?? ''); }
-        else setTlId(null);
+        if (result.tlId) {
+          setTlId(result.tlId);
+          setTlName(result.tlName ?? '');
+        } else setTlId(null);
       } catch { setTlId(null); }
       finally { setIsResolving(false); }
     };
@@ -58,9 +80,9 @@ export default function StrategistPerfilPage() {
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <Card>
             <CardContent className="py-14 text-center">
-              <User className="h-12 w-12 mx-auto text-muted-foreground/40 mb-3" />
+              <User className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">
-                Selecione um perfil no menu lateral para otimizar.
+                Selecione um Thought Leader para otimizar o perfil.
               </p>
             </CardContent>
           </Card>
@@ -69,27 +91,14 @@ export default function StrategistPerfilPage() {
     );
   }
 
-  if (isResolving || (!tlId && tlSlug)) {
+  if (isResolving || !tlId) {
     return (
       <>
         <Header title="Otimizador de Perfil" />
         <main className="flex-1 overflow-auto p-4 md:p-6 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </main>
-      </>
-    );
-  }
-
-  if (!tlId) {
-    return (
-      <>
-        <Header title="Otimizador de Perfil" />
-        <main className="flex-1 overflow-auto p-4 md:p-6">
-          <Card>
-            <CardContent className="py-14 text-center">
-              <p className="text-sm text-muted-foreground">Perfil não encontrado.</p>
-            </CardContent>
-          </Card>
+          {isResolving
+            ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            : <p className="text-sm text-muted-foreground">Thought Leader não encontrado.</p>}
         </main>
       </>
     );
@@ -97,15 +106,15 @@ export default function StrategistPerfilPage() {
 
   return (
     <>
-      <Header title={`Perfil${tlName ? ` — ${tlName}` : ''}`} />
-      <main className="flex-1 overflow-auto p-4 md:p-6">
-        <ProfileOptimizerEditor tlId={tlId} tlName={tlName} tlAvatarUrl={tlAvatarUrl} />
-      </main>
+      <Header title="Otimizador de Perfil" />
+      <ProfileOptimizerEditor tlId={tlId} tlName={tlName} tlAvatarUrl={tlAvatarUrl} />
     </>
   );
 }
 
-// ── Editor principal ─────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Editor principal
+// ---------------------------------------------------------------------------
 
 function ProfileOptimizerEditor({
   tlId,
@@ -125,35 +134,43 @@ function ProfileOptimizerEditor({
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [editedSuggestions, setEditedSuggestions] = useState<LinkedInProfileSuggestions | null>(null);
-  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | undefined>();
-  const [profileBannerUrl, setProfileBannerUrl] = useState<string | undefined>();
-
-  // Arquivo de print pendente (para enviar junto com o PDF)
   const [pendingScreenshot, setPendingScreenshot] = useState<File | null>(null);
 
-  // Polling durante 'processing'
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  // Fotos do perfil (URLs do Storage — para passar para o preview)
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
+  const [profileBannerUrl, setProfileBannerUrl] = useState<string | null>(null);
 
-  const fetchProfile = useCallback(async () => {
-    const token = await getAuthToken();
-    const result = await getLinkedInProfile(token, tlId);
-    if (result.profile) {
-      setProfile(result.profile);
-      if (result.profile.avatarUrl) setProfileAvatarUrl(result.profile.avatarUrl);
-      if (result.profile.bannerUrl) setProfileBannerUrl(result.profile.bannerUrl);
-      // Inicializar editedSuggestions com edited (se existir) ou suggestions
-      if (result.profile.edited) setEditedSuggestions(result.profile.edited);
-      else if (result.profile.suggestions) setEditedSuggestions(result.profile.suggestions);
+  // Estado local de edição (sincronizado com profile.edited)
+  const [editedSuggestions, setEditedSuggestions] = useState<LinkedInProfileSuggestions | null>(null);
+
+  // Polling ref
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Fetch ────────────────────────────────────────────────────────────────
+
+  async function fetchProfile() {
+    try {
+      const token = await getAuthToken();
+      const result = await getLinkedInProfile(token, tlId);
+      if (result.profile) {
+        setProfile(result.profile);
+        setProfileAvatarUrl(result.profile.avatarUrl ?? null);
+        setProfileBannerUrl(result.profile.bannerUrl ?? null);
+        if (result.profile.edited) {
+          setEditedSuggestions(result.profile.edited);
+        }
+      }
+    } catch (err) {
+      toast({ variant: 'destructive', description: 'Erro ao carregar perfil.' });
     }
-  }, [tlId]);
+  }
 
   useEffect(() => {
     setLoading(true);
     fetchProfile().finally(() => setLoading(false));
   }, [tlId]);
 
-  // Polling quando status = processing
+  // Polling durante status=processing
   useEffect(() => {
     if (profile?.status === 'processing') {
       pollingRef.current = setInterval(async () => {
@@ -161,16 +178,21 @@ function ProfileOptimizerEditor({
         const result = await getLinkedInProfile(token, tlId);
         if (result.profile && result.profile.status !== 'processing') {
           setProfile(result.profile);
+          setProfileAvatarUrl(result.profile.avatarUrl ?? null);
+          setProfileBannerUrl(result.profile.bannerUrl ?? null);
           if (result.profile.edited) setEditedSuggestions(result.profile.edited);
-          else if (result.profile.suggestions) setEditedSuggestions(result.profile.suggestions);
           if (pollingRef.current) clearInterval(pollingRef.current);
         }
       }, 3000);
+    } else {
+      if (pollingRef.current) clearInterval(pollingRef.current);
     }
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [profile?.status, tlId]);
 
-  async function handleUpload(pdfFile: File, screenshotFile: File | null, additionalContext: string) {
+  // ── Upload ───────────────────────────────────────────────────────────────
+
+  async function handleUpload(pdfFile: File, screenshotFile: File | null) {
     if (!pdfFile || pdfFile.type !== 'application/pdf') {
       toast({ variant: 'destructive', description: 'Envie um arquivo PDF.' });
       return;
@@ -185,7 +207,6 @@ function ProfileOptimizerEditor({
       const pdfBuffer = await pdfFile.arrayBuffer();
       const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
 
-      // Converter print para base64 se existir
       let screenshotBase64: string | undefined;
       let screenshotMimeType: string | undefined;
       if (screenshotFile) {
@@ -195,28 +216,12 @@ function ProfileOptimizerEditor({
       }
 
       const token = await getAuthToken();
-      const result = await uploadProfilePdf(
-        token,
-        tlId,
-        pdfBase64,
-        screenshotBase64,
-        screenshotMimeType,
-        additionalContext.trim() || undefined,
-      );
+      const result = await uploadProfilePdf(token, tlId, pdfBase64, screenshotBase64, screenshotMimeType);
       if (result.error) throw new Error(result.error);
 
-      toast({ description: screenshotFile
-        ? 'PDF + print enviados! Processando perfil...'
-        : 'PDF enviado! Processando perfil...' });
-
-      setProfile({
-        current: null,
-        suggestions: null,
-        edited: null,
-        editedAt: null,
-        status: 'processing',
-        publishedAt: null,
-      });
+      toast({ description: screenshotFile ? 'PDF + print enviados!' : 'PDF enviado! Lendo perfil...' });
+      setEditedSuggestions(null);
+      setProfile({ current: null, suggestions: null, edited: null, editedAt: null, status: 'processing', publishedAt: null });
       setPendingScreenshot(null);
     } catch (err) {
       toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao enviar.' });
@@ -226,6 +231,8 @@ function ProfileOptimizerEditor({
     }
   }
 
+  // ── Salvar ───────────────────────────────────────────────────────────────
+
   async function handleSave() {
     if (!editedSuggestions) return;
     setSaving(true);
@@ -233,7 +240,7 @@ function ProfileOptimizerEditor({
       const token = await getAuthToken();
       const result = await saveProfileEdits(token, tlId, editedSuggestions);
       if (result.error) throw new Error(result.error);
-      toast({ description: 'Edições salvas!' });
+      toast({ description: 'Rascunho salvo!' });
     } catch (err) {
       toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao salvar.' });
     } finally {
@@ -241,17 +248,30 @@ function ProfileOptimizerEditor({
     }
   }
 
+  // ── Publicar ─────────────────────────────────────────────────────────────
+
   async function handlePublish() {
+    if (saving) return;
+    // Salva primeiro, depois publica
+    if (editedSuggestions) {
+      setSaving(true);
+      try {
+        const token = await getAuthToken();
+        await saveProfileEdits(token, tlId, editedSuggestions);
+      } catch {
+        toast({ variant: 'destructive', description: 'Erro ao salvar antes de publicar.' });
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+
     setPublishing(true);
     try {
       const token = await getAuthToken();
-      // Salvar edições antes de publicar
-      if (editedSuggestions) {
-        await saveProfileEdits(token, tlId, editedSuggestions);
-      }
       const result = await publishProfile(token, tlId);
       if (result.error) throw new Error(result.error);
-      toast({ description: 'Perfil publicado para o TL! ✓' });
+      toast({ description: 'Perfil publicado para o Thought Leader!' });
       await fetchProfile();
     } catch (err) {
       toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao publicar.' });
@@ -260,19 +280,19 @@ function ProfileOptimizerEditor({
     }
   }
 
+  // ── Reset ─────────────────────────────────────────────────────────────────
+
   async function handleReset() {
-    if (!confirm('Tem certeza? Isso apagará todos os dados do perfil e você precisará fazer um novo upload.')) return;
     setResetting(true);
     try {
       const token = await getAuthToken();
       const result = await resetProfile(token, tlId);
       if (result.error) throw new Error(result.error);
-      toast({ description: 'Perfil resetado. Faça um novo upload para começar.' });
       setProfile({ current: null, suggestions: null, edited: null, editedAt: null, status: 'empty', publishedAt: null });
       setEditedSuggestions(null);
-      setProfileAvatarUrl(undefined);
-      setProfileBannerUrl(undefined);
-      setPendingScreenshot(null);
+      setProfileAvatarUrl(null);
+      setProfileBannerUrl(null);
+      toast({ description: 'Perfil resetado.' });
     } catch (err) {
       toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao resetar.' });
     } finally {
@@ -280,37 +300,130 @@ function ProfileOptimizerEditor({
     }
   }
 
-  // ── Render ──
+  // ── Loading ───────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <main className="flex-1 overflow-auto p-4 md:p-6 flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      </main>
     );
   }
 
-  // Estado de erro
-  if (profile?.status === 'error') {
+  // ── Estado vazio ──────────────────────────────────────────────────────────
+
+  if (!profile || profile.status === 'empty') {
     return (
-      <div className="max-w-xl mx-auto mt-8">
-        <Card>
-          <CardContent className="py-12 flex flex-col items-center text-center gap-5">
-            <div className="h-16 w-16 rounded-full bg-red-50 flex items-center justify-center">
-              <Upload className="h-8 w-8 text-red-500" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold mb-1 text-red-600">Erro no processamento</h2>
-              <p className="text-sm text-muted-foreground max-w-sm mb-2">
-                Ocorreu um erro ao analisar o PDF. Verifique os logs do servidor.
+      <main className="flex-1 overflow-auto p-4 md:p-6">
+        <div className="max-w-sm mx-auto mt-12 flex flex-col items-center gap-6">
+          <div className="h-16 w-16 rounded-full bg-violet-50 flex items-center justify-center">
+            <User className="h-8 w-8 text-violet-400" />
+          </div>
+          <div className="text-center">
+            <h2 className="text-lg font-semibold mb-1">Enviar PDF do perfil</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Exporte o perfil do LinkedIn como PDF e envie aqui. O sistema lê o perfil e prepara os campos para edição.
+            </p>
+            <a
+              href="https://www.linkedin.com/help/linkedin/answer/4281"
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-violet-600 hover:underline block mb-6"
+            >
+              Como exportar o PDF no LinkedIn →
+            </a>
+          </div>
+          <UploadForm
+            screenshotInputRef={screenshotInputRef}
+            pendingScreenshot={pendingScreenshot}
+            onPendingScreenshot={setPendingScreenshot}
+            onUpload={handleUpload}
+            uploading={uploading}
+          />
+        </div>
+      </main>
+    );
+  }
+
+  // ── Estado de processamento ────────────────────────────────────────────────
+
+  if (profile.status === 'processing') {
+    return (
+      <main className="flex-1 overflow-auto p-4 md:p-6 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-violet-500 mx-auto" />
+          <p className="text-sm font-medium text-gray-700">Lendo o perfil...</p>
+          <p className="text-xs text-muted-foreground">Isso leva alguns segundos</p>
+        </div>
+      </main>
+    );
+  }
+
+  // ── Estado de erro ────────────────────────────────────────────────────────
+
+  if (profile.status === 'error') {
+    return (
+      <main className="flex-1 overflow-auto p-4 md:p-6">
+        <div className="max-w-sm mx-auto mt-12 flex flex-col items-center gap-4">
+          <div className="text-center">
+            <h2 className="text-lg font-semibold mb-1 text-red-600">Erro ao processar</h2>
+            {profile.errorMessage && (
+              <p className="text-xs text-muted-foreground bg-red-50 border border-red-200 rounded p-2 mt-2">
+                {profile.errorMessage}
               </p>
-              {profile.errorMessage && (
-                <p className="text-xs font-mono bg-red-50 text-red-700 rounded p-2 max-w-sm text-left break-all">
-                  {profile.errorMessage}
-                </p>
-              )}
-            </div>
-            <UploadForm
+            )}
+          </div>
+          <UploadForm
+            screenshotInputRef={screenshotInputRef}
+            pendingScreenshot={pendingScreenshot}
+            onPendingScreenshot={setPendingScreenshot}
+            onUpload={handleUpload}
+            uploading={uploading}
+          />
+          <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={handleReset} disabled={resetting}>
+            {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            Começar de novo
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  // ── Estado ready / published ──────────────────────────────────────────────
+
+  const currentPreview = profile.current ? currentToPreview(profile.current) : null;
+  const activeEdited = editedSuggestions;
+
+  return (
+    <main className="flex-1 overflow-auto p-4 md:p-6">
+      <div className="max-w-6xl mx-auto space-y-4">
+
+        {/* Barra de ações */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleSave} disabled={saving || !editedSuggestions}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+            {saving ? 'Salvando...' : 'Salvar rascunho'}
+          </Button>
+
+          <Button
+            size="sm"
+            className="gap-2 bg-violet-600 hover:bg-violet-700"
+            onClick={handlePublish}
+            disabled={publishing || saving || !editedSuggestions}
+          >
+            {publishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            {publishing ? 'Publicando...' : profile.status === 'published' ? 'Republicar' : 'Publicar para TL'}
+          </Button>
+
+          {profile.status === 'published' && (
+            <span className="flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+              <CheckCircle2 className="h-3 w-3" />
+              Publicado
+            </span>
+          )}
+
+          <div className="ml-auto flex items-center gap-2">
+            <ReUploadButton
               screenshotInputRef={screenshotInputRef}
               pendingScreenshot={pendingScreenshot}
               onPendingScreenshot={setPendingScreenshot}
@@ -319,205 +432,82 @@ function ProfileOptimizerEditor({
             />
             <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={handleReset} disabled={resetting}>
               {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-              Começar de novo
+              Resetar
             </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Estado vazio
-  if (!profile || profile.status === 'empty') {
-    return (
-      <div className="max-w-xl mx-auto mt-8">
-        <Card>
-          <CardContent className="py-12 flex flex-col items-center text-center gap-5">
-            <div className="h-16 w-16 rounded-full bg-violet-50 flex items-center justify-center">
-              <Upload className="h-8 w-8 text-violet-600" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold mb-1">Enviar PDF do Perfil</h2>
-              <p className="text-sm text-muted-foreground max-w-sm">
-                Exporte o perfil do LinkedIn do TL como PDF e envie aqui.
-                Opcionalmente, anexe também um print do perfil (do topo até o Destaque)
-                para que a IA extraia as competências fixadas e os cards de destaque com mais precisão.
-              </p>
-              <a
-                href="https://www.linkedin.com/in/"
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs text-violet-600 hover:underline block mt-2"
-              >
-                Como exportar o PDF no LinkedIn →
-              </a>
-            </div>
-            <UploadForm
-              screenshotInputRef={screenshotInputRef}
-              pendingScreenshot={pendingScreenshot}
-              onPendingScreenshot={setPendingScreenshot}
-              onUpload={handleUpload}
-              uploading={uploading}
-            />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Estado processing
-  if (profile.status === 'processing') {
-    return (
-      <div className="max-w-xl mx-auto mt-8">
-        <Card>
-          <CardContent className="py-12 flex flex-col items-center text-center gap-5">
-            <Loader2 className="h-12 w-12 animate-spin text-violet-600" />
-            <div>
-              <h2 className="text-lg font-semibold mb-1">Analisando perfil...</h2>
-              <p className="text-sm text-muted-foreground">
-                A IA está lendo o PDF, verificando o Brand Context e gerando sugestões de otimização.
-                Isso pode levar até 1 minuto.
-              </p>
-            </div>
-            <div className="space-y-2 text-sm text-muted-foreground w-full max-w-xs text-left">
-              {[
-                'PDF recebido',
-                'Extraindo perfil atual...',
-                'Lendo Brand Context e pilares...',
-                'Gerando sugestões de otimização...',
-                'Calculando score 360Brew...',
-              ].map((step, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  {i === 0 ? (
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                  ) : (
-                    <Loader2 className="h-4 w-4 animate-spin text-violet-400 shrink-0" />
-                  )}
-                  <span>{step}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Estado ready / published
-  const activeSuggestions = editedSuggestions || profile.suggestions;
-  const aiSuggestions = profile.suggestions!;
-
-  return (
-    <div className="space-y-4">
-      {/* Barra de ações */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          {profile.status === 'published' && (
-            <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
-              <CheckCircle2 className="h-4 w-4" />
-              Publicado para o TL
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Começar de novo */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-muted-foreground hover:text-destructive"
-            onClick={handleReset}
-            disabled={resetting}
-            title="Apaga todos os dados e permite um novo upload"
-          >
-            {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-            Começar de novo
-          </Button>
-          {/* Re-upload — botão que abre o formulário inline */}
-          <ReUploadButton
-            screenshotInputRef={screenshotInputRef}
-            pendingScreenshot={pendingScreenshot}
-            onPendingScreenshot={setPendingScreenshot}
-            onUpload={handleUpload}
-            uploading={uploading}
-          />
-          {/* Salvar rascunho */}
-          <Button variant="outline" size="sm" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            {saving ? 'Salvando...' : 'Salvar rascunho'}
-          </Button>
-          {/* Publicar */}
-          <Button size="sm" className="gap-2" onClick={handlePublish} disabled={publishing}>
-            {publishing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Send className="h-3.5 w-3.5" />
-            )}
-            {publishing ? 'Publicando...' : 'Publicar para TL'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Score antes/depois (só quando currentAlignment disponível) */}
-      {profile.currentAlignment && activeSuggestions?.semanticAlignment && (
-        <div className="rounded-lg border bg-gray-50 p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-            Score 360Brew — Antes vs. Depois
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Perfil atual</p>
-              <AlignmentScoreBadge alignment={profile.currentAlignment} showIssues={false} compact />
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-violet-600 font-medium">Perfil otimizado</p>
-              <AlignmentScoreBadge alignment={activeSuggestions.semanticAlignment} showIssues={false} compact />
-            </div>
           </div>
         </div>
-      )}
 
-      {/* Layout split: editor + preview */}
-      {activeSuggestions && (
+        {/* Comparativo lado a lado */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Editor */}
+
+          {/* ANTES — read-only */}
           <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Editor</h2>
-            <ProfileEditor
-              initial={activeSuggestions}
-              aiSuggestions={aiSuggestions}
-              currentProfile={profile.current}
-              tlUserId={tlId}
-              onChange={setEditedSuggestions}
-              onAvatarUrl={setProfileAvatarUrl}
-              onBannerUrl={setProfileBannerUrl}
-              existingAvatarUrl={profileAvatarUrl}
-              existingBannerUrl={profileBannerUrl}
-            />
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Antes</span>
+              <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">Perfil atual</span>
+              {profile.currentAlignment && (
+                <AlignmentScoreBadge alignment={profile.currentAlignment} showIssues={false} compact />
+              )}
+            </div>
+            {currentPreview ? (
+              <div className="opacity-80 grayscale">
+                <ProfilePreview
+                  suggestions={currentPreview}
+                  tlName={tlName}
+                  tlAvatarUrl={tlAvatarUrl}
+                  profileAvatarUrl={profileAvatarUrl ?? undefined}
+                  profileBannerUrl={profileBannerUrl ?? undefined}
+                  readOnly={true}
+                  variant="before"
+                />
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed bg-gray-50 p-8 text-center text-sm text-muted-foreground">
+                Perfil original não disponível
+              </div>
+            )}
           </div>
 
-          {/* Preview */}
-          <div className="space-y-2 sticky top-4">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Preview</h2>
-            <ProfilePreview
-              suggestions={activeSuggestions}
-              tlName={tlName}
-              tlAvatarUrl={tlAvatarUrl}
-              profileAvatarUrl={profileAvatarUrl}
-              profileBannerUrl={profileBannerUrl}
-              readOnly={false}
-            />
+          {/* DEPOIS — editável */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-violet-600 uppercase tracking-wide">Depois</span>
+              <span className="text-xs bg-violet-50 text-violet-700 border border-violet-200 rounded-full px-2 py-0.5">
+                Editável
+              </span>
+              {(activeEdited?.semanticAlignment?.score ?? 0) > 0 && activeEdited?.semanticAlignment && (
+                <AlignmentScoreBadge alignment={activeEdited.semanticAlignment} showIssues={false} compact />
+              )}
+            </div>
+            {activeEdited ? (
+              <ProfileEditablePreview
+                data={activeEdited}
+                tlName={tlName}
+                tlUserId={tlId}
+                tlAvatarUrl={tlAvatarUrl}
+                profileAvatarUrl={profileAvatarUrl}
+                profileBannerUrl={profileBannerUrl}
+                onChange={setEditedSuggestions}
+                onAvatarUrl={setProfileAvatarUrl}
+                onBannerUrl={setProfileBannerUrl}
+              />
+            ) : (
+              <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 p-8 text-center text-sm text-muted-foreground">
+                Aguardando leitura do perfil...
+              </div>
+            )}
           </div>
         </div>
-      )}
-    </div>
+      </div>
+    </main>
   );
 }
 
-// ── Tipos compartilhados dos formulários de upload ────────────────────────────
+// ---------------------------------------------------------------------------
+// UploadForm — PDF + print opcional
+// ---------------------------------------------------------------------------
 
-type UploadHandler = (pdf: File, screenshot: File | null, context: string) => void;
-
-// ── Componente de upload unificado PDF + print + contexto ─────────────────────
+type UploadHandler = (pdf: File, screenshot: File | null) => void;
 
 function UploadForm({
   screenshotInputRef,
@@ -534,11 +524,10 @@ function UploadForm({
 }) {
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const [pendingPdf, setPendingPdf] = useState<File | null>(null);
-  const [context, setContext] = useState('');
 
   return (
     <div className="w-full max-w-sm space-y-3">
-      {/* PDF — obrigatório */}
+      {/* PDF */}
       <div>
         <input
           ref={pdfInputRef}
@@ -593,47 +582,27 @@ function UploadForm({
         </button>
       </div>
 
-      {/* Contexto adicional — opcional */}
-      <div>
-        <textarea
-          value={context}
-          onChange={(e) => setContext(e.target.value)}
-          disabled={uploading}
-          placeholder="Contexto adicional (opcional) — ex: &quot;Clara é conhecida por Branding e tem podcast semanal&quot;"
-          rows={3}
-          className={cn(
-            'w-full text-xs border rounded-lg px-3 py-2 resize-none transition-colors placeholder:text-muted-foreground/60',
-            'border-gray-200 hover:border-violet-300 focus:border-violet-400 focus:outline-none bg-gray-50',
-            uploading && 'opacity-50 cursor-not-allowed',
-          )}
-        />
-        <p className="text-[11px] text-muted-foreground mt-0.5">
-          A IA usa isso para não remover competências e temas pelos quais o TL é reconhecido.
-        </p>
-      </div>
-
-      {/* Botão de envio — só aparece com PDF selecionado */}
+      {/* Botão de envio */}
       {pendingPdf && !uploading && (
-        <Button
-          onClick={() => onUpload(pendingPdf, pendingScreenshot, context)}
-          className="w-full gap-2"
-        >
+        <Button onClick={() => onUpload(pendingPdf, pendingScreenshot)} className="w-full gap-2">
           <Upload className="h-4 w-4" />
-          {pendingScreenshot ? 'Analisar PDF + print' : 'Analisar PDF'}
+          {pendingScreenshot ? 'Enviar PDF + print' : 'Enviar PDF'}
         </Button>
       )}
 
       {uploading && (
         <div className="flex items-center justify-center gap-2 text-sm text-violet-600 py-1">
           <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Enviando e processando...</span>
+          <span>Enviando e lendo perfil...</span>
         </div>
       )}
     </div>
   );
 }
 
-// ── Botão de re-upload (modo ready/published) — abre formulário inline ────────
+// ---------------------------------------------------------------------------
+// ReUploadButton — dropdown no modo ready/published
+// ---------------------------------------------------------------------------
 
 function ReUploadButton({
   screenshotInputRef,
@@ -659,11 +628,7 @@ function ReUploadButton({
         onClick={() => setOpen((v) => !v)}
         disabled={uploading}
       >
-        {uploading ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        ) : (
-          <RotateCcw className="h-3.5 w-3.5" />
-        )}
+        {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
         Re-enviar PDF
         {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </Button>
@@ -674,7 +639,7 @@ function ReUploadButton({
             screenshotInputRef={screenshotInputRef}
             pendingScreenshot={pendingScreenshot}
             onPendingScreenshot={onPendingScreenshot}
-            onUpload={(pdf, ss, ctx) => { onUpload(pdf, ss, ctx); setOpen(false); }}
+            onUpload={(pdf, ss) => { onUpload(pdf, ss); setOpen(false); }}
             uploading={uploading}
           />
         </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { Header } from '@/components/dashboard/header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Sparkles, CheckSquare } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInProfile } from '@/app/actions/profile-optimizer';
 import { ProfilePreview } from '@/components/profile-optimizer/profile-preview';
@@ -33,16 +33,8 @@ function currentToSuggestions(current: LinkedInProfileCurrent): LinkedInProfileS
       rationale: '',
     })),
     semanticAlignment: { score: 0, passesAudit: false, issues: [] },
-    gapAnalysis: '',
-    generatedAt: '',
+    editedAt: '',
   };
-}
-
-function parseGapAnalysis(text: string): string[] {
-  if (!text) return [];
-  const numbered = text.split(/\n?\d+\.\s+/).filter(Boolean);
-  if (numbered.length > 1) return numbered.map((s) => s.trim());
-  return text.split(/\n{1,2}/).map((s) => s.trim()).filter(Boolean);
 }
 
 export default function ThoughtLeaderPerfilPage() {
@@ -106,8 +98,7 @@ export default function ThoughtLeaderPerfilPage() {
     );
   }
 
-  const activeSuggestions: LinkedInProfileSuggestions = (profile.edited || profile.suggestions)!;
-  const gapItems = parseGapAnalysis(activeSuggestions.gapAnalysis);
+  const activeSuggestions: LinkedInProfileSuggestions = profile.edited!;
 
   return (
     <>
@@ -119,13 +110,13 @@ export default function ThoughtLeaderPerfilPage() {
           <div className="rounded-lg bg-violet-50 border border-violet-200 p-4 text-sm text-violet-800">
             <p className="font-semibold mb-1">Como usar este guia</p>
             <p>
-              Veja abaixo como era seu perfil <strong>antes</strong> e como ficará <strong>depois</strong> da otimização.
+              Veja como era seu perfil <strong>antes</strong> e como ficará <strong>depois</strong> da otimização.
               Use os botões <strong>Copiar</strong> para colar cada seção diretamente no LinkedIn.
             </p>
           </div>
 
-          {/* Score antes/depois */}
-          {profile.currentAlignment && activeSuggestions.semanticAlignment && (
+          {/* Score antes/depois — só exibe quando score do depois foi gerado */}
+          {profile.currentAlignment && activeSuggestions.semanticAlignment?.score > 0 && (
             <div className="rounded-lg border bg-gray-50 p-4">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 Score 360Brew — Antes vs. Depois
@@ -197,25 +188,6 @@ export default function ThoughtLeaderPerfilPage() {
             </div>
           </div>
 
-          {/* Gap analysis em checklist */}
-          {gapItems.length > 0 && (
-            <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
-              <div className="flex items-center gap-1.5 mb-2">
-                <CheckSquare className="h-3.5 w-3.5 text-amber-700" />
-                <p className="text-sm font-semibold text-amber-800">O que foi ajustado no seu perfil</p>
-              </div>
-              <ul className="space-y-1.5">
-                {gapItems.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-amber-700">
-                    <span className="shrink-0 mt-0.5 h-4 w-4 rounded border border-amber-400 bg-white flex items-center justify-center text-amber-500 font-bold text-[10px]">
-                      {i + 1}
-                    </span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       </main>
     </>

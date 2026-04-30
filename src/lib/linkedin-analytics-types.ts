@@ -157,8 +157,8 @@ export type ProfileExperience = {
 };
 
 export type ProfileExperienceSuggestion = ProfileExperience & {
-  action: 'keep' | 'rewrite' | 'add_impact';
-  rewrittenDescription?: string; // preenchido se action !== 'keep'
+  action: 'keep' | 'rewrite';
+  rewrittenDescription?: string; // preenchido se action === 'rewrite'
 };
 
 export type ProfileFeaturedItem = {
@@ -199,18 +199,18 @@ export type LinkedInProfileCurrent = {
 };
 
 /**
- * Sugestões geradas pela IA (ou editadas pela estrategista).
- * Salva em users/{tlUserId}/linkedinProfile/current.suggestions / .edited
+ * Versão editada do perfil pela estrategista.
+ * Começa como cópia do current (extraído do PDF) e é editado manualmente.
+ * Salva em users/{tlUserId}/linkedinProfile/current.edited
  */
 export type LinkedInProfileSuggestions = {
   headline: string;
   about: string;
-  topSkills: string[];       // exatamente 5
+  topSkills: string[];
   experiences: ProfileExperienceSuggestion[];
   featuredItems: ProfileFeaturedItemSuggestion[];
   semanticAlignment: ProfileSemanticAlignment;
-  gapAnalysis: string;       // texto livre com diagnóstico de gaps
-  generatedAt: string;       // ISO timestamp
+  editedAt: string;          // ISO timestamp da última edição
 };
 
 /**

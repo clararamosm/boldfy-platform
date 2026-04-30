@@ -14,71 +14,6 @@ import type {
 } from '@/lib/linkedin-analytics-types';
 
 // ---------------------------------------------------------------------------
-// Constantes
-// ---------------------------------------------------------------------------
-
-const TRAINING_DOC = `
-# REGRAS DE OTIMIZAÇÃO — ALGORITMO 360BREW DO LINKEDIN (Boldfy 2026)
-
-## Contexto
-O algoritmo 360Brew executa uma auditoria de pré-distribuição antes de qualquer post chegar a alguém.
-O perfil é um documento de treinamento de IA que determina se o conteúdo é distribuído ou suprimido.
-
-## 1. HEADLINE
-Fórmula: [Resultado claro / Problema que resolve] | [Cargo/Papel] | [Palavras-chave do nicho/metodologia]
-- Tom: neutro focado em ação, verbos no gerúndio/infinitivo ("Ajudando", "Construindo"). Sem "eu" nem terceira pessoa.
-- Exemplos aprovados: "Ajudando empresas SaaS a aumentar a receita | Estratégia de Conteúdo e Crescimento", "Geração de demanda B2B SaaS para startups Series A-C", "I help overlooked leaders become impossible to ignore"
-- PROIBIDO: Buzzwords ("Visionário", "Inovador", "Apaixonado"), cargos isolados ("CEO", "Empreendedor"), promessas vagas ("Ajudando empresas a crescer")
-
-## 2. SEÇÃO SOBRE
-Estrutura obrigatória (nesta ordem):
-1. Statement de abertura: 1 frase de impacto sobre o problema ou ponto de vista único do TL (NÃO começa com "Eu")
-2. Apresentação: "Sou [Nome], [papel] na/na [empresa/contexto]." — 1–2 frases apresentando quem é, o que faz e onde
-3. Background e prova: experiências relevantes, números reais, empresas conhecidas — sem adjetivos vazios
-4. Pilares de conteúdo: mencionar explicitamente os 2–3 tópicos sobre os quais o TL escreve no LinkedIn
-5. CTA: 1 frase convidando o público a seguir
-
-Formatação OBRIGATÓRIA:
-- LEITURA FLUIDA: misture parágrafos curtos (1–3 linhas) com listas curtas (→ ou •) quando listar 3+ itens
-- NÃO use blocos de texto longos e carregados — máx 3–4 frases por parágrafo
-- Use \n\n entre cada bloco/parágrafo
-- Primeira pessoa em todo o texto
-- PROIBIDO: texto corrido sem respiro, narrativa vaga, buzzwords, omitir os pilares de conteúdo, começar com "Eu"
-
-## 3. COMPETÊNCIAS
-- Sempre 5 (máximo do LinkedIn)
-- Distribuição ideal: 2 competências mais amplas (reconhecimento de marca) + 3 mais nichadas (semântica de algoritmo)
-- As 3 nichadas devem espelhar diretamente os pilares de conteúdo do TL
-- As 2 amplas podem ser a área principal que a pessoa é conhecida por (ex: "Branding", "Marketing de Conteúdo")
-- Idioma: mesma língua dos posts e do ICP
-- NUNCA remover uma competência central pela qual o TL é conhecido no mercado — verifique o contexto adicional
-
-## 4. EXPERIÊNCIAS
-Estrutura: [Contexto breve] → [Ação concreta] → [Resultado em número]
-- Cargo atual: SEMPRE preencher. Vazio = gap semântico fatal.
-- Experiências antigas: enxutas, filtradas, só o que suporta o nicho atual
-- Pessoa: primeira pessoa ativa ("Liderei...", "Escalei...", "Construí...")
-- PROIBIDO: "Responsável por...", "Atuei como...", "Fui encarregado de..."
-
-## 5. DESTAQUE (Featured)
-- Padrão Boldfy: 2 itens. Item 1 = book a call (conversão). Item 2 = material rico (autoridade).
-- SEM descrição — 1 clique direto para o link.
-- Título pode ser reescrito para ser mais atrativo.
-
-## 6. GAP ANALYSIS
-- Tom: direto, diagnóstico técnico, sem rodeios — texto puro, SEM markdown (sem **, sem *, sem #)
-- Priorizar por impacto no algoritmo, não por facilidade de correção
-- Erros críticos: (1) Identity Mismatch — perfil fala de X, posts falam de Y; (2) Cargo atual em branco
-
-## 7. REGRAS GERAIS
-- SEMPRE: usar pilares de conteúdo como bússola semântica
-- SEMPRE: respeitar o contexto adicional fornecido — ele contém informações sobre como a pessoa é conhecida no mercado
-- NUNCA: buzzwords, linguagem corporativa engessada, texto genérico, inventar números
-- NUNCA: usar markdown (**, *, #) em nenhum campo de texto — apenas texto puro
-- Teste: "Isso poderia ser de qualquer outro profissional, ou é claramente desta pessoa neste nicho?"
-`;
-
-// ---------------------------------------------------------------------------
 // Helpers de acesso
 // ---------------------------------------------------------------------------
 
@@ -112,7 +47,7 @@ function profileDocRef(tlUserId: string) {
 // ---------------------------------------------------------------------------
 
 function computeAlignmentScore(
-  suggestions: Pick<LinkedInProfileSuggestions, 'headline' | 'about' | 'topSkills' | 'experiences'>,
+  profile: Pick<LinkedInProfileSuggestions, 'headline' | 'about' | 'topSkills' | 'experiences'>,
   contentPillars: string[],
 ): ProfileSemanticAlignment {
   const issues: ProfileAlignmentIssue[] = [];
@@ -126,10 +61,10 @@ function computeAlignmentScore(
   }
 
   // Critério 1 — Headline (25%)
-  const headlineHasPillar = containsPillarKeyword(suggestions.headline);
+  const headlineHasPillar = containsPillarKeyword(profile.headline);
   const headlineIsGeneric =
     /^(ceo|cto|cmo|coo|founder|fundador|empreendedor|lider|líder|diretor|gerente|manager|vp)\s*$/i.test(
-      suggestions.headline.trim(),
+      profile.headline.trim(),
     );
   if (headlineHasPillar && !headlineIsGeneric) {
     score += 25;
@@ -148,13 +83,13 @@ function computeAlignmentScore(
         description: 'Headline não reflete os pilares de conteúdo do TL',
         fix: 'Inclua termos específicos do nicho alinhados com os temas dos posts',
       });
-      score += 10; // parcial
+      score += 10;
     }
   }
 
   // Critério 2 — Sobre menciona pilares (25%)
   const aboutMentionsPillars = pillarsLower.filter((p) =>
-    suggestions.about.toLowerCase().includes(p),
+    profile.about.toLowerCase().includes(p),
   ).length;
   const pillarRatio = contentPillars.length > 0 ? aboutMentionsPillars / contentPillars.length : 0;
   if (pillarRatio >= 0.66) {
@@ -165,19 +100,19 @@ function computeAlignmentScore(
       element: 'about',
       severity: 'medium',
       description: 'Seção Sobre menciona poucos pilares de conteúdo explicitamente',
-      fix: 'Declare os 2–3 tópicos sobre os quais você escreve no LinkedIn (ex: "Aqui escrevo sobre X, Y e Z")',
+      fix: 'Declare os 2–3 tópicos sobre os quais você escreve no LinkedIn',
     });
   } else {
     issues.push({
       element: 'about',
       severity: 'high',
       description: 'Seção Sobre não menciona os pilares de conteúdo',
-      fix: 'Inclua uma linha declarando os tópicos do seu conteúdo LinkedIn — isso é obrigatório para o algoritmo',
+      fix: 'Inclua uma linha declarando os tópicos do seu conteúdo LinkedIn',
     });
   }
 
   // Critério 3 — Competências espelham pilares (25%)
-  const matchedSkills = suggestions.topSkills.filter((s) => containsPillarKeyword(s)).length;
+  const matchedSkills = profile.topSkills.filter((s) => containsPillarKeyword(s)).length;
   const skillScore = Math.round((matchedSkills / 5) * 25);
   score += skillScore;
   if (matchedSkills < 3) {
@@ -185,16 +120,17 @@ function computeAlignmentScore(
       element: 'skills',
       severity: matchedSkills < 2 ? 'high' : 'medium',
       description: `Apenas ${matchedSkills} de 5 competências estão alinhadas com os pilares de conteúdo`,
-      fix: 'Substitua competências genéricas ou fora do nicho por termos que espelham seus tópicos de conteúdo',
+      fix: 'Substitua competências genéricas por termos que espelham seus tópicos de conteúdo',
     });
   }
 
   // Critério 4 — Cargo atual preenchido (15%)
-  const currentExp = suggestions.experiences.find((e) => e.isCurrent);
-  if (currentExp && currentExp.description && currentExp.description.trim().length > 20) {
+  const currentExp = profile.experiences.find((e) => e.isCurrent);
+  const currentDesc = currentExp?.rewrittenDescription || currentExp?.description || '';
+  if (currentExp && currentDesc.trim().length > 20) {
     score += 15;
-  } else if (currentExp && (!currentExp.description || currentExp.description.trim().length <= 20)) {
-    score += 5; // tem cargo mas sem descrição
+  } else if (currentExp) {
+    score += 5;
     issues.push({
       element: 'experience',
       severity: 'high',
@@ -206,17 +142,14 @@ function computeAlignmentScore(
       element: 'experience',
       severity: 'high',
       description: 'Nenhum cargo atual identificado no perfil',
-      fix: 'Adicione um cargo atual. Se estiver em transição, use "Consultora Independente" ou "Pausa na Carreira"',
+      fix: 'Adicione um cargo atual. Se estiver em transição, use "Consultora Independente"',
     });
   }
 
   // Critério 5 — Sem dissonâncias críticas (10%)
   const highIssues = issues.filter((i) => i.severity === 'high').length;
-  const identityMismatch = highIssues >= 2;
-  if (!identityMismatch) {
+  if (highIssues < 2) {
     score += 10;
-  } else {
-    // -10% por Identity Mismatch (já está implícito por não somar)
   }
 
   const finalScore = Math.min(100, Math.max(0, score));
@@ -240,7 +173,7 @@ Não invente dados. Use exatamente o que está no texto.
 ESTRUTURA ESPERADA:
 {
   "headline": string,
-  "about": string,  // Preservar parágrafos com \n\n entre eles — NÃO juntar em um bloco
+  "about": string,  // Preservar parágrafos com \\n\\n entre eles — NÃO juntar em um bloco
   "topSkills": string[],  // máx 5, seção "Principais competências" ou "Top Skills"
   "experiences": [
     {
@@ -280,141 +213,13 @@ Retorne APENAS o JSON, sem markdown, sem explicações.`;
 }
 
 // ---------------------------------------------------------------------------
-// Geração de sugestões pela IA
-// ---------------------------------------------------------------------------
-
-async function generateSuggestions(
-  current: LinkedInProfileCurrent,
-  brandContext: Record<string, unknown>,
-  recentPostCaptions: string[],
-  bestPracticesText: string,
-  additionalContext?: string,
-): Promise<LinkedInProfileSuggestions> {
-  const contentPillars: string[] = Array.isArray(brandContext.approvedTopics)
-    ? (brandContext.approvedTopics as string[])
-    : [];
-
-  const prompt = `Você é especialista em otimização de perfil LinkedIn para fundadores e executivos B2B.
-Sua missão é otimizar o perfil abaixo para passar na auditoria do algoritmo 360Brew do LinkedIn.
-
-${TRAINING_DOC}
-
-## BOAS PRÁTICAS BOLDFY
-${bestPracticesText ? bestPracticesText.slice(0, 4000) : 'Não disponível.'}
-
-## PERFIL ATUAL DO TL
-Headline: ${current.headline}
-Sobre: ${current.about}
-Competências: ${current.topSkills.join(', ')}
-Experiências:
-${current.experiences
-  .map(
-    (e) =>
-      `- ${e.title} @ ${e.company} (${e.period})${e.isCurrent ? ' [ATUAL]' : ''}: ${e.description || 'sem descrição'}`,
-  )
-  .join('\n')}
-
-## BRAND CONTEXT
-- Público-alvo (ICP): ${brandContext.targetAudience || 'não definido'}
-- Posicionamento: ${brandContext.positioning || 'não definido'}
-- Pilares de conteúdo: ${contentPillars.join(', ') || 'não definidos'}
-- Proposta de valor: ${brandContext.valueProposition || 'não definida'}
-- Tom de voz: ${brandContext.brandVoice || 'não definido'}
-
-## POSTS RECENTES (últimos ${recentPostCaptions.length})
-${recentPostCaptions.slice(0, 12).map((c, i) => `${i + 1}. ${c.slice(0, 200)}`).join('\n')}
-${additionalContext ? `\n## CONTEXTO ADICIONAL SOBRE O TL\n${additionalContext}\n\nEste contexto deve ser respeitado integralmente — não remova competências, temas ou projetos pelos quais o TL é reconhecido no mercado.\n` : ''}
-## TAREFA
-Gere sugestões de otimização para cada seção seguindo as regras do 360Brew acima.
-- Para cada experiência: decida se 'keep' (já está ótima), 'rewrite' (precisa de reescrita) ou 'add_impact' (precisa só de números/impacto).
-- Se action for 'rewrite' ou 'add_impact', preencha rewrittenDescription.
-- Para o featured: sugira 2 itens — item 1 = book a call (placeholder de URL), item 2 = material rico relevante.
-- O gapAnalysis deve ser um diagnóstico técnico direto em português, listando os 3–5 principais gaps do perfil ATUAL (não do otimizado).
-
-Retorne um JSON válido com esta estrutura:
-{
-  "headline": string,
-  "about": string,  // OBRIGATÓRIO: separar cada parágrafo com \n\n — máx 4 parágrafos curtos
-  "topSkills": string[5],
-  "experiences": [
-    {
-      "title": string,
-      "company": string,
-      "period": string,
-      "description": string,
-      "isCurrent": boolean,
-      "action": "keep" | "rewrite" | "add_impact",
-      "rewrittenDescription": string | undefined
-    }
-  ],
-  "featuredItems": [
-    {
-      "title": string,
-      "url": string | null,
-      "imageUrl": null,
-      "action": "keep" | "replace" | "add",
-      "rationale": string
-    }
-  ],
-  "gapAnalysis": string
-}
-
-Retorne APENAS o JSON, sem markdown, sem explicações.`;
-
-  const { text } = await ai.generate(prompt);
-  const clean = text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
-  const parsed = JSON.parse(clean);
-
-  // Calcular score determinístico
-  const semanticAlignment = computeAlignmentScore(
-    {
-      headline: parsed.headline || '',
-      about: parsed.about || '',
-      topSkills: parsed.topSkills || [],
-      experiences: parsed.experiences || [],
-    },
-    contentPillars,
-  );
-
-  return {
-    headline: parsed.headline || '',
-    about: parsed.about || '',
-    topSkills: Array.isArray(parsed.topSkills) ? parsed.topSkills.slice(0, 5) : [],
-    experiences: Array.isArray(parsed.experiences) ? parsed.experiences : [],
-    featuredItems: Array.isArray(parsed.featuredItems) ? parsed.featuredItems : [],
-    semanticAlignment,
-    gapAnalysis: parsed.gapAnalysis || '',
-    generatedAt: new Date().toISOString(),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Extração de texto de PDF via pdfjs-dist (já presente no projeto)
+// Extração de texto de PDF via unpdf
 // ---------------------------------------------------------------------------
 
 async function extractTextFromPdfBuffer(buffer: Buffer): Promise<string> {
   const { extractText } = await import('unpdf');
   const { text } = await extractText(new Uint8Array(buffer), { mergePages: true });
   return Array.isArray(text) ? text.join('\n') : (text as string);
-}
-
-// ---------------------------------------------------------------------------
-// Buscar texto do PDF de boas práticas (Storage global)
-// ---------------------------------------------------------------------------
-
-async function getBestPracticesText(): Promise<string> {
-  try {
-    const bucket = adminStorage.bucket();
-    const file = bucket.file('linkedinProfiles/global/best-practices.pdf');
-    const [exists] = await file.exists();
-    if (!exists) return '';
-
-    const [buffer] = await file.download();
-    return await extractTextFromPdfBuffer(buffer);
-  } catch (err) {
-    console.error('[profile-optimizer] Erro ao ler best-practices.pdf:', err);
-    return '';
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -432,30 +237,83 @@ async function getBrandContext(tlUserId: string): Promise<Record<string, unknown
 }
 
 // ---------------------------------------------------------------------------
-// Buscar posts recentes do contentPipeline
+// Extração de dados de perfil a partir de uma imagem (print do LinkedIn)
 // ---------------------------------------------------------------------------
 
-async function getRecentPostCaptions(tlUserId: string): Promise<string[]> {
-  try {
-    const snap = await adminDb
-      .collection('users')
-      .doc(tlUserId)
-      .collection('contentPipeline')
-      .where('status', '==', 'postado')
-      .orderBy('publishedAt', 'desc')
-      .limit(12)
-      .get();
+interface ScreenshotExtractedData {
+  topSkills: string[];
+  featuredItems: Array<{ title: string; url: null; imageUrl: null }>;
+  headline: string | null;
+  about: string | null;
+}
 
-    return snap.docs
-      .map((d) => d.data().caption || d.data().title || '')
-      .filter((c) => c.length > 0);
-  } catch {
-    return [];
-  }
+async function extractDataFromScreenshot(
+  imageBase64: string,
+  mimeType: string,
+): Promise<ScreenshotExtractedData> {
+  const prompt = `Você está vendo um print do perfil LinkedIn de uma pessoa.
+Extraia APENAS as informações que são visíveis NA IMAGEM e retorne um JSON com:
+{
+  "topSkills": string[],
+  "featuredItems": [{ "title": string, "url": null, "imageUrl": null }],
+  "headline": string | null,
+  "about": string | null
+}
+
+Se alguma seção não estiver visível na imagem, retorne array vazio ou null.
+Retorne APENAS o JSON, sem markdown.`;
+
+  const response = await ai.generate({
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { text: prompt },
+          { media: { url: `data:${mimeType};base64,${imageBase64}`, contentType: mimeType } },
+        ],
+      },
+    ],
+  });
+
+  const clean = response.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+  const parsed = JSON.parse(clean);
+
+  return {
+    topSkills: Array.isArray(parsed.topSkills) ? parsed.topSkills : [],
+    featuredItems: Array.isArray(parsed.featuredItems) ? parsed.featuredItems : [],
+    headline: parsed.headline || null,
+    about: parsed.about || null,
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Processamento assíncrono do PDF + print opcional (roda em background)
+// Converter current → edited inicial (cópia editável)
+// ---------------------------------------------------------------------------
+
+function currentToEditedInitial(current: LinkedInProfileCurrent): LinkedInProfileSuggestions {
+  return {
+    headline: current.headline,
+    about: current.about,
+    topSkills: current.topSkills,
+    experiences: current.experiences.map((e) => ({
+      ...e,
+      action: 'keep' as const,
+      rewrittenDescription: undefined,
+    })),
+    featuredItems: current.featuredItems.map((f) => ({
+      title: f.title,
+      ...(f.url != null ? { url: f.url } : {}),
+      ...(f.imageUrl != null ? { imageUrl: f.imageUrl } : {}),
+      action: 'keep' as const,
+      rationale: '',
+    })),
+    semanticAlignment: { score: 0, passesAudit: false, issues: [] },
+    editedAt: new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Processamento assíncrono do PDF + print opcional
 // ---------------------------------------------------------------------------
 
 async function processPdfInBackground(
@@ -463,17 +321,15 @@ async function processPdfInBackground(
   pdfBuffer: Buffer,
   screenshotBase64?: string,
   screenshotMimeType?: string,
-  additionalContext?: string,
 ): Promise<void> {
   const docRef = profileDocRef(tlUserId);
-  console.log(`[profile-optimizer] Iniciando processamento para ${tlUserId}, buffer size: ${pdfBuffer.length}`);
+  console.log(`[profile-optimizer] Iniciando processamento para ${tlUserId}`);
   try {
-    // Salvar PDF no Storage (opcional — não bloqueia o processamento se Storage não estiver configurado)
+    // Salvar PDF no Storage (opcional)
     try {
       const bucket = adminStorage.bucket();
       const file = bucket.file(`linkedinProfiles/${tlUserId}/profile.pdf`);
       await file.save(pdfBuffer, { contentType: 'application/pdf' });
-      console.log('[profile-optimizer] PDF salvo no Storage');
     } catch (storageErr) {
       console.warn('[profile-optimizer] Storage indisponível, continuando sem salvar PDF:', storageErr);
     }
@@ -485,25 +341,22 @@ async function processPdfInBackground(
         const bucket = adminStorage.bucket();
         const file = bucket.file(`linkedinProfiles/${tlUserId}/profile-screenshot.${ext}`);
         await file.save(Buffer.from(screenshotBase64, 'base64'), { contentType: screenshotMimeType });
-        console.log('[profile-optimizer] Screenshot salvo no Storage');
       } catch (storageErr) {
-        console.warn('[profile-optimizer] Storage indisponível, continuando sem salvar screenshot:', storageErr);
+        console.warn('[profile-optimizer] Storage indisponível para screenshot:', storageErr);
       }
     }
 
-    // Extrair texto do PDF via unpdf
+    // Extrair texto do PDF
     console.log('[profile-optimizer] Extraindo texto do PDF...');
     const pdfText = await extractTextFromPdfBuffer(pdfBuffer);
-    console.log(`[profile-optimizer] Texto extraído: ${pdfText.length} chars`);
 
     // Prompt 1: extrair estrutura do perfil atual
-    console.log('[profile-optimizer] Executando Prompt 1 (extração)...');
+    console.log('[profile-optimizer] Extraindo perfil do texto...');
     let current = await extractProfileFromPdfText(pdfText);
-    console.log('[profile-optimizer] Prompt 1 concluído, headline:', current.headline?.slice(0, 50));
 
-    // Se tiver print, enriquecer o current com dados da imagem (competências fixadas, destaque)
+    // Enriquecer com dados do print (competências fixadas, destaque)
     if (screenshotBase64 && screenshotMimeType) {
-      console.log('[profile-optimizer] Enriquecendo com dados do print...');
+      console.log('[profile-optimizer] Enriquecendo com print...');
       try {
         const enriched = await extractDataFromScreenshot(screenshotBase64, screenshotMimeType);
         current = {
@@ -521,24 +374,13 @@ async function processPdfInBackground(
           ...(enriched.headline ? { headline: enriched.headline } : {}),
           ...(enriched.about ? { about: enriched.about } : {}),
         };
-        console.log('[profile-optimizer] Enriquecimento do print concluído, skills:', current.topSkills);
       } catch (enrichErr) {
-        console.warn('[profile-optimizer] Erro ao enriquecer com print, continuando:', enrichErr);
+        console.warn('[profile-optimizer] Erro ao enriquecer com print:', enrichErr);
       }
     }
 
-    await docRef.update({ current, status: 'processing' });
-
-    // Buscar contextos necessários para o Prompt 2
-    console.log('[profile-optimizer] Buscando brand context e posts...');
-    const [brandContext, recentCaptions, bestPracticesText] = await Promise.all([
-      getBrandContext(tlUserId),
-      getRecentPostCaptions(tlUserId),
-      getBestPracticesText(),
-    ]);
-    console.log(`[profile-optimizer] Brand context ok, posts: ${recentCaptions.length}`);
-
-    // Calcular score do perfil ATUAL (antes da otimização)
+    // Calcular score do perfil atual
+    const brandContext = await getBrandContext(tlUserId);
     const contentPillars: string[] = Array.isArray(brandContext.approvedTopics)
       ? (brandContext.approvedTopics as string[])
       : [];
@@ -551,31 +393,21 @@ async function processPdfInBackground(
       },
       contentPillars,
     );
-    console.log('[profile-optimizer] Score do perfil atual calculado:', currentAlignment.score);
 
-    // Prompt 2: gerar sugestões
-    console.log('[profile-optimizer] Executando Prompt 2 (sugestões)...');
-    const suggestions = await generateSuggestions(
-      current,
-      brandContext,
-      recentCaptions,
-      bestPracticesText,
-      additionalContext,
-    );
-    console.log('[profile-optimizer] Prompt 2 concluído, score:', suggestions.semanticAlignment?.score);
+    // Criar edited inicial (cópia do current, pronto para edição pela estrategista)
+    const editedInitial = currentToEditedInitial(current);
 
     await docRef.update({
       current,
       currentAlignment,
-      suggestions,
+      edited: editedInitial,
+      suggestions: null,
       status: 'ready',
     });
-    console.log('[profile-optimizer] Processamento concluído com sucesso!');
+    console.log('[profile-optimizer] Processamento concluído! Score atual:', currentAlignment.score);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    const errStack = err instanceof Error ? err.stack : '';
-    console.error('[profile-optimizer] ERRO no processamento:', errMsg);
-    console.error('[profile-optimizer] Stack:', errStack);
+    console.error('[profile-optimizer] ERRO:', errMsg);
     await docRef.update({ status: 'error', errorMessage: errMsg }).catch(() => {});
   }
 }
@@ -585,10 +417,9 @@ async function processPdfInBackground(
 // ---------------------------------------------------------------------------
 
 /**
- * Upload do PDF do perfil (+ print opcional) + dispara extração e geração de sugestões em background.
- * Retorna imediatamente com status 'processing'.
- * screenshotBase64/screenshotMimeType: print do perfil LinkedIn (opcional) — a IA usa para extrair
- * as 5 competências fixadas e os cards de Destaque que não aparecem corretamente no PDF.
+ * Upload do PDF do perfil (+ print opcional).
+ * Extrai o perfil atual e cria uma cópia editável para a estrategista.
+ * Não gera sugestões de IA — a estrategista edita manualmente.
  */
 export async function uploadProfilePdf(
   idToken: string,
@@ -596,13 +427,11 @@ export async function uploadProfilePdf(
   pdfBase64: string,
   screenshotBase64?: string,
   screenshotMimeType?: string,
-  additionalContext?: string,
 ): Promise<{ success?: boolean; error?: string }> {
   try {
     await requireProfileAccess(idToken, tlUserId);
 
     const caller = await requireAuth(idToken);
-    // TL não pode fazer upload do próprio PDF — apenas estrategista/admin/master
     if (caller.uid === tlUserId && caller.role === 'thoughtleader') {
       return { error: 'Apenas a estrategista pode enviar o PDF do perfil.' };
     }
@@ -622,11 +451,10 @@ export async function uploadProfilePdf(
         publishedAt: null,
       });
     } else {
-      await docRef.update({ status: 'processing', suggestions: null });
+      await docRef.update({ status: 'processing', edited: null, suggestions: null });
     }
 
-    // Disparar processamento em background (não await)
-    processPdfInBackground(tlUserId, pdfBuffer, screenshotBase64, screenshotMimeType, additionalContext).catch((err) =>
+    processPdfInBackground(tlUserId, pdfBuffer, screenshotBase64, screenshotMimeType).catch((err) =>
       console.error('[profile-optimizer] processPdfInBackground error:', err),
     );
 
@@ -670,6 +498,7 @@ export async function getLinkedInProfile(
 
 /**
  * Salva edições da estrategista (sem publicar para o TL).
+ * Não recalcula o score — score é calculado apenas via calculateOptimizedScore.
  */
 export async function saveProfileEdits(
   idToken: string,
@@ -678,35 +507,13 @@ export async function saveProfileEdits(
 ): Promise<{ success?: boolean; error?: string }> {
   try {
     const caller = await requireAuth(idToken);
-    // Só estrategista/admin/master pode editar
     if (caller.uid === tlUserId && caller.role === 'thoughtleader') {
       return { error: 'Thought Leaders não podem editar as sugestões de perfil.' };
     }
     await requireProfileAccess(idToken, tlUserId);
 
-    // Recalcular score com os dados editados
-    const brandContext = await getBrandContext(tlUserId);
-    const contentPillars: string[] = Array.isArray(brandContext.approvedTopics)
-      ? (brandContext.approvedTopics as string[])
-      : [];
-
-    const semanticAlignment = computeAlignmentScore(
-      {
-        headline: edited.headline,
-        about: edited.about,
-        topSkills: edited.topSkills,
-        experiences: edited.experiences,
-      },
-      contentPillars,
-    );
-
-    const editedWithScore: LinkedInProfileSuggestions = {
-      ...edited,
-      semanticAlignment,
-    };
-
     await profileDocRef(tlUserId).update({
-      edited: editedWithScore,
+      edited: { ...edited, editedAt: new Date().toISOString() },
       editedAt: new Date().toISOString(),
     });
 
@@ -718,8 +525,54 @@ export async function saveProfileEdits(
 }
 
 /**
- * Publica o perfil otimizado para o TL ver.
- * Usa a versão editada se existir, caso contrário usa as sugestões da IA.
+ * Calcula (ou recalcula) o score 360Brew para o perfil editado.
+ * Chamado explicitamente pela estrategista ao clicar em "Gerar score".
+ * Salva o score no campo edited.semanticAlignment e retorna o resultado.
+ */
+export async function calculateOptimizedScore(
+  idToken: string,
+  tlUserId: string,
+  edited: LinkedInProfileSuggestions,
+): Promise<{ alignment?: ProfileSemanticAlignment; error?: string }> {
+  try {
+    await requireProfileAccess(idToken, tlUserId);
+
+    const brandContext = await getBrandContext(tlUserId);
+    const contentPillars: string[] = Array.isArray(brandContext.approvedTopics)
+      ? (brandContext.approvedTopics as string[])
+      : [];
+
+    const alignment = computeAlignmentScore(
+      {
+        headline: edited.headline,
+        about: edited.about,
+        topSkills: edited.topSkills,
+        experiences: edited.experiences,
+      },
+      contentPillars,
+    );
+
+    // Persiste o score no edited
+    const updatedEdited: LinkedInProfileSuggestions = {
+      ...edited,
+      semanticAlignment: alignment,
+      editedAt: new Date().toISOString(),
+    };
+
+    await profileDocRef(tlUserId).update({
+      edited: updatedEdited,
+      editedAt: updatedEdited.editedAt,
+    });
+
+    return { alignment };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Erro desconhecido';
+    return { error: message };
+  }
+}
+
+/**
+ * Publica o perfil editado para o TL ver.
  */
 export async function publishProfile(
   idToken: string,
@@ -736,8 +589,8 @@ export async function publishProfile(
     if (!doc.exists) return { error: 'Perfil não encontrado.' };
 
     const data = doc.data() as LinkedInProfileOptimization;
-    if (!data.suggestions && !data.edited) {
-      return { error: 'Nenhuma sugestão disponível para publicar.' };
+    if (!data.edited) {
+      return { error: 'Nenhuma versão editada disponível para publicar.' };
     }
 
     await profileDocRef(tlUserId).update({
@@ -753,31 +606,7 @@ export async function publishProfile(
 }
 
 /**
- * Upload do PDF de boas práticas global (apenas master).
- */
-export async function uploadBestPracticesPdf(
-  idToken: string,
-  pdfBase64: string,
-): Promise<{ success?: boolean; error?: string }> {
-  try {
-    await requireMaster(idToken);
-
-    const pdfBuffer = Buffer.from(pdfBase64, 'base64');
-    const bucket = adminStorage.bucket();
-    const file = bucket.file('linkedinProfiles/global/best-practices.pdf');
-    await file.save(pdfBuffer, { contentType: 'application/pdf' });
-
-    return { success: true };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erro desconhecido';
-    return { error: message };
-  }
-}
-
-/**
  * Reseta todos os dados do otimizador de perfil para o estado vazio.
- * Permite começar um novo upload do zero.
- * Apenas estrategista/admin/master pode executar.
  */
 export async function resetProfile(
   idToken: string,
@@ -811,34 +640,7 @@ export async function resetProfile(
 }
 
 /**
- * Recalcula o score de alinhamento 360Brew para o perfil editado/sugerido atual.
- * Útil para recalcular em tempo real no editor sem salvar.
- */
-export async function recalculateAlignmentScore(
-  idToken: string,
-  tlUserId: string,
-  partial: Pick<LinkedInProfileSuggestions, 'headline' | 'about' | 'topSkills' | 'experiences'>,
-): Promise<{ alignment?: ProfileSemanticAlignment; error?: string }> {
-  try {
-    await requireProfileAccess(idToken, tlUserId);
-    const brandContext = await getBrandContext(tlUserId);
-    const contentPillars: string[] = Array.isArray(brandContext.approvedTopics)
-      ? (brandContext.approvedTopics as string[])
-      : [];
-
-    const alignment = computeAlignmentScore(partial, contentPillars);
-    return { alignment };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erro desconhecido';
-    return { error: message };
-  }
-}
-
-/**
  * Upload de foto de perfil ou banner para o Storage.
- * type: 'avatar' | 'banner'
- * imageBase64: base64 da imagem (JPEG/PNG)
- * Returns: URL pública do arquivo no Storage (ou undefined se Storage não estiver configurado)
  */
 export async function uploadProfileImage(
   idToken: string,
@@ -855,7 +657,6 @@ export async function uploadProfileImage(
 
     let url: string | undefined;
 
-    // Storage é opcional — se não configurado, não bloqueia
     try {
       const bucket = adminStorage.bucket();
       const filePath = `linkedinProfiles/${tlUserId}/${type}.${ext}`;
@@ -867,10 +668,9 @@ export async function uploadProfileImage(
       await file.makePublic();
       url = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
     } catch (storageErr) {
-      console.warn(`[profile-optimizer] Storage indisponível para ${type}, continuando sem salvar:`, storageErr);
+      console.warn(`[profile-optimizer] Storage indisponível para ${type}:`, storageErr);
     }
 
-    // Salvar URL no documento do perfil (só se tiver URL do Storage)
     if (url) {
       const docRef = profileDocRef(tlUserId);
       const doc = await docRef.get();
@@ -889,150 +689,5 @@ export async function uploadProfileImage(
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido';
     return { error: message };
-  }
-}
-
-/**
- * Upload standalone do print do perfil LinkedIn (imagem).
- * Usado quando o print é enviado SEPARADAMENTE do PDF (ex: perfil já processado).
- * A IA extrai competências fixadas e destaque e faz merge com o current existente.
- * O processamento roda em background.
- */
-export async function uploadProfileScreenshot(
-  idToken: string,
-  tlUserId: string,
-  imageBase64: string,
-  mimeType: string,
-): Promise<{ success?: boolean; error?: string }> {
-  try {
-    await requireProfileAccess(idToken, tlUserId);
-
-    const caller = await requireAuth(idToken);
-    if (caller.uid === tlUserId && caller.role === 'thoughtleader') {
-      return { error: 'Apenas a estrategista pode enviar o print do perfil.' };
-    }
-
-    // Salvar no Storage (opcional)
-    try {
-      const ext = mimeType.includes('png') ? 'png' : 'jpg';
-      const buffer = Buffer.from(imageBase64, 'base64');
-      const bucket = adminStorage.bucket();
-      const filePath = `linkedinProfiles/${tlUserId}/profile-screenshot.${ext}`;
-      const file = bucket.file(filePath);
-      await file.save(buffer, { contentType: mimeType });
-    } catch (storageErr) {
-      console.warn('[profile-optimizer] Storage indisponível para screenshot, continuando:', storageErr);
-    }
-
-    // Enriquecer perfil existente com dados da imagem em background
-    enrichProfileFromScreenshotInBackground(tlUserId, imageBase64, mimeType).catch((err) =>
-      console.error('[profile-optimizer] enrichProfileFromScreenshotInBackground error:', err),
-    );
-
-    return { success: true };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erro desconhecido';
-    return { error: message };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Extração de dados de perfil a partir de uma imagem (print do LinkedIn)
-// ---------------------------------------------------------------------------
-
-interface ScreenshotExtractedData {
-  topSkills: string[];
-  featuredItems: Array<{ title: string; url: null; imageUrl: null }>;
-  headline: string | null;
-  about: string | null;
-}
-
-async function extractDataFromScreenshot(
-  imageBase64: string,
-  mimeType: string,
-): Promise<ScreenshotExtractedData> {
-  const prompt = `Você está vendo um print do perfil LinkedIn de uma pessoa.
-Extraia APENAS as informações que são visíveis NA IMAGEM e retorne um JSON com:
-{
-  "topSkills": string[],        // As 5 competências fixadas no topo do perfil (seção "Principais competências" ou logo abaixo do Sobre). APENAS as fixadas, não todas.
-  "featuredItems": [
-    {
-      "title": string,           // Título do card de Destaque
-      "url": null,               // URL não é visível na imagem
-      "imageUrl": null           // URL da imagem do card (não disponível no print)
-    }
-  ],
-  "headline": string | null,    // Headline se visível, null caso contrário
-  "about": string | null        // Início do Sobre se visível, null caso contrário
-}
-
-Se alguma seção não estiver visível na imagem, retorne array vazio ou null.
-Retorne APENAS o JSON, sem markdown.`;
-
-  const response = await ai.generate({
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { text: prompt },
-          { media: { url: `data:${mimeType};base64,${imageBase64}`, contentType: mimeType } },
-        ],
-      },
-    ],
-  });
-
-  const clean = response.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
-  const parsed = JSON.parse(clean);
-  console.log('[profile-optimizer] Screenshot parsed, skills:', parsed.topSkills);
-
-  return {
-    topSkills: Array.isArray(parsed.topSkills) ? parsed.topSkills : [],
-    featuredItems: Array.isArray(parsed.featuredItems) ? parsed.featuredItems : [],
-    headline: parsed.headline || null,
-    about: parsed.about || null,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Enriquecimento do perfil existente com dados do print (standalone — sem PDF)
-// ---------------------------------------------------------------------------
-
-async function enrichProfileFromScreenshotInBackground(
-  tlUserId: string,
-  imageBase64: string,
-  mimeType: string,
-): Promise<void> {
-  const docRef = profileDocRef(tlUserId);
-  console.log('[profile-optimizer] Enriquecendo perfil com screenshot standalone...');
-  try {
-    const enriched = await extractDataFromScreenshot(imageBase64, mimeType);
-
-    const doc = await docRef.get();
-    if (!doc.exists) return;
-
-    const existing = doc.data() as { current?: Record<string, unknown> };
-    const currentData = existing.current || {};
-
-    const mergedCurrent = {
-      ...currentData,
-      ...(enriched.topSkills.length > 0 ? { topSkills: enriched.topSkills } : {}),
-      ...(enriched.featuredItems.length > 0
-        ? {
-            featuredItems: enriched.featuredItems.map((f) => ({
-              title: f.title,
-              ...(f.url != null ? { url: f.url } : {}),
-              ...(f.imageUrl != null ? { imageUrl: f.imageUrl } : {}),
-            })),
-          }
-        : {}),
-      ...(enriched.headline ? { headline: enriched.headline } : {}),
-      ...(enriched.about ? { about: enriched.about } : {}),
-    };
-
-    await docRef.update({ current: mergedCurrent });
-    console.log('[profile-optimizer] Perfil enriquecido com dados do screenshot standalone!');
-  } catch (err) {
-    console.error('[profile-optimizer] Erro ao enriquecer com screenshot:', err);
-    // Não reverte status — enriquecimento é opcional
   }
 }

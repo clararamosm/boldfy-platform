@@ -212,9 +212,7 @@ function ExperienceCard({
   const actionBadge =
     exp.action === 'rewrite'
       ? { label: 'Reescrito', cls: 'bg-blue-50 text-blue-700 border-blue-200' }
-      : exp.action === 'add_impact'
-        ? { label: '+ Impacto', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
-        : null;
+      : null;
 
   return (
     <div className="group flex gap-3">
