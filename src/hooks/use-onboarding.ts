@@ -115,16 +115,46 @@ const COLABORADOR_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
 
 const THOUGHTLEADER_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
   {
-    id: 'connect-linkedin',
-    label: 'Conectar seu LinkedIn',
-    description: 'Vincule sua conta do LinkedIn',
-    href: '/thoughtleader/configuracoes',
+    id: 'visit-backlog',
+    label: 'Backlog',
+    description: 'Onde você revisa e aprova os posts da equipe',
+    href: '/thoughtleader/backlog',
   },
   {
-    id: 'upload-linkedin-history',
-    label: 'Importar histórico LinkedIn',
-    description: 'Faça upload dos últimos 12 meses para ativar os gráficos',
+    id: 'visit-calendario',
+    label: 'Calendário',
+    description: 'Visão da sua pauta em forma de calendário',
+    href: '/thoughtleader/calendario',
+  },
+  {
+    id: 'visit-linkedin-feed',
+    label: 'LinkedIn Feed',
+    description: 'Onde você acompanha o conteúdo dos seus colegas',
+    href: '/thoughtleader/linkedin-feed',
+  },
+  {
+    id: 'visit-analytics',
+    label: 'Analytics',
+    description: 'Seu dashboard de análise de desempenho',
     href: '/thoughtleader/analytics',
+  },
+  {
+    id: 'visit-perfil',
+    label: 'Perfil do LinkedIn',
+    description: 'Veja o perfil conectado e gerencie a conexão',
+    href: '/thoughtleader/perfil',
+  },
+  {
+    id: 'visit-estrategia',
+    label: 'Estratégia',
+    description: 'Onde você vê sua estratégia de conteúdo',
+    href: '/thoughtleader/estrategia',
+  },
+  {
+    id: 'visit-manual',
+    label: 'Manual de Marca',
+    description: 'Seu guia de voz e identidade de marca',
+    href: '/thoughtleader/manual',
   },
 ];
 

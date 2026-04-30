@@ -88,9 +88,39 @@ const COLAB_TOOLTIPS: TooltipDef[] = [
 
 const TL_TOOLTIPS: TooltipDef[] = [
   {
-    pathPattern: '/thoughtleader/configuracoes',
-    message: <><strong>Conecte seu LinkedIn.</strong> Isso permite que a equipe publique posts no seu perfil.</>,
-    checklistItemId: 'connect-linkedin',
+    pathPattern: '/thoughtleader/backlog',
+    message: <><strong>Este é o seu Backlog.</strong> Aqui você revisa e aprova os posts que a equipe de estratégia preparou pra você. Tudo organizado, pronto pra publicar com 1 clique.</>,
+    checklistItemId: 'visit-backlog',
+  },
+  {
+    pathPattern: '/thoughtleader/calendario',
+    message: <><strong>Este é o seu Calendário.</strong> Visualize toda a sua pauta de conteúdo organizada por data — fica fácil ver o que está agendado e quando vai publicar.</>,
+    checklistItemId: 'visit-calendario',
+  },
+  {
+    pathPattern: '/thoughtleader/linkedin-feed',
+    message: <><strong>Este é o LinkedIn Feed.</strong> Aqui você acompanha o que seus colegas estão publicando no LinkedIn — ótimo pra se inspirar e engajar com o time.</>,
+    checklistItemId: 'visit-linkedin-feed',
+  },
+  {
+    pathPattern: '/thoughtleader/analytics',
+    message: <><strong>Este é o seu Analytics.</strong> Seu dashboard completo de análise de desempenho. Pra alimentá-lo, faça o upload do extrato do LinkedIn Analytics uma vez por mês.</>,
+    checklistItemId: 'visit-analytics',
+  },
+  {
+    pathPattern: '/thoughtleader/perfil',
+    message: <><strong>Este é o Perfil do LinkedIn.</strong> Aqui você vê o perfil conectado e pode gerenciar a autorização de publicação.</>,
+    checklistItemId: 'visit-perfil',
+  },
+  {
+    pathPattern: '/thoughtleader/estrategia',
+    message: <><strong>Esta é a sua Estratégia.</strong> Aqui fica documentada toda a sua estratégia de conteúdo — pilares, tópicos e posicionamento definidos pela equipe.</>,
+    checklistItemId: 'visit-estrategia',
+  },
+  {
+    pathPattern: '/thoughtleader/manual',
+    message: <><strong>Este é o Manual de Marca.</strong> Seu guia completo de voz, personalidade e identidade de marca. A base de tudo que a equipe produz pra você.</>,
+    checklistItemId: 'visit-manual',
   },
 ];
 
@@ -157,12 +187,16 @@ export function OnboardingShell({
     return match;
   }, [ob.state.checklistCompleted, ob.state.dismissedTooltips, ob.state.completedItems, tooltipDefs, pathname]);
 
-  // Handler for "Entendi!" — dismisses the tooltip (does NOT complete checklist item)
+  // Handler for "Entendi!" — for TL: marks item as completed + dismisses tooltip
+  // For other roles: only dismisses (item is completed by performing the actual action)
   const handleTooltipDismiss = useCallback(async () => {
-    if (currentTooltip) {
-      await ob.dismissTooltipForItem(currentTooltip.checklistItemId);
+    if (!currentTooltip) return;
+    if (role === 'thoughtleader') {
+      // Visiting the page + reading the tooltip is enough — complete on "Entendi!"
+      await ob.markItemCompleted(currentTooltip.checklistItemId);
     }
-  }, [currentTooltip, ob]);
+    await ob.dismissTooltipForItem(currentTooltip.checklistItemId);
+  }, [currentTooltip, ob, role]);
 
   // Find the single checklist item for this page
   const currentChecklistItem = useMemo(() => {

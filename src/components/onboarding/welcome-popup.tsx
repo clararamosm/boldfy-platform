@@ -189,7 +189,15 @@ const COLAB_ITEMS = [
   'Completar uma missão',
 ];
 
-const TL_ITEMS = ['Conectar seu LinkedIn', 'Importar histórico LinkedIn'];
+const TL_ITEMS = [
+  'Backlog — revise e aprove seus posts',
+  'Calendário — veja sua pauta',
+  'LinkedIn Feed — acompanhe seus colegas',
+  'Analytics — seu dashboard de análise',
+  'Perfil do LinkedIn — perfil conectado',
+  'Estratégia — sua estratégia de conteúdo',
+  'Manual de Marca — seu guia de voz',
+];
 
 // ─── Message builders ────────────────────────────────────────
 
@@ -350,6 +358,27 @@ function getThoughtLeaderMessages(name: string, onUploadClick: () => void): Chat
       type: 'fai',
       content: (
         <>
+          Antes de tudo, você precisa <strong>conectar seu perfil do LinkedIn</strong>. É por lá que a equipe vai publicar os posts no seu nome — sem isso, nada rola!
+          <div className="mt-3 bg-white/70 border border-primary/10 rounded-[12px] p-3 space-y-1.5">
+            <p className="text-xs font-bold text-foreground/80">Como conectar:</p>
+            <div className="text-[11px] text-muted-foreground space-y-1">
+              <div className="flex items-start gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">1</span>
+                <span>Vá em <strong>Configurações</strong> no menu lateral</span>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">2</span>
+                <span>Clique em <strong>Conectar LinkedIn</strong> e autorize o acesso</span>
+              </div>
+            </div>
+          </div>
+        </>
+      ),
+    },
+    {
+      type: 'fai',
+      content: (
+        <>
           Pra ativar seu <strong>dashboard de Analytics</strong>, vou precisar do seu histórico do LinkedIn. Com ele, você já estreia com os gráficos de evolução do seu perfil desde o início.
           <LinkedInExportTutorial onUploadClick={onUploadClick} />
         </>
@@ -359,7 +388,7 @@ function getThoughtLeaderMessages(name: string, onUploadClick: () => void): Chat
       type: 'fai',
       content: (
         <>
-          Pra começar, essas são suas etapas:
+          Vou te apresentar cada parte da plataforma. Conforme você explora, vai completando essas etapas:
           <div className="mt-2 flex flex-col gap-1.5">
             {TL_ITEMS.map((item) => (
               <div key={item} className="flex items-center gap-2 text-xs font-medium text-foreground/80 bg-white/70 border border-primary/10 rounded-[10px] px-2.5 py-1.5">
@@ -389,8 +418,9 @@ export function WelcomePopup({
   const [visibleCount, setVisibleCount] = useState(0);
   const messagesRef = useRef<HTMLDivElement>(null);
 
-  // Roles que precisam do upload histórico no welcome (TL e Colaborador)
-  const needsHistoricalUpload = role === 'thoughtleader' || role === 'colaborador';
+  // Apenas Colaborador precisa do upload histórico no welcome para liberar "Vamos lá!"
+  // TL não é bloqueado pelo upload — ele vai conectar o LinkedIn depois
+  const needsHistoricalUpload = role === 'colaborador';
 
   const handleUploadClick = () => {
     onRequestUpload?.();
@@ -413,6 +443,7 @@ export function WelcomePopup({
     setVisibleCount(1);
 
     let i = 1;
+    const delay = role === 'thoughtleader' ? 2000 : 1200; // TL gets more reading time
     const interval = setInterval(() => {
       i++;
       if (i > messages.length) {
@@ -420,7 +451,7 @@ export function WelcomePopup({
         return;
       }
       setVisibleCount(i);
-    }, 1200); // 1.2s between messages
+    }, delay);
 
     return () => clearInterval(interval);
   }, [open, messages.length]);
