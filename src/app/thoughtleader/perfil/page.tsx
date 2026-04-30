@@ -124,6 +124,25 @@ export default function ThoughtLeaderPerfilPage() {
             </p>
           </div>
 
+          {/* Score antes/depois */}
+          {profile.currentAlignment && activeSuggestions.semanticAlignment && (
+            <div className="rounded-lg border bg-gray-50 p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                Score 360Brew — Antes vs. Depois
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Perfil atual</p>
+                  <AlignmentScoreBadge alignment={profile.currentAlignment} showIssues={false} compact />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-violet-600 font-medium">Perfil otimizado</p>
+                  <AlignmentScoreBadge alignment={activeSuggestions.semanticAlignment} showIssues={false} compact />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Comparativo lado a lado */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 

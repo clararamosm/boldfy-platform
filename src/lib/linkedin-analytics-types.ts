@@ -225,6 +225,8 @@ export type LinkedInProfileOptimization = {
   status: 'empty' | 'processing' | 'ready' | 'published' | 'error';
   publishedAt: string | null;
   errorMessage?: string;
+  // Score do perfil ANTES da otimização (calculado a partir do current)
+  currentAlignment?: ProfileSemanticAlignment | null;
   // Fotos do perfil (URLs do Storage)
   avatarUrl?: string | null;
   bannerUrl?: string | null;

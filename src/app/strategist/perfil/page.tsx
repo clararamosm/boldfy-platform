@@ -5,22 +5,23 @@ import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/dashboard/header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Upload, User, CheckCircle2, RotateCcw, Send } from 'lucide-react';
+import { Loader2, Upload, User, CheckCircle2, RotateCcw, Send, Trash2 } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth-client';
 import {
   uploadProfilePdf,
   getLinkedInProfile,
   saveProfileEdits,
   publishProfile,
+  resetProfile,
 } from '@/app/actions/profile-optimizer';
 import { ProfileEditor } from '@/components/profile-optimizer/profile-editor';
 import { ProfilePreview } from '@/components/profile-optimizer/profile-preview';
+import { AlignmentScoreBadge } from '@/components/profile-optimizer/alignment-score-badge';
 import type {
   LinkedInProfileOptimization,
   LinkedInProfileSuggestions,
 } from '@/lib/linkedin-analytics-types';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 
 export default function StrategistPerfilPage() {
   const searchParams = useSearchParams();
@@ -115,16 +116,21 @@ function ProfileOptimizerEditor({
   tlAvatarUrl?: string;
 }) {
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<LinkedInProfileOptimization | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [editedSuggestions, setEditedSuggestions] = useState<LinkedInProfileSuggestions | null>(null);
   const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | undefined>();
   const [profileBannerUrl, setProfileBannerUrl] = useState<string | undefined>();
+
+  // Arquivo de print pendente (para enviar junto com o PDF)
+  const [pendingScreenshot, setPendingScreenshot] = useState<File | null>(null);
 
   // Polling durante 'processing'
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -164,26 +170,39 @@ function ProfileOptimizerEditor({
     return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
   }, [profile?.status, tlId]);
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || file.type !== 'application/pdf') {
+  async function handleUpload() {
+    const pdfFile = pdfInputRef.current?.files?.[0];
+    if (!pdfFile || pdfFile.type !== 'application/pdf') {
       toast({ variant: 'destructive', description: 'Envie um arquivo PDF.' });
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ variant: 'destructive', description: 'Arquivo muito grande. Máximo: 10 MB.' });
+    if (pdfFile.size > 10 * 1024 * 1024) {
+      toast({ variant: 'destructive', description: 'PDF muito grande. Máximo: 10 MB.' });
       return;
     }
 
     setUploading(true);
     try {
-      const buffer = await file.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString('base64');
+      const pdfBuffer = await pdfFile.arrayBuffer();
+      const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
+
+      // Converter print para base64 se existir
+      let screenshotBase64: string | undefined;
+      let screenshotMimeType: string | undefined;
+      if (pendingScreenshot) {
+        const ssBuffer = await pendingScreenshot.arrayBuffer();
+        screenshotBase64 = Buffer.from(ssBuffer).toString('base64');
+        screenshotMimeType = pendingScreenshot.type;
+      }
+
       const token = await getAuthToken();
-      const result = await uploadProfilePdf(token, tlId, base64);
+      const result = await uploadProfilePdf(token, tlId, pdfBase64, screenshotBase64, screenshotMimeType);
       if (result.error) throw new Error(result.error);
 
-      toast({ description: 'PDF enviado! Processando perfil...' });
+      toast({ description: pendingScreenshot
+        ? 'PDF + print enviados! Processando perfil...'
+        : 'PDF enviado! Processando perfil...' });
+
       setProfile({
         current: null,
         suggestions: null,
@@ -192,11 +211,13 @@ function ProfileOptimizerEditor({
         status: 'processing',
         publishedAt: null,
       });
+      setPendingScreenshot(null);
     } catch (err) {
-      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao enviar PDF.' });
+      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao enviar.' });
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+      if (screenshotInputRef.current) screenshotInputRef.current.value = '';
     }
   }
 
@@ -234,6 +255,26 @@ function ProfileOptimizerEditor({
     }
   }
 
+  async function handleReset() {
+    if (!confirm('Tem certeza? Isso apagará todos os dados do perfil e você precisará fazer um novo upload.')) return;
+    setResetting(true);
+    try {
+      const token = await getAuthToken();
+      const result = await resetProfile(token, tlId);
+      if (result.error) throw new Error(result.error);
+      toast({ description: 'Perfil resetado. Faça um novo upload para começar.' });
+      setProfile({ current: null, suggestions: null, edited: null, editedAt: null, status: 'empty', publishedAt: null });
+      setEditedSuggestions(null);
+      setProfileAvatarUrl(undefined);
+      setProfileBannerUrl(undefined);
+      setPendingScreenshot(null);
+    } catch (err) {
+      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao resetar.' });
+    } finally {
+      setResetting(false);
+    }
+  }
+
   // ── Render ──
 
   if (loading) {
@@ -264,24 +305,19 @@ function ProfileOptimizerEditor({
                 </p>
               )}
             </div>
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                variant="outline"
-                className="gap-2"
-              >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                {uploading ? 'Enviando...' : 'Tentar novamente'}
-              </Button>
-            </div>
+            <UploadForm
+              pdfInputRef={pdfInputRef}
+              screenshotInputRef={screenshotInputRef}
+              pendingScreenshot={pendingScreenshot}
+              onPendingScreenshot={setPendingScreenshot}
+              onUpload={handleUpload}
+              uploading={uploading}
+              label="Tentar novamente"
+            />
+            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={handleReset} disabled={resetting}>
+              {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Começar de novo
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -301,7 +337,8 @@ function ProfileOptimizerEditor({
               <h2 className="text-lg font-semibold mb-1">Enviar PDF do Perfil</h2>
               <p className="text-sm text-muted-foreground max-w-sm">
                 Exporte o perfil do LinkedIn do TL como PDF e envie aqui.
-                A IA vai analisar e gerar sugestões de otimização para o algoritmo 360Brew.
+                Opcionalmente, anexe também um print do perfil (do topo até o Destaque)
+                para que a IA extraia as competências fixadas e os cards de destaque com mais precisão.
               </p>
               <a
                 href="https://www.linkedin.com/in/"
@@ -312,23 +349,14 @@ function ProfileOptimizerEditor({
                 Como exportar o PDF no LinkedIn →
               </a>
             </div>
-            <div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="application/pdf"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="gap-2"
-              >
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                {uploading ? 'Enviando...' : 'Selecionar PDF'}
-              </Button>
-            </div>
+            <UploadForm
+              pdfInputRef={pdfInputRef}
+              screenshotInputRef={screenshotInputRef}
+              pendingScreenshot={pendingScreenshot}
+              onPendingScreenshot={setPendingScreenshot}
+              onUpload={handleUpload}
+              uploading={uploading}
+            />
           </CardContent>
         </Card>
       </div>
@@ -389,21 +417,44 @@ function ProfileOptimizerEditor({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Começar de novo */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground hover:text-destructive"
+            onClick={handleReset}
+            disabled={resetting}
+            title="Apaga todos os dados e permite um novo upload"
+          >
+            {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            Começar de novo
+          </Button>
           {/* Re-upload */}
           <div>
             <input
-              ref={fileInputRef}
+              ref={pdfInputRef}
               type="file"
               accept="application/pdf"
-              onChange={handleFileChange}
               className="hidden"
+            />
+            <input
+              ref={screenshotInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/jpg"
+              className="hidden"
+              onChange={(e) => setPendingScreenshot(e.target.files?.[0] ?? null)}
             />
             <Button
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (pdfInputRef.current) {
+                  pdfInputRef.current.onchange = () => handleUpload();
+                  pdfInputRef.current.click();
+                }
+              }}
               disabled={uploading}
             >
               {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
@@ -426,6 +477,25 @@ function ProfileOptimizerEditor({
           </Button>
         </div>
       </div>
+
+      {/* Score antes/depois (só quando currentAlignment disponível) */}
+      {profile.currentAlignment && activeSuggestions?.semanticAlignment && (
+        <div className="rounded-lg border bg-gray-50 p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+            Score 360Brew — Antes vs. Depois
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Perfil atual</p>
+              <AlignmentScoreBadge alignment={profile.currentAlignment} showIssues={false} compact />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-violet-600 font-medium">Perfil otimizado</p>
+              <AlignmentScoreBadge alignment={activeSuggestions.semanticAlignment} showIssues={false} compact />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Layout split: editor + preview */}
       {activeSuggestions && (
@@ -458,6 +528,83 @@ function ProfileOptimizerEditor({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Componente de upload unificado PDF + print ────────────────────────────────
+
+function UploadForm({
+  pdfInputRef,
+  screenshotInputRef,
+  pendingScreenshot,
+  onPendingScreenshot,
+  onUpload,
+  uploading,
+  label = 'Analisar perfil',
+}: {
+  pdfInputRef: { current: HTMLInputElement | null };
+  screenshotInputRef: { current: HTMLInputElement | null };
+  pendingScreenshot: File | null;
+  onPendingScreenshot: (f: File | null) => void;
+  onUpload: () => void;
+  uploading: boolean;
+  label?: string;
+}) {
+  return (
+    <div className="w-full max-w-sm space-y-3">
+      {/* PDF — obrigatório */}
+      <div>
+        <input
+          ref={pdfInputRef as React.RefObject<HTMLInputElement>}
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+        />
+        <Button
+          onClick={() => pdfInputRef.current?.click()}
+          disabled={uploading}
+          variant="outline"
+          className="w-full gap-2"
+        >
+          <Upload className="h-4 w-4" />
+          Selecionar PDF do perfil
+        </Button>
+        <p className="text-[11px] text-muted-foreground mt-1 text-center">
+          Exporte no LinkedIn: Perfil → Mais → Salvar como PDF
+        </p>
+      </div>
+
+      {/* Print — opcional */}
+      <div>
+        <input
+          ref={screenshotInputRef as React.RefObject<HTMLInputElement>}
+          type="file"
+          accept="image/jpeg,image/png,image/jpg"
+          className="hidden"
+          onChange={(e) => onPendingScreenshot(e.target.files?.[0] ?? null)}
+        />
+        <button
+          type="button"
+          onClick={() => screenshotInputRef.current?.click()}
+          className="w-full text-xs text-muted-foreground border border-dashed rounded-lg px-3 py-2 hover:border-violet-300 hover:text-violet-600 transition-colors flex items-center justify-center gap-1.5"
+        >
+          <Upload className="h-3.5 w-3.5" />
+          {pendingScreenshot
+            ? `Print selecionado: ${pendingScreenshot.name}`
+            : '+ Adicionar print do perfil (opcional — melhora extração de competências e destaque)'}
+        </button>
+      </div>
+
+      {/* Botão enviar */}
+      <Button
+        onClick={onUpload}
+        disabled={uploading}
+        className="w-full gap-2"
+      >
+        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+        {uploading ? 'Enviando...' : label}
+      </Button>
     </div>
   );
 }
