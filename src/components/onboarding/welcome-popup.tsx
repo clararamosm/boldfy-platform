@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Check, Heart, MessageCircle, Bookmark, Sparkles, Eye, Send } from 'lucide-react';
+import { Check, Heart, MessageCircle, Bookmark, Sparkles, Eye, Send, Linkedin, Loader2 } from 'lucide-react';
 import type { OnboardingRole } from '@/hooks/use-onboarding';
 import './onboarding-animations.css';
 
@@ -30,6 +30,8 @@ type WelcomePopupProps = {
   onRequestUpload?: () => void;
   /** true quando o upload histórico já foi concluído — desbloqueia o botão "Vamos lá!" */
   historyUploaded?: boolean;
+  /** Chamado quando o usuário clica em "Conectar LinkedIn" dentro do popup */
+  onRequestLinkedInConnect?: () => void;
   onComplete: () => void;
 };
 
@@ -182,21 +184,26 @@ const ADMIN_ITEMS = [
 ];
 
 const COLAB_ITEMS = [
-  'Conectar LinkedIn',
-  'Importar histórico LinkedIn',
-  'Ver uma trilha',
-  'Criar um post',
-  'Completar uma missão',
+  'Dashboard → seus pontos, missões e ranking',
+  'Calendário → sua pauta de posts',
+  'Assistente → IA que escreve com a sua voz',
+  'LinkedIn Feed → o que seus colegas publicam',
+  'Analytics → suas métricas de desempenho',
+  'Biblioteca → conteúdos e assets de marca',
+  'Marca Pessoal → sua voz e seus pilares',
+  'Missões → desafios que geram pontos',
+  'Recompensas → troque pontos por prêmios',
+  'Trilhas → aprenda e ganhe pontos',
 ];
 
 const TL_ITEMS = [
-  'Backlog — revise e aprove seus posts',
-  'Calendário — veja sua pauta',
-  'LinkedIn Feed — acompanhe seus colegas',
-  'Analytics — seu dashboard de análise',
-  'Perfil do LinkedIn — perfil conectado',
-  'Estratégia — sua estratégia de conteúdo',
-  'Manual de Marca — seu guia de voz',
+  'Backlog → revise e aprove seus posts',
+  'Calendário → veja sua pauta',
+  'LinkedIn Feed → acompanhe seus colegas',
+  'Analytics → seu dashboard de análise',
+  'Perfil do LinkedIn → perfil conectado',
+  'Estratégia → sua estratégia de conteúdo',
+  'Manual de Marca → seu guia de voz',
 ];
 
 // ─── Message builders ────────────────────────────────────────
@@ -276,7 +283,25 @@ function getAdminMessages(name: string, licenses: number): ChatMessage[] {
   ];
 }
 
-function getColaboradorMessages(name: string, company: string, onUploadClick: () => void): ChatMessage[] {
+function LinkedInConnectButton({ onConnect }: { onConnect: () => void }) {
+  const [connecting, setConnecting] = useState(false);
+  return (
+    <button
+      onClick={() => { setConnecting(true); onConnect(); }}
+      disabled={connecting}
+      className="mt-3 w-full flex items-center justify-center gap-2 rounded-[10px] border border-[#0A66C2]/40 bg-[#0A66C2]/5 hover:bg-[#0A66C2]/10 text-[#0A66C2] font-bold text-xs px-3 py-2.5 transition-colors"
+    >
+      {connecting ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Linkedin className="h-3.5 w-3.5" />
+      )}
+      {connecting ? 'Conectando...' : 'Conectar LinkedIn'}
+    </button>
+  );
+}
+
+function getColaboradorMessages(name: string, company: string, onUploadClick: () => void, onLinkedInConnect: () => void): ChatMessage[] {
   return [
     {
       type: 'fai',
@@ -304,19 +329,7 @@ function getColaboradorMessages(name: string, company: string, onUploadClick: ()
       content: (
         <>
           Antes de tudo, você precisa <strong>conectar seu perfil do LinkedIn</strong>. É por lá que a IA vai publicar os posts no seu nome — sem isso, nada rola!
-          <div className="mt-3 bg-white/70 border border-primary/10 rounded-[12px] p-3 space-y-1.5">
-            <p className="text-xs font-bold text-foreground/80">Como conectar:</p>
-            <div className="text-[11px] text-muted-foreground space-y-1">
-              <div className="flex items-start gap-1.5">
-                <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">1</span>
-                <span>Vá em <strong>Configurações</strong> no menu lateral</span>
-              </div>
-              <div className="flex items-start gap-1.5">
-                <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">2</span>
-                <span>Clique em <strong>Conectar LinkedIn</strong> e autorize o acesso</span>
-              </div>
-            </div>
-          </div>
+          <LinkedInConnectButton onConnect={onLinkedInConnect} />
         </>
       ),
     },
@@ -351,7 +364,7 @@ function getColaboradorMessages(name: string, company: string, onUploadClick: ()
   ];
 }
 
-function getThoughtLeaderMessages(name: string, onUploadClick: () => void): ChatMessage[] {
+function getThoughtLeaderMessages(name: string, onUploadClick: () => void, onLinkedInConnect: () => void): ChatMessage[] {
   return [
     {
       type: 'fai',
@@ -380,19 +393,7 @@ function getThoughtLeaderMessages(name: string, onUploadClick: () => void): Chat
       content: (
         <>
           Antes de tudo, você precisa <strong>conectar seu perfil do LinkedIn</strong>. É por lá que a equipe vai publicar os posts no seu nome — sem isso, nada rola!
-          <div className="mt-3 bg-white/70 border border-primary/10 rounded-[12px] p-3 space-y-1.5">
-            <p className="text-xs font-bold text-foreground/80">Como conectar:</p>
-            <div className="text-[11px] text-muted-foreground space-y-1">
-              <div className="flex items-start gap-1.5">
-                <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">1</span>
-                <span>Vá em <strong>Configurações</strong> no menu lateral</span>
-              </div>
-              <div className="flex items-start gap-1.5">
-                <span className="w-4 h-4 rounded-full bg-primary/15 text-primary font-bold flex-shrink-0 flex items-center justify-center text-[9px] mt-0.5">2</span>
-                <span>Clique em <strong>Conectar LinkedIn</strong> e autorize o acesso</span>
-              </div>
-            </div>
-          </div>
+          <LinkedInConnectButton onConnect={onLinkedInConnect} />
         </>
       ),
     },
@@ -434,6 +435,7 @@ export function WelcomePopup({
   licensesCount = 5,
   onRequestUpload,
   historyUploaded = false,
+  onRequestLinkedInConnect,
   onComplete,
 }: WelcomePopupProps) {
   const [visibleCount, setVisibleCount] = useState(0);
@@ -447,11 +449,15 @@ export function WelcomePopup({
     onRequestUpload?.();
   };
 
+  const handleLinkedInConnect = () => {
+    onRequestLinkedInConnect?.();
+  };
+
   const messages = role === 'admin'
     ? getAdminMessages(userName, licensesCount)
     : role === 'colaborador'
-    ? getColaboradorMessages(userName, companyName, handleUploadClick)
-    : getThoughtLeaderMessages(userName, handleUploadClick);
+    ? getColaboradorMessages(userName, companyName, handleUploadClick, handleLinkedInConnect)
+    : getThoughtLeaderMessages(userName, handleUploadClick, handleLinkedInConnect);
 
   // Progressive message reveal
   useEffect(() => {

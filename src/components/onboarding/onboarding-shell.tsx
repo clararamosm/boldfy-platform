@@ -13,6 +13,8 @@ import { WelcomePopup } from './welcome-popup';
 import { FaiWidget } from './fai-widget';
 import { PageTooltip } from './page-tooltip';
 import { XlsxUploadModal } from '@/components/linkedin-analytics/xlsx-upload-modal';
+import { getLinkedInAuthUrl } from '@/app/actions/linkedin';
+import { getAuthToken } from '@/lib/auth-client';
 
 type OnboardingShellProps = {
   role: OnboardingRole;
@@ -60,29 +62,54 @@ const ADMIN_TOOLTIPS: TooltipDef[] = [
 
 const COLAB_TOOLTIPS: TooltipDef[] = [
   {
-    pathPattern: '/colaborador/configuracoes',
-    message: <><strong>Suas configurações.</strong> Conecte seu LinkedIn aqui pra poder publicar posts!</>,
-    checklistItemId: 'connect-linkedin',
-  },
-  {
-    pathPattern: '/colaborador/trilhas',
-    message: <><strong>Trilhas de aprendizado.</strong> Explore conteúdos pra melhorar seu posicionamento no LinkedIn.</>,
-    checklistItemId: 'view-trail',
-  },
-  {
-    pathPattern: '/colaborador/posts',
-    message: <><strong>Seus posts.</strong> Crie conteúdo com ajuda da IA e publique direto no LinkedIn!</>,
-    checklistItemId: 'create-post',
+    pathPattern: '/colaborador/dashboard',
+    message: <><strong>Este é o seu Dashboard.</strong> Aqui você acompanha seus pontos, missões ativas, progresso nas trilhas e o ranking da empresa. Tudo num lugar só.</>,
+    checklistItemId: 'visit-dashboard',
   },
   {
     pathPattern: '/colaborador/calendario',
-    message: <><strong>Seus posts.</strong> Crie conteúdo com ajuda da IA e publique direto no LinkedIn!</>,
-    checklistItemId: 'create-post',
+    message: <><strong>Este é o seu Calendário.</strong> Veja toda a sua pauta de posts organizada por data — fácil de acompanhar o que está agendado e quando vai publicar.</>,
+    checklistItemId: 'visit-calendario',
+  },
+  {
+    pathPattern: '/colaborador/assistente',
+    message: <><strong>Este é o Assistente.</strong> Sua IA que escreve posts com a sua voz. Não é template genérico — é conteúdo que parece você. Use os créditos pra gerar quantos quiser!</>,
+    checklistItemId: 'visit-assistente',
+  },
+  {
+    pathPattern: '/colaborador/linkedin-feed',
+    message: <><strong>Este é o LinkedIn Feed.</strong> Veja o que seus colegas estão publicando — ótimo pra se inspirar, engajar e manter o time conectado.</>,
+    checklistItemId: 'visit-linkedin-feed',
+  },
+  {
+    pathPattern: '/colaborador/analytics',
+    message: <><strong>Este é o seu Analytics.</strong> Acompanhe suas métricas de desempenho no LinkedIn. Pra manter os gráficos atualizados, faça o upload do extrato do LinkedIn Analytics uma vez por mês — fique tranquilo, a gente te manda um lembrete por e-mail!</>,
+    checklistItemId: 'visit-analytics',
+  },
+  {
+    pathPattern: '/colaborador/biblioteca',
+    message: <><strong>Esta é a Biblioteca.</strong> Aqui ficam os conteúdos gerados pela IA e os assets de marca da empresa — imagens, templates e materiais prontos pra usar nos seus posts.</>,
+    checklistItemId: 'visit-biblioteca',
+  },
+  {
+    pathPattern: '/colaborador/marca-pessoal',
+    message: <><strong>Esta é a sua Marca Pessoal.</strong> Defina sua voz, seus pilares de conteúdo e sua proposta de valor. É daqui que a IA aprende a escrever do seu jeito.</>,
+    checklistItemId: 'visit-marca-pessoal',
   },
   {
     pathPattern: '/colaborador/missoes',
-    message: <><strong>Missões do programa.</strong> Complete desafios pra ganhar pontos e recompensas!</>,
-    checklistItemId: 'complete-mission',
+    message: <><strong>Estas são as Missões.</strong> Complete desafios, acumule pontos e suba no ranking. Cada missão concluída te aproxima das recompensas!</>,
+    checklistItemId: 'visit-missoes',
+  },
+  {
+    pathPattern: '/colaborador/recompensas',
+    message: <><strong>Esta é a loja de Recompensas.</strong> Troque seus pontos por prêmios reais. Quanto mais você publica e engaja, mais pontos acumula!</>,
+    checklistItemId: 'visit-recompensas',
+  },
+  {
+    pathPattern: '/colaborador/trilhas',
+    message: <><strong>Estas são as Trilhas.</strong> Conteúdos de aprendizado sobre LinkedIn, marca pessoal e posicionamento. Cada trilha concluída vale pontos!</>,
+    checklistItemId: 'visit-trilhas',
   },
 ];
 
@@ -162,6 +189,19 @@ export function OnboardingShell({
     setHistoricalUploadOpen(true);
   }, []);
 
+  const handleLinkedInConnect = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const token = await getAuthToken();
+      const result = await getLinkedInAuthUrl(token, user.uid);
+      if (result.url) {
+        window.location.href = result.url;
+      }
+    } catch {
+      // Silent fail — user can connect later via settings
+    }
+  }, [user?.uid]);
+
   const handleHistoricalUploadSuccess = useCallback(async () => {
     setHistoricalUploadOpen(false);
     // Marcar item de onboarding como concluído
@@ -187,12 +227,11 @@ export function OnboardingShell({
     return match;
   }, [ob.state.checklistCompleted, ob.state.dismissedTooltips, ob.state.completedItems, tooltipDefs, pathname]);
 
-  // Handler for "Entendi!" — for TL: marks item as completed + dismisses tooltip
-  // For other roles: only dismisses (item is completed by performing the actual action)
+  // Handler for "Entendi!" — for TL and colaborador: marks item as completed + dismisses tooltip
+  // Visiting the page + reading the tooltip is enough — no further action required
   const handleTooltipDismiss = useCallback(async () => {
     if (!currentTooltip) return;
-    if (role === 'thoughtleader') {
-      // Visiting the page + reading the tooltip is enough — complete on "Entendi!"
+    if (role === 'thoughtleader' || role === 'colaborador') {
       await ob.markItemCompleted(currentTooltip.checklistItemId);
     }
     await ob.dismissTooltipForItem(currentTooltip.checklistItemId);
@@ -227,6 +266,7 @@ export function OnboardingShell({
         licensesCount={licensesCount}
         onRequestUpload={handleRequestUpload}
         historyUploaded={historyUploaded}
+        onRequestLinkedInConnect={handleLinkedInConnect}
         onComplete={ob.markWelcomeSeen}
       />
 
