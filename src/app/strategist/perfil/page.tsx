@@ -432,6 +432,7 @@ function ProfileOptimizerEditor({
             <ProfileEditor
               initial={activeSuggestions}
               aiSuggestions={aiSuggestions}
+              currentProfile={profile.current}
               tlUserId={tlId}
               onChange={setEditedSuggestions}
             />

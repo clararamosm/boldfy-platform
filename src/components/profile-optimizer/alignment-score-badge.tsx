@@ -54,8 +54,8 @@ export function AlignmentScoreBadge({
             </div>
             <p className="text-xs opacity-75 mt-0.5">
               {passesAudit
-                ? 'Distribuição desbloqueada — perfil alinhado ao algoritmo'
-                : 'Alcance limitado às conexões de 1º grau'}
+                ? 'Perfil otimizado — distribuição desbloqueada'
+                : 'Perfil otimizado — alcance ainda limitado'}
             </p>
           </div>
         </div>

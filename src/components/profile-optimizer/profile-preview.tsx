@@ -16,6 +16,7 @@ interface ProfilePreviewProps {
   tlName: string;
   tlAvatarUrl?: string;
   readOnly?: boolean;
+  variant?: 'default' | 'before'; // 'before' = estilo cinza sem funcionalidade de cópia
 }
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -39,12 +40,13 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
   );
 }
 
-export function ProfilePreview({ suggestions, tlName, tlAvatarUrl, readOnly = false }: ProfilePreviewProps) {
+export function ProfilePreview({ suggestions, tlName, tlAvatarUrl, readOnly = false, variant = 'default' }: ProfilePreviewProps) {
+  const isBefore = variant === 'before';
   return (
     <TooltipProvider>
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden font-sans text-sm text-gray-800 max-w-2xl mx-auto">
         {/* Banner */}
-        <div className="h-24 bg-gradient-to-r from-violet-600 to-purple-500 relative">
+        <div className={cn('h-24 relative', isBefore ? 'bg-gradient-to-r from-gray-400 to-gray-300' : 'bg-gradient-to-r from-violet-600 to-purple-500')}>
           {/* Avatar */}
           <div className="absolute -bottom-8 left-5 h-16 w-16 rounded-full border-4 border-white bg-gray-200 overflow-hidden">
             {tlAvatarUrl ? (
@@ -55,31 +57,33 @@ export function ProfilePreview({ suggestions, tlName, tlAvatarUrl, readOnly = fa
               </div>
             )}
           </div>
-          {/* Botão Seguir */}
-          <div className="absolute bottom-3 right-4 flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="flex items-center gap-1.5 rounded-full bg-violet-700 text-white text-xs font-semibold px-4 py-1.5 cursor-default">
-                  Seguir
-                  <Info className="h-3 w-3 opacity-70" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs text-xs">
-                <p className="font-semibold mb-1">Como ativar o botão Seguir:</p>
-                <p>LinkedIn → Configurações → Visibilidade → Seguidores e conexões → &quot;Todos no LinkedIn podem seguir você&quot;</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
         </div>
 
         <div className="pt-10 px-5 pb-5 space-y-5">
-          {/* Nome + Headline */}
-          <div className="group flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900">{tlName}</h2>
-              <p className="text-sm text-gray-700 leading-snug mt-0.5">{suggestions.headline}</p>
+          {/* Nome + Headline + Seguir */}
+          <div className="space-y-2">
+            <div className="group flex items-start justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">{tlName}</h2>
+                <p className="text-sm text-gray-700 leading-snug mt-0.5">{suggestions.headline}</p>
+              </div>
+              {!readOnly && <CopyButton text={suggestions.headline} label="Headline" />}
             </div>
-            {!readOnly && <CopyButton text={suggestions.headline} label="Headline" />}
+            {/* Botão Seguir — abaixo do headline, antes do Sobre */}
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="flex items-center gap-1.5 rounded-full border border-violet-600 text-violet-700 text-xs font-semibold px-4 py-1.5 cursor-default hover:bg-violet-50 transition-colors">
+                    Seguir
+                    <Info className="h-3 w-3 opacity-70" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs">
+                  <p className="font-semibold mb-1">Como ativar o botão Seguir:</p>
+                  <p>LinkedIn → Configurações → Visibilidade → Seguidores e conexões → &quot;Todos no LinkedIn podem seguir você&quot;</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
           {/* Sobre */}
