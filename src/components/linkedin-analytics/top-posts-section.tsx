@@ -26,7 +26,7 @@ export function TopPostsSection({ topByEngagement, topByImpressions }: TopPostsS
         </h3>
         <div className="space-y-2">
           {topByEngagement.length > 0
-            ? topByEngagement.map((post, i) => (
+            ? topByEngagement.slice(0, 3).map((post, i) => (
                 <PostCard key={`eng-${i}`} post={post} metric="engagement" />
               ))
             : <p className="text-xs text-muted-foreground">Sem dados disponíveis.</p>
@@ -41,7 +41,7 @@ export function TopPostsSection({ topByEngagement, topByImpressions }: TopPostsS
         </h3>
         <div className="space-y-2">
           {topByImpressions.length > 0
-            ? topByImpressions.map((post, i) => (
+            ? topByImpressions.slice(0, 3).map((post, i) => (
                 <PostCard key={`imp-${i}`} post={post} metric="impressions" />
               ))
             : <p className="text-xs text-muted-foreground">Sem dados disponíveis.</p>

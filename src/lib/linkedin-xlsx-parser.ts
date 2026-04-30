@@ -283,8 +283,11 @@ function parseAba2TopPosts(sheet: XLSX.WorkSheet, mesAno: string): {
   }
 
   return {
-    topPostsByEngagement: byEngagement.slice(0, 3),
-    topPostsByImpressions: byImpressions.slice(0, 3),
+    // Todos os posts do mês — sem slice aqui. O write-back de métricas usa a lista completa
+    // para popular analyticsImpressions/Reactions em todos os posts do contentPipeline.
+    // O display do Analytics (TopPostsSection) aplica slice(0, 3) na renderização.
+    topPostsByEngagement: byEngagement,
+    topPostsByImpressions: byImpressions,
     // Conta posts únicos publicados no mês (union das duas tabelas)
     totalPostsPublished: seenUrlsThisMonth.size,
   };
