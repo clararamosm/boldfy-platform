@@ -1,7 +1,7 @@
 'use client';
 
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { LayoutDashboard, ClipboardList, CalendarDays, Newspaper, UserSearch, FileText, BookOpen, BarChart2 } from "lucide-react";
+import { ClipboardList, CalendarDays, Newspaper, UserSearch, FileText, BookOpen, BarChart2 } from "lucide-react";
 import { useT } from '@/lib/i18n/context';
 
 interface ThoughtLeaderSidebarNavProps {
@@ -11,8 +11,7 @@ interface ThoughtLeaderSidebarNavProps {
 export function ThoughtLeaderSidebarNav({ uploadPending = false }: ThoughtLeaderSidebarNavProps) {
     const t = useT();
     const navItems = [
-        { title: t.nav.dashboard, href: "/thoughtleader/dashboard", icon: LayoutDashboard },
-        { title: t.nav.backlog, href: "/thoughtleader/backlog", icon: ClipboardList },
+        { title: t.nav.backlog, href: "/thoughtleader/dashboard", icon: ClipboardList },
         { title: t.nav.calendar, href: "/thoughtleader/calendario", icon: CalendarDays },
         { title: t.nav.linkedinFeed, href: "/thoughtleader/linkedin-feed", icon: Newspaper },
         { title: t.nav.linkedinLeads, href: "/thoughtleader/linkedin-leads", icon: UserSearch, badge: t.nav.comingSoon, disabled: true },
