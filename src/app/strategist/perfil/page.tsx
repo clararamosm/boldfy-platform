@@ -123,6 +123,8 @@ function ProfileOptimizerEditor({
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [editedSuggestions, setEditedSuggestions] = useState<LinkedInProfileSuggestions | null>(null);
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | undefined>();
+  const [profileBannerUrl, setProfileBannerUrl] = useState<string | undefined>();
 
   // Polling durante 'processing'
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -132,6 +134,8 @@ function ProfileOptimizerEditor({
     const result = await getLinkedInProfile(token, tlId);
     if (result.profile) {
       setProfile(result.profile);
+      if (result.profile.avatarUrl) setProfileAvatarUrl(result.profile.avatarUrl);
+      if (result.profile.bannerUrl) setProfileBannerUrl(result.profile.bannerUrl);
       // Inicializar editedSuggestions com edited (se existir) ou suggestions
       if (result.profile.edited) setEditedSuggestions(result.profile.edited);
       else if (result.profile.suggestions) setEditedSuggestions(result.profile.suggestions);
@@ -435,6 +439,8 @@ function ProfileOptimizerEditor({
               currentProfile={profile.current}
               tlUserId={tlId}
               onChange={setEditedSuggestions}
+              onAvatarUrl={setProfileAvatarUrl}
+              onBannerUrl={setProfileBannerUrl}
             />
           </div>
 
@@ -445,6 +451,8 @@ function ProfileOptimizerEditor({
               suggestions={activeSuggestions}
               tlName={tlName}
               tlAvatarUrl={tlAvatarUrl}
+              profileAvatarUrl={profileAvatarUrl}
+              profileBannerUrl={profileBannerUrl}
               readOnly={false}
             />
           </div>

@@ -13,21 +13,24 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Sparkles, ChevronDown, ChevronUp, ImagePlus, X, CheckSquare } from 'lucide-react';
+import { Sparkles, ChevronDown, ChevronUp, ImagePlus, X, CheckSquare, Camera, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { recalculateAlignmentScore } from '@/app/actions/profile-optimizer';
+import { recalculateAlignmentScore, uploadProfileImage, uploadProfileScreenshot } from '@/app/actions/profile-optimizer';
 import { getAuthToken } from '@/lib/auth-client';
 import { AlignmentScoreBadge } from './alignment-score-badge';
+import { useToast } from '@/hooks/use-toast';
 
 interface ProfileEditorProps {
   initial: LinkedInProfileSuggestions;
   aiSuggestions: LinkedInProfileSuggestions;
-  currentProfile?: LinkedInProfileCurrent | null; // perfil extraído do PDF (original)
+  currentProfile?: LinkedInProfileCurrent | null;
   tlUserId: string;
   onChange: (updated: LinkedInProfileSuggestions) => void;
+  onAvatarUrl?: (url: string) => void;
+  onBannerUrl?: (url: string) => void;
 }
 
-export function ProfileEditor({ initial, aiSuggestions, currentProfile, tlUserId, onChange }: ProfileEditorProps) {
+export function ProfileEditor({ initial, aiSuggestions, currentProfile, tlUserId, onChange, onAvatarUrl, onBannerUrl }: ProfileEditorProps) {
   const [data, setData] = useState<LinkedInProfileSuggestions>(initial);
   const [alignment, setAlignment] = useState<ProfileSemanticAlignment>(initial.semanticAlignment);
   const [scoreLoading, setScoreLoading] = useState(false);
@@ -102,6 +105,9 @@ export function ProfileEditor({ initial, aiSuggestions, currentProfile, tlUserId
           </ul>
         </div>
       )}
+
+      {/* Fotos & Print */}
+      <PhotosPanel tlUserId={tlUserId} onAvatarUrl={onAvatarUrl} onBannerUrl={onBannerUrl} />
 
       {/* Abas */}
       <Tabs defaultValue="headline">
@@ -454,6 +460,179 @@ function ExperienceEditorItem({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Painel de Fotos & Print ──────────────────────────────────────────────────
+
+function PhotosPanel({
+  tlUserId,
+  onAvatarUrl,
+  onBannerUrl,
+}: {
+  tlUserId: string;
+  onAvatarUrl?: (url: string) => void;
+  onBannerUrl?: (url: string) => void;
+}) {
+  const { toast } = useToast();
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+  const screenshotInputRef = useRef<HTMLInputElement>(null);
+
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingScreenshot, setUploadingScreenshot] = useState(false);
+
+  async function handleImageUpload(
+    file: File,
+    type: 'avatar' | 'banner',
+    setPreview: (url: string) => void,
+    setUploading: (v: boolean) => void,
+    onUrl?: (url: string) => void,
+  ) {
+    setUploading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      const token = await getAuthToken();
+      const result = await uploadProfileImage(token, tlUserId, type, base64, file.type);
+      if (result.error) throw new Error(result.error);
+      setPreview(URL.createObjectURL(file));
+      if (result.url) onUrl?.(result.url);
+      toast({ description: `${type === 'avatar' ? 'Foto de perfil' : 'Capa'} enviada!` });
+    } catch (err) {
+      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao enviar imagem.' });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleScreenshot(file: File) {
+    setUploadingScreenshot(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      const token = await getAuthToken();
+      const result = await uploadProfileScreenshot(token, tlUserId, base64, file.type);
+      if (result.error) throw new Error(result.error);
+      setScreenshotPreview(URL.createObjectURL(file));
+      toast({ description: 'Print enviado! A IA está extraindo as competências e destaques...' });
+    } catch (err) {
+      toast({ variant: 'destructive', description: err instanceof Error ? err.message : 'Erro ao enviar print.' });
+    } finally {
+      setUploadingScreenshot(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border p-4 space-y-4">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fotos & Print do perfil</p>
+
+      {/* Linha 1: Foto de perfil + Banner (assets novos/otimizados) */}
+      <div className="grid grid-cols-2 gap-3">
+        {/* Avatar */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Foto de perfil <span className="text-muted-foreground">(nova)</span></Label>
+          <div
+            className={cn(
+              'relative h-20 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition-colors',
+              avatarPreview ? 'border-transparent' : 'border-gray-200 hover:border-violet-300 bg-gray-50',
+            )}
+            onClick={() => avatarInputRef.current?.click()}
+          >
+            {avatarPreview ? (
+              <>
+                <img src={avatarPreview} alt="Avatar" className="h-full w-full object-cover" />
+                <button type="button" className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/50 text-white flex items-center justify-center"
+                  onClick={(e) => { e.stopPropagation(); setAvatarPreview(null); }}>
+                  <X className="h-3 w-3" />
+                </button>
+              </>
+            ) : uploadingAvatar ? (
+              <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                <Camera className="h-5 w-5" />
+                <span className="text-[10px]">JPEG / PNG</span>
+              </div>
+            )}
+            <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/jpg" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, 'avatar', setAvatarPreview, setUploadingAvatar, onAvatarUrl); }} />
+          </div>
+        </div>
+
+        {/* Banner */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Capa do perfil <span className="text-muted-foreground">(nova)</span></Label>
+          <div
+            className={cn(
+              'relative h-20 rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition-colors',
+              bannerPreview ? 'border-transparent' : 'border-gray-200 hover:border-violet-300 bg-gray-50',
+            )}
+            onClick={() => bannerInputRef.current?.click()}
+          >
+            {bannerPreview ? (
+              <>
+                <img src={bannerPreview} alt="Banner" className="h-full w-full object-cover" />
+                <button type="button" className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/50 text-white flex items-center justify-center"
+                  onClick={(e) => { e.stopPropagation(); setBannerPreview(null); }}>
+                  <X className="h-3 w-3" />
+                </button>
+              </>
+            ) : uploadingBanner ? (
+              <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                <ImagePlus className="h-5 w-5" />
+                <span className="text-[10px]">JPEG / PNG</span>
+              </div>
+            )}
+            <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/jpg" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f, 'banner', setBannerPreview, setUploadingBanner, onBannerUrl); }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Linha 2: Print do perfil atual (para IA extrair dados) */}
+      <div className="space-y-1.5">
+        <Label className="text-xs">
+          Print do perfil atual{' '}
+          <span className="text-muted-foreground">(a IA extrai as 5 competências fixadas e os cards de Destaque)</span>
+        </Label>
+        <div
+          className={cn(
+            'relative rounded-lg border-2 border-dashed flex items-center justify-center cursor-pointer overflow-hidden transition-colors',
+            screenshotPreview ? 'border-transparent h-40' : 'h-16 border-gray-200 hover:border-violet-300 bg-gray-50',
+          )}
+          onClick={() => screenshotInputRef.current?.click()}
+        >
+          {screenshotPreview ? (
+            <>
+              <img src={screenshotPreview} alt="Print" className="h-full w-full object-cover object-top" />
+              <button type="button" className="absolute top-1 right-1 h-5 w-5 rounded-full bg-black/50 text-white flex items-center justify-center"
+                onClick={(e) => { e.stopPropagation(); setScreenshotPreview(null); }}>
+                <X className="h-3 w-3" />
+              </button>
+            </>
+          ) : uploadingScreenshot ? (
+            <div className="flex items-center gap-2 text-violet-500 text-xs">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Enviando e analisando...</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-muted-foreground text-xs">
+              <Camera className="h-4 w-4" />
+              <span>Enviar print do perfil atual (do topo até os Destaques)</span>
+            </div>
+          )}
+          <input ref={screenshotInputRef} type="file" accept="image/jpeg,image/png,image/jpg" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleScreenshot(f); }} />
+        </div>
+      </div>
     </div>
   );
 }

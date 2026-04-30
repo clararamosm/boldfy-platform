@@ -14,9 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 interface ProfilePreviewProps {
   suggestions: LinkedInProfileSuggestions;
   tlName: string;
-  tlAvatarUrl?: string;
+  tlAvatarUrl?: string;        // foto de perfil (do auth ou do Storage)
+  profileAvatarUrl?: string;   // foto de perfil enviada pelo editor (Storage)
+  profileBannerUrl?: string;   // foto de banner enviada pelo editor (Storage)
   readOnly?: boolean;
-  variant?: 'default' | 'before'; // 'before' = estilo cinza sem funcionalidade de cópia
+  variant?: 'default' | 'before';
 }
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -40,17 +42,22 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
   );
 }
 
-export function ProfilePreview({ suggestions, tlName, tlAvatarUrl, readOnly = false, variant = 'default' }: ProfilePreviewProps) {
+export function ProfilePreview({ suggestions, tlName, tlAvatarUrl, profileAvatarUrl, profileBannerUrl, readOnly = false, variant = 'default' }: ProfilePreviewProps) {
   const isBefore = variant === 'before';
+  // Prioridade: foto enviada pelo editor > foto do auth
+  const avatarSrc = profileAvatarUrl || tlAvatarUrl;
   return (
     <TooltipProvider>
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden font-sans text-sm text-gray-800 max-w-2xl mx-auto">
         {/* Banner */}
-        <div className={cn('h-24 relative', isBefore ? 'bg-gradient-to-r from-gray-400 to-gray-300' : 'bg-gradient-to-r from-violet-600 to-purple-500')}>
+        <div className={cn('h-32 relative', !profileBannerUrl && (isBefore ? 'bg-gradient-to-r from-gray-400 to-gray-300' : 'bg-gradient-to-r from-violet-600 to-purple-500'))}>
+          {profileBannerUrl && (
+            <img src={profileBannerUrl} alt="Banner" className="h-full w-full object-cover" />
+          )}
           {/* Avatar */}
           <div className="absolute -bottom-8 left-5 h-16 w-16 rounded-full border-4 border-white bg-gray-200 overflow-hidden">
-            {tlAvatarUrl ? (
-              <img src={tlAvatarUrl} alt={tlName} className="h-full w-full object-cover" />
+            {avatarSrc ? (
+              <img src={avatarSrc} alt={tlName} className="h-full w-full object-cover" />
             ) : (
               <div className="h-full w-full flex items-center justify-center text-xl font-bold text-gray-500">
                 {tlName.charAt(0).toUpperCase()}

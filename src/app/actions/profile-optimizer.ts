@@ -231,7 +231,7 @@ Não invente dados. Use exatamente o que está no texto.
 ESTRUTURA ESPERADA:
 {
   "headline": string,
-  "about": string,
+  "about": string,  // Preservar parágrafos com \n\n entre eles — NÃO juntar em um bloco
   "topSkills": string[],  // máx 5, seção "Principais competências" ou "Top Skills"
   "experiences": [
     {
@@ -324,7 +324,7 @@ Gere sugestões de otimização para cada seção seguindo as regras do 360Brew 
 Retorne um JSON válido com esta estrutura:
 {
   "headline": string,
-  "about": string,
+  "about": string,  // OBRIGATÓRIO: separar cada parágrafo com \n\n — máx 4 parágrafos curtos
   "topSkills": string[5],
   "experiences": [
     {
@@ -717,5 +717,163 @@ export async function recalculateAlignmentScore(
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Erro desconhecido';
     return { error: message };
+  }
+}
+
+/**
+ * Upload de foto de perfil ou banner para o Storage.
+ * type: 'avatar' | 'banner'
+ * imageBase64: base64 da imagem (JPEG/PNG)
+ * Returns: URL pública do arquivo no Storage
+ */
+export async function uploadProfileImage(
+  idToken: string,
+  tlUserId: string,
+  type: 'avatar' | 'banner',
+  imageBase64: string,
+  mimeType: string,
+): Promise<{ url?: string; error?: string }> {
+  try {
+    await requireProfileAccess(idToken, tlUserId);
+
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    const buffer = Buffer.from(imageBase64, 'base64');
+    const bucket = adminStorage.bucket();
+    const filePath = `linkedinProfiles/${tlUserId}/${type}.${ext}`;
+    const file = bucket.file(filePath);
+    await file.save(buffer, {
+      contentType: mimeType,
+      metadata: { cacheControl: 'public, max-age=3600' },
+    });
+    await file.makePublic();
+    const url = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+
+    // Salvar URL no documento do perfil
+    const docRef = profileDocRef(tlUserId);
+    const doc = await docRef.get();
+    if (doc.exists) {
+      await docRef.update({ [`${type}Url`]: url });
+    } else {
+      await docRef.set({
+        current: null, suggestions: null, edited: null,
+        editedAt: null, status: 'empty', publishedAt: null,
+        [`${type}Url`]: url,
+      });
+    }
+
+    return { url };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Erro desconhecido';
+    return { error: message };
+  }
+}
+
+/**
+ * Upload do print do perfil LinkedIn (imagem).
+ * A IA vai usar a imagem para extrair dados não disponíveis no PDF:
+ * as 5 competências fixadas, os cards do Destaque, e confirmar o avatar/banner.
+ * O processamento roda em background igual ao PDF.
+ */
+export async function uploadProfileScreenshot(
+  idToken: string,
+  tlUserId: string,
+  imageBase64: string,
+  mimeType: string,
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    await requireProfileAccess(idToken, tlUserId);
+
+    const caller = await requireAuth(idToken);
+    if (caller.uid === tlUserId && caller.role === 'thoughtleader') {
+      return { error: 'Apenas a estrategista pode enviar o print do perfil.' };
+    }
+
+    // Salvar no Storage
+    const ext = mimeType.includes('png') ? 'png' : 'jpg';
+    const buffer = Buffer.from(imageBase64, 'base64');
+    const bucket = adminStorage.bucket();
+    const filePath = `linkedinProfiles/${tlUserId}/profile-screenshot.${ext}`;
+    const file = bucket.file(filePath);
+    await file.save(buffer, { contentType: mimeType });
+
+    // Enriquecer perfil existente com dados da imagem em background
+    enrichProfileFromScreenshotInBackground(tlUserId, imageBase64, mimeType).catch((err) =>
+      console.error('[profile-optimizer] enrichProfileFromScreenshotInBackground error:', err),
+    );
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Erro desconhecido';
+    return { error: message };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Enriquecimento do perfil com dados do print (imagem)
+// ---------------------------------------------------------------------------
+
+async function enrichProfileFromScreenshotInBackground(
+  tlUserId: string,
+  imageBase64: string,
+  mimeType: string,
+): Promise<void> {
+  const docRef = profileDocRef(tlUserId);
+  console.log('[profile-optimizer] Enriquecendo perfil com screenshot...');
+  try {
+    const prompt = `Você está vendo um print do perfil LinkedIn de uma pessoa.
+Extraia APENAS as informações que são visíveis NA IMAGEM e retorne um JSON com:
+{
+  "topSkills": string[],        // As 5 competências fixadas no topo do perfil (seção "Principais competências" ou logo abaixo do Sobre). APENAS as fixadas, não todas.
+  "featuredItems": [
+    {
+      "title": string,           // Título do card de Destaque
+      "url": null,               // URL não é visível na imagem
+      "imageUrl": null           // URL da imagem do card (não disponível no print)
+    }
+  ],
+  "hasFollowButton": boolean,   // true se o botão "Seguir" está visível no perfil
+  "headline": string | null,    // Headline se visível, null caso contrário
+  "about": string | null        // Início do Sobre se visível, null caso contrário
+}
+
+Se alguma seção não estiver visível na imagem, retorne array vazio ou null.
+Retorne APENAS o JSON, sem markdown.`;
+
+    const response = await ai.generate({
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { text: prompt },
+            { media: { url: `data:${mimeType};base64,${imageBase64}`, contentType: mimeType } },
+          ],
+        },
+      ],
+    });
+
+    const clean = response.text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '');
+    const parsed = JSON.parse(clean);
+    console.log('[profile-optimizer] Screenshot parsed, skills:', parsed.topSkills);
+
+    // Fazer merge com o current existente (não sobrescrever tudo)
+    const doc = await docRef.get();
+    if (!doc.exists) return;
+
+    const existing = doc.data() as { current?: Record<string, unknown> };
+    const currentData = existing.current || {};
+
+    const mergedCurrent = {
+      ...currentData,
+      ...(parsed.topSkills?.length > 0 ? { topSkills: parsed.topSkills } : {}),
+      ...(parsed.featuredItems?.length > 0 ? { featuredItems: parsed.featuredItems } : {}),
+      ...(parsed.headline ? { headline: parsed.headline } : {}),
+      ...(parsed.about ? { about: parsed.about } : {}),
+    };
+
+    await docRef.update({ current: mergedCurrent });
+    console.log('[profile-optimizer] Perfil enriquecido com dados do screenshot!');
+  } catch (err) {
+    console.error('[profile-optimizer] Erro ao enriquecer com screenshot:', err);
+    // Não reverte status — é enriquecimento opcional
   }
 }

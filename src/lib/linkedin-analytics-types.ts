@@ -225,4 +225,7 @@ export type LinkedInProfileOptimization = {
   status: 'empty' | 'processing' | 'ready' | 'published' | 'error';
   publishedAt: string | null;
   errorMessage?: string;
+  // Fotos do perfil (URLs do Storage)
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
 };
