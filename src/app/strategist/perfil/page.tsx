@@ -312,7 +312,6 @@ function ProfileOptimizerEditor({
               onPendingScreenshot={setPendingScreenshot}
               onUpload={handleUpload}
               uploading={uploading}
-              label="Tentar novamente"
             />
             <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={handleReset} disabled={resetting}>
               {resetting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
@@ -437,6 +436,7 @@ function ProfileOptimizerEditor({
               type="file"
               accept="application/pdf"
               className="hidden"
+              onChange={handleUpload}
             />
             <input
               ref={screenshotInputRef}
@@ -449,12 +449,7 @@ function ProfileOptimizerEditor({
               variant="outline"
               size="sm"
               className="gap-2"
-              onClick={() => {
-                if (pdfInputRef.current) {
-                  pdfInputRef.current.onchange = () => handleUpload();
-                  pdfInputRef.current.click();
-                }
-              }}
+              onClick={() => pdfInputRef.current?.click()}
               disabled={uploading}
             >
               {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
@@ -541,7 +536,6 @@ function UploadForm({
   onPendingScreenshot,
   onUpload,
   uploading,
-  label = 'Analisar perfil',
 }: {
   pdfInputRef: { current: HTMLInputElement | null };
   screenshotInputRef: { current: HTMLInputElement | null };
@@ -549,7 +543,6 @@ function UploadForm({
   onPendingScreenshot: (f: File | null) => void;
   onUpload: () => void;
   uploading: boolean;
-  label?: string;
 }) {
   return (
     <div className="w-full max-w-sm space-y-3">
@@ -560,6 +553,7 @@ function UploadForm({
           type="file"
           accept="application/pdf"
           className="hidden"
+          onChange={onUpload}
         />
         <Button
           onClick={() => pdfInputRef.current?.click()}
@@ -596,15 +590,12 @@ function UploadForm({
         </button>
       </div>
 
-      {/* Botão enviar */}
-      <Button
-        onClick={onUpload}
-        disabled={uploading}
-        className="w-full gap-2"
-      >
-        {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-        {uploading ? 'Enviando...' : label}
-      </Button>
+      {uploading && (
+        <div className="flex items-center justify-center gap-2 text-sm text-violet-600 py-1">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Enviando e processando...</span>
+        </div>
+      )}
     </div>
   );
 }
