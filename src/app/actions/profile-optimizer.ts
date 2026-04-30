@@ -298,7 +298,7 @@ function currentToEditedInitial(current: LinkedInProfileCurrent): LinkedInProfil
     experiences: current.experiences.map((e) => ({
       ...e,
       action: 'keep' as const,
-      rewrittenDescription: undefined,
+      // rewrittenDescription omitido intencionalmente — undefined rejeitado pelo Firestore
     })),
     featuredItems: current.featuredItems.map((f) => ({
       title: f.title,
