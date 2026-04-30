@@ -68,7 +68,12 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
       .where('status', '==', 'postado')
       .get();
 
-    if (pipelineSnap.empty) return;
+    console.log(`[enrich] userId=${userId} mesAno=${mesAno} pipeline_posts=${pipelineSnap.size}`);
+
+    if (pipelineSnap.empty) {
+      console.log(`[enrich] Sem posts postados no pipeline — enriquecimento não possível`);
+      return;
+    }
 
     type EnrichmentEntry = {
       postId: string;
@@ -98,20 +103,33 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
       if (url) {
         // Match preciso via ID numérico do LinkedIn — compatível com urn:li:share e urn:li:activity
         const key = normalizeLinkedInUrl(url);
+        console.log(`[enrich] pipeline doc=${doc.id} linkedinPostUrl="${url}" normalized="${key}"`);
         if (key) {
           urlMap[key] = entry;
           continue;
         }
+      } else {
+        console.log(`[enrich] pipeline doc=${doc.id} sem linkedinPostUrl — tentando fallback por publishedAt`);
       }
 
       // Fallback: indexar por data de publicação (YYYY-MM-DD) para posts sem URL
       const publishedAt = d.publishedAt as string | undefined;
       if (publishedAt && publishedAt.startsWith(mesAno)) {
         const dayKey = publishedAt.substring(0, 10);
+        console.log(`[enrich] pipeline doc=${doc.id} publishedAt=${publishedAt} → fallback dateMap[${dayKey}]`);
         if (!dateMap[dayKey]) dateMap[dayKey] = [];
         dateMap[dayKey].push(entry);
+      } else {
+        console.log(`[enrich] pipeline doc=${doc.id} publishedAt="${publishedAt}" não cobre mesAno=${mesAno} — sem match`);
       }
     }
+
+    const topUrls = [
+      ...(data.topPostsByEngagement ?? []),
+      ...(data.topPostsByImpressions ?? []),
+    ].map(p => normalizeLinkedInUrl(p.url));
+    console.log(`[enrich] top post keys (normalized): ${JSON.stringify([...new Set(topUrls)])}`);
+    console.log(`[enrich] urlMap keys: ${JSON.stringify(Object.keys(urlMap))}`);
 
     // Enriquecer cada top post — prioridade: match por URL > match por data
     function enrichList(posts: typeof data.topPostsByEngagement) {
@@ -119,13 +137,24 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
         // 1. Match exato por ID numérico do LinkedIn
         const key = normalizeLinkedInUrl(post.url);
         const byUrl = key ? urlMap[key] : undefined;
-        if (byUrl) return { ...post, ...byUrl };
+        if (byUrl) {
+          console.log(`[enrich] ✓ URL match: post.url="${post.url}" → postId=${byUrl.postId}`);
+          return { ...post, ...byUrl };
+        }
 
         // 2. Fallback: se o post ainda não tem caption/mediaUrl, tentar match por data
         // (só aplica se há exatamente 1 post do pipeline naquela data — evita match errado)
         if (!post.caption && !post.mediaUrl && post.date) {
           const candidates = dateMap[post.date];
-          if (candidates?.length === 1) return { ...post, ...candidates[0] };
+          if (candidates?.length === 1) {
+            console.log(`[enrich] ✓ date match: post.date="${post.date}" → postId=${candidates[0].postId}`);
+            return { ...post, ...candidates[0] };
+          }
+          if (candidates && candidates.length > 1) {
+            console.log(`[enrich] ✗ date ambíguo: post.date="${post.date}" tem ${candidates.length} candidatos — sem match`);
+          } else {
+            console.log(`[enrich] ✗ sem match: post.url="${post.url}" date="${post.date}" — chave normalizada="${key}"`);
+          }
         }
 
         return post;
@@ -136,6 +165,8 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
       topPostsByEngagement: enrichList(data.topPostsByEngagement ?? []),
       topPostsByImpressions: enrichList(data.topPostsByImpressions ?? []),
     });
+
+    console.log(`[enrich] snapshot ${mesAno} atualizado com sucesso`);
   } catch (err) {
     // Falha silenciosa — o snapshot já está salvo e é válido sem o enriquecimento
     console.error('[linkedin-analytics] enrichSnapshotWithPostData error:', err);
@@ -159,9 +190,18 @@ export async function uploadLinkedInSnapshot(
   try {
     const caller = await requireAuth(idToken);
 
-    // Apenas o próprio usuário pode fazer upload
+    // Autorizado: próprio usuário, master, admin (mesma empresa), strategist (com acesso ao TL)
     if (caller.uid !== userId && caller.role !== 'master') {
-      return { error: 'Acesso negado: apenas o próprio usuário pode fazer upload.' };
+      if (caller.role === 'admin') {
+        const tlDoc = await adminDb.collection('users').doc(userId).get();
+        if (!tlDoc.exists || tlDoc.data()?.companyId !== caller.companyId) {
+          return { error: 'Acesso negado: TL não pertence à sua empresa.' };
+        }
+      } else if (caller.role === 'strategist') {
+        await requireStrategistForTL(idToken, userId);
+      } else {
+        return { error: 'Acesso negado.' };
+      }
     }
 
     const { mesAno } = snapshotData;
@@ -214,8 +254,18 @@ export async function uploadLinkedInSnapshotBatch(
   try {
     const caller = await requireAuth(idToken);
 
+    // Autorizado: próprio usuário, master, admin (mesma empresa), strategist (com acesso ao TL)
     if (caller.uid !== userId && caller.role !== 'master') {
-      return { error: 'Acesso negado: apenas o próprio usuário pode fazer upload.' };
+      if (caller.role === 'admin') {
+        const tlDoc = await adminDb.collection('users').doc(userId).get();
+        if (!tlDoc.exists || tlDoc.data()?.companyId !== caller.companyId) {
+          return { error: 'Acesso negado: TL não pertence à sua empresa.' };
+        }
+      } else if (caller.role === 'strategist') {
+        await requireStrategistForTL(idToken, userId);
+      } else {
+        return { error: 'Acesso negado.' };
+      }
     }
 
     if (!snapshots.length) {
@@ -251,8 +301,10 @@ export async function uploadLinkedInSnapshotBatch(
       'linkedinSnapshotStatus.lastUploadAt': now,
     });
 
-    // Enriquecimento do mês mais recente (top posts)
-    enrichSnapshotWithPostData(userId, latestMonth).catch(() => {});
+    // Enriquecimento de todos os meses salvos (top posts)
+    for (const month of savedMonths) {
+      enrichSnapshotWithPostData(userId, month).catch(() => {});
+    }
 
     return { success: true, savedMonths };
   } catch (err) {
