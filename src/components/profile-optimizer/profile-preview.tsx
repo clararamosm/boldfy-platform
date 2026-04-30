@@ -237,7 +237,7 @@ function ExperienceCard({
           </div>
         </div>
         {displayDescription && (
-          <p className="mt-1 text-xs text-gray-600 leading-relaxed line-clamp-4">
+          <p className="mt-1 text-xs text-gray-600 leading-relaxed whitespace-pre-line">
             {displayDescription}
           </p>
         )}

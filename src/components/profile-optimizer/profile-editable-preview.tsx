@@ -101,18 +101,21 @@ function InlineText({
     );
   }
 
+  // Campos multiline usam div (block) para suportar whitespace-pre-line e ocupar toda a largura
+  const Tag = multiline ? 'div' : 'span';
   return (
-    <span
+    <Tag
       onClick={() => setEditing(true)}
       title="Clique para editar"
       className={cn(
         'cursor-text hover:bg-violet-50 hover:outline hover:outline-1 hover:outline-violet-200 rounded px-0.5 -mx-0.5 transition-colors',
+        multiline && 'whitespace-pre-line w-full',
         !value && 'text-gray-400 italic',
         className,
       )}
     >
       {value || placeholder}
-    </span>
+    </Tag>
   );
 }
 
@@ -350,7 +353,6 @@ export function ProfileEditablePreview({
                   multiline
                   rows={8}
                   placeholder="Seção Sobre..."
-                  className="whitespace-pre-line"
                 />
               </div>
               <div className="absolute top-0 right-0">
@@ -603,7 +605,6 @@ function EditableExperienceCard({
               multiline
               rows={4}
               placeholder="Descrição da experiência..."
-              className="leading-relaxed"
             />
           </div>
         )}
