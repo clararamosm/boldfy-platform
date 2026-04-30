@@ -284,12 +284,34 @@ function LocationMap({ items }: LocationMapProps) {
   const formatPct = (n: number) =>
     n < 1 ? '<1%' : `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}%`;
 
+  // LinkedIn exporta localidades no formato "Cidade e Região" ou "Estado, UF"
+  // Tenta fazer lookup exato e, se falhar, tenta variantes extraídas do label
+  function findCentroid(label: string): [number, number] | undefined {
+    // 1. Lookup exato
+    if (BR_LOCATIONS[label]) return BR_LOCATIONS[label];
+
+    // 2. "Cidade e Região" → tenta "Cidade" (remove " e Região", " e Reg.", " e região")
+    const semRegiao = label.replace(/\s+e\s+regi[ãa]o.*/i, '').trim();
+    if (semRegiao !== label && BR_LOCATIONS[semRegiao]) return BR_LOCATIONS[semRegiao];
+
+    // 3. "Cidade, UF" → tenta só "Cidade" (remove ", XX")
+    const semUF = label.replace(/,\s*[A-Z]{2}$/, '').trim();
+    if (semUF !== label && BR_LOCATIONS[semUF]) return BR_LOCATIONS[semUF];
+
+    // 4. Procura parcial: se alguma chave do mapa está contida no início do label
+    for (const key of Object.keys(BR_LOCATIONS)) {
+      if (label.startsWith(key)) return BR_LOCATIONS[key];
+    }
+
+    return undefined;
+  }
+
   // Split items into those matched on the Brazil map vs others (e.g., Portugal, USA)
   const brazilDots: Array<{ label: string; pct: number; cx: number; cy: number; r: number }> = [];
   const otherItems: Array<{ label: string; pct: number }> = [];
 
   for (const item of top) {
-    const centroid = BR_LOCATIONS[item.label];
+    const centroid = findCentroid(item.label);
     if (centroid) {
       const r = 4 + (item.percentage / maxPct) * 10; // radius 4–14
       brazilDots.push({ label: item.label, pct: item.percentage, cx: centroid[0], cy: centroid[1], r });

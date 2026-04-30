@@ -91,12 +91,18 @@ function parsePercentage(val: unknown): number {
  */
 export function normalizeLinkedInUrl(url: string): string {
   if (!url) return '';
+  // Decodificar percent-encoding — o cron salva a URL com urn%3Ali%3Ashare%3AXXX
+  // enquanto o XLSX exporta urn:li:activity:XXX (sem encoding).
+  // Sem decode, o regex não encontra "urn:li:" na string e o match falha.
+  let decoded = url;
+  try { decoded = decodeURIComponent(url); } catch { /* mantém original se decode falhar */ }
+
   // Captura o ID numérico de qualquer variante: urn:li:activity:XXX, urn:li:share:XXX, etc.
-  const urnMatch = url.match(/urn:li:[^:]+:(\d+)/);
+  const urnMatch = decoded.match(/urn:li:[^:]+:(\d+)/);
   if (urnMatch) return urnMatch[1];
   // Fallback: últimos dígitos contínuos da URL (ex: /posts/123456/)
-  const numMatch = url.match(/(\d{8,})\/?$/);
-  return numMatch ? numMatch[1] : url.trim();
+  const numMatch = decoded.match(/(\d{8,})\/?$/);
+  return numMatch ? numMatch[1] : decoded.trim();
 }
 
 /**
