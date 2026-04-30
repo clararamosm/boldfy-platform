@@ -459,46 +459,59 @@ async function getRecentPostCaptions(tlUserId: string): Promise<string[]> {
 
 async function processPdfInBackground(tlUserId: string, pdfBuffer: Buffer): Promise<void> {
   const docRef = profileDocRef(tlUserId);
+  console.log(`[profile-optimizer] Iniciando processamento para ${tlUserId}, buffer size: ${pdfBuffer.length}`);
   try {
     // Salvar PDF no Storage (opcional — não bloqueia o processamento se Storage não estiver configurado)
     try {
       const bucket = adminStorage.bucket();
       const file = bucket.file(`linkedinProfiles/${tlUserId}/profile.pdf`);
       await file.save(pdfBuffer, { contentType: 'application/pdf' });
+      console.log('[profile-optimizer] PDF salvo no Storage');
     } catch (storageErr) {
       console.warn('[profile-optimizer] Storage indisponível, continuando sem salvar PDF:', storageErr);
     }
 
     // Extrair texto do PDF via pdfjs-dist
+    console.log('[profile-optimizer] Extraindo texto do PDF...');
     const pdfText = await extractTextFromPdfBuffer(pdfBuffer);
+    console.log(`[profile-optimizer] Texto extraído: ${pdfText.length} chars`);
 
     // Prompt 1: extrair estrutura do perfil atual
+    console.log('[profile-optimizer] Executando Prompt 1 (extração)...');
     const current = await extractProfileFromPdfText(pdfText);
-    await docRef.update({ current, 'status': 'processing' });
+    console.log('[profile-optimizer] Prompt 1 concluído, headline:', current.headline?.slice(0, 50));
+    await docRef.update({ current, status: 'processing' });
 
     // Buscar contextos necessários para o Prompt 2
+    console.log('[profile-optimizer] Buscando brand context e posts...');
     const [brandContext, recentCaptions, bestPracticesText] = await Promise.all([
       getBrandContext(tlUserId),
       getRecentPostCaptions(tlUserId),
       getBestPracticesText(),
     ]);
+    console.log(`[profile-optimizer] Brand context ok, posts: ${recentCaptions.length}`);
 
     // Prompt 2: gerar sugestões
+    console.log('[profile-optimizer] Executando Prompt 2 (sugestões)...');
     const suggestions = await generateSuggestions(
       current,
       brandContext,
       recentCaptions,
       bestPracticesText,
     );
+    console.log('[profile-optimizer] Prompt 2 concluído, score:', suggestions.semanticAlignment?.score);
 
     await docRef.update({
       current,
       suggestions,
       status: 'ready',
     });
+    console.log('[profile-optimizer] Processamento concluído com sucesso!');
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error('[profile-optimizer] Erro no processamento do PDF:', errMsg, err);
+    const errStack = err instanceof Error ? err.stack : '';
+    console.error('[profile-optimizer] ERRO no processamento:', errMsg);
+    console.error('[profile-optimizer] Stack:', errStack);
     await docRef.update({ status: 'error', errorMessage: errMsg }).catch(() => {});
   }
 }
