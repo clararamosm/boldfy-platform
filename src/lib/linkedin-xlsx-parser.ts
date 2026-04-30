@@ -294,31 +294,46 @@ function parseAba3Seguidores(sheet: XLSX.WorkSheet): {
  * Mapa de aliases: chave = variações possíveis (lower), valor = nome canônico.
  */
 const CATEGORY_ALIASES: Record<string, string> = {
-  // Cargo
+  // Cargo (singular e plural — LinkedIn PT-BR exporta "Cargos")
   'cargo': 'Cargo',
+  'cargos': 'Cargo',
   'function': 'Cargo',
   'job function': 'Cargo',
   'job title': 'Cargo',
   'função': 'Cargo',
-  // Setor
+  'funcoes': 'Cargo',
+  'funções': 'Cargo',
+  // Setor (singular e plural — LinkedIn PT-BR exporta "Setores")
   'setor': 'Setor',
+  'setores': 'Setor',
   'industry': 'Setor',
+  'industries': 'Setor',
   'indústria': 'Setor',
   'industria': 'Setor',
   // Tamanho da empresa
   'tamanho da empresa': 'Tamanho da empresa',
   'company size': 'Tamanho da empresa',
   'porte da empresa': 'Tamanho da empresa',
-  // Senioridade
+  // Senioridade (LinkedIn PT-BR exporta "Nível de experiência")
   'senioridade': 'Senioridade',
   'seniority': 'Senioridade',
   'experience': 'Senioridade',
+  'nível de experiência': 'Senioridade',
+  'nivel de experiencia': 'Senioridade',
+  'nível de senioridade': 'Senioridade',
+  'nivel de senioridade': 'Senioridade',
   'nível hierárquico': 'Senioridade',
   'nivel hierarquico': 'Senioridade',
-  // Localização
+  'seniority level': 'Senioridade',
+  // Localização (LinkedIn PT-BR exporta "Localidades")
   'localização': 'Localização',
   'localizacao': 'Localização',
+  'localidades': 'Localização',
+  'localidade': 'Localização',
   'location': 'Localização',
+  'locations': 'Localização',
+  'geography': 'Localização',
+  'geographies': 'Localização',
   'país': 'País',
   'pais': 'País',
   'country': 'País',
