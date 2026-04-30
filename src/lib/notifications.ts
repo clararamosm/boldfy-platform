@@ -8,20 +8,23 @@ import { db as adminDb } from '@/lib/firebase-admin';
 // ── Types ────────────────────────────────────────────────────────────
 
 export type NotificationType =
-  | 'mission_submitted'      // admin ← collaborator submitted proof
-  | 'mission_reviewed'       // collaborator ← admin approved/rejected
-  | 'reward_redeemed'        // admin ← collaborator redeemed a reward
-  | 'post_ready_for_review'; // TL ← strategist moved post to review
+  | 'mission_submitted'        // admin ← collaborator submitted proof
+  | 'mission_reviewed'         // collaborator ← admin approved/rejected
+  | 'reward_redeemed'          // admin ← collaborator redeemed a reward
+  | 'post_ready_for_review'    // TL ← strategist moved post to review
+  | 'monthly_analytics_reminder'; // TL/colaborador ← lembrete mensal de upload do XLSX
 
 export type NotificationPrefs = {
   mission_submitted?: boolean;
   mission_reviewed?: boolean;
   reward_redeemed?: boolean;
   post_ready_for_review?: boolean;
+  monthly_analytics_reminder?: boolean;
 };
 
 const DEFAULT_PREFS: NotificationPrefs = {
   mission_submitted: true,
+  monthly_analytics_reminder: true,
   mission_reviewed: true,
   reward_redeemed: true,
   post_ready_for_review: true,
@@ -377,6 +380,124 @@ export async function notifyPostReadyForReview({
          style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
         → Ver na plataforma
       </a>
+    </p>`,
+  );
+}
+
+/**
+ * Lembrete mensal de upload do extract do LinkedIn Analytics.
+ * Enviado no 1º dia útil do mês para todos os TLs e colaboradores ativos.
+ *
+ * @param userId  — uid do destinatário
+ * @param role    — 'thoughtleader' | 'colaborador' (define URL de destino)
+ * @param monthLabel — ex: "maio de 2026" (mês que deve ser exportado)
+ */
+export async function notifyMonthlyAnalyticsReminder({
+  userId,
+  role,
+  monthLabel,
+}: {
+  userId: string;
+  role: 'thoughtleader' | 'colaborador';
+  monthLabel: string;
+}) {
+  const prefs = await getUserNotifPrefs(userId);
+  if (!prefs.monthly_analytics_reminder) return;
+
+  const userDoc = await adminDb.collection('users').doc(userId).get();
+  const data = userDoc.data();
+  const email = data?.profile?.email || data?.email;
+  if (!email) return;
+
+  const name = (data?.profile?.name || data?.name || '').split(' ')[0] || 'Olá';
+  const baseUrl = getBaseUrl();
+  const analyticsUrl = `${baseUrl}/${role}/analytics`;
+
+  await sendNotificationEmail(
+    email,
+    `Hora de atualizar seu Analytics do LinkedIn — ${monthLabel}`,
+    `
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+      Oi, ${name}! 👋
+    </p>
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+      Começou um novo mês — e isso significa que já dá pra exportar o relatório
+      do LinkedIn Analytics referente a <strong>${monthLabel}</strong> e fazer o
+      upload aqui na plataforma.
+    </p>
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 8px;">
+      Com esses dados a gente consegue ver como foi a performance do seu conteúdo
+      e manter tudo atualizado no seu painel. 📊
+    </p>
+
+    <!-- CTA principal -->
+    <div style="margin: 28px 0;">
+      <a href="${analyticsUrl}"
+         style="display: inline-block; background-color: #9333ea; color: #ffffff;
+                font-size: 15px; font-weight: 600; text-decoration: none;
+                padding: 12px 24px; border-radius: 8px;">
+        → Fazer upload agora
+      </a>
+    </div>
+
+    <!-- Mini tutorial -->
+    <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px 24px; margin-bottom: 8px;">
+      <p style="margin: 0 0 12px; font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.05em;">
+        Como exportar o relatório
+      </p>
+      <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
+        <tr>
+          <td style="vertical-align: top; padding-bottom: 12px;">
+            <span style="display: inline-flex; align-items: center; justify-content: center;
+                         width: 22px; height: 22px; background-color: #9333ea; color: #fff;
+                         border-radius: 50%; font-size: 11px; font-weight: 700;
+                         margin-right: 10px; flex-shrink: 0;">1</span>
+            <span style="font-size: 14px; color: #374151; line-height: 1.5;">
+              Acesse o <strong>LinkedIn</strong> e vá em
+              <strong>Analytics → Desempenho do conteúdo</strong>
+            </span>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; padding-bottom: 12px;">
+            <span style="display: inline-flex; align-items: center; justify-content: center;
+                         width: 22px; height: 22px; background-color: #9333ea; color: #fff;
+                         border-radius: 50%; font-size: 11px; font-weight: 700;
+                         margin-right: 10px; flex-shrink: 0;">2</span>
+            <span style="font-size: 14px; color: #374151; line-height: 1.5;">
+              Filtre o período para o mês de <strong>${monthLabel}</strong>
+              (do dia 1 ao último dia do mês)
+            </span>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top; padding-bottom: 12px;">
+            <span style="display: inline-flex; align-items: center; justify-content: center;
+                         width: 22px; height: 22px; background-color: #9333ea; color: #fff;
+                         border-radius: 50%; font-size: 11px; font-weight: 700;
+                         margin-right: 10px; flex-shrink: 0;">3</span>
+            <span style="font-size: 14px; color: #374151; line-height: 1.5;">
+              Clique em <strong>Exportar</strong> e salve o arquivo <code>.xlsx</code>
+            </span>
+          </td>
+        </tr>
+        <tr>
+          <td style="vertical-align: top;">
+            <span style="display: inline-flex; align-items: center; justify-content: center;
+                         width: 22px; height: 22px; background-color: #9333ea; color: #fff;
+                         border-radius: 50%; font-size: 11px; font-weight: 700;
+                         margin-right: 10px; flex-shrink: 0;">4</span>
+            <span style="font-size: 14px; color: #374151; line-height: 1.5;">
+              Volte pra plataforma, clique em
+              <strong>"Upload do Relatório"</strong> e suba o arquivo
+            </span>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <p style="font-size: 13px; color: #6B7280; line-height: 1.6; margin: 16px 0 0;">
+      Qualquer dúvida, é só responder este e-mail. 💜
     </p>`,
   );
 }
