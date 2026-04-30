@@ -47,7 +47,7 @@ export const CalendarDayCell = React.memo(function CalendarDayCell({
       onDrop={droppable ? (e) => { e.preventDefault(); onDrop?.(e); } : undefined}
       className={cn(
         minHeight,
-        'p-1.5 border-b border-r text-left transition-colors',
+        'p-1.5 border-b border-r text-left transition-colors flex flex-col justify-start',
         !inMonth && 'bg-muted/10',
         isSelected && 'ring-2 ring-primary ring-inset bg-primary/5',
         isDragOver && 'bg-primary/10 ring-2 ring-primary/40 ring-inset',

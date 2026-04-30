@@ -100,6 +100,14 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
         {displayTitle}
       </p>
 
+      {/* Time (logo abaixo do título) */}
+      {showTime && (
+        <div className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
+          <Clock className="h-2.5 w-2.5" />
+          <span>{time}</span>
+        </div>
+      )}
+
       {/* Status */}
       <div className="flex items-center gap-1">
         <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', statusConfig.dot)} />
@@ -133,31 +141,21 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
         </div>
       )}
 
-      {/* Time + Engagement (for published posts) */}
-      {(showTime || hasMetrics) && (
-        <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-          {showTime && (
-            <>
-              <Clock className="h-2.5 w-2.5" />
-              <span>{time}</span>
-            </>
+      {/* Métricas (reações + impressões) — linha própria abaixo de tudo */}
+      {hasMetrics && (
+        <div className="flex items-center gap-1.5 text-[9px]">
+          {reactions != null && (
+            <span className="flex items-center gap-0.5 text-rose-500">
+              <Heart className="h-2.5 w-2.5" />
+              {reactions.toLocaleString('pt-BR')}
+            </span>
           )}
-          {hasMetrics && (
-            <span className="ml-auto flex items-center gap-1.5">
-              {reactions != null && (
-                <span className="flex items-center gap-0.5 text-rose-500">
-                  <Heart className="h-2.5 w-2.5" />
-                  {reactions.toLocaleString('pt-BR')}
-                </span>
-              )}
-              {impressions != null && (
-                <span className="flex items-center gap-0.5 text-sky-500">
-                  <Eye className="h-2.5 w-2.5" />
-                  {impressions >= 1000
-                    ? `${(impressions / 1000).toFixed(1)}k`
-                    : impressions.toLocaleString('pt-BR')}
-                </span>
-              )}
+          {impressions != null && (
+            <span className="flex items-center gap-0.5 text-sky-500">
+              <Eye className="h-2.5 w-2.5" />
+              {impressions >= 1000
+                ? `${(impressions / 1000).toFixed(1)}k`
+                : impressions.toLocaleString('pt-BR')}
             </span>
           )}
         </div>
