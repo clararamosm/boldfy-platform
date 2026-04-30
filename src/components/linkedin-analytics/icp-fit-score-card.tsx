@@ -58,7 +58,17 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-function CategoryBar({ category, score, insight }: { category: string; score: number; insight: string }) {
+function CategoryBar({
+  category,
+  score,
+  insight,
+  matchedLabels,
+}: {
+  category: string;
+  score: number;
+  insight: string;
+  matchedLabels?: string[];
+}) {
   const color =
     score >= 70 ? 'bg-emerald-500'
     : score >= 45 ? 'bg-amber-400'
@@ -77,6 +87,24 @@ function CategoryBar({ category, score, insight }: { category: string; score: nu
         />
       </div>
       <p className="text-[11px] text-muted-foreground leading-tight">{insight}</p>
+      {/* Labels que fizeram match — detalhe colapsável */}
+      {matchedLabels && matchedLabels.length > 0 && (
+        <div className="flex flex-wrap gap-1 pt-0.5">
+          {matchedLabels.slice(0, 4).map(label => (
+            <span
+              key={label}
+              className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full leading-tight"
+            >
+              {label}
+            </span>
+          ))}
+          {matchedLabels.length > 4 && (
+            <span className="text-[10px] text-muted-foreground/60 px-1 py-0.5 leading-tight">
+              +{matchedLabels.length - 4} mais
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -87,13 +115,14 @@ export function IcpFitScoreCard({ userId, mesAno }: IcpFitScoreCardProps) {
   const [noTargetAudience, setNoTargetAudience] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const compute = useCallback(async () => {
+  // Carrega o score (do cache ou calcula pela primeira vez)
+  const load = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
     setNoTargetAudience(false);
     try {
       const token = await getAuthToken();
-      const result = await getIcpFitScore(token, userId, mesAno);
+      const result = await getIcpFitScore(token, userId, mesAno, forceRefresh);
       if (result.noTargetAudience) {
         setNoTargetAudience(true);
       } else if (result.error) {
@@ -108,9 +137,9 @@ export function IcpFitScoreCard({ userId, mesAno }: IcpFitScoreCardProps) {
     }
   }, [userId, mesAno]);
 
-  // Calcular automaticamente ao montar ou quando o mês muda
+  // Carrega ao montar ou quando o mês muda — usa cache se disponível
   useEffect(() => {
-    compute();
+    load(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, mesAno]);
 
@@ -119,7 +148,9 @@ export function IcpFitScoreCard({ userId, mesAno }: IcpFitScoreCardProps) {
     return (
       <div className="rounded-xl border bg-card p-5 flex flex-col items-center gap-3 py-10">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        <p className="text-xs text-muted-foreground">Analisando audiência vs ICP...</p>
+        <p className="text-xs text-muted-foreground">
+          {score ? 'Recalculando score...' : 'Calculando ICP-Fit Score...'}
+        </p>
       </div>
     );
   }
@@ -152,7 +183,7 @@ export function IcpFitScoreCard({ userId, mesAno }: IcpFitScoreCardProps) {
           <h3 className="text-sm font-semibold text-foreground">ICP-Fit Score</h3>
         </div>
         <p className="text-xs text-red-600">{error}</p>
-        <Button size="sm" variant="outline" onClick={compute}>
+        <Button size="sm" variant="outline" onClick={() => load(true)}>
           Tentar novamente
         </Button>
       </div>
@@ -169,12 +200,15 @@ export function IcpFitScoreCard({ userId, mesAno }: IcpFitScoreCardProps) {
         <div className="flex items-center gap-2">
           <Target className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">ICP-Fit Score</h3>
-          <span className="text-[10px] bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">IA</span>
+          <span className="text-[10px] bg-slate-100 text-slate-500 font-medium px-2 py-0.5 rounded-full">
+            determinístico
+          </span>
         </div>
+        {/* Botão de recalcular — força descarte do cache e nova extração */}
         <button
-          onClick={compute}
+          onClick={() => load(true)}
           className="text-muted-foreground hover:text-foreground transition-colors"
-          title="Recalcular"
+          title="Recalcular (descarta cache)"
         >
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
@@ -193,6 +227,7 @@ export function IcpFitScoreCard({ userId, mesAno }: IcpFitScoreCardProps) {
               category={cat.category}
               score={cat.score}
               insight={cat.insight}
+              matchedLabels={cat.matchedLabels}
             />
           ))}
         </div>
@@ -205,7 +240,10 @@ export function IcpFitScoreCard({ userId, mesAno }: IcpFitScoreCardProps) {
 
       {/* Timestamp */}
       <p className="text-[10px] text-muted-foreground/60 text-right">
-        Calculado em {new Date(score.computedAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        Calculado em {new Date(score.computedAt).toLocaleString('pt-BR', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+        })}
       </p>
     </div>
   );

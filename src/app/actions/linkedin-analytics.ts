@@ -10,6 +10,7 @@ import type {
   AnalyticsUser,
   ActionPlanItem,
   IcpFitScore,
+  IcpDefinition,
 } from '@/lib/linkedin-analytics-types';
 
 // ---------------------------------------------------------------------------
@@ -704,18 +705,254 @@ export async function toggleActionPlanItem(
   }
 }
 
+// ---------------------------------------------------------------------------
+// ICP-Fit Score — duas camadas
+// ---------------------------------------------------------------------------
+
+/**
+ * CAMADA 1 — IA extrai dicionário de match do targetAudience (texto livre).
+ *
+ * Resultado salvo em companies/{companyId}.icpDefinition para reutilização.
+ * Só é recalculado se o targetAudience mudar (comparamos via hash simples).
+ */
+async function getOrExtractIcpDefinition(
+  companyId: string,
+  targetAudience: string,
+): Promise<IcpDefinition | null> {
+  const compRef = adminDb.collection('companies').doc(companyId);
+  const compDoc = await compRef.get();
+  const existing = compDoc.data()?.icpDefinition as IcpDefinition | undefined;
+
+  // Hash simples: primeiros 200 chars do targetAudience (suficiente para detectar mudanças)
+  const fingerprint = targetAudience.trim().slice(0, 200);
+
+  // Se já existe definição extraída do mesmo targetAudience, reutiliza
+  if (existing && existing.extractedFrom === fingerprint) {
+    return existing;
+  }
+
+  // Chama IA para extrair o dicionário estruturado de keywords de match
+  const prompt = `Você é um especialista em LinkedIn Analytics B2B.
+
+Seu trabalho é extrair, a partir de uma descrição textual de ICP (Ideal Customer Profile), listas de palavras-chave que serão usadas para fazer match automático com dados demográficos do LinkedIn Analytics.
+
+## Descrição do ICP (texto livre do time de estratégia):
+"${targetAudience}"
+
+## Contexto importante:
+Os dados demográficos do LinkedIn usam os seguintes formatos reais:
+- Cargos: títulos como aparecem no LinkedIn ("CEO", "Fundador", "Diretor de Marketing", "VP de Vendas", "Head de Produto", "Gerente Sênior", "Analista de RH", etc.)
+- Setores: nomes de setores como "Tecnologia da Informação e Serviços", "Marketing e Publicidade", "Varejo", "Serviços Financeiros", "Recursos Humanos", etc.
+- Tamanhos: exatamente nos formatos do LinkedIn: "1-10 funcionários", "11-50 funcionários", "51-200 funcionários", "201-500 funcionários", "501-1000 funcionários", "1001-5000 funcionários", "5001-10000 funcionários", "Mais de 10001 funcionários"
+
+## Tarefa:
+Expanda a descrição do ICP em listas de palavras-chave de match para cada categoria.
+
+REGRAS:
+- Para cargos: inclua variações e sinônimos reais que aparecem no LinkedIn (ex: "líderes de marketing" → ["CMO", "VP de Marketing", "Diretor de Marketing", "Head de Marketing", "Gerente de Marketing Sênior"])
+- Para setores: inclua variações do nome exato como aparece no LinkedIn
+- Para tamanhos: use EXATAMENTE os formatos do LinkedIn listados acima
+- Seja abrangente mas preciso — prefira incluir variações legítimas a deixar match falhar por diferença de escrita
+- Se o ICP não especificar uma categoria (ex: não menciona tamanho), retorne lista vazia para ela
+
+Responda EXATAMENTE neste formato JSON (sem markdown, sem explicações extras):
+{
+  "cargos": ["<cargo1>", "<cargo2>", ...],
+  "setores": ["<setor1>", "<setor2>", ...],
+  "tamanhos": ["<tamanho1>", "<tamanho2>", ...]
+}`;
+
+  try {
+    const { text } = await ai.generate(prompt);
+    const clean = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(clean) as { cargos: string[]; setores: string[]; tamanhos: string[] };
+
+    if (!Array.isArray(parsed.cargos) || !Array.isArray(parsed.setores) || !Array.isArray(parsed.tamanhos)) {
+      console.error('[getOrExtractIcpDefinition] Resposta inesperada da IA:', text);
+      return null;
+    }
+
+    const definition: IcpDefinition = {
+      cargos: parsed.cargos,
+      setores: parsed.setores,
+      tamanhos: parsed.tamanhos,
+      extractedFrom: fingerprint,
+      extractedAt: new Date().toISOString(),
+    };
+
+    // Salva na empresa para reutilização futura
+    await compRef.update({ icpDefinition: definition }).catch(() => {});
+
+    return definition;
+  } catch (err) {
+    console.error('[getOrExtractIcpDefinition] Erro:', err);
+    return null;
+  }
+}
+
+/**
+ * CAMADA 2 — Score determinístico.
+ *
+ * Dado o dicionário de match (IcpDefinition) e os dados demográficos do XLSX,
+ * calcula o score por categoria somando as porcentagens dos labels que fizeram match.
+ *
+ * Match: case-insensitive, verifica se o label do XLSX contém alguma keyword do ICP
+ * ou se a keyword do ICP contém o label do XLSX (matching bidirecional parcial).
+ *
+ * Score da categoria = soma das porcentagens dos itens que fizeram match, limitado a 100.
+ * Overall = média ponderada: Cargo (40%) + Setor (35%) + Tamanho (25%).
+ */
+function computeDeterministicScore(
+  demographics: Array<{ category: string; label: string; percentage: number }>,
+  definition: IcpDefinition,
+): IcpFitScore {
+  // Agrupar dados demográficos por categoria
+  const byCategory: Record<string, Array<{ label: string; percentage: number }>> = {};
+  for (const d of demographics) {
+    if (!byCategory[d.category]) byCategory[d.category] = [];
+    byCategory[d.category].push({ label: d.label, percentage: d.percentage });
+  }
+
+  // Helper: verifica se um label do XLSX faz match com qualquer keyword do ICP
+  function matchesAny(label: string, keywords: string[]): boolean {
+    const labelLow = label.toLowerCase();
+    return keywords.some(kw => {
+      const kwLow = kw.toLowerCase();
+      // Match bidirecional parcial: label contém keyword OU keyword contém label
+      return labelLow.includes(kwLow) || kwLow.includes(labelLow);
+    });
+  }
+
+  // Helper: calcula score e matched labels para uma categoria
+  function calcCategory(
+    rawCategory: string, // ex: "Cargo", "Setor", "Tamanho da empresa"
+    keywords: string[],
+    displayName: string,
+    insight_match: string,
+    insight_no_data: string,
+    insight_low: string,
+  ): IcpFitScore['categories'][number] {
+    const items = byCategory[rawCategory] ?? [];
+
+    if (items.length === 0 || keywords.length === 0) {
+      return {
+        category: displayName,
+        score: 0,
+        insight: keywords.length === 0
+          ? 'ICP não especifica esta categoria.'
+          : insight_no_data,
+        matchedLabels: [],
+        matchedPct: 0,
+      };
+    }
+
+    const matched = items.filter(i => matchesAny(i.label, keywords));
+    const matchedPct = Math.min(100, matched.reduce((sum, i) => sum + i.percentage, 0));
+    const score = Math.round(matchedPct);
+
+    const matchedLabels = matched
+      .sort((a, b) => b.percentage - a.percentage)
+      .slice(0, 5)
+      .map(i => `${i.label} (${i.percentage}%)`);
+
+    let insight: string;
+    if (score >= 70) {
+      insight = insight_match.replace('{pct}', `${score}%`).replace('{labels}', matchedLabels.slice(0, 3).join(', '));
+    } else if (score >= 30) {
+      insight = `Fit parcial — ${score}% da audiência bate com o ICP. ${matchedLabels.length > 0 ? `Destaque: ${matchedLabels[0]}.` : ''}`;
+    } else if (score > 0) {
+      insight = insight_low.replace('{pct}', `${score}%`);
+    } else {
+      insight = 'Nenhum item encontrado com match no ICP desta categoria.';
+    }
+
+    return { category: displayName, score, insight, matchedLabels: matched.map(i => i.label), matchedPct };
+  }
+
+  const cargoResult = calcCategory(
+    'Cargo',
+    definition.cargos,
+    'Cargo & Senioridade',
+    '{pct} da audiência está em cargos do ICP: {labels}.',
+    'Dados de cargo não disponíveis no snapshot.',
+    'Apenas {pct} da audiência está em cargos do ICP — maioria fora do perfil desejado.',
+  );
+
+  const setorResult = calcCategory(
+    'Setor',
+    definition.setores,
+    'Setor',
+    '{pct} da audiência está nos setores-alvo: {labels}.',
+    'Dados de setor não disponíveis no snapshot.',
+    'Apenas {pct} da audiência é dos setores-alvo — audiência predominantemente de outros mercados.',
+  );
+
+  const tamanhoResult = calcCategory(
+    'Tamanho da empresa',
+    definition.tamanhos,
+    'Tamanho da empresa',
+    '{pct} da audiência trabalha em empresas do porte do ICP: {labels}.',
+    'Dados de tamanho de empresa não disponíveis no snapshot.',
+    'Apenas {pct} da audiência está em empresas do porte desejado.',
+  );
+
+  // Pesos: Cargo 40%, Setor 35%, Tamanho 25%
+  // Se o ICP não especificou uma categoria (keywords vazias), redistribui peso
+  const hasCargoKw = definition.cargos.length > 0;
+  const hasSetorKw = definition.setores.length > 0;
+  const hasTamanhoKw = definition.tamanhos.length > 0;
+  const totalWeight = (hasCargoKw ? 40 : 0) + (hasSetorKw ? 35 : 0) + (hasTamanhoKw ? 25 : 0);
+
+  const overall = totalWeight === 0
+    ? 0
+    : Math.round(
+        ((hasCargoKw ? cargoResult.score * 40 : 0) +
+         (hasSetorKw ? setorResult.score * 35 : 0) +
+         (hasTamanhoKw ? tamanhoResult.score * 25 : 0)) / totalWeight,
+      );
+
+  // Summary textual determinístico
+  const parts: string[] = [];
+  if (cargoResult.score >= 50) parts.push(`${cargoResult.score}% da audiência está em cargos do ICP`);
+  if (setorResult.score >= 50) parts.push(`${setorResult.score}% nos setores-alvo`);
+  if (tamanhoResult.score >= 50) parts.push(`${tamanhoResult.score}% em empresas do porte desejado`);
+
+  let summary: string;
+  if (overall >= 70) {
+    summary = `Audiência bem alinhada com o ICP. ${parts.join(', ')}. Score calculado com base no match direto entre os dados demográficos do LinkedIn e as keywords extraídas do ICP.`;
+  } else if (overall >= 45) {
+    summary = `Fit moderado com o ICP. ${parts.length > 0 ? parts.join(', ') + '.' : 'Parte da audiência está no perfil desejado, mas há espaço para melhora.'} Revise os pilares de conteúdo para atrair mais do público-alvo.`;
+  } else {
+    summary = `Audiência ainda distante do ICP definido. A maioria dos seguidores está fora dos cargos, setores ou portes de empresa desejados. Considere reavaliar a estratégia de conteúdo.`;
+  }
+
+  return {
+    overall,
+    categories: [cargoResult, setorResult, tamanhoResult],
+    summary,
+    computedAt: new Date().toISOString(),
+    method: 'deterministic',
+  };
+}
+
 /**
  * Calcula o ICP-Fit Score para um TL com base nos dados demográficos do snapshot
  * e no targetAudience definido no Brand Context da empresa.
  *
- * Retorna null para `score` se:
- * - O TL não tem snapshots mensais
- * - O Brand Context não tem targetAudience preenchido
+ * ARQUITETURA DE DUAS CAMADAS:
+ * 1. IA extrai o dicionário de match (keywords por categoria) do targetAudience textual.
+ *    Resultado salvo na empresa e reutilizado enquanto o targetAudience não mudar.
+ * 2. Matemática pura: soma as porcentagens dos labels do XLSX que fazem match com as keywords.
+ *    Score é 100% determinístico — mesmo XLSX sempre gera mesmo score.
+ *
+ * Cache: score já calculado é lido do snapshot (não recalcula na abertura da página).
+ * Recálculo manual: forceRefresh=true força descarte do cache e novo cálculo.
  */
 export async function getIcpFitScore(
   idToken: string,
   userId: string,
   mesAno: string,
+  forceRefresh = false,
 ): Promise<{ score?: IcpFitScore | null; noTargetAudience?: boolean; error?: string }> {
   try {
     await requireSnapshotAccess(idToken, userId);
@@ -734,7 +971,12 @@ export async function getIcpFitScore(
 
     const snapshot = snapDoc.data() as LinkedInSnapshot;
 
-    // 2. Buscar companyId e brandContext.targetAudience do usuário
+    // 2. Retornar score em cache se já calculado (e não forçar recálculo)
+    if (!forceRefresh && snapshot.icpFitScore) {
+      return { score: snapshot.icpFitScore };
+    }
+
+    // 3. Buscar companyId e brandContext.targetAudience do usuário
     const userDoc = await adminDb.collection('users').doc(userId).get();
     if (!userDoc.exists) return { error: 'Usuário não encontrado.' };
 
@@ -751,103 +993,18 @@ export async function getIcpFitScore(
       return { score: null, noTargetAudience: true };
     }
 
-    // 3. Preparar dados demográficos para o prompt
+    // 4. CAMADA 1 — IA extrai (ou reutiliza) o dicionário de match do ICP
+    const definition = await getOrExtractIcpDefinition(companyId, targetAudience);
+    if (!definition) {
+      return { error: 'Erro ao extrair definição do ICP. Tente novamente.' };
+    }
+
+    // 5. CAMADA 2 — Score determinístico com matemática pura
     const demographics = snapshot.demographics ?? [];
+    const score = computeDeterministicScore(demographics, definition);
 
-    // Agrupar por categoria
-    const byCategory: Record<string, Array<{ label: string; percentage: number }>> = {};
-    for (const d of demographics) {
-      if (!byCategory[d.category]) byCategory[d.category] = [];
-      byCategory[d.category].push({ label: d.label, percentage: d.percentage });
-    }
-
-    // Ordenar cada categoria por percentual desc, pegar top 8
-    const demoSummary = Object.entries(byCategory)
-      .map(([cat, items]) => {
-        const top = items
-          .sort((a, b) => b.percentage - a.percentage)
-          .slice(0, 8)
-          .map(i => `  ${i.label}: ${i.percentage}%`)
-          .join('\n');
-        return `${cat}:\n${top}`;
-      })
-      .join('\n\n');
-
-    // 4. Chamar IA para calcular score
-    const prompt = `Você é um especialista em estratégia de conteúdo B2B no LinkedIn.
-
-Analise o fit entre a audiência real de um perfil no LinkedIn e o ICP (Ideal Customer Profile) da empresa.
-
-## ICP da empresa (definido pelo time de estratégia):
-${targetAudience}
-
-## Audiência real do perfil (dados demográficos LinkedIn Analytics — mês ${mesAno}):
-${demoSummary || 'Dados demográficos não disponíveis.'}
-
-## Tarefa:
-Calcule um ICP-Fit Score de 0 a 100 avaliando o quanto a audiência real bate com o ICP definido.
-
-IMPORTANTE: Faça uma leitura CONTEXTUAL CRUZADA entre as categorias — não avalie cada uma de forma isolada.
-
-Exemplos de leitura contextual:
-- "Fundador" + empresa de "1-10 funcionários" = decisor solo de alta influência → peso elevado se o ICP busca PMEs
-- "Analista" ou "Especialista" + empresa grande = influenciador, não decisor final → relevante se o ICP inclui influenciadores
-- "Diretor" + setor fora do ICP = cargo ideal mas mercado errado → score médio
-- "Gerente" + senioridade "Sênior" = mais poder decisório do que "Gerente Júnior" mesmo com mesmo cargo
-- Volume alto de um setor não-alvo pode diluir o fit mesmo com cargos corretos
-
-Avalie:
-1. **Cargo × Senioridade** — o nível hierárquico real bate com os decisores e influenciadores do ICP? (Senioridade diferencia o poder de decisão mesmo para o mesmo título)
-2. **Setor** — os setores presentes são os que a empresa quer atingir?
-3. **Tamanho da empresa × Cargo** — o porte das empresas corresponde ao mercado-alvo? Um fundador em startup é diferente de um gerente em enterprise.
-4. **Leitura integrada** — considerando tudo junto, a audiência tende a ser decisores, influenciadores ou ruído para o ICP?
-
-Responda EXATAMENTE neste formato JSON (sem markdown, sem explicações extras):
-{
-  "overall": <número 0-100>,
-  "categories": [
-    { "category": "Cargo & Senioridade", "score": <0-100>, "insight": "<uma frase curta em português cruzando cargo e nível de experiência>" },
-    { "category": "Setor", "score": <0-100>, "insight": "<uma frase curta em português>" },
-    { "category": "Tamanho da empresa", "score": <0-100>, "insight": "<uma frase curta em português>" }
-  ],
-  "summary": "<2-3 frases em português com a leitura contextual integrada: quem domina a audiência, se são decisores/influenciadores do ICP, e o principal gap ou acerto>"
-}
-
-Seja realista e preciso. Use os dados reais disponíveis. Se uma categoria não tiver dados, score = 0 com insight explicando.`;
-
-    const { text } = await ai.generate(prompt);
-
-    // 5. Parse da resposta JSON
-    let parsed: { overall: number; categories: IcpFitScore['categories']; summary: string };
-    try {
-      // Remover possível markdown code fence
-      const clean = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-      parsed = JSON.parse(clean);
-    } catch {
-      console.error('[linkedin-analytics] getIcpFitScore JSON parse error. Response:', text);
-      return { error: 'Erro ao interpretar resposta da IA.' };
-    }
-
-    // Validar estrutura básica
-    if (typeof parsed.overall !== 'number' || !Array.isArray(parsed.categories)) {
-      return { error: 'Resposta da IA em formato inesperado.' };
-    }
-
-    const score: IcpFitScore = {
-      overall: Math.max(0, Math.min(100, Math.round(parsed.overall))),
-      categories: parsed.categories.map(c => ({
-        category: c.category,
-        score: Math.max(0, Math.min(100, Math.round(c.score))),
-        insight: c.insight,
-      })),
-      summary: parsed.summary,
-      computedAt: new Date().toISOString(),
-    };
-
-    // Persistir o score no snapshot para que o dashboard possa ler sem recalcular
-    await snapDoc.ref.update({ icpFitScore: score }).catch(() => {
-      // Falha silenciosa — o score ainda é retornado corretamente
-    });
+    // 6. Persistir o score no snapshot
+    await snapDoc.ref.update({ icpFitScore: score }).catch(() => {});
 
     return { score };
   } catch (err) {

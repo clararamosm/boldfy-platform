@@ -121,6 +121,8 @@ export type IcpFitCategoryScore = {
   category: string;          // ex: "Cargo", "Setor", "Tamanho da empresa"
   score: number;             // 0-100
   insight: string;           // uma linha explicando o score desta categoria
+  matchedLabels?: string[];  // labels do XLSX que fizeram match com o ICP
+  matchedPct?: number;       // soma das porcentagens dos labels que fizeram match
 };
 
 export type IcpFitScore = {
@@ -128,4 +130,18 @@ export type IcpFitScore = {
   categories: IcpFitCategoryScore[];
   summary: string;           // 2-3 frases resumindo o fit da audiência
   computedAt: string;        // ISO timestamp
+  method?: 'deterministic' | 'ai-only'; // método usado no cálculo
+};
+
+/**
+ * Dicionário de match extraído pela IA a partir do targetAudience textual.
+ * Salvo no Firestore em companies/{companyId}.icpDefinition
+ * Só é recalculado quando o targetAudience muda.
+ */
+export type IcpDefinition = {
+  cargos: string[];          // ex: ["CEO", "Fundador", "VP", "Diretor", "Head", "CMO"]
+  setores: string[];         // ex: ["Tecnologia", "SaaS", "Marketing", "Varejo"]
+  tamanhos: string[];        // ex: ["1-10", "11-50", "201-500"] — valores que aparecem no LinkedIn
+  extractedFrom: string;     // hash ou trecho do targetAudience que gerou esta definição
+  extractedAt: string;       // ISO timestamp
 };
