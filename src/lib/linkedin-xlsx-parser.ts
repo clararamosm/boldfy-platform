@@ -106,6 +106,25 @@ export function normalizeLinkedInUrl(url: string): string {
 }
 
 /**
+ * Retorna o prefixo de 8 dígitos do ID numérico de um LinkedIn URN.
+ *
+ * Por que 8 dígitos?
+ * LinkedIn usa Snowflake IDs — os bits mais altos codificam o timestamp em ms.
+ * urn:li:activity e urn:li:share do mesmo post são criados com poucos ms de diferença,
+ * então compartilham os primeiros ~8-9 dígitos decimais.
+ * Dois posts diferentes publicados com mais de ~30s de diferença nunca vão colidir
+ * nos primeiros 8 dígitos, tornando esse prefixo um identificador de post seguro.
+ *
+ * Exemplos reais observados:
+ *   activity:7451238122723381248 ↔ share:7451238121754484736  → prefixo "74512381" (231ms apart)
+ *   activity:7449901954681565184 ↔ ugcPost:7449901907164323840 → prefixo "74499019" (11s apart)
+ */
+export function linkedInIdPrefix(url: string): string {
+  const full = normalizeLinkedInUrl(url);
+  return full.length >= 8 ? full.substring(0, 8) : full;
+}
+
+/**
  * Infere o mês de referência (YYYY-MM) a partir de um array de datas "YYYY-MM-DD"
  * Usa o mês mais frequente nas datas
  */

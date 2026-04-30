@@ -3,7 +3,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { requireAuth, requireStrategistForTL } from '@/lib/auth-guard';
 import { ai } from '@/ai/genkit';
-import { normalizeLinkedInUrl } from '@/lib/linkedin-xlsx-parser';
+import { normalizeLinkedInUrl, linkedInIdPrefix } from '@/lib/linkedin-xlsx-parser';
 import type {
   LinkedInSnapshot,
   ParsedLinkedInData,
@@ -84,12 +84,16 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
       publishedAt?: string; // ISO completo — usado para ordenar candidatos em colisão de data
     };
 
-    // Mapa primário: ID numérico do LinkedIn (via linkedinPostUrl) → enrichment
+    // Mapa 1 — match exato: ID numérico completo (só funciona se XLSX e API usam mesmo tipo de URN)
     const urlMap: Record<string, EnrichmentEntry> = {};
 
-    // Mapa secundário: fallback por data de publicação (YYYY-MM-DD) → candidatos ordenados por publishedAt
-    // Necessário porque urn:li:activity (XLSX) e urn:li:share (API) têm IDs numéricos distintos
-    // para o mesmo post — o URL match sempre falha entre essas duas fontes.
+    // Mapa 2 — match por prefixo de 8 dígitos do Snowflake ID:
+    // urn:li:activity e urn:li:share do mesmo post são criados com poucos ms de diferença,
+    // então compartilham os primeiros 8 dígitos decimais do ID.
+    // Ex: activity:7451238122723381248 ↔ share:7451238121754484736 → prefixo "74512381"
+    const prefixMap: Record<string, EnrichmentEntry> = {};
+
+    // Mapa 3 — fallback por data (YYYY-MM-DD) → candidatos ordenados por publishedAt
     const dateMap: Record<string, EnrichmentEntry[]> = {};
 
     for (const doc of pipelineSnap.docs) {
@@ -106,10 +110,17 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
 
       const url = d.linkedinPostUrl as string | undefined;
       if (url) {
-        // Match preciso via ID numérico do LinkedIn — compatível com urn:li:share e urn:li:activity
+        // Mapa 1: match exato pelo ID numérico completo
         const key = normalizeLinkedInUrl(url);
-        console.log(`[enrich] pipeline doc=${doc.id} linkedinPostUrl="${url}" normalized="${key}" publishedAt="${publishedAt}"`);
         if (key) urlMap[key] = entry;
+
+        // Mapa 2: match por prefixo de 8 dígitos (Snowflake timestamp bits)
+        // Cobre o caso urn:li:share (pipeline) ↔ urn:li:activity (XLSX) que têm IDs distintos
+        // mas prefixo numérico idêntico pois foram criados com milissegundos de diferença.
+        const prefix = linkedInIdPrefix(url);
+        if (prefix) prefixMap[prefix] = entry;
+
+        console.log(`[enrich] pipeline doc=${doc.id} url_normalized="${key}" prefix="${prefix}" publishedAt="${publishedAt}"`);
       } else {
         console.log(`[enrich] pipeline doc=${doc.id} sem linkedinPostUrl publishedAt="${publishedAt}"`);
       }
@@ -148,18 +159,30 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
       usedPostIds = new Set<string>(),
     ) {
       return (posts ?? []).map(post => {
-        // 1. Match exato por ID numérico do LinkedIn
         const key = normalizeLinkedInUrl(post.url);
+        const prefix = linkedInIdPrefix(post.url);
+
+        // Nível 1 — match exato pelo ID numérico completo
         const byUrl = key ? urlMap[key] : undefined;
-        if (byUrl) {
-          console.log(`[enrich] ✓ URL match: post.url="${post.url}" → postId=${byUrl.postId}`);
+        if (byUrl && !usedPostIds.has(byUrl.postId)) {
+          console.log(`[enrich] ✓ URL match (exato): post.url="${post.url}" → postId=${byUrl.postId}`);
           usedPostIds.add(byUrl.postId);
           return { ...post, ...byUrl };
         }
 
-        // 2. Fallback por data — urn:li:activity (XLSX) ≠ urn:li:share (API), IDs distintos.
-        // Quando há múltiplos candidatos no mesmo dia, usa o primeiro ainda não utilizado
-        // (candidatos já ordenados por publishedAt crescente → primeiro = mais cedo no dia).
+        // Nível 2 — match por prefixo Snowflake de 8 dígitos
+        // urn:li:activity (XLSX) e urn:li:share/ugcPost (API) têm IDs distintos mas
+        // compartilham os primeiros 8 dígitos pois foram criados com ms de diferença.
+        const byPrefix = prefix ? prefixMap[prefix] : undefined;
+        if (byPrefix && !usedPostIds.has(byPrefix.postId)) {
+          console.log(`[enrich] ✓ prefix match (8 dígitos): post.url="${post.url}" prefix="${prefix}" → postId=${byPrefix.postId}`);
+          usedPostIds.add(byPrefix.postId);
+          return { ...post, ...byPrefix };
+        }
+
+        // Nível 3 — fallback por data de publicação (YYYY-MM-DD)
+        // Último recurso para posts sem linkedinPostUrl no pipeline.
+        // Candidatos ordenados por publishedAt crescente; usedPostIds evita duplicatas.
         if (post.date) {
           const candidates = dateMap[post.date];
           if (candidates?.length) {
@@ -172,7 +195,7 @@ async function enrichSnapshotWithPostData(userId: string, mesAno: string): Promi
             }
             console.log(`[enrich] ✗ date match: post.date="${post.date}" todos os ${candidates.length} candidatos já foram usados`);
           } else {
-            console.log(`[enrich] ✗ sem match: post.url="${post.url}" date="${post.date}" — nenhum candidato no dateMap`);
+            console.log(`[enrich] ✗ sem match: post.url="${post.url}" date="${post.date}" — nenhum candidato`);
           }
         }
 
