@@ -240,6 +240,50 @@ function ProfileOptimizerEditor({
     );
   }
 
+  // Estado de erro
+  if (profile?.status === 'error') {
+    return (
+      <div className="max-w-xl mx-auto mt-8">
+        <Card>
+          <CardContent className="py-12 flex flex-col items-center text-center gap-5">
+            <div className="h-16 w-16 rounded-full bg-red-50 flex items-center justify-center">
+              <Upload className="h-8 w-8 text-red-500" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold mb-1 text-red-600">Erro no processamento</h2>
+              <p className="text-sm text-muted-foreground max-w-sm mb-2">
+                Ocorreu um erro ao analisar o PDF. Verifique os logs do servidor.
+              </p>
+              {profile.errorMessage && (
+                <p className="text-xs font-mono bg-red-50 text-red-700 rounded p-2 max-w-sm text-left break-all">
+                  {profile.errorMessage}
+                </p>
+              )}
+            </div>
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/pdf"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                variant="outline"
+                className="gap-2"
+              >
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {uploading ? 'Enviando...' : 'Tentar novamente'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Estado vazio
   if (!profile || profile.status === 'empty') {
     return (

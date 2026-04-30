@@ -497,8 +497,9 @@ async function processPdfInBackground(tlUserId: string, pdfBuffer: Buffer): Prom
       status: 'ready',
     });
   } catch (err) {
-    console.error('[profile-optimizer] Erro no processamento do PDF:', err);
-    await docRef.update({ status: 'empty' }).catch(() => {});
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error('[profile-optimizer] Erro no processamento do PDF:', errMsg, err);
+    await docRef.update({ status: 'error', errorMessage: errMsg }).catch(() => {});
   }
 }
 

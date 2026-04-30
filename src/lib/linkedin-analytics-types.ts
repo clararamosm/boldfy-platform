@@ -222,6 +222,7 @@ export type LinkedInProfileOptimization = {
   suggestions: LinkedInProfileSuggestions | null;
   edited: LinkedInProfileSuggestions | null;
   editedAt: string | null;
-  status: 'empty' | 'processing' | 'ready' | 'published';
+  status: 'empty' | 'processing' | 'ready' | 'published' | 'error';
   publishedAt: string | null;
+  errorMessage?: string;
 };
