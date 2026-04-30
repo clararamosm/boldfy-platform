@@ -231,17 +231,35 @@ export async function getCompanyFeed(
 
     const allPosts: FeedPost[] = [];
 
-    // 3a. Fetch published scheduledPosts from collaborators (parallel)
-    const colabPromises = colabSnap.docs.map(async (userDoc) => {
+    // Helper: fetch com orderBy, com fallback sem orderBy caso o índice ainda não exista
+    async function fetchPostsWithFallback(
+      collection: FirebaseFirestore.CollectionReference,
+      statusValue: string,
+    ): Promise<FirebaseFirestore.QuerySnapshot> {
       try {
-        const postsSnap = await adminDb
-          .collection('users')
-          .doc(userDoc.id)
-          .collection('scheduledPosts')
-          .where('status', '==', 'published')
+        return await collection
+          .where('status', '==', statusValue)
           .orderBy('publishedAt', 'desc')
           .limit(50)
           .get();
+      } catch {
+        // Índice composto ainda não deployado — fallback sem orderBy
+        // O sort final por publishedAt no allPosts ainda garante a ordem correta
+        console.warn('[Feed] publishedAt index not ready, falling back to unordered query');
+        return collection
+          .where('status', '==', statusValue)
+          .limit(50)
+          .get();
+      }
+    }
+
+    // 3a. Fetch published scheduledPosts from collaborators (parallel)
+    const colabPromises = colabSnap.docs.map(async (userDoc) => {
+      try {
+        const postsSnap = await fetchPostsWithFallback(
+          adminDb.collection('users').doc(userDoc.id).collection('scheduledPosts'),
+          'published',
+        );
 
         const userInfo = userMap.get(userDoc.id);
 
@@ -269,14 +287,10 @@ export async function getCompanyFeed(
     // 3b. Fetch published pipeline posts from TLs (status === 'postado')
     const tlPromises = tlSnap.docs.map(async (userDoc) => {
       try {
-        const postsSnap = await adminDb
-          .collection('users')
-          .doc(userDoc.id)
-          .collection('contentPipeline')
-          .where('status', '==', 'postado')
-          .orderBy('publishedAt', 'desc')
-          .limit(50)
-          .get();
+        const postsSnap = await fetchPostsWithFallback(
+          adminDb.collection('users').doc(userDoc.id).collection('contentPipeline'),
+          'postado',
+        );
 
         const userInfo = userMap.get(userDoc.id);
 
