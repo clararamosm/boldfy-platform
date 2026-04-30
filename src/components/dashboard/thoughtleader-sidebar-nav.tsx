@@ -11,7 +11,7 @@ interface ThoughtLeaderSidebarNavProps {
 export function ThoughtLeaderSidebarNav({ uploadPending = false }: ThoughtLeaderSidebarNavProps) {
     const t = useT();
     const navItems = [
-        { title: t.nav.backlog, href: "/thoughtleader/dashboard", icon: ClipboardList },
+        { title: t.nav.backlog, href: "/thoughtleader/backlog", icon: ClipboardList },
         { title: t.nav.calendar, href: "/thoughtleader/calendario", icon: CalendarDays },
         { title: t.nav.linkedinFeed, href: "/thoughtleader/linkedin-feed", icon: Newspaper },
         { title: t.nav.linkedinLeads, href: "/thoughtleader/linkedin-leads", icon: UserSearch, badge: t.nav.comingSoon, disabled: true },

@@ -75,7 +75,7 @@ function LoginForm() {
           router.push('/admin/dashboard');
         }
         else if (userRole === 'colaborador') { router.push('/colaborador/dashboard'); }
-        else if (userRole === 'thoughtleader') { router.push('/thoughtleader/dashboard'); }
+        else if (userRole === 'thoughtleader') { router.push('/thoughtleader/backlog'); }
         else if (userRole === 'strategist') { router.push('/strategist/dashboard'); }
         else { setError(t.auth.errors.profileNotRecognized); setLoading(false); return; }
       } else {
