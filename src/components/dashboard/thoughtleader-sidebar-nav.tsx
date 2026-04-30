@@ -1,7 +1,7 @@
 'use client';
 
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { ClipboardList, CalendarDays, Newspaper, UserSearch, FileText, BookOpen, BarChart2 } from "lucide-react";
+import { ClipboardList, CalendarDays, Newspaper, UserSearch, FileText, BookOpen, BarChart2, UserCircle } from "lucide-react";
 import { useT } from '@/lib/i18n/context';
 
 interface ThoughtLeaderSidebarNavProps {
@@ -21,6 +21,7 @@ export function ThoughtLeaderSidebarNav({ uploadPending = false }: ThoughtLeader
             icon: BarChart2,
             ...(uploadPending ? { badge: 'Upload', badgeVariant: 'danger' as const } : {}),
         },
+        { title: 'Perfil LinkedIn', href: "/thoughtleader/perfil", icon: UserCircle },
         { title: t.nav.strategy, href: "/thoughtleader/estrategia", icon: FileText },
         { title: t.nav.brandManual, href: "/thoughtleader/manual", icon: BookOpen },
     ];

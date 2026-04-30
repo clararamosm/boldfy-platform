@@ -145,3 +145,83 @@ export type IcpDefinition = {
   extractedFrom: string;     // hash ou trecho do targetAudience que gerou esta definição
   extractedAt: string;       // ISO timestamp
 };
+
+// ─── LinkedIn Profile Optimizer ───────────────────────────────────────────────
+
+export type ProfileExperience = {
+  title: string;
+  company: string;
+  period: string;            // ex: "jan 2022 – presente"
+  description: string;
+  isCurrent: boolean;
+};
+
+export type ProfileExperienceSuggestion = ProfileExperience & {
+  action: 'keep' | 'rewrite' | 'add_impact';
+  rewrittenDescription?: string; // preenchido se action !== 'keep'
+};
+
+export type ProfileFeaturedItem = {
+  title: string;
+  url?: string;
+  imageUrl?: string;
+};
+
+export type ProfileFeaturedItemSuggestion = ProfileFeaturedItem & {
+  action: 'keep' | 'replace' | 'add';
+  rationale: string;
+};
+
+export type ProfileAlignmentIssue = {
+  element: 'headline' | 'about' | 'skills' | 'experience' | 'featured';
+  severity: 'high' | 'medium' | 'low';
+  description: string;       // ex: "Headline genérico — não declara nicho"
+  fix: string;               // ex: "Declare o problema resolvido + metodologia"
+};
+
+export type ProfileSemanticAlignment = {
+  score: number;             // 0–100
+  passesAudit: boolean;      // score >= 40
+  issues: ProfileAlignmentIssue[];
+};
+
+/**
+ * Versão atual do perfil, extraída do PDF.
+ * Salva em users/{tlUserId}/linkedinProfile/current.current
+ */
+export type LinkedInProfileCurrent = {
+  headline: string;
+  about: string;
+  topSkills: string[];       // até 5 (o que existia no PDF)
+  experiences: ProfileExperience[];
+  featuredItems: ProfileFeaturedItem[];
+  extractedAt: string;       // ISO timestamp
+};
+
+/**
+ * Sugestões geradas pela IA (ou editadas pela estrategista).
+ * Salva em users/{tlUserId}/linkedinProfile/current.suggestions / .edited
+ */
+export type LinkedInProfileSuggestions = {
+  headline: string;
+  about: string;
+  topSkills: string[];       // exatamente 5
+  experiences: ProfileExperienceSuggestion[];
+  featuredItems: ProfileFeaturedItemSuggestion[];
+  semanticAlignment: ProfileSemanticAlignment;
+  gapAnalysis: string;       // texto livre com diagnóstico de gaps
+  generatedAt: string;       // ISO timestamp
+};
+
+/**
+ * Documento principal do otimizador de perfil.
+ * Salvo em users/{tlUserId}/linkedinProfile/current
+ */
+export type LinkedInProfileOptimization = {
+  current: LinkedInProfileCurrent | null;
+  suggestions: LinkedInProfileSuggestions | null;
+  edited: LinkedInProfileSuggestions | null;
+  editedAt: string | null;
+  status: 'empty' | 'processing' | 'ready' | 'published';
+  publishedAt: string | null;
+};
