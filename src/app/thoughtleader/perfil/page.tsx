@@ -151,6 +151,8 @@ export default function ThoughtLeaderPerfilPage() {
                     suggestions={currentToSuggestions(profile.current)}
                     tlName={userName}
                     tlAvatarUrl={userAvatar}
+                    profileAvatarUrl={profile.avatarUrl ?? undefined}
+                    profileBannerUrl={profile.bannerUrl ?? undefined}
                     readOnly={true}
                     variant="before"
                   />
@@ -182,6 +184,8 @@ export default function ThoughtLeaderPerfilPage() {
                   suggestions={activeSuggestions}
                   tlName={userName}
                   tlAvatarUrl={userAvatar}
+                  profileAvatarUrl={profile.avatarUrl ?? undefined}
+                  profileBannerUrl={profile.bannerUrl ?? undefined}
                   readOnly={false}
                 />
               </div>
