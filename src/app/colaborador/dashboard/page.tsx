@@ -24,7 +24,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getCompanyRanking, type RankedUser } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
 import { useT } from '@/lib/i18n/context';
-import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
 
 // ---- Types ----
 type Mission = {
@@ -270,11 +269,6 @@ export default function ColaboradorDashboardPage() {
                         </CardContent>
                     </Card>
                 </div>
-
-                {/* LinkedIn Metrics Section */}
-                {authUser?.uid && (
-                    <LinkedInPerformance userId={authUser.uid} hideIfNotConnected={false} />
-                )}
 
                 {/* Content Grid — Missions, Trails + Ranking sidebar */}
                 <div className="grid lg:grid-cols-3 md:grid-cols-2 gap-6">

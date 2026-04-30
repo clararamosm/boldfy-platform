@@ -12,7 +12,6 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
 import { completeOnboardingItem } from '@/hooks/use-onboarding';
-import { LinkedInPerformance } from '@/components/linkedin-performance/linkedin-performance';
 import type { PipelinePost } from '@/app/actions/content-pipeline';
 
 export default function ThoughtLeaderDashboardPage() {
@@ -119,10 +118,6 @@ export default function ThoughtLeaderDashboardPage() {
               </Card>
             </div>
 
-            {/* LinkedIn Performance */}
-            {user?.uid && (
-              <LinkedInPerformance userId={user.uid} hideIfNotConnected={false} />
-            )}
           </>
         )}
       </main>
