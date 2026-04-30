@@ -239,7 +239,8 @@ export async function getCompanyFeed(
           .doc(userDoc.id)
           .collection('scheduledPosts')
           .where('status', '==', 'published')
-          .limit(10)
+          .orderBy('publishedAt', 'desc')
+          .limit(50)
           .get();
 
         const userInfo = userMap.get(userDoc.id);
@@ -273,7 +274,8 @@ export async function getCompanyFeed(
           .doc(userDoc.id)
           .collection('contentPipeline')
           .where('status', '==', 'postado')
-          .limit(10)
+          .orderBy('publishedAt', 'desc')
+          .limit(50)
           .get();
 
         const userInfo = userMap.get(userDoc.id);
