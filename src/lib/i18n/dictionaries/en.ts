@@ -595,6 +595,11 @@ const en: Dictionary = {
         8: 'Level 8 — max level! Legendary.',
       },
     },
+    redemption: {
+      title: 'Reward redeemed!',
+      subtitle: 'Congrats on your reward',
+      close: 'Close',
+    },
     dashboard: {
       heroPoints: 'Points',
       heroRewards: 'Redeemed',

@@ -1,5 +1,6 @@
 // src/components/gamification/conquest-modal.tsx
 // Modal celebrating a conquest achievement — appears when a milestone is unlocked.
+// Uses CSS-only animated illustrations: PostStack for pub, ConfettiExplosion for high targets.
 'use client';
 
 import React from 'react';
@@ -16,6 +17,7 @@ import { CoinIcon } from '@/components/coin-icon';
 import { FileText, BookOpen, Zap, Diamond } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n/context';
+import { PostStackIllustration, ConfettiExplosionIllustration } from '@/components/gamification/illustrations';
 
 // ─── Category visual config ──────────────────────────────────────
 
@@ -62,6 +64,21 @@ type ConquestModalProps = {
   points: number;
 };
 
+// ─── Illustration picker ──────────────────────────────────────────
+// pub category → PostStack (cards spreading out)
+// High targets (≥10) → ConfettiExplosion (big celebration badge)
+// Otherwise → fallback to category icon with sparkles
+
+function ConquestIllustration({ category, target }: { category: string; target: number }) {
+  if (category === 'pub') {
+    return <PostStackIllustration />;
+  }
+  if (target >= 10) {
+    return <ConfettiExplosionIllustration number={target} />;
+  }
+  return null; // fallback handled below
+}
+
 // ─── Component ────────────────────────────────────────────────────
 
 export function ConquestModal({
@@ -69,6 +86,7 @@ export function ConquestModal({
   onClose,
   conquestId,
   category,
+  target,
   points,
 }: ConquestModalProps) {
   const t = useT();
@@ -79,26 +97,36 @@ export function ConquestModal({
   const conquestLabel =
     (t.gamification?.conquests as Record<string, string> | undefined)?.[conquestId] || conquestId;
 
+  // Decide if we use a CSS illustration or the icon fallback
+  const useIllustration = category === 'pub' || target >= 10;
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-[400px] text-center p-0 overflow-hidden">
-        {/* Animated icon area */}
-        <div className={cn('flex flex-col items-center justify-center pt-10 pb-6 px-6', config.bgColor)}>
-          <div
-            className={cn(
-              'relative flex items-center justify-center w-24 h-24 rounded-full',
-              config.bgColor,
-              'shadow-xl',
-              config.glowColor,
-              'animate-in zoom-in-50 duration-500',
-            )}
-          >
-            <IconComponent className={cn('h-12 w-12', config.color)} />
-            {/* Sparkle dots */}
-            <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-yellow-400 animate-pulse" />
-            <span className="absolute -bottom-1 -left-2 h-2 w-2 rounded-full bg-yellow-300 animate-pulse delay-150" />
-            <span className="absolute top-2 -left-3 h-2.5 w-2.5 rounded-full bg-yellow-400 animate-pulse delay-300" />
-          </div>
+        {/* Animated illustration / icon area */}
+        <div className={cn(
+          'flex flex-col items-center justify-center pt-8 pb-6 px-6',
+          useIllustration ? 'bg-gradient-to-b from-purple-600/10 via-purple-500/5 to-transparent' : config.bgColor,
+        )}>
+          {useIllustration ? (
+            <ConquestIllustration category={category} target={target} />
+          ) : (
+            <div
+              className={cn(
+                'relative flex items-center justify-center w-24 h-24 rounded-full',
+                config.bgColor,
+                'shadow-xl',
+                config.glowColor,
+                'animate-in zoom-in-50 duration-500',
+              )}
+            >
+              <IconComponent className={cn('h-12 w-12', config.color)} />
+              {/* Sparkle dots */}
+              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-yellow-400 animate-pulse" />
+              <span className="absolute -bottom-1 -left-2 h-2 w-2 rounded-full bg-yellow-300 animate-pulse delay-150" />
+              <span className="absolute top-2 -left-3 h-2.5 w-2.5 rounded-full bg-yellow-400 animate-pulse delay-300" />
+            </div>
+          )}
         </div>
 
         <div className="px-6 pb-2">

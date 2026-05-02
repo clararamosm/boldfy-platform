@@ -13,6 +13,7 @@ import { FileText, Trophy, BookOpen, Flame, Award, Zap, Heart, Gift } from 'luci
 import { cn } from '@/lib/utils';
 import { ConquestModal } from '@/components/gamification/conquest-modal';
 import { LevelUpModal } from '@/components/gamification/level-up-modal';
+import { RedemptionModal } from '@/components/gamification/redemption-modal';
 import { completeOnboardingItem } from '@/hooks/use-onboarding';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -51,6 +52,12 @@ type ConquestQueueItem = {
 type LevelUpQueueItem = {
   level: number;
   cyclesCompleted: number;
+};
+
+type RedemptionQueueItem = {
+  description: string;
+  points: number;
+  onboardingItemId?: string;
 };
 
 // ─── Source-specific config ───────────────────────────────────
@@ -122,6 +129,10 @@ export function GamificationToastProvider() {
   const [levelUpQueue, setLevelUpQueue] = useState<LevelUpQueueItem[]>([]);
   const [activeLevelUp, setActiveLevelUp] = useState<LevelUpQueueItem | null>(null);
 
+  // Redemption modal queue (shown after conquest + level-up modals)
+  const [redemptionQueue, setRedemptionQueue] = useState<RedemptionQueueItem[]>([]);
+  const [activeRedemption, setActiveRedemption] = useState<RedemptionQueueItem | null>(null);
+
   // Track which notification createdAt timestamps we've already processed (dedupe)
   const processedIdsRef = useRef<Set<number>>(new Set());
   // Prevent concurrent processing
@@ -143,10 +154,11 @@ export function GamificationToastProvider() {
     // Sort by createdAt ascending so oldest shows first
     const sorted = [...newNotifications].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
-    // Separate conquest/levelUp notifications from point toasts
+    // Separate conquest/levelUp/redemption notifications from point toasts
     const pointNotifications: PendingNotification[] = [];
     const newConquests: ConquestQueueItem[] = [];
     const newLevelUps: LevelUpQueueItem[] = [];
+    const newRedemptions: RedemptionQueueItem[] = [];
 
     for (const notification of sorted) {
       if (notification.type === 'conquest' && notification.conquestId && notification.category != null) {
@@ -167,6 +179,13 @@ export function GamificationToastProvider() {
           level: notification.level,
           cyclesCompleted: notification.cyclesCompleted || 0,
         });
+      } else if (notification.source === 'resgate') {
+        // Reward redemption → show gift box modal
+        newRedemptions.push({
+          description: notification.description,
+          points: notification.points || 0,
+          onboardingItemId: notification.onboardingItemId,
+        });
       } else {
         pointNotifications.push(notification);
       }
@@ -180,6 +199,11 @@ export function GamificationToastProvider() {
     // Queue level-up modals (shown after conquest modals)
     if (newLevelUps.length > 0) {
       setLevelUpQueue(prev => [...prev, ...newLevelUps]);
+    }
+
+    // Queue redemption modals (shown after conquest + level-up modals)
+    if (newRedemptions.length > 0) {
+      setRedemptionQueue(prev => [...prev, ...newRedemptions]);
     }
 
     // Stagger toasts with delay
@@ -209,6 +233,14 @@ export function GamificationToastProvider() {
     for (const notification of pointNotifications) {
       if (notification.onboardingItemId) {
         completeOnboardingItem(uid, notification.onboardingItemId)
+          .catch(err => console.error('[GamificationToast] Failed to complete onboarding item:', err));
+      }
+    }
+
+    // Handle onboarding auto-complete for redemption notifications
+    for (const redemption of newRedemptions) {
+      if (redemption.onboardingItemId) {
+        completeOnboardingItem(uid, redemption.onboardingItemId)
           .catch(err => console.error('[GamificationToast] Failed to complete onboarding item:', err));
       }
     }
@@ -258,6 +290,17 @@ export function GamificationToastProvider() {
     setLevelUpQueue(rest);
   }, [levelUpQueue, activeLevelUp, activeConquest, conquestQueue]);
 
+  // Process redemption queue — show after all conquest + level-up modals are done
+  useEffect(() => {
+    if (activeRedemption || redemptionQueue.length === 0) return;
+    // Wait until all conquest + level-up modals are done
+    if (activeConquest || conquestQueue.length > 0) return;
+    if (activeLevelUp || levelUpQueue.length > 0) return;
+    const [next, ...rest] = redemptionQueue;
+    setActiveRedemption(next);
+    setRedemptionQueue(rest);
+  }, [redemptionQueue, activeRedemption, activeConquest, conquestQueue, activeLevelUp, levelUpQueue]);
+
   const handleDismiss = useCallback((id: string) => {
     setToasts(prev =>
       prev.map(t => (t.id === id ? { ...t, exiting: true } : t))
@@ -276,6 +319,11 @@ export function GamificationToastProvider() {
   const handleLevelUpClose = useCallback(() => {
     setActiveLevelUp(null);
     // Next level-up (if any) will be picked up by the useEffect above
+  }, []);
+
+  const handleRedemptionClose = useCallback(() => {
+    setActiveRedemption(null);
+    // Next redemption (if any) will be picked up by the useEffect above
   }, []);
 
   // Only show max 3 toasts at a time
@@ -311,6 +359,16 @@ export function GamificationToastProvider() {
           onClose={handleLevelUpClose}
           level={activeLevelUp.level}
           cyclesCompleted={activeLevelUp.cyclesCompleted}
+        />
+      )}
+
+      {/* Redemption modal (gift box) */}
+      {activeRedemption && (
+        <RedemptionModal
+          open={true}
+          onClose={handleRedemptionClose}
+          description={activeRedemption.description}
+          points={activeRedemption.points}
         />
       )}
     </>

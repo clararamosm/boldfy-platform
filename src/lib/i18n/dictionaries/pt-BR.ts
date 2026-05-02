@@ -593,6 +593,11 @@ const ptBR = {
         8: 'Nível 8 — o nível máximo! Lendário.',
       },
     },
+    redemption: {
+      title: 'Recompensa resgatada!',
+      subtitle: 'Parabéns pelo resgate',
+      close: 'Fechar',
+    },
     dashboard: {
       heroPoints: 'Pontos',
       heroRewards: 'Resgatados',
