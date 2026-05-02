@@ -7,6 +7,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { requireAuth, requireSelf } from '@/lib/auth-guard';
 import { requireActiveModuleByRole } from '@/lib/billing/module-gate';
 import { ai } from '@/ai/genkit';
+import { ensureAndRenewCredits, checkCreditsAvailable, consumeCredit } from '@/lib/ai-credits';
 
 // ---- Helpers ----
 
@@ -114,6 +115,13 @@ export async function handleAlignContent(
       return { error: 'Acesso negado: você não pertence a esta empresa.', alignedContent: null };
     }
 
+    // ── AI Credits: renew + check ──
+    const credits = await ensureAndRenewCredits(userId);
+    const creditCheck = checkCreditsAvailable(credits);
+    if (!creditCheck.ok) {
+      return { error: creditCheck.error, alignedContent: null };
+    }
+
     const companyProfile = await getCompanyProfile(companyId);
     const personalBranding = await getPersonalBranding(userId);
 
@@ -138,6 +146,9 @@ export async function handleAlignContent(
     if (!alignedContent) {
       throw new Error('A IA não retornou conteúdo.');
     }
+
+    // ── Consume 1 AI credit after successful generation ──
+    await consumeCredit(userId, credits);
 
     if (userId) {
       adminDb.collection('users').doc(userId).collection('generatedContent').add({
@@ -194,6 +205,13 @@ export async function generateHooks(input: GenerateHooksInput): Promise<Generate
     // Validate user belongs to the company
     if (authUser.companyId !== input.companyId) {
       return { error: 'Acesso negado: você não pertence a esta empresa.' };
+    }
+
+    // ── AI Credits: renew + check ──
+    const credits = await ensureAndRenewCredits(input.userId);
+    const creditCheck = checkCreditsAvailable(credits);
+    if (!creditCheck.ok) {
+      return { error: creditCheck.error };
     }
 
     const companyProfile = await getCompanyProfile(input.companyId);
@@ -270,6 +288,9 @@ Linha 2 do hook C`;
       return { error: 'Não foi possível gerar hooks.' };
     }
 
+    // NOTE: Credit is NOT consumed here — only when the full post is
+    // generated (generateWithHook). This way 1 post = 1 credit.
+
     return { hooks };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
@@ -312,6 +333,13 @@ export async function generateWithHook(input: GenerateWithHookInput): Promise<Al
       return { error: 'Acesso negado: você não pertence a esta empresa.', alignedContent: null };
     }
 
+    // ── AI Credits: renew + check ──
+    const credits = await ensureAndRenewCredits(input.userId);
+    const creditCheck = checkCreditsAvailable(credits);
+    if (!creditCheck.ok) {
+      return { error: creditCheck.error, alignedContent: null };
+    }
+
     const companyProfile = await getCompanyProfile(input.companyId);
     const personalBranding = await getPersonalBranding(input.userId);
 
@@ -342,6 +370,9 @@ Gere o post COMPLETO comecando com o hook acima. NAO mude o hook. Desenvolva o b
     if (!alignedContent) {
       throw new Error('A IA não retornou conteúdo.');
     }
+
+    // ── Consume 1 AI credit after successful generation ──
+    await consumeCredit(input.userId, credits);
 
     if (input.userId) {
       adminDb.collection('users').doc(input.userId).collection('generatedContent').add({

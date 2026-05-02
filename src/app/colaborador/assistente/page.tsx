@@ -15,14 +15,51 @@ import Link from 'next/link';
 import { useAiCredits } from '@/hooks/use-ai-credits';
 
 function AiCreditsTag() {
-  const { totalAvailable, monthlyLimit, loading } = useAiCredits();
+  const { remaining, bonusCredits, monthlyLimit, totalAvailable, loading } = useAiCredits();
   if (loading) return null;
   const isExhausted = totalAvailable <= 0;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${isExhausted ? 'bg-red-100 text-red-700' : 'bg-purple-100 text-purple-700'}`}>
-      <Sparkles className="h-3 w-3" />
-      {totalAvailable}/{monthlyLimit} créditos · renovação mensal
-    </span>
+    <div className="flex items-center gap-2 flex-wrap">
+      {/* Monthly credits */}
+      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${isExhausted ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400' : 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-400'}`}>
+        <Sparkles className="h-3 w-3" />
+        {remaining}/{monthlyLimit} mensais
+      </span>
+      {/* Bonus credits (redeemed) — only show if > 0 */}
+      {bonusCredits > 0 && (
+        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400">
+          <ShoppingCart className="h-3 w-3" />
+          +{bonusCredits} resgatados
+        </span>
+      )}
+    </div>
+  );
+}
+
+function CreditExhaustedCard() {
+  const { daysUntilRenewal } = useAiCredits();
+  return (
+    <Card className="border-dashed border-red-200 dark:border-red-900">
+      <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="h-16 w-16 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center mb-4">
+          <Sparkles className="h-8 w-8 text-red-400" />
+        </div>
+        <h3 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-1">Créditos esgotados</h3>
+        <p className="text-sm text-muted-foreground max-w-md mb-4">
+          Você usou todos os seus créditos de IA deste mês.
+          {daysUntilRenewal != null && (
+            <> Seus créditos mensais renovam em <strong>{daysUntilRenewal} dia{daysUntilRenewal !== 1 ? 's' : ''}</strong>.</>
+          )}
+          {' '}Você também pode trocar seus pontos por créditos extras na loja de recompensas.
+        </p>
+        <Button asChild variant="default" className="bg-purple-600 hover:bg-purple-700">
+          <Link href="/colaborador/recompensas">
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Resgatar créditos extras
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -101,24 +138,7 @@ export default function AiAssistantPage() {
           <AssistantPageSkeleton />
         ) : user ? (
           isBlocked ? (
-            <Card className="border-dashed border-red-200">
-              <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                <div className="h-16 w-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                  <Sparkles className="h-8 w-8 text-red-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-red-700 mb-1">Creditos esgotados</h3>
-                <p className="text-sm text-muted-foreground max-w-md mb-4">
-                  Voce usou todos os seus creditos de IA deste mes.
-                  Troque seus pontos por mais creditos na loja de recompensas ou aguarde a renovacao mensal.
-                </p>
-                <Button asChild variant="default" className="bg-purple-600 hover:bg-purple-700">
-                  <Link href="/colaborador/recompensas">
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    Ir para a loja
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <CreditExhaustedCard />
           ) : (
             <AiAssistantForm
               companyId={user.companyId || ''}
