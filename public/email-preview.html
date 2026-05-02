@@ -3,33 +3,54 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Boldfy — Email Preview</title>
+  <title>Boldfy — Email Preview (todos os e-mails por role)</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       background-color: #111;
       color: #fff;
-      padding: 40px 20px;
+      padding: 40px 20px 80px;
     }
-    .preview-header { text-align: center; margin-bottom: 40px; }
+
+    .preview-header { text-align: center; margin-bottom: 36px; }
     .preview-header h1 { font-size: 22px; font-weight: 600; color: #e0d0f0; margin-bottom: 6px; }
     .preview-header p { color: #888; font-size: 13px; }
 
-    .preview-tabs {
-      display: flex; justify-content: center; gap: 6px;
-      margin-bottom: 28px; flex-wrap: wrap;
+    /* ── Role sections ── */
+    .role-section { max-width: 680px; margin: 0 auto 40px; }
+    .role-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px; padding-bottom: 8px;
+      border-bottom: 1px solid #2a2a2a;
     }
-    .preview-tab {
-      padding: 7px 16px; border-radius: 999px;
+    .role-badge {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; padding: 4px 10px; border-radius: 999px;
+    }
+    .role-badge.admin { background: #7c3aed; color: #fff; }
+    .role-badge.colaborador { background: #2563eb; color: #fff; }
+    .role-badge.tl { background: #059669; color: #fff; }
+    .role-badge.estrategista { background: #d97706; color: #fff; }
+    .role-badge.todos { background: #6b7280; color: #fff; }
+    .role-header h2 { font-size: 15px; font-weight: 600; color: #ccc; }
+    .role-count { font-size: 12px; color: #666; margin-left: auto; }
+
+    /* ── Tabs within each role ── */
+    .role-tabs {
+      display: flex; gap: 5px; flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .role-tab {
+      padding: 6px 14px; border-radius: 999px;
       border: 1px solid #333; background: transparent;
-      color: #888; font-size: 12px; font-weight: 500;
+      color: #888; font-size: 11px; font-weight: 500;
       cursor: pointer; transition: all 0.15s;
     }
-    .preview-tab:hover { border-color: #9333ea; color: #c4a0e8; }
-    .preview-tab.active { background: #9333ea; border-color: #9333ea; color: white; }
+    .role-tab:hover { border-color: #9333ea; color: #c4a0e8; }
+    .role-tab.active { background: #9333ea; border-color: #9333ea; color: white; }
 
-    .email-container { max-width: 620px; margin: 0 auto; }
+    /* ── Email frame ── */
     .email-frame {
       display: none; border-radius: 10px; overflow: hidden;
       box-shadow: 0 4px 24px rgba(0,0,0,0.4);
@@ -43,9 +64,11 @@
     .subject-bar .from { font-size: 11px; color: #666; margin-bottom: 3px; }
     .subject-bar .from strong { color: #aaa; }
     .subject-bar .subject-text { font-size: 14px; font-weight: 600; color: #ddd; }
+    .subject-bar .to-line { font-size: 11px; color: #555; margin-top: 3px; }
 
+    /* ── Footer note ── */
     .note-box {
-      max-width: 620px; margin: 20px auto 0;
+      max-width: 680px; margin: 0 auto;
       padding: 14px 18px; background: #1a1a1a;
       border-radius: 8px; border: 1px solid #2a2a2a;
     }
@@ -57,30 +80,182 @@
 
 <div class="preview-header">
   <h1>📧 Email Preview — Fai da Boldfy</h1>
-  <p>Clique nas tabs pra ver cada tipo de email</p>
+  <p>Todos os 16 e-mails da plataforma, organizados por role do destinatário</p>
 </div>
 
-<div class="preview-tabs">
-  <button class="preview-tab active" onclick="showEmail('invite')">Convite</button>
-  <button class="preview-tab" onclick="showEmail('mission-submitted')">Missão Enviada</button>
-  <button class="preview-tab" onclick="showEmail('mission-approved')">Missão Aprovada</button>
-  <button class="preview-tab" onclick="showEmail('mission-rejected')">Missão Rejeitada</button>
-  <button class="preview-tab" onclick="showEmail('reward')">Resgate</button>
-  <button class="preview-tab" onclick="showEmail('post-review')">Post p/ Revisão</button>
-</div>
+<!-- ╔══════════════════════════════════════════════════════════════════╗ -->
+<!-- ║  ADMIN (4 e-mails)                                             ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════════╝ -->
+<div class="role-section" id="section-admin">
+  <div class="role-header">
+    <span class="role-badge admin">Admin</span>
+    <h2>E-mails recebidos pelo Admin</h2>
+    <span class="role-count">4 e-mails</span>
+  </div>
 
-<div class="email-container">
+  <div class="role-tabs">
+    <button class="role-tab active" onclick="showInSection('admin','invite-admin')">Convite</button>
+    <button class="role-tab" onclick="showInSection('admin','mission-submitted')">Missão Enviada</button>
+    <button class="role-tab" onclick="showInSection('admin','reward-redeemed')">Resgate</button>
+    <button class="role-tab" onclick="showInSection('admin','low-stock')">Estoque Baixo</button>
+  </div>
 
-  <!-- ═══════════ CONVITE ═══════════ -->
-  <div class="email-frame active" id="email-invite">
+  <!-- ADMIN: Convite -->
+  <div class="email-frame active" id="admin-invite-admin">
     <div class="subject-bar">
       <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
       <div class="subject-text">Você foi convidado pra Acme Corp na Boldfy!</div>
+      <div class="to-line">Para: clara@acmecorp.com (Admin)</div>
     </div>
     <div style="background-color: #ffffff; padding: 40px 24px 32px;">
       <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Clara! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Você foi convidado como <strong>Administrador</strong> na empresa <strong>Acme Corp</strong> na plataforma Boldfy.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Clica aqui embaixo pra criar sua senha e acessar:</p>
+        <p style="margin: 0 0 24px;">
+          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Criar minha senha e acessar</a>
+        </p>
+        <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">
+          Depois disso, é só acessar <a href="#" style="color: #9333ea; text-decoration: none;">https://app.boldfy.com.br/login</a> sempre que quiser.
+        </p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Se você não esperava este convite, pode ignorar este e-mail.</p>
+      </div>
+    </div>
+  </div>
 
-        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Maria! 👋</p>
+  <!-- ADMIN: Missão Enviada -->
+  <div class="email-frame" id="admin-mission-submitted">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">Nova comprovação de missão — João Silva</div>
+      <div class="to-line">Para: clara@acmecorp.com (Admin)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Clara! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">O <strong>João Silva</strong> acabou de enviar uma comprovação pra missão <strong>"Compartilhar post da empresa no LinkedIn"</strong>.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Dá uma olhada quando puder?</p>
+        <p style="margin: 0;">
+          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Revisar comprovação</a>
+        </p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Você recebeu este e-mail porque tem notificações ativas na Boldfy.<br/>Acesse <a href="#" style="color: #9333ea;">Configurações</a> para ajustar suas preferências.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN: Resgate de recompensa -->
+  <div class="email-frame" id="admin-reward-redeemed">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">Resgate de recompensa — João Silva</div>
+      <div class="to-line">Para: clara@acmecorp.com (Admin)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Clara! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">O <strong>João Silva</strong> resgatou a recompensa <strong>"Vale-presente R$50"</strong> por <strong>500 pontos</strong>.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Quando rolar a entrega, é só marcar como entregue na plataforma.</p>
+        <p style="margin: 0;">
+          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Ver resgates</a>
+        </p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Você recebeu este e-mail porque tem notificações ativas na Boldfy.<br/>Acesse <a href="#" style="color: #9333ea;">Configurações</a> para ajustar suas preferências.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN: Estoque baixo de códigos -->
+  <div class="email-frame" id="admin-low-stock">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">⚠️ Recompensa "Vale iFood R$30" com poucos códigos</div>
+      <div class="to-line">Para: clara@acmecorp.com (Admin)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Clara! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">A recompensa <strong>"Vale iFood R$30"</strong> tem apenas <strong>2 código(s)</strong> disponível(is).</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Quando acabarem, ela ficará indisponível automaticamente. É hora de comprar mais gift cards e cadastrar os códigos na plataforma.</p>
+        <p style="margin: 0;">
+          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Gerenciar códigos</a>
+        </p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Você recebeu este e-mail porque tem notificações ativas na Boldfy.<br/>Acesse <a href="#" style="color: #9333ea;">Configurações</a> para ajustar suas preferências.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════════════╗ -->
+<!-- ║  COLABORADOR (5 e-mails)                                       ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════════╝ -->
+<div class="role-section" id="section-colaborador">
+  <div class="role-header">
+    <span class="role-badge colaborador">Colaborador</span>
+    <h2>E-mails recebidos pelo Colaborador</h2>
+    <span class="role-count">5 e-mails</span>
+  </div>
+
+  <div class="role-tabs">
+    <button class="role-tab active" onclick="showInSection('colaborador','invite-colab')">Convite</button>
+    <button class="role-tab" onclick="showInSection('colaborador','mission-approved')">Missão Aprovada</button>
+    <button class="role-tab" onclick="showInSection('colaborador','mission-rejected')">Missão Rejeitada</button>
+    <button class="role-tab" onclick="showInSection('colaborador','code-redeemed')">Código Resgatado</button>
+    <button class="role-tab" onclick="showInSection('colaborador','analytics-colab')">Lembrete Analytics</button>
+  </div>
+
+  <!-- COLAB: Convite -->
+  <div class="email-frame active" id="colaborador-invite-colab">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">Você foi convidado pra Acme Corp na Boldfy!</div>
+      <div class="to-line">Para: joao@email.com (Colaborador)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, João! 👋</p>
         <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Você foi convidado como <strong>Colaborador</strong> na empresa <strong>Acme Corp</strong> na plataforma Boldfy.</p>
         <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Clica aqui embaixo pra criar sua senha e acessar:</p>
         <p style="margin: 0 0 24px;">
@@ -89,51 +264,6 @@
         <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">
           Depois disso, é só acessar <a href="#" style="color: #9333ea; text-decoration: none;">https://app.boldfy.com.br/login</a> sempre que quiser.
         </p>
-
-        <!-- Signature -->
-        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
-          <table cellpadding="0" cellspacing="0" border="0">
-            <tr>
-              <td style="vertical-align: top; padding-right: 14px;">
-                <img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" />
-              </td>
-              <td style="vertical-align: top;">
-                <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
-                <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
-                <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
-              </td>
-            </tr>
-          </table>
-        </div>
-
-        <!-- Logo -->
-        <div style="margin-top: 28px; text-align: center;">
-          <img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" height="auto" style="display: inline-block;" />
-        </div>
-
-        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">
-          Se você não esperava este convite, pode ignorar este e-mail.
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════ MISSÃO ENVIADA (pro admin) ═══════════ -->
-  <div class="email-frame" id="email-mission-submitted">
-    <div class="subject-bar">
-      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
-      <div class="subject-text">Nova comprovação de missão — João Silva</div>
-    </div>
-    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
-      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-
-        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Clara! 👋</p>
-        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">O <strong>João Silva</strong> acabou de enviar uma comprovação pra missão <strong>"Compartilhar post da empresa no LinkedIn"</strong>.</p>
-        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Dá uma olhada quando puder?</p>
-        <p style="margin: 0;">
-          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Revisar comprovação</a>
-        </p>
-
         <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
           <table cellpadding="0" cellspacing="0" border="0"><tr>
             <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
@@ -145,20 +275,20 @@
           </tr></table>
         </div>
         <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
-        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Você recebeu este e-mail porque tem notificações ativas na Boldfy.<br/>Acesse <a href="#" style="color: #9333ea;">Configurações</a> para ajustar suas preferências.</p>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Se você não esperava este convite, pode ignorar este e-mail.</p>
       </div>
     </div>
   </div>
 
-  <!-- ═══════════ MISSÃO APROVADA ═══════════ -->
-  <div class="email-frame" id="email-mission-approved">
+  <!-- COLAB: Missão Aprovada -->
+  <div class="email-frame" id="colaborador-mission-approved">
     <div class="subject-bar">
       <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
       <div class="subject-text">✅ Missão aprovada: Compartilhar post da empresa no LinkedIn</div>
+      <div class="to-line">Para: joao@email.com (Colaborador)</div>
     </div>
     <div style="background-color: #ffffff; padding: 40px 24px 32px;">
       <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-
         <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, João! 🎊</p>
         <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Boa notícia! Sua comprovação da missão <strong>"Compartilhar post da empresa no LinkedIn"</strong> foi <strong style="color: #059669;">aprovada</strong>.</p>
         <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Você ganhou <strong>+150 pontos</strong>! 🎉</p>
@@ -166,7 +296,6 @@
         <p style="margin: 0;">
           <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Ver minhas missões</a>
         </p>
-
         <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
           <table cellpadding="0" cellspacing="0" border="0"><tr>
             <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
@@ -183,15 +312,15 @@
     </div>
   </div>
 
-  <!-- ═══════════ MISSÃO REJEITADA ═══════════ -->
-  <div class="email-frame" id="email-mission-rejected">
+  <!-- COLAB: Missão Rejeitada -->
+  <div class="email-frame" id="colaborador-mission-rejected">
     <div class="subject-bar">
       <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
       <div class="subject-text">Missão não aprovada: Compartilhar post da empresa no LinkedIn</div>
+      <div class="to-line">Para: joao@email.com (Colaborador)</div>
     </div>
     <div style="background-color: #ffffff; padding: 40px 24px 32px;">
       <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-
         <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, João!</p>
         <p style="font-size: 15px; line-height: 1.7; margin: 0 0 4px;">Sua comprovação da missão <strong>"Compartilhar post da empresa no LinkedIn"</strong> não foi aprovada dessa vez.</p>
         <div style="margin: 16px 0 20px; padding: 12px 16px; background-color: #f9fafb; border-left: 3px solid #d1d5db; border-radius: 4px;">
@@ -202,7 +331,6 @@
         <p style="margin: 0;">
           <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Ver minhas missões</a>
         </p>
-
         <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
           <table cellpadding="0" cellspacing="0" border="0"><tr>
             <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
@@ -219,22 +347,25 @@
     </div>
   </div>
 
-  <!-- ═══════════ RESGATE ═══════════ -->
-  <div class="email-frame" id="email-reward">
+  <!-- COLAB: Código voucher resgatado -->
+  <div class="email-frame" id="colaborador-code-redeemed">
     <div class="subject-bar">
       <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
-      <div class="subject-text">Resgate de recompensa — João Silva</div>
+      <div class="subject-text">🎁 Seu código de resgate: Vale iFood R$30</div>
+      <div class="to-line">Para: joao@email.com (Colaborador)</div>
     </div>
     <div style="background-color: #ffffff; padding: 40px 24px 32px;">
       <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-
-        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Clara! 👋</p>
-        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">O <strong>João Silva</strong> resgatou a recompensa <strong>"Vale-presente R$50"</strong> por <strong>500 pontos</strong>.</p>
-        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Quando rolar a entrega, é só marcar como entregue na plataforma.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, João! 🎉</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Sua recompensa <strong>"Vale iFood R$30"</strong> foi resgatada com sucesso! Aqui está o seu código:</p>
+        <div style="margin: 20px 0; padding: 16px 24px; background-color: #f3f0ff; border: 2px solid #9333ea; border-radius: 10px; text-align: center;">
+          <p style="margin: 0; font-size: 22px; font-weight: 700; font-family: 'Courier New', monospace; color: #1F2937; letter-spacing: 2px;">IFOOD-X8K2-M9P1</p>
+        </div>
+        <p style="font-size: 14px; line-height: 1.7; margin: 0 0 16px; color: #6B7280;">⚠️ Guarde este código com carinho — ele é único e não aparecerá novamente na plataforma. Você também pode acessá-lo nos seus resgates.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Aproveite! 💜</p>
         <p style="margin: 0;">
-          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Ver resgates</a>
+          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Ver meus resgates</a>
         </p>
-
         <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
           <table cellpadding="0" cellspacing="0" border="0"><tr>
             <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
@@ -251,22 +382,117 @@
     </div>
   </div>
 
-  <!-- ═══════════ POST PARA REVISÃO ═══════════ -->
-  <div class="email-frame" id="email-post-review">
+  <!-- COLAB: Lembrete Analytics Mensal -->
+  <div class="email-frame" id="colaborador-analytics-colab">
     <div class="subject-bar">
       <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
-      <div class="subject-text">Post pronto pra revisão: 5 tendências de IA para 2025</div>
+      <div class="subject-text">Hora de atualizar seu Analytics do LinkedIn — abril de 2026</div>
+      <div class="to-line">Para: joao@email.com (Colaborador)</div>
     </div>
     <div style="background-color: #ffffff; padding: 40px 24px 32px;">
       <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, João! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Começou um novo mês — e isso significa que já dá pra exportar o relatório do LinkedIn Analytics referente a <strong>abril de 2026</strong> e fazer o upload aqui na plataforma.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 8px;">Com esses dados a gente consegue ver como foi a performance do seu conteúdo e manter tudo atualizado no seu painel. 📊</p>
+        <div style="margin: 28px 0;">
+          <a href="#" style="display: inline-block; background-color: #9333ea; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">→ Fazer upload agora</a>
+        </div>
+        <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px 24px; margin-bottom: 8px;">
+          <p style="margin: 0 0 12px; font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.05em;">Como exportar o relatório</p>
+          <p style="font-size: 14px; color: #374151; line-height: 1.8; margin: 0;">
+            <strong style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background-color: #9333ea; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 8px;">1</strong>
+            Acesse o LinkedIn Analytics → Desempenho do conteúdo<br/>
+            <strong style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background-color: #9333ea; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 8px;">2</strong>
+            Filtre o período para <strong>abril de 2026</strong><br/>
+            <strong style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background-color: #9333ea; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 8px;">3</strong>
+            Clique em <strong>Exportar</strong> e salve o .xlsx<br/>
+            <strong style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background-color: #9333ea; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 8px;">4</strong>
+            Volte e faça o upload na plataforma
+          </p>
+        </div>
+        <p style="font-size: 13px; color: #6B7280; line-height: 1.6; margin: 16px 0 0;">Qualquer dúvida, é só responder este e-mail. 💜</p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Você recebeu este e-mail porque tem notificações ativas na Boldfy.<br/>Acesse <a href="#" style="color: #9333ea;">Configurações</a> para ajustar suas preferências.</p>
+      </div>
+    </div>
+  </div>
+</div>
 
+<!-- ╔══════════════════════════════════════════════════════════════════╗ -->
+<!-- ║  THOUGHT LEADER (3 e-mails)                                    ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════════╝ -->
+<div class="role-section" id="section-tl">
+  <div class="role-header">
+    <span class="role-badge tl">Thought Leader</span>
+    <h2>E-mails recebidos pelo Thought Leader</h2>
+    <span class="role-count">3 e-mails</span>
+  </div>
+
+  <div class="role-tabs">
+    <button class="role-tab active" onclick="showInSection('tl','invite-tl')">Convite</button>
+    <button class="role-tab" onclick="showInSection('tl','post-review')">Post p/ Revisão</button>
+    <button class="role-tab" onclick="showInSection('tl','analytics-tl')">Lembrete Analytics</button>
+  </div>
+
+  <!-- TL: Convite -->
+  <div class="email-frame active" id="tl-invite-tl">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">Você foi convidado pra Acme Corp na Boldfy!</div>
+      <div class="to-line">Para: ricardo@acmecorp.com (Thought Leader)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
         <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Ricardo! 👋</p>
-        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Tem um post novo prontinho pra você revisar: <strong>"5 tendências de IA para 2025"</strong>.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Você foi convidado como <strong>Thought Leader</strong> na empresa <strong>Acme Corp</strong> na plataforma Boldfy.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Clica aqui embaixo pra criar sua senha e acessar:</p>
+        <p style="margin: 0 0 24px;">
+          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Criar minha senha e acessar</a>
+        </p>
+        <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">
+          Depois disso, é só acessar <a href="#" style="color: #9333ea; text-decoration: none;">https://app.boldfy.com.br/login</a> sempre que quiser.
+        </p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Se você não esperava este convite, pode ignorar este e-mail.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TL: Post pronto pra revisão -->
+  <div class="email-frame" id="tl-post-review">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">Post pronto pra revisão: 5 tendências de IA para 2026</div>
+      <div class="to-line">Para: ricardo@acmecorp.com (Thought Leader)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Ricardo! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Tem um post novo prontinho pra você revisar: <strong>"5 tendências de IA para 2026"</strong>.</p>
         <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Confere lá quando der?</p>
         <p style="margin: 0;">
           <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Ver na plataforma</a>
         </p>
-
         <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
           <table cellpadding="0" cellspacing="0" border="0"><tr>
             <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
@@ -283,19 +509,199 @@
     </div>
   </div>
 
+  <!-- TL: Lembrete Analytics -->
+  <div class="email-frame" id="tl-analytics-tl">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">Hora de atualizar seu Analytics do LinkedIn — abril de 2026</div>
+      <div class="to-line">Para: ricardo@acmecorp.com (Thought Leader)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Ricardo! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Começou um novo mês — e isso significa que já dá pra exportar o relatório do LinkedIn Analytics referente a <strong>abril de 2026</strong> e fazer o upload aqui na plataforma.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 8px;">Com esses dados a gente consegue ver como foi a performance do seu conteúdo e manter tudo atualizado no seu painel. 📊</p>
+        <div style="margin: 28px 0;">
+          <a href="#" style="display: inline-block; background-color: #9333ea; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">→ Fazer upload agora</a>
+        </div>
+        <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px 24px; margin-bottom: 8px;">
+          <p style="margin: 0 0 12px; font-size: 13px; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.05em;">Como exportar o relatório</p>
+          <p style="font-size: 14px; color: #374151; line-height: 1.8; margin: 0;">
+            <strong style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background-color: #9333ea; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 8px;">1</strong>
+            Acesse o LinkedIn Analytics → Desempenho do conteúdo<br/>
+            <strong style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background-color: #9333ea; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 8px;">2</strong>
+            Filtre o período para <strong>abril de 2026</strong><br/>
+            <strong style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background-color: #9333ea; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 8px;">3</strong>
+            Clique em <strong>Exportar</strong> e salve o .xlsx<br/>
+            <strong style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background-color: #9333ea; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 8px;">4</strong>
+            Volte e faça o upload na plataforma
+          </p>
+        </div>
+        <p style="font-size: 13px; color: #6B7280; line-height: 1.6; margin: 16px 0 0;">Qualquer dúvida, é só responder este e-mail. 💜</p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Você recebeu este e-mail porque tem notificações ativas na Boldfy.<br/>Acesse <a href="#" style="color: #9333ea;">Configurações</a> para ajustar suas preferências.</p>
+      </div>
+    </div>
+  </div>
 </div>
 
+<!-- ╔══════════════════════════════════════════════════════════════════╗ -->
+<!-- ║  ESTRATEGISTA (1 e-mail)                                       ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════════╝ -->
+<div class="role-section" id="section-estrategista">
+  <div class="role-header">
+    <span class="role-badge estrategista">Estrategista</span>
+    <h2>E-mails recebidos pelo Estrategista</h2>
+    <span class="role-count">1 e-mail</span>
+  </div>
+
+  <div class="role-tabs">
+    <button class="role-tab active" onclick="showInSection('estrategista','invite-strat')">Convite</button>
+  </div>
+
+  <!-- STRAT: Convite -->
+  <div class="email-frame active" id="estrategista-invite-strat">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">Você foi convidado pra Boldfy na Boldfy!</div>
+      <div class="to-line">Para: ana@boldfy.com.br (Estrategista)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Ana! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Você foi convidado como <strong>Estrategista</strong> na empresa <strong>Boldfy</strong> na plataforma Boldfy.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Clica aqui embaixo pra criar sua senha e acessar:</p>
+        <p style="margin: 0 0 24px;">
+          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Criar minha senha e acessar</a>
+        </p>
+        <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">
+          Depois disso, é só acessar <a href="#" style="color: #9333ea; text-decoration: none;">https://app.boldfy.com.br/login</a> sempre que quiser.
+        </p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Se você não esperava este convite, pode ignorar este e-mail.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ╔══════════════════════════════════════════════════════════════════╗ -->
+<!-- ║  TODOS OS USUÁRIOS (2 e-mails)                                 ║ -->
+<!-- ╚══════════════════════════════════════════════════════════════════╝ -->
+<div class="role-section" id="section-todos">
+  <div class="role-header">
+    <span class="role-badge todos">Todos</span>
+    <h2>E-mails recebidos por qualquer usuário</h2>
+    <span class="role-count">2 e-mails</span>
+  </div>
+
+  <div class="role-tabs">
+    <button class="role-tab active" onclick="showInSection('todos','reset-password')">Reset de Senha</button>
+    <button class="role-tab" onclick="showInSection('todos','resend-invite')">Reenvio de Convite</button>
+  </div>
+
+  <!-- TODOS: Reset de senha -->
+  <div class="email-frame active" id="todos-reset-password">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">Redefinir sua senha da Boldfy</div>
+      <div class="to-line">Para: usuario@email.com (qualquer role)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Maria! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">A gente recebeu um pedido pra redefinir a senha da sua conta na Boldfy.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Clica aqui embaixo pra criar uma nova senha:</p>
+        <p style="margin: 0 0 24px;">
+          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Redefinir minha senha</a>
+        </p>
+        <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">Este link é válido por 1 hora.</p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Se você não pediu para redefinir sua senha, pode ignorar este e-mail com tranquilidade.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TODOS: Reenvio de convite -->
+  <div class="email-frame" id="todos-resend-invite">
+    <div class="subject-bar">
+      <div class="from">De: <strong>Fai da Boldfy</strong> &lt;admin@boldfy.com.br&gt;</div>
+      <div class="subject-text">Você foi convidado pra Acme Corp na Boldfy!</div>
+      <div class="to-line">Para: usuario@email.com (qualquer role pendente)</div>
+    </div>
+    <div style="background-color: #ffffff; padding: 40px 24px 32px;">
+      <div style="max-width: 560px; margin: 0 auto; color: #374151; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Oi, Pedro! 👋</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">Você foi convidado como <strong>Colaborador</strong> na empresa <strong>Acme Corp</strong> na plataforma Boldfy.</p>
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Clica aqui embaixo pra criar sua senha e acessar:</p>
+        <p style="margin: 0 0 24px;">
+          <a href="#" style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">→ Criar minha senha e acessar</a>
+        </p>
+        <p style="font-size: 13px; line-height: 1.6; color: #6B7280; margin: 0; padding: 12px 16px; background-color: #f9fafb; border-radius: 6px;">
+          Depois disso, é só acessar <a href="#" style="color: #9333ea; text-decoration: none;">https://app.boldfy.com.br/login</a> sempre que quiser.
+        </p>
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+          <table cellpadding="0" cellspacing="0" border="0"><tr>
+            <td style="vertical-align: top; padding-right: 14px;"><img src="/images/email/fai-avatar.png" alt="Fai" width="48" height="48" style="border-radius: 50%; display: block;" /></td>
+            <td style="vertical-align: top;">
+              <p style="margin: 0 0 1px; font-size: 14px; font-weight: 600; color: #1F2937;">Fai da Boldfy</p>
+              <p style="margin: 0; font-size: 12px; color: #6B7280; line-height: 1.4;">Gerente de Educação e Sucesso do Cliente</p>
+              <a href="mailto:admin@boldfy.com.br" style="font-size: 12px; color: #9333ea; text-decoration: none;">admin@boldfy.com.br</a>
+            </td>
+          </tr></table>
+        </div>
+        <div style="margin-top: 28px; text-align: center;"><img src="/images/email/boldfy-logo.svg" alt="Boldfy" width="90" /></div>
+        <p style="margin-top: 20px; font-size: 11px; color: #9CA3AF; text-align: center; line-height: 1.5;">Se você não esperava este convite, pode ignorar este e-mail.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Footer Note ── -->
 <div class="note-box">
   <p>
-    ☝️ A foto da Fai vem de <code>public/images/email/fai-avatar.png</code> e o logo de <code>public/images/email/boldfy-logo.svg</code>. Se estiver visualizando no dev server local, as imagens já aparecem. Se abrir o HTML direto do file system, pode precisar servir via server.
+    ☝️ A foto da Fai vem de <code>public/images/email/fai-avatar.png</code> e o logo de <code>public/images/email/boldfy-logo.svg</code>.<br/>
+    📋 Total: <strong>15 e-mails únicos</strong> (16 contando reenvio de convite, que usa o mesmo template do convite original).<br/>
+    🔔 Os e-mails de notificação respeitam as preferências do usuário em <code>notificationPrefs</code>.<br/>
+    💜 Todos saem de <strong>"Fai da Boldfy"</strong> (<code>admin@boldfy.com.br</code>).
   </p>
 </div>
 
 <script>
-function showEmail(id) {
-  document.querySelectorAll('.email-frame').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.preview-tab').forEach(el => el.classList.remove('active'));
-  document.getElementById('email-' + id).classList.add('active');
+function showInSection(section, emailId) {
+  const container = document.getElementById('section-' + section);
+  container.querySelectorAll('.email-frame').forEach(el => el.classList.remove('active'));
+  container.querySelectorAll('.role-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(section + '-' + emailId).classList.add('active');
   event.target.classList.add('active');
 }
 </script>

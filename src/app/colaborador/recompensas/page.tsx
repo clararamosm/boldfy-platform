@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Gift, History, TrendingUp, TrendingDown, PlusCircle, MinusCircle, Loader2, BookOpen, Trophy, FileText, Flame, Award, Zap, Copy, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Gift, History, TrendingUp, TrendingDown, PlusCircle, MinusCircle, Loader2, BookOpen, Trophy, FileText, Flame, Award, Zap, Copy, Check, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { CoinIcon } from "@/components/coin-icon";
 import Image from "next/image";
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,6 +31,9 @@ type Reward = {
   imageUrl?: string;
   stock: number | 'Ilimitado';
   deliveryMethod?: 'manual' | 'code' | 'instant';
+  type?: string;
+  isNative?: boolean;
+  status?: string;
 };
 
 type Rescue = {
@@ -127,22 +130,37 @@ function CodeRevealDialog({
 
 const RewardCard = ({ reward, onRedeem, disabled, isSubmitting }: { reward: Reward; onRedeem: () => void; disabled: boolean; isSubmitting: boolean }) => {
   const t = useT();
+  const isAiCredits = reward.type === 'ai_credits';
   return (
-    <Card className="hover:shadow-lg transition-shadow flex flex-col">
+    <Card className={`hover:shadow-lg transition-shadow flex flex-col ${isAiCredits ? 'border-purple-200 dark:border-purple-800' : ''}`}>
       <CardHeader className="p-0">
-        <div className="aspect-video bg-muted flex items-center justify-center rounded-t-lg overflow-hidden">
-          {reward.imageUrl ? <Image src={reward.imageUrl} alt={reward.name} width={300} height={168} className="w-full h-full object-cover" data-ai-hint="reward gift" /> : <Gift className="h-12 w-12 text-muted-foreground" />}
+        <div className={`aspect-video flex items-center justify-center rounded-t-lg overflow-hidden ${isAiCredits ? 'bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-950/30 dark:to-violet-900/20' : 'bg-muted'}`}>
+          {reward.imageUrl ? (
+            <Image src={reward.imageUrl} alt={reward.name} width={300} height={168} className="w-full h-full object-cover" data-ai-hint="reward gift" />
+          ) : isAiCredits ? (
+            <Sparkles className="h-12 w-12 text-purple-500" />
+          ) : (
+            <Gift className="h-12 w-12 text-muted-foreground" />
+          )}
         </div>
       </CardHeader>
       <CardContent className="p-4 flex-grow">
         <CardTitle className="text-base font-semibold">{reward.name}</CardTitle>
-        {/* Delivery method badge */}
-        {reward.deliveryMethod === 'code' && (
-          <Badge variant="outline" className="mt-2 text-[10px] px-1.5 py-0 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
-            <Zap className="h-3 w-3 mr-0.5" />
-            {t.colabRewards.instantCode}
-          </Badge>
-        )}
+        {/* Delivery method badges */}
+        <div className="flex flex-wrap gap-1 mt-2">
+          {isAiCredits && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800">
+              <Sparkles className="h-3 w-3 mr-0.5" />
+              {t.colabRewards.instantCredit || 'Crédito instantâneo'}
+            </Badge>
+          )}
+          {reward.deliveryMethod === 'code' && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+              <Zap className="h-3 w-3 mr-0.5" />
+              {t.colabRewards.instantCode}
+            </Badge>
+          )}
+        </div>
       </CardContent>
       <CardFooter className="flex justify-between items-center">
         <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
@@ -357,19 +375,31 @@ export default function InfluencerRecompensasPage() {
 
       setUserInfo({ uid: userId, companyId, name: userData.name || '' });
 
-      // Fetch rewards from companies/{companyId}/rewards
+      // Fetch rewards from companies/{companyId}/rewards — only available ones
       const rewardsSnapshot = await getDocs(collection(db, 'companies', companyId, 'rewards'));
-      const rewardsData: Reward[] = rewardsSnapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          title: data.title || '',
-          name: data.name || '',
-          points: data.points || 0,
-          imageUrl: data.imageUrl,
-          stock: data.stock ?? 'Ilimitado',
-          deliveryMethod: data.deliveryMethod,
-        };
+      const rewardsData: Reward[] = rewardsSnapshot.docs
+        .map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            title: data.title || '',
+            name: data.name || '',
+            points: data.points || 0,
+            imageUrl: data.imageUrl,
+            stock: data.stock ?? 'Ilimitado',
+            deliveryMethod: data.deliveryMethod,
+            type: data.type,
+            isNative: data.isNative,
+            status: data.status,
+          };
+        })
+        .filter((r) => r.status !== 'Desativada');
+
+      // Sort: native AI credit rewards first (cheapest first), then others by points
+      rewardsData.sort((a, b) => {
+        if (a.isNative && !b.isNative) return -1;
+        if (!a.isNative && b.isNative) return 1;
+        return a.points - b.points;
       });
       setRewards(rewardsData);
 

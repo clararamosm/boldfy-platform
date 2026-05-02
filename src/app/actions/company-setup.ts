@@ -4,34 +4,7 @@
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireMaster } from '@/lib/auth-guard';
-
-// ─── Native Rewards Definitions ──────────────────────────────────────
-// These rewards are automatically available in every company's store.
-// Admins can toggle them off but cannot delete them.
-
-export const NATIVE_REWARDS = [
-  {
-    name: '+10 créditos de IA',
-    nameEn: '+10 AI credits',
-    points: 100,
-    type: 'ai_credits' as const,
-    creditsAmount: 10,
-  },
-  {
-    name: '+25 créditos de IA',
-    nameEn: '+25 AI credits',
-    points: 200,
-    type: 'ai_credits' as const,
-    creditsAmount: 25,
-  },
-  {
-    name: '+50 créditos de IA',
-    nameEn: '+50 AI credits',
-    points: 350,
-    type: 'ai_credits' as const,
-    creditsAmount: 50,
-  },
-] as const;
+import { NATIVE_REWARDS } from '@/lib/native-rewards';
 
 // ─── Seed native rewards for a single company ───────────────────────
 // Idempotent: skips if isNative rewards already exist.

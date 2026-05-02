@@ -1466,6 +1466,7 @@ const ptBR = {
     codeCopied: 'Código copiado!',
     viewCode: 'Ver código',
     instantCode: 'Código instantâneo',
+    instantCredit: 'Crédito instantâneo',
     deliveryManual: 'Entrega manual',
   },
 

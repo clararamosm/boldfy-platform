@@ -1466,6 +1466,7 @@ const en: Dictionary = {
     codeCopied: 'Code copied!',
     viewCode: 'View code',
     instantCode: 'Instant code',
+    instantCredit: 'Instant credit',
     deliveryManual: 'Manual delivery',
   },
 
