@@ -3,7 +3,7 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { requireSelf } from '@/lib/auth-guard';
-import { CONQUEST_LADDERS } from './gamification';
+import { CONQUEST_LADDERS } from '@/lib/gamification-constants';
 
 // ---- Server-Side Company Ranking ----
 
