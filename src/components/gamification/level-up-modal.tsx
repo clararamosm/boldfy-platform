@@ -15,7 +15,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { GemBadge } from '@/components/gamification/gem-badge';
 import { useT } from '@/lib/i18n/context';
-import Link from 'next/link';
 
 // ─── Confetti colors ─────────────────────────────────────────────
 const CONFETTI_COLORS = ['#a855f7', '#f59e0b', '#10b981', '#8b5cf6'];
@@ -114,13 +113,8 @@ export function LevelUpModal({
           </p>
         </div>
 
-        <DialogFooter className="flex-col gap-2 px-6 pb-6 sm:flex-col">
-          <Button asChild className="w-full">
-            <Link href="/colaborador/dashboard" onClick={onClose}>
-              {viewProfileLabel}
-            </Link>
-          </Button>
-          <Button variant="ghost" className="w-full" onClick={onClose}>
+        <DialogFooter className="px-6 pb-6">
+          <Button variant="outline" className="w-full" onClick={onClose}>
             {closeLabel}
           </Button>
         </DialogFooter>
