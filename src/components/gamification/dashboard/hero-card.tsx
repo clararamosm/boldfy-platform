@@ -1,5 +1,5 @@
 // src/components/gamification/dashboard/hero-card.tsx
-// Hero card with avatar, gem badge, level pill, and 3 top stats.
+// Hero card with avatar, gem badge, level pill, subtitle, and 3 top stats.
 'use client';
 
 import React from 'react';
@@ -32,6 +32,7 @@ type HeroCardProps = {
   points: number;
   redeemed: number;
   conquests: number;
+  subtitle?: string;
   t: {
     greeting: string;
     levelPill: string;
@@ -51,6 +52,7 @@ export function HeroCard({
   points,
   redeemed,
   conquests,
+  subtitle,
   t,
   className,
 }: HeroCardProps) {
@@ -73,35 +75,44 @@ export function HeroCard({
             </div>
           </div>
 
-          {/* Name + Level pill */}
+          {/* Name + Level pill + Subtitle */}
           <div className="flex-1 text-center sm:text-left min-w-0">
-            <h2 className="text-lg font-bold text-foreground truncate">
+            <h2 className="text-xl font-extrabold text-foreground tracking-tight truncate">
               {t.greeting.replace('{name}', userName)}
             </h2>
-            <div className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30">
-              <GemBadge level={level} size="sm" className="scale-[0.6] origin-center -m-1" />
-              <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">
-                {t.levelPill.replace('{level}', String(level))}
+            <div className="flex items-center gap-2 mt-1 justify-center sm:justify-start">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800">
+                <GemBadge level={level} size="sm" className="scale-[0.6] origin-center -m-1" />
+                <span className="text-xs font-bold text-purple-700 dark:text-purple-300">
+                  {t.levelPill.replace('{level}', String(level))}
+                </span>
               </span>
+              {subtitle && (
+                <span className="text-xs text-muted-foreground">{subtitle}</span>
+              )}
             </div>
           </div>
 
-          {/* 3 Stats */}
-          <div className="flex items-center gap-4 sm:gap-6">
-            <div className="flex flex-col items-center gap-0.5">
-              <CoinIcon size="lg" />
-              <span className="text-lg font-bold text-foreground">{points.toLocaleString()}</span>
-              <span className="text-[10px] text-muted-foreground">{t.heroPoints}</span>
+          {/* 3 Stats with vertical dividers */}
+          <div className="flex items-center gap-0 flex-shrink-0">
+            {/* Pontos */}
+            <div className="flex flex-col items-center px-4 sm:px-5">
+              <span className="text-xl font-extrabold text-primary leading-tight">{points.toLocaleString()}</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t.heroPoints}</span>
             </div>
-            <div className="flex flex-col items-center gap-0.5">
-              <Gift className="h-5 w-5 text-green-500" />
-              <span className="text-lg font-bold text-foreground">{redeemed}</span>
-              <span className="text-[10px] text-muted-foreground">{t.heroRewards}</span>
+            {/* Divider */}
+            <div className="w-px h-9 bg-border" />
+            {/* Recompensas */}
+            <div className="flex flex-col items-center px-4 sm:px-5">
+              <span className="text-xl font-extrabold text-foreground leading-tight">{redeemed}</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t.heroRewards}</span>
             </div>
-            <div className="flex flex-col items-center gap-0.5">
-              <Award className="h-5 w-5 text-purple-500" />
-              <span className="text-lg font-bold text-foreground">{conquests}</span>
-              <span className="text-[10px] text-muted-foreground">{t.heroConquests}</span>
+            {/* Divider */}
+            <div className="w-px h-9 bg-border" />
+            {/* Conquistas */}
+            <div className="flex flex-col items-center px-4 sm:px-5">
+              <span className="text-xl font-extrabold text-foreground leading-tight">{conquests}</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t.heroConquests}</span>
             </div>
           </div>
         </div>

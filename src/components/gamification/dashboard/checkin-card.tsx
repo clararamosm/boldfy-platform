@@ -1,10 +1,10 @@
 // src/components/gamification/dashboard/checkin-card.tsx
-// Weekly check-in card: day-by-day posts, streak week counter, cycle progress.
+// Weekly check-in card: day-by-day posts, streak week counter, cycle stepper.
 'use client';
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarCheck, Check, Flame } from 'lucide-react';
+import { CalendarCheck, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ type CheckinCardProps = {
     noPosts: string;
     cycle: string;
     weeksStreak: string;
+    weekSummary: string;
     days: string[];
   };
   className?: string;
@@ -49,116 +50,148 @@ export function CheckinCard({
   const postsDisplay = Math.min(postsThisWeek, 3);
   const streakWeekLabel = currentWeeks > 0 ? currentWeeks : (isWeekCompleted ? 1 : 0);
 
-  // Current bonus for this week (or next if week isn't done)
+  // Bonus for current completed week
   const currentWeekIdx = Math.max(0, Math.min(currentWeeks - 1, 6));
-  const nextBonusIdx = isWeekCompleted
-    ? Math.min(currentWeeks, 6)  // Already completed this week, show next
-    : Math.max(0, Math.min(currentWeeks - 1, 6));
   const currentBonus = isWeekCompleted ? WEEK_BONUSES[currentWeekIdx] : 0;
-  const nextBonus = WEEK_BONUSES[isWeekCompleted ? Math.min(currentWeeks, 6) : Math.max(0, currentWeeks > 0 ? currentWeeks - 1 : 0)];
+
+  // Next bonus the user would earn
+  const nextBonusIdx = isWeekCompleted
+    ? Math.min(currentWeeks, 6)
+    : Math.max(0, currentWeeks > 0 ? currentWeeks - 1 : 0);
+  const nextBonus = WEEK_BONUSES[nextBonusIdx];
+
+  // Post points this week
+  const postPoints = postsDisplay * 30;
 
   return (
     <Card className={cn('overflow-hidden', className)}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <CardTitle className="text-base font-bold flex items-center gap-2">
             <CalendarCheck className="h-4 w-4 text-primary" />
             {t.title}
+            {streakWeekLabel > 0 && (
+              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                {t.week} {streakWeekLabel}
+              </span>
+            )}
           </CardTitle>
-          {streakWeekLabel > 0 && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs font-semibold">
-              <Flame className="h-3 w-3" />
-              {t.week} {streakWeekLabel}
-            </span>
-          )}
+          {/* 3/3 status tag */}
+          <span className={cn(
+            'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold',
+            isWeekCompleted
+              ? 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+              : 'bg-muted text-muted-foreground',
+          )}>
+            {isWeekCompleted && <Check className="h-3 w-3" />}
+            {postsDisplay}/3
+          </span>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* Week status */}
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            {t.postsCount.replace('{count}', String(postsDisplay))}
-          </span>
-          {isWeekCompleted && (
-            <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400">
-              <Check className="h-3 w-3" />
-              {t.completed}
-            </span>
-          )}
-        </div>
-
-        {/* Day-by-day row */}
-        <div className="grid grid-cols-7 gap-1.5">
+        {/* Day-by-day grid — rounded squares, not circles */}
+        <div className="flex gap-2 flex-wrap">
           {weekDaysWithPosts.map((published, idx) => {
             const isToday = idx === ((new Date().getDay() + 6) % 7); // Mon=0 ... Sun=6
             return (
-              <div key={idx} className="flex flex-col items-center gap-1">
-                <span className="text-[10px] text-muted-foreground">{t.days[idx]}</span>
+              <div key={idx} className="flex flex-col items-center gap-1 min-w-[42px]">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">{t.days[idx]}</span>
                 <div
                   className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium transition-colors',
-                    published
-                      ? 'bg-green-500 text-white'
-                      : isToday
-                        ? 'border-2 border-primary bg-primary/5 text-primary'
-                        : 'bg-muted text-muted-foreground',
+                    'w-8 h-8 rounded-lg flex items-center justify-center border-2 transition-colors',
+                    published && isToday
+                      ? 'border-primary bg-green-50 dark:bg-green-900/20'
+                      : published
+                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                        : isToday
+                          ? 'border-primary border-[3px] shadow-sm shadow-primary/15 bg-background'
+                          : 'border-border bg-muted/30',
                   )}
                 >
-                  {published ? <Check className="h-3.5 w-3.5" /> : ''}
+                  {published && <Check className="h-3.5 w-3.5 text-green-500" />}
                 </div>
-                {published && (
-                  <span className="text-[9px] font-medium text-primary">+30</span>
-                )}
+                <span className="text-[9px] font-extrabold text-green-500 min-h-[13px]">
+                  {published ? '+30' : ''}
+                </span>
               </div>
             );
           })}
         </div>
 
-        {/* Streak bonus info */}
-        {isWeekCompleted && currentBonus > 0 && (
-          <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-            {t.streakBonus.replace('{points}', String(currentBonus))}
-          </p>
-        )}
-        {!isWeekCompleted && currentWeeks > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {t.nextBonus.replace('{points}', String(nextBonus))}
-          </p>
+        {/* Week summary */}
+        {postsDisplay > 0 && (
+          <div className="text-xs font-bold p-2 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/40">
+            {postsDisplay} {postsDisplay === 1 ? 'post' : 'posts'} esta semana:{' '}
+            <span className="text-green-600 dark:text-green-400 font-extrabold">+{postPoints} pts posts</span>
+            {isWeekCompleted && currentBonus > 0 && (
+              <> + <span className="text-green-600 dark:text-green-400 font-extrabold">+{currentBonus} pts streak</span></>
+            )}
+          </div>
         )}
 
-        {/* Cycle progress: S1–S7 */}
-        <div className="pt-2 border-t">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground font-medium">
-              {t.cycle} {cyclesCompleted + 1}
-            </span>
-            <span className="text-[10px] text-muted-foreground">
-              {t.weeksStreak.replace('{count}', String(currentWeeks))}
-            </span>
+        {/* Cycle stepper: S1–S7 as discrete steps */}
+        <div className="pt-3 border-t">
+          <div className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-widest mb-2">
+            {t.cycle} {cyclesCompleted + 1}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex gap-1.5">
             {Array.from({ length: 7 }, (_, i) => {
               const weekNum = i + 1;
               const done = weekNum <= currentWeeks;
-              const isCurrent = weekNum === currentWeeks + 1 && !isWeekCompleted;
+              const isCurrent = weekNum === currentWeeks + 1 && !isWeekCompleted && currentWeeks > 0;
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                  <div
-                    className={cn(
-                      'w-full h-2 rounded-full transition-colors',
-                      done
-                        ? 'bg-green-500'
-                        : isCurrent
-                          ? 'bg-amber-400 animate-pulse'
-                          : 'bg-muted',
-                    )}
-                  />
-                  <span className="text-[8px] text-muted-foreground">S{weekNum}</span>
-                  <span className="text-[8px] text-muted-foreground">+{WEEK_BONUSES[i]}</span>
+                <div
+                  key={i}
+                  className={cn(
+                    'flex-1 flex flex-col items-center gap-1 py-2 rounded-xl border-[1.5px]',
+                    done
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/10'
+                      : isCurrent
+                        ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/10 animate-pulse'
+                        : 'border-border bg-muted/20',
+                  )}
+                >
+                  <span className={cn(
+                    'text-[9px] font-extrabold',
+                    done ? 'text-green-600 dark:text-green-400' : isCurrent ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
+                  )}>
+                    S{weekNum}
+                  </span>
+                  {/* Circle indicator */}
+                  <div className={cn(
+                    'w-5 h-5 rounded-full flex items-center justify-center',
+                    done
+                      ? 'bg-green-500'
+                      : isCurrent
+                        ? 'border-2 border-amber-400 bg-amber-100 dark:bg-amber-900/30'
+                        : 'border-2 border-border bg-muted/30',
+                  )}>
+                    {done && <Check className="h-2.5 w-2.5 text-white" />}
+                  </div>
+                  <span className={cn(
+                    'text-[9px] font-extrabold',
+                    done ? 'text-green-600 dark:text-green-400' : isCurrent ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground opacity-60',
+                  )}>
+                    +{WEEK_BONUSES[i]}
+                  </span>
                 </div>
               );
             })}
+          </div>
+
+          {/* Cycle summary */}
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-xs font-bold text-foreground">
+              {currentWeeks > 0
+                ? <>{currentWeeks} {t.weeksStreak.replace('{count}', String(currentWeeks))}</>
+                : t.noPosts}
+            </span>
+            {!isWeekCompleted && currentWeeks > 0 && (
+              <span className="text-xs font-bold">
+                {t.nextBonus.replace('{points}', String(nextBonus))}
+              </span>
+            )}
           </div>
         </div>
       </CardContent>

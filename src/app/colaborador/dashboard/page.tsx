@@ -58,10 +58,13 @@ type DashboardData = {
   weekDaysWithPosts: boolean[];
   // Conquests
   completedConquests: string[];
+  // Real counts for conquest progress
+  totalPublications: number;
+  totalApprovedMissions: number;
+  totalCompletedTrails: number;
   // Missions / Trails
   activeMissions: Mission[];
   trails: Trail[];
-  completedTrails: number;
   // Points breakdown
   totalEarned: number;
   totalSpent: number;
@@ -70,7 +73,7 @@ type DashboardData = {
   availableRewards: number;
 };
 
-// ─── Sub-components (kept from original) ──────────────────────────
+// ─── Sub-components ───────────────────────────────────────────────
 
 const MissionItem = ({ title, points, pointsLabel }: { title: string; points: number; pointsLabel: string }) => (
   <Link href="/colaborador/missoes" className="flex items-center justify-between p-3 -mx-3 rounded-lg hover:bg-muted/50 transition-colors">
@@ -130,6 +133,14 @@ function getNextConquest(category: string, completed: string[]): number | null {
   return null;
 }
 
+// ─── Helper: goal name for conquests ──────────────────────────────
+
+const GOAL_NAMES: Record<string, Record<number, string>> = {
+  pub: { 1: '1a publicacao', 10: '10 publicacoes', 30: '30 publicacoes', 50: '50 publicacoes', 100: '100 publicacoes' },
+  trail: { 1: '1a trilha', 5: '5 trilhas', 10: '10 trilhas', 20: '20 trilhas', 30: '30 trilhas', 40: '40 trilhas' },
+  mission: { 1: '1a missao', 5: '5 missoes', 10: '10 missoes', 20: '20 missoes' },
+};
+
 // ─── Main Component ───────────────────────────────────────────────
 
 export default function ColaboradorDashboardPage() {
@@ -161,6 +172,8 @@ export default function ColaboradorDashboardPage() {
         gainHistorySnap,
         spentHistorySnap,
         weekPostsSnap,
+        pubHistorySnap,
+        missionSubmissionsSnap,
       ] = await Promise.all([
         getDocs(query(
           collection(db, 'companies', companyId, 'missions'),
@@ -187,6 +200,17 @@ export default function ColaboradorDashboardPage() {
           collection(db, 'users', uid, 'pointsHistory'),
           where('source', '==', 'publicacao'),
           where('date', '>=', Timestamp.fromDate(weekMonday)),
+        )),
+        // Real publication count for conquest progress
+        getDocs(query(
+          collection(db, 'users', uid, 'pointsHistory'),
+          where('source', '==', 'publicacao'),
+        )),
+        // Approved missions count for conquest progress
+        getDocs(query(
+          collection(db, 'companies', companyId, 'missionSubmissions'),
+          where('userId', '==', uid),
+          where('status', '==', 'approved'),
         )),
       ]);
 
@@ -247,9 +271,11 @@ export default function ColaboradorDashboardPage() {
         streakCurrentWeekId: (rawStreak.currentWeekId as string) || '',
         weekDaysWithPosts: weekDays,
         completedConquests,
+        totalPublications: pubHistorySnap.size,
+        totalApprovedMissions: missionSubmissionsSnap.size,
+        totalCompletedTrails: completedTrails,
         activeMissions: missions,
         trails,
-        completedTrails,
         totalEarned,
         totalSpent,
         redeemed: rescuesSnap.size,
@@ -301,39 +327,49 @@ export default function ColaboradorDashboardPage() {
   // Is this week completed?
   const isWeekCompleted = data.streakPostsThisWeek >= 3 && data.streakLastCompletedWeek === data.streakCurrentWeekId;
 
-  // Build conquest progress (pub/trail/mission)
+  // Build conquest progress (pub/trail/mission) — using REAL counts, not badge thresholds
+  const realCounts: Record<string, number> = {
+    pub: data.totalPublications,
+    trail: data.totalCompletedTrails,
+    mission: data.totalApprovedMissions,
+  };
+
   const conquestCategories = ['pub', 'trail', 'mission'] as const;
-  const conquestProgress: { category: string; current: number; target: number; label: string }[] = [];
+  const conquestProgress: { category: string; current: number; target: number; label: string; goalName: string }[] = [];
 
   for (const cat of conquestCategories) {
     const nextTarget = getNextConquest(cat, data.completedConquests);
     if (nextTarget !== null) {
-      const completedInCat = data.completedConquests.filter(c => c.startsWith(`${cat}_`));
-      const highestCompleted = completedInCat.reduce((max, c) => {
-        const num = parseInt(c.split('_')[1], 10);
-        return num > max ? num : max;
-      }, 0);
       conquestProgress.push({
         category: cat,
-        current: highestCompleted,
+        current: realCounts[cat] || 0,
         target: nextTarget,
         label: gamDash?.[`${cat}Category`] || cat,
+        goalName: GOAL_NAMES[cat]?.[nextTarget] || `${nextTarget} ${cat}`,
       });
     }
   }
 
   // Build conquest badges
   const conquestBadges = data.completedConquests.map((id) => {
-    const [cat] = id.split('_');
-    return { id, category: cat, label: conquestsI18n?.[id] || id };
+    const [cat, numStr] = id.split('_');
+    const num = parseInt(numStr, 10);
+    // Generate a display label: "1a" for first, number for the rest
+    const displayLabel = num === 1 ? '1a' : String(num);
+    return { id, category: cat, label: conquestsI18n?.[id] || displayLabel };
   });
+
+  // Hero subtitle based on streak
+  const heroSubtitle = data.streakCurrentWeeks >= 4
+    ? 'Publicando com consistencia!'
+    : data.streakCurrentWeeks >= 1
+      ? 'Continue publicando!'
+      : undefined;
 
   return (
     <div>
-      <Header
-        title={t.colabDashboard.greeting.replace('{name}', data.userName)}
-        subtitle={t.colabDashboard.subtitle}
-      />
+      {/* No duplicate greeting — Header just shows "Dashboard" */}
+      <Header title={t.nav.dashboard} />
       <div className="p-6 space-y-4">
         {/* Row 1: Hero (full width) */}
         <HeroCard
@@ -343,6 +379,7 @@ export default function ColaboradorDashboardPage() {
           points={data.points}
           redeemed={data.redeemed}
           conquests={data.completedConquests.length}
+          subtitle={heroSubtitle}
           t={{
             greeting: t.colabDashboard.greeting,
             levelPill: (gamLevelUp?.levelPill as string) || 'Nivel {level}',
@@ -369,18 +406,22 @@ export default function ColaboradorDashboardPage() {
             cycleComplete: (gamCheckin?.cycleComplete as string) || 'Ciclo completo!',
             noPosts: (gamCheckin?.noPosts as string) || 'Nenhuma publicacao',
             cycle: (gamCheckin?.cycle as string) || 'Ciclo',
-            weeksStreak: (gamCheckin?.weeksStreak as string) || '{count} semanas seguidas',
+            weeksStreak: (gamCheckin?.weeksStreak as string) || 'semanas seguidas',
+            weekSummary: (gamCheckin?.weekSummary as string) || 'posts esta semana',
             days: (gamCheckin?.days as string[]) || ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'],
           }}
         />
 
-        {/* Row 3: Missions + Trails */}
+        {/* Row 3: Missions + Trails (with header icons) */}
         <div className="grid md:grid-cols-2 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold">{t.colabDashboard.activeMissionsTitle}</CardTitle>
-                <Link href="/colaborador/missoes" className="text-xs text-primary hover:underline">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-primary" />
+                  {t.colabDashboard.activeMissionsTitle}
+                </CardTitle>
+                <Link href="/colaborador/missoes" className="text-[11px] font-semibold text-primary hover:underline">
                   {t.common.seeAll}
                 </Link>
               </div>
@@ -403,8 +444,11 @@ export default function ColaboradorDashboardPage() {
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold">{t.colabDashboard.learningTrails}</CardTitle>
-                <Link href="/colaborador/trilhas" className="text-xs text-primary hover:underline">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  {t.colabDashboard.learningTrails}
+                </CardTitle>
+                <Link href="/colaborador/trilhas" className="text-[11px] font-semibold text-primary hover:underline">
                   {t.common.seeAll}
                 </Link>
               </div>
@@ -429,17 +473,19 @@ export default function ColaboradorDashboardPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <ConquestsProgressCard
             conquests={conquestProgress}
-            t={{ conquestsInProgress: gamDash?.conquestsInProgress || 'Proximas conquistas' }}
+            t={{ conquestsInProgress: gamDash?.conquestsInProgress || 'Conquistas em Andamento' }}
           />
           <ConquestsBadgesCard
             badges={conquestBadges}
+            userLevel={data.level}
+            completedConquests={data.completedConquests}
             t={{
               conquestsBadges: gamDash?.conquestsBadges || 'Conquistas',
-              badgesCollected: gamDash?.badgesCollected || '{count} badges colecionados',
+              badgesCollected: gamDash?.badgesCollected || '{count} conquistados',
               pubCategory: gamDash?.pubCategory || 'Publicacoes',
               trailCategory: gamDash?.trailCategory || 'Trilhas',
               missionCategory: gamDash?.missionCategory || 'Missoes',
-              seqCategory: gamDash?.seqCategory || 'Sequencia',
+              seqCategory: gamDash?.seqCategory || 'Constancia (jornada de niveis)',
             }}
           />
         </div>
@@ -451,7 +497,7 @@ export default function ColaboradorDashboardPage() {
             totalEarned={data.totalEarned}
             totalSpent={data.totalSpent}
             t={{
-              myPoints: gamDash?.myPoints || 'Meus pontos',
+              myPoints: gamDash?.myPoints || 'Meus Pontos',
               available: gamDash?.available || 'Disponiveis',
               totalEarned: gamDash?.totalEarned || 'Total ganhos',
               totalSpent: gamDash?.totalSpent || 'Total gastos',
@@ -464,8 +510,11 @@ export default function ColaboradorDashboardPage() {
             t={{
               rewardsCard: gamDash?.rewardsCard || 'Recompensas',
               redeemed: gamDash?.redeemed || 'Resgatadas',
+              redeemedLabel: gamDash?.redeemedLabel || 'recompensas resgatadas',
+              availableLabel: gamDash?.availableLabel || 'recompensas disponiveis',
               availableInShop: gamDash?.availableInShop || 'Disponiveis na loja',
               viewShop: gamDash?.viewShop || 'Ver loja',
+              history: gamDash?.history || 'Historico',
             }}
           />
         </div>

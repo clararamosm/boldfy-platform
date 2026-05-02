@@ -1,10 +1,10 @@
 // src/components/gamification/dashboard/rewards-card.tsx
-// Rewards summary: redeemed count + available in shop + link to shop.
+// Rewards summary: redeemed count + available in shop, vertical row layout.
 'use client';
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Gift, ShoppingBag, Check } from 'lucide-react';
+import { Gift, Check, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -16,8 +16,11 @@ type RewardsCardProps = {
   t: {
     rewardsCard: string;
     redeemed: string;
+    redeemedLabel: string;
+    availableLabel: string;
     availableInShop: string;
     viewShop: string;
+    history: string;
   };
   className?: string;
 };
@@ -34,35 +37,45 @@ export function RewardsCard({
     <Card className={cn(className)}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Gift className="h-4 w-4 text-primary" />
+          <CardTitle className="text-base font-bold flex items-center gap-2">
+            <Gift className="h-4 w-4 text-green-500" />
             {t.rewardsCard}
           </CardTitle>
           <Link
             href="/colaborador/recompensas"
-            className="text-xs text-primary hover:underline"
+            className="text-[11px] font-semibold text-primary hover:underline"
           >
             {t.viewShop}
           </Link>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-3">
-          {/* Redeemed */}
-          <div className="flex flex-col items-center p-3 rounded-lg bg-green-50 dark:bg-green-900/10">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Check className="h-4 w-4 text-green-500" />
-              <span className="text-xl font-bold text-foreground">{redeemed}</span>
+      <CardContent className="space-y-2">
+        {/* Redeemed row */}
+        <div className="flex items-center justify-between py-1.5">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
+              <Check className="h-3.5 w-3.5 text-green-500" />
             </div>
-            <span className="text-[10px] text-muted-foreground">{t.redeemed}</span>
+            <span className="text-sm font-bold text-foreground">
+              {redeemed} {t.redeemedLabel}
+            </span>
           </div>
-          {/* Available in shop */}
-          <div className="flex flex-col items-center p-3 rounded-lg bg-primary/5">
-            <div className="flex items-center gap-1.5 mb-1">
-              <ShoppingBag className="h-4 w-4 text-primary" />
-              <span className="text-xl font-bold text-foreground">{availableInShop}</span>
+          <Link
+            href="/colaborador/recompensas"
+            className="text-[11px] font-semibold text-primary hover:underline"
+          >
+            {t.history}
+          </Link>
+        </div>
+        {/* Available in shop row */}
+        <div className="flex items-center py-1.5">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Package className="h-3.5 w-3.5 text-primary" />
             </div>
-            <span className="text-[10px] text-muted-foreground">{t.availableInShop}</span>
+            <span className="text-sm font-bold text-foreground">
+              {availableInShop} {t.availableLabel}
+            </span>
           </div>
         </div>
       </CardContent>
