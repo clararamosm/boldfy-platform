@@ -146,6 +146,10 @@ export async function redeemReward(
       });
     }
 
+    // Auto-paid: code delivery (code is instant) or AI credits (system delivers instantly)
+    const isAutoPaid = !!redeemedCode || reward.type === 'ai_credits';
+    const rescueStatus = isAutoPaid ? 'Pago' : 'Pendente';
+
     // User rescue doc
     const userRescueRef = adminDb
       .collection('users')
@@ -157,7 +161,7 @@ export async function redeemReward(
       rewardName: reward.name,
       rewardId,
       date: now,
-      status: redeemedCode ? 'Pago' : 'Pendente',
+      status: rescueStatus,
       points: reward.points,
       deliveryMethod: reward.deliveryMethod || 'manual',
       ...(redeemedCode && { code: redeemedCode }),
@@ -176,7 +180,7 @@ export async function redeemReward(
       rewardName: reward.name,
       rewardId,
       date: now,
-      status: redeemedCode ? 'Pago' : 'Pendente',
+      status: rescueStatus,
       points: reward.points,
       deliveryMethod: reward.deliveryMethod || 'manual',
       ...(redeemedCode && { code: redeemedCode }),

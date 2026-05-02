@@ -80,7 +80,16 @@ export function ActionDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className={cn("sm:max-w-xl", className)}>
+      <DialogContent
+        className={cn("sm:max-w-xl", className)}
+        onPointerDownOutside={(e) => {
+          // Prevent dialog from closing when interacting with portalled Select dropdowns
+          const target = e.target as HTMLElement;
+          if (target?.closest?.('[data-radix-select-content]')) {
+            e.preventDefault();
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
