@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import {
-  collection, getDocs, getDoc, doc, query, where, orderBy, limit, Timestamp,
+  collection, getDocs, getDoc, doc, query, where, orderBy, Timestamp,
 } from 'firebase/firestore';
 import { Header } from '@/components/dashboard/header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -148,10 +148,10 @@ export default function ColaboradorDashboardPage() {
 
       const weekMonday = getWeekMonday();
 
-      // ── Parallel queries ──
+      // ── Parallel queries (batch 1: non-dependent) ──
       const [
-        missionsSnap,
-        trailsSnap,
+        allMissionsSnap,
+        missionSubsSnap,
         rewardsSnap,
         progressSnap,
         rescuesSnap,
@@ -160,17 +160,12 @@ export default function ColaboradorDashboardPage() {
         weekPostsSnap,
         pubHistorySnap,
         missionSubmissionsSnap,
+        activatedGlobalSnap,
       ] = await Promise.all([
-        getDocs(query(
-          collection(db, 'companies', companyId, 'missions'),
-          where('status', '==', 'Ativa'),
-          limit(5),
-        )),
-        getDocs(query(
-          collection(db, 'companies', companyId, 'trails'),
-          where('active', '==', true),
-          orderBy('order', 'asc'),
-        )),
+        // All missions (NO status filter — status is derived client-side)
+        getDocs(collection(db, 'companies', companyId, 'missions')),
+        // All submissions for this user (to derive mission status)
+        getDocs(collection(db, 'companies', companyId, 'missionSubmissions')),
         getDocs(collection(db, 'companies', companyId, 'rewards')),
         getDocs(collection(db, 'users', uid, 'trailProgress')),
         getDocs(collection(db, 'users', uid, 'rescues')),
@@ -198,29 +193,122 @@ export default function ColaboradorDashboardPage() {
           where('userId', '==', uid),
           where('status', '==', 'approved'),
         )),
+        // Activated global trails for this company
+        getDocs(collection(db, 'companies', companyId, 'activatedGlobalTrails')),
       ]);
 
-      // ── Parse missions ──
-      const missions: Mission[] = missionsSnap.docs.map(d => ({
-        id: d.id,
-        title: d.data().title || d.data().name || 'Sem titulo',
-        points: d.data().points || 0,
-      }));
+      // ── Parse missions (derive active status client-side, same as missoes page) ──
+      const userSubs: Record<string, { status: string }> = {};
+      missionSubsSnap.docs.forEach(d => {
+        const data = d.data();
+        if (data.userId === uid) {
+          const existing = userSubs[data.missionId];
+          if (!existing || data.status === 'pending' || data.status === 'approved') {
+            userSubs[data.missionId] = { status: data.status };
+          }
+        }
+      });
 
-      // ── Parse trails ──
+      const now = new Date();
+      const missions: Mission[] = [];
+      allMissionsSnap.docs.forEach(docSnap => {
+        const data = docSnap.data();
+        // Skip trail-type missions assigned to other users
+        const isTrailMission = data.type === 'trail_content' || data.type === 'trail_trigger';
+        if (isTrailMission && data.assignedTo && data.assignedTo !== uid) return;
+
+        const sub = userSubs[docSnap.id];
+        // Already completed or awaiting → not active for dashboard
+        if (sub?.status === 'approved' || sub?.status === 'pending') return;
+
+        const isFixed = data.type === 'fixed';
+        const start = data.startDate?.toDate ? data.startDate.toDate() : data.startDate ? new Date(data.startDate) : null;
+        const end = data.endDate?.toDate ? data.endDate.toDate() : data.endDate ? new Date(data.endDate) : null;
+
+        // Derive status
+        if (!isFixed && start && now < start) return; // scheduled → skip
+        if (!isFixed && end && now > end) return;      // expired → skip
+
+        // At this point it's an active mission (pendente or rejeitada)
+        missions.push({
+          id: docSnap.id,
+          title: data.name || data.title || 'Sem titulo',
+          points: data.points || 0,
+        });
+      });
+
+      // ── Parse trails (correct 2-source pattern: global + custom sessions) ──
       const progressMap: Record<string, number[]> = {};
       progressSnap.docs.forEach(d => {
-        // Trail player writes `modulosCompletos` (array of completed module indices)
         progressMap[d.id] = d.data().modulosCompletos || [];
       });
-      const trails: Trail[] = trailsSnap.docs.map(d => {
-        const tData = d.data();
-        // Trail definitions use `modulos` (array of module objects), not `phases`
-        const totalPhases = (tData.modulos || tData.phases || []).length;
-        const completed = progressMap[d.id] || [];
+
+      type TrailDoc = { id: string; titulo: string; modulos: unknown[]; ativa?: boolean; ordem?: number };
+      const allTrailDocs: TrailDoc[] = [];
+
+      // Source 1: Activated global trails
+      const activatedBySession: Record<string, string[]> = {};
+      activatedGlobalSnap.docs.forEach(d => {
+        const sessId = d.data().sessionId;
+        if (!sessId) return;
+        if (!activatedBySession[sessId]) activatedBySession[sessId] = [];
+        activatedBySession[sessId].push(d.id);
+      });
+      for (const [sessId, trailIds] of Object.entries(activatedBySession)) {
+        for (const tid of trailIds) {
+          try {
+            const tDoc = await getDoc(doc(db, `globalSessions/${sessId}/trails`, tid));
+            if (tDoc.exists()) {
+              const data = tDoc.data();
+              if (data.ativa !== false) {
+                allTrailDocs.push({
+                  id: tDoc.id,
+                  titulo: data.titulo || 'Sem titulo',
+                  modulos: data.modulos || [],
+                  ativa: data.ativa,
+                  ordem: data.ordem,
+                });
+              }
+            }
+          } catch { /* skip inaccessible global trail */ }
+        }
+      }
+
+      // Source 2: Company custom sessions → trails
+      try {
+        const compSessSnap = await getDocs(
+          query(collection(db, `companies/${companyId}/sessions`), orderBy('ordem', 'asc'))
+        );
+        for (const sessDoc of compSessSnap.docs) {
+          const sessData = sessDoc.data();
+          if (sessData.ativa === false) continue;
+          try {
+            const trailSnap = await getDocs(
+              query(collection(db, `companies/${companyId}/sessions/${sessDoc.id}/trails`), orderBy('ordem', 'asc'))
+            );
+            trailSnap.docs.forEach(td => {
+              const data = td.data();
+              if (data.ativa !== false) {
+                allTrailDocs.push({
+                  id: td.id,
+                  titulo: data.titulo || 'Sem titulo',
+                  modulos: data.modulos || [],
+                  ativa: data.ativa,
+                  ordem: data.ordem,
+                });
+              }
+            });
+          } catch { /* skip inaccessible custom session */ }
+        }
+      } catch { /* skip if no sessions collection */ }
+
+      // Build Trail[] with progress
+      const trails: Trail[] = allTrailDocs.map(t => {
+        const totalPhases = (t.modulos || []).length;
+        const completed = progressMap[t.id] || [];
         const completedCount = completed.length;
         const progress = totalPhases > 0 ? Math.round((completedCount / totalPhases) * 100) : 0;
-        return { id: d.id, title: tData.title || 'Sem titulo', totalPhases, completedPhases: completedCount, progress };
+        return { id: t.id, title: t.titulo, totalPhases, completedPhases: completedCount, progress };
       });
       const completedTrails = trails.filter(tr => tr.progress === 100).length;
 

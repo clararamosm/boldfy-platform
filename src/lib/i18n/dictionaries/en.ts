@@ -141,7 +141,7 @@ const en: Dictionary = {
     calendar: 'Calendar',
     rankings: 'Rankings',
     content: 'Content',
-    gamification: 'Gamification',
+    gamification: 'Journey',
     companies: 'Companies',
     globalContent: 'Global Content',
     settings: 'Settings',

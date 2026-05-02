@@ -85,7 +85,7 @@ export async function checkAndAwardConquests(
     if (!userDoc.exists) return;
 
     const userData = userDoc.data();
-    if (userData?.role !== 'collaborator') return;
+    if (userData?.role !== 'colaborador') return;
 
     let completed: string[] = userData?.conquests?.completed || [];
 
@@ -172,7 +172,7 @@ export async function catchUpConquests(
     if (!userDoc.exists) return { awarded };
 
     const userData = userDoc.data();
-    if (userData?.role !== 'collaborator') return { awarded };
+    if (userData?.role !== 'colaborador') return { awarded };
 
     let completed: string[] = userData?.conquests?.completed || [];
     const categories: ConquestCategory[] = ['pub', 'trail', 'mission', 'seq'];
@@ -281,7 +281,7 @@ async function processStreakOnPublication(userId: string): Promise<void> {
     if (!userDoc.exists) return;
 
     const userData = userDoc.data();
-    if (userData?.role !== 'collaborator') return;
+    if (userData?.role !== 'colaborador') return;
 
     // Initialize streak from user doc (or defaults)
     const rawStreak = userData?.streak || {};
@@ -507,7 +507,7 @@ export async function awardPublicationPoints(
     if (!userDoc.exists) return;
 
     const userData = userDoc.data();
-    if (userData?.role !== 'collaborator') return;
+    if (userData?.role !== 'colaborador') return;
 
     // 2. Idempotency check — prevent double-awarding for the same post
     const existingSnap = await adminDb

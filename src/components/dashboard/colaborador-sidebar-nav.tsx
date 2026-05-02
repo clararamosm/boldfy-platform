@@ -191,9 +191,9 @@ export function ColaboradorSidebarNav({ uploadPending = false }: ColaboradorSide
             ]}
           />
 
-          {/* Gamificação — collapsible group */}
+          {/* Jornada — collapsible group */}
           <CollapsibleGroup
-            label={t.nav.gamification || 'Gamificação'}
+            label={t.nav.gamification || 'Jornada'}
             icon={Gamepad2}
             defaultOpen
             items={[

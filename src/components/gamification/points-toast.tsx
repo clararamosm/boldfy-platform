@@ -19,7 +19,7 @@ import { completeOnboardingItem } from '@/hooks/use-onboarding';
 
 type PendingNotification = {
   type: 'points' | 'conquest' | 'levelUp' | 'congratulation';
-  source?: 'publicacao' | 'trilha' | 'missao' | 'streak' | 'conquest' | 'extract' | 'congratulation';
+  source?: 'publicacao' | 'trilha' | 'missao' | 'streak' | 'conquest' | 'extract' | 'congratulation' | 'resgate';
   points?: number;
   description: string;
   createdAt: number;
