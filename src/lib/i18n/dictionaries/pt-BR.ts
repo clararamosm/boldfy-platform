@@ -138,6 +138,8 @@ const ptBR = {
     contentAssistant: 'Assistente de Conteúdo',
     calendar: 'Calendário',
     rankings: 'Rankings',
+    content: 'Conteúdo',
+    gamification: 'Gamificação',
     companies: 'Empresas',
     globalContent: 'Conteúdo Global',
     settings: 'Configurações',

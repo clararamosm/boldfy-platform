@@ -140,6 +140,8 @@ const en: Dictionary = {
     contentAssistant: 'Content Assistant',
     calendar: 'Calendar',
     rankings: 'Rankings',
+    content: 'Content',
+    gamification: 'Gamification',
     companies: 'Companies',
     globalContent: 'Global Content',
     settings: 'Settings',
