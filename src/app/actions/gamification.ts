@@ -87,66 +87,157 @@ export async function checkAndAwardConquests(
     const userData = userDoc.data();
     if (userData?.role !== 'collaborator') return;
 
-    // Get current conquests state
-    const completed: string[] = userData?.conquests?.completed || [];
-    const nextTarget = getNextConquest(category, completed);
-    if (nextTarget === null) return; // all conquered
+    let completed: string[] = userData?.conquests?.completed || [];
 
     // Count current total
     const total = await countCategoryTotal(userId, category);
-    if (total < nextTarget) return; // not yet reached
 
-    // Award conquest!
-    const conquestId = `${category}_${nextTarget}`;
-    const batch = adminDb.batch();
+    // Loop: award ALL pending conquests for this category (not just one)
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const nextTarget = getNextConquest(category, completed);
+      if (nextTarget === null || total < nextTarget) break;
 
-    // 1. Add to completed array
-    batch.update(userRef, {
-      'conquests.completed': FieldValue.arrayUnion(conquestId),
-    });
+      const conquestId = `${category}_${nextTarget}`;
+      const batch = adminDb.batch();
 
-    // 2. Record in pointsHistory
-    const historyRef = userRef.collection('pointsHistory').doc();
-    batch.set(historyRef, {
-      description: `Conquista: ${conquestId}`,
-      date: FieldValue.serverTimestamp(),
-      points: CONQUEST_POINTS,
-      type: 'gain',
-      source: 'conquest',
-    });
+      // 1. Add to completed array
+      batch.update(userRef, {
+        'conquests.completed': FieldValue.arrayUnion(conquestId),
+      });
 
-    // 3. Increment points
-    batch.update(userRef, {
-      points: FieldValue.increment(CONQUEST_POINTS),
-    });
+      // 2. Record in pointsHistory
+      const historyRef = userRef.collection('pointsHistory').doc();
+      batch.set(historyRef, {
+        description: `Conquista: ${conquestId}`,
+        date: FieldValue.serverTimestamp(),
+        points: CONQUEST_POINTS,
+        type: 'gain',
+        source: 'conquest',
+      });
 
-    // 4. Add pending notification (modal-type for conquests)
-    const notification: Record<string, unknown> = {
-      type: 'conquest',
-      source: 'conquest',
-      points: CONQUEST_POINTS,
-      conquestId,
-      category,
-      target: nextTarget,
-      description: `Conquista: ${conquestId}`,
-      createdAt: Date.now(),
-    };
+      // 3. Increment points
+      batch.update(userRef, {
+        points: FieldValue.increment(CONQUEST_POINTS),
+      });
 
-    // If it's the first publication, flag for onboarding auto-complete
-    if (conquestId === 'pub_1') {
-      notification.onboardingItemId = 'first-publication';
+      // 4. Add pending notification (modal-type for conquests)
+      const notification: Record<string, unknown> = {
+        type: 'conquest',
+        source: 'conquest',
+        points: CONQUEST_POINTS,
+        conquestId,
+        category,
+        target: nextTarget,
+        description: `Conquista: ${conquestId}`,
+        createdAt: Date.now(),
+      };
+
+      // If it's the first publication, flag for onboarding auto-complete
+      if (conquestId === 'pub_1') {
+        notification.onboardingItemId = 'first-publication';
+      }
+
+      batch.update(userRef, {
+        pendingNotifications: FieldValue.arrayUnion(notification),
+      });
+
+      await batch.commit();
+
+      completed = [...completed, conquestId];
+      console.log(`[Gamification] Conquest ${conquestId} awarded to user ${userId}`);
     }
-
-    batch.update(userRef, {
-      pendingNotifications: FieldValue.arrayUnion(notification),
-    });
-
-    await batch.commit();
-
-    console.log(`[Gamification] Conquest ${conquestId} awarded to user ${userId}`);
   } catch (error) {
     console.error(`[Gamification] checkAndAwardConquests failed for user ${userId}, category ${category}:`, error);
   }
+}
+
+// ─── Retroactive catch-up: award ALL pending conquests ────────────
+// Loops through all categories and awards every missed conquest.
+// Called on dashboard load to fix historical gaps (e.g., missions done
+// before gamification existed, or when checkAndAwardConquests only
+// awarded one conquest per call).
+
+export async function catchUpConquests(
+  idToken: string,
+  userId: string,
+): Promise<{ awarded: string[] }> {
+  await requireSelf(idToken, userId);
+
+  const awarded: string[] = [];
+
+  try {
+    const userRef = adminDb.collection('users').doc(userId);
+    const userDoc = await userRef.get();
+    if (!userDoc.exists) return { awarded };
+
+    const userData = userDoc.data();
+    if (userData?.role !== 'collaborator') return { awarded };
+
+    let completed: string[] = userData?.conquests?.completed || [];
+    const categories: ConquestCategory[] = ['pub', 'trail', 'mission', 'seq'];
+
+    for (const category of categories) {
+      const total = await countCategoryTotal(userId, category);
+
+      // Loop: keep awarding until no more pending conquests
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const nextTarget = getNextConquest(category, completed);
+        if (nextTarget === null || total < nextTarget) break;
+
+        const conquestId = `${category}_${nextTarget}`;
+        const batch = adminDb.batch();
+
+        batch.update(userRef, {
+          'conquests.completed': FieldValue.arrayUnion(conquestId),
+        });
+
+        const historyRef = userRef.collection('pointsHistory').doc();
+        batch.set(historyRef, {
+          description: `Conquista: ${conquestId}`,
+          date: FieldValue.serverTimestamp(),
+          points: CONQUEST_POINTS,
+          type: 'gain',
+          source: 'conquest',
+        });
+
+        batch.update(userRef, {
+          points: FieldValue.increment(CONQUEST_POINTS),
+        });
+
+        const notification: Record<string, unknown> = {
+          type: 'conquest',
+          source: 'conquest',
+          points: CONQUEST_POINTS,
+          conquestId,
+          category,
+          target: nextTarget,
+          description: `Conquista: ${conquestId}`,
+          createdAt: Date.now(),
+        };
+
+        if (conquestId === 'pub_1') {
+          notification.onboardingItemId = 'first-publication';
+        }
+
+        batch.update(userRef, {
+          pendingNotifications: FieldValue.arrayUnion(notification),
+        });
+
+        await batch.commit();
+
+        completed = [...completed, conquestId];
+        awarded.push(conquestId);
+
+        console.log(`[Gamification] Catch-up: ${conquestId} awarded to user ${userId}`);
+      }
+    }
+  } catch (error) {
+    console.error(`[Gamification] catchUpConquests failed for user ${userId}:`, error);
+  }
+
+  return { awarded };
 }
 
 // ─── Client-callable wrapper (requires auth) ─────────────────────

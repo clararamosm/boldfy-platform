@@ -18,7 +18,8 @@ import Link from 'next/link';
 import { Zap, BookOpen, ChevronRight } from 'lucide-react';
 import { useT } from '@/lib/i18n/context';
 import { getWeekMonday } from '@/lib/iso-week';
-import { getNextConquestTarget, getConquestGoalName, getLevelFromCycles } from '@/app/actions';
+import { getNextConquestTarget, getConquestGoalName, getLevelFromCycles, catchUpConquests } from '@/app/actions';
+import { getAuthToken } from '@/lib/auth-client';
 
 // Dashboard sub-components
 import { HeroCard } from '@/components/gamification/dashboard/hero-card';
@@ -244,7 +245,20 @@ export default function ColaboradorDashboardPage() {
       const rawStreak = userData.streak || {};
       const cyclesCompleted = (rawStreak.cyclesCompleted as number) || 0;
       const level = (userData.level?.current as number) || getLevelFromCycles(cyclesCompleted);
-      const completedConquests: string[] = userData.conquests?.completed || [];
+      let completedConquests: string[] = userData.conquests?.completed || [];
+
+      // ── Retroactive catch-up: award any pending conquests ──
+      // Fire-and-forget but await to update completedConquests before rendering
+      try {
+        const token = await getAuthToken();
+        const catchUpResult = await catchUpConquests(token, uid);
+        if (catchUpResult.awarded.length > 0) {
+          // Merge newly awarded conquests into the list
+          completedConquests = [...completedConquests, ...catchUpResult.awarded];
+        }
+      } catch (err) {
+        console.error('Conquest catch-up failed:', err);
+      }
 
       setData({
         userName: userData.profile?.name || userData.name || 'Colaborador',

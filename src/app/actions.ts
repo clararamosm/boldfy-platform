@@ -12,5 +12,5 @@ export { createPipelinePost, updatePipelinePost, deletePipelinePost, getPipeline
 export { saveContentStrategy, getContentStrategy, saveBrandManual, getBrandManual, getCompanyBrandContext, saveCompanyBrandContext, type ContentStrategyData, type BrandManualData, type BrandContextData } from './actions/content-strategy';
 export { getSlackChannels, getSlackConfig, saveSlackConfig, testSlackNotification } from './actions/slack';
 export { seedNativeRewards, migrateAllCompaniesNativeRewards } from './actions/company-setup';
-export { awardPublicationPoints, checkAndAwardConquests, checkConquestsFromClient, sendCongratulation } from './actions/gamification';
+export { awardPublicationPoints, checkAndAwardConquests, checkConquestsFromClient, catchUpConquests, sendCongratulation } from './actions/gamification';
 export { CONQUEST_LADDERS, getLevelFromCycles, LEVEL_THRESHOLDS, getNextConquestTarget, getConquestGoalName } from '@/lib/gamification-constants';
