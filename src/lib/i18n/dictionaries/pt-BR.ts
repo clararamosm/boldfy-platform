@@ -1467,6 +1467,9 @@ const ptBR = {
     viewCode: 'Ver código',
     instantCode: 'Código instantâneo',
     instantCredit: 'Crédito instantâneo',
+    aiCreditsTitle: 'Créditos de IA',
+    aiCreditsDescription: 'Troque seus pontos por créditos de IA para usar na plataforma.',
+    selectCredits: 'Escolha a quantidade',
     deliveryManual: 'Entrega manual',
   },
 

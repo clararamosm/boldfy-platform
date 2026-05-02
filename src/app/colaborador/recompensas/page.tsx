@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Gift, History, TrendingUp, TrendingDown, PlusCircle, MinusCircle, Loader2, BookOpen, Trophy, FileText, Flame, Award, Zap, Copy, Check, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { CoinIcon } from "@/components/coin-icon";
@@ -34,6 +35,7 @@ type Reward = {
   type?: string;
   isNative?: boolean;
   status?: string;
+  creditsAmount?: number;
 };
 
 type Rescue = {
@@ -176,6 +178,78 @@ const RewardCard = ({ reward, onRedeem, disabled, isSubmitting }: { reward: Rewa
           }
           actionText={t.colabRewards.confirmRedeem}
           onAction={onRedeem}
+          showCancel
+        >
+          <p>{t.colabRewards.redeemConfirmQuestion}</p>
+        </ActionDialog>
+      </CardFooter>
+    </Card>
+  );
+};
+
+// ─── AI Credits Card (Consolidated) ──────────────────────────────
+
+const AiCreditsCard = ({
+  rewards,
+  availablePoints,
+  onRedeem,
+  isSubmitting,
+}: {
+  rewards: Reward[];
+  availablePoints: number;
+  onRedeem: (reward: Reward) => void;
+  isSubmitting: boolean;
+}) => {
+  const t = useT();
+  const [selectedId, setSelectedId] = useState(rewards[0]?.id || '');
+  const selected = rewards.find(r => r.id === selectedId) || rewards[0];
+  const disabled = !selected || availablePoints < selected.points;
+
+  return (
+    <Card className="border-purple-200 dark:border-purple-800 hover:shadow-lg transition-shadow flex flex-col">
+      <CardHeader className="p-0">
+        <div className="aspect-video flex items-center justify-center rounded-t-lg overflow-hidden bg-gradient-to-br from-purple-50 to-violet-100 dark:from-purple-950/30 dark:to-violet-900/20">
+          <Sparkles className="h-12 w-12 text-purple-500" />
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 flex-grow space-y-3">
+        <div>
+          <CardTitle className="text-base font-semibold">{t.colabRewards.aiCreditsTitle}</CardTitle>
+          <CardDescription className="text-xs mt-1">{t.colabRewards.aiCreditsDescription}</CardDescription>
+        </div>
+        {/* Tier selector */}
+        <Select value={selectedId} onValueChange={setSelectedId}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder={t.colabRewards.selectCredits} />
+          </SelectTrigger>
+          <SelectContent>
+            {rewards.map(r => (
+              <SelectItem key={r.id} value={r.id}>
+                +{r.creditsAmount} — {r.points.toLocaleString()} pts
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* Badge */}
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800">
+          <Sparkles className="h-3 w-3 mr-0.5" />
+          {t.colabRewards.instantCredit}
+        </Badge>
+      </CardContent>
+      <CardFooter className="flex justify-between items-center">
+        <Badge variant="secondary" className="bg-primary/10 text-primary whitespace-nowrap shrink-0">
+          <CoinIcon size="xs" className="mr-1" /> {selected?.points.toLocaleString() || 0}
+        </Badge>
+        <ActionDialog
+          title={`${t.colabRewards.redeem} +${selected?.creditsAmount || 0} ${t.colabRewards.aiCreditsTitle}?`}
+          description={t.colabRewards.redeemConfirmDescription}
+          trigger={
+            <Button size="sm" disabled={disabled || isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : disabled ? t.colabRewards.insufficientPoints : t.colabRewards.redeem}
+            </Button>
+          }
+          actionText={t.colabRewards.confirmRedeem}
+          onAction={() => selected && onRedeem(selected)}
           showCancel
         >
           <p>{t.colabRewards.redeemConfirmQuestion}</p>
@@ -391,6 +465,7 @@ export default function InfluencerRecompensasPage() {
             type: data.type,
             isNative: data.isNative,
             status: data.status,
+            creditsAmount: data.creditsAmount,
           };
         })
         .filter((r) => r.status !== 'Desativada');
@@ -538,13 +613,28 @@ export default function InfluencerRecompensasPage() {
           </TabsList>
 
           <TabsContent value="loja" className="mt-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {rewards.length > 0 ? (
-                rewards.map(reward => <RewardCard key={reward.id} reward={reward} onRedeem={() => handleRedeem(reward)} disabled={stats.available < reward.points} isSubmitting={isSubmitting} />)
+            {(() => {
+              const aiCreditRewards = rewards.filter(r => r.type === 'ai_credits');
+              const otherRewards = rewards.filter(r => r.type !== 'ai_credits');
+              const hasAny = aiCreditRewards.length > 0 || otherRewards.length > 0;
+              return hasAny ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {aiCreditRewards.length > 0 && (
+                    <AiCreditsCard
+                      rewards={aiCreditRewards}
+                      availablePoints={stats.available}
+                      onRedeem={handleRedeem}
+                      isSubmitting={isSubmitting}
+                    />
+                  )}
+                  {otherRewards.map(reward => (
+                    <RewardCard key={reward.id} reward={reward} onRedeem={() => handleRedeem(reward)} disabled={stats.available < reward.points} isSubmitting={isSubmitting} />
+                  ))}
+                </div>
               ) : (
-                <p className="text-muted-foreground col-span-full text-center py-8">{t.colabRewards.noRewards}</p>
-              )}
-            </div>
+                <p className="text-muted-foreground text-center py-8">{t.colabRewards.noRewards}</p>
+              );
+            })()}
           </TabsContent>
 
           <TabsContent value="meus-resgates" className="mt-4">

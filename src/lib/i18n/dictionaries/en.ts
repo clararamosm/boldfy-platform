@@ -1467,6 +1467,9 @@ const en: Dictionary = {
     viewCode: 'View code',
     instantCode: 'Instant code',
     instantCredit: 'Instant credit',
+    aiCreditsTitle: 'AI Credits',
+    aiCreditsDescription: 'Exchange your points for AI credits to use on the platform.',
+    selectCredits: 'Choose amount',
     deliveryManual: 'Manual delivery',
   },
 
