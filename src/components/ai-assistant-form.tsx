@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getAuthToken } from '@/lib/auth-client';
 import { generateHooks, generateWithHook } from '@/app/actions';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -347,6 +348,8 @@ export function AiAssistantForm({
       if (result.alignedContent) {
         setFinalContent(result.alignedContent);
         setStep('result');
+        // Auto-complete onboarding item: "Usar uma ideia de conteúdo"
+        completeOnboardingItem(userId, 'use-content-idea');
       }
     } catch {
       toast({ variant: 'destructive', title: 'Erro de autenticação', description: 'Faça login novamente para continuar.' });

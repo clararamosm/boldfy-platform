@@ -169,6 +169,20 @@ export async function completeMissionSelf(
       source: 'missao',
     });
 
+    // Toast notification for mission points
+    if (missionPoints > 0) {
+      batch.update(userRef, {
+        pendingNotifications: FieldValue.arrayUnion({
+          type: 'points',
+          source: 'missao',
+          points: missionPoints,
+          description: `Missão concluída: ${missionData.name || 'Missão'}`,
+          createdAt: Date.now(),
+          onboardingItemId: 'complete-mission',
+        }),
+      });
+    }
+
     await batch.commit();
 
     // Check mission conquests (fire-and-forget)
@@ -231,6 +245,7 @@ export async function reviewMissionProof(
         adminFeedback: adminFeedback || null,
       });
 
+      const missionName = missionDoc.exists ? (missionDoc.data()?.name || 'Missão') : 'Missão';
       const userRef = adminDb.collection('users').doc(subData.userId);
       batch.update(userRef, {
         points: FieldValue.increment(missionPoints),
@@ -242,12 +257,26 @@ export async function reviewMissionProof(
         .collection('pointsHistory')
         .doc();
       batch.set(historyRef, {
-        description: `Missão concluída: ${missionDoc.exists ? (missionDoc.data()?.name || 'Missão') : 'Missão'}`,
+        description: `Missão concluída: ${missionName}`,
         date: FieldValue.serverTimestamp(),
         points: missionPoints,
         type: 'gain',
         source: 'missao',
       });
+
+      // Toast notification for mission points
+      if (missionPoints > 0) {
+        batch.update(userRef, {
+          pendingNotifications: FieldValue.arrayUnion({
+            type: 'points',
+            source: 'missao',
+            points: missionPoints,
+            description: `Missão concluída: ${missionName}`,
+            createdAt: Date.now(),
+            onboardingItemId: 'complete-mission',
+          }),
+        });
+      }
 
       await batch.commit();
 

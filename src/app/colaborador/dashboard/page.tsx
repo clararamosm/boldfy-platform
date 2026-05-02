@@ -18,7 +18,7 @@ import Link from 'next/link';
 import { Zap, BookOpen, ChevronRight } from 'lucide-react';
 import { useT } from '@/lib/i18n/context';
 import { getWeekMonday } from '@/lib/iso-week';
-import { CONQUEST_LADDERS, getLevelFromCycles } from '@/app/actions';
+import { getNextConquestTarget, getConquestGoalName, getLevelFromCycles } from '@/app/actions';
 
 // Dashboard sub-components
 import { HeroCard } from '@/components/gamification/dashboard/hero-card';
@@ -122,24 +122,9 @@ const DashboardSkeleton = () => (
   </div>
 );
 
-// ─── Helper: get next conquest target ─────────────────────────────
-
-function getNextConquest(category: string, completed: string[]): number | null {
-  const ladder = CONQUEST_LADDERS[category];
-  if (!ladder) return null;
-  for (const target of ladder) {
-    if (!completed.includes(`${category}_${target}`)) return target;
-  }
-  return null;
-}
-
-// ─── Helper: goal name for conquests ──────────────────────────────
-
-const GOAL_NAMES: Record<string, Record<number, string>> = {
-  pub: { 1: '1a publicacao', 10: '10 publicacoes', 30: '30 publicacoes', 50: '50 publicacoes', 100: '100 publicacoes' },
-  trail: { 1: '1a trilha', 5: '5 trilhas', 10: '10 trilhas', 20: '20 trilhas', 30: '30 trilhas', 40: '40 trilhas' },
-  mission: { 1: '1a missao', 5: '5 missoes', 10: '10 missoes', 20: '20 missoes' },
-};
+// ─── Conquest helpers ──────────────────────────────────────────────
+// getNextConquestTarget + getConquestGoalName imported from gamification-constants
+// They handle infinite ladders for pub/trail/mission and finite for seq.
 
 // ─── Main Component ───────────────────────────────────────────────
 
@@ -224,11 +209,13 @@ export default function ColaboradorDashboardPage() {
       // ── Parse trails ──
       const progressMap: Record<string, number[]> = {};
       progressSnap.docs.forEach(d => {
-        progressMap[d.id] = d.data().completedPhases || [];
+        // Trail player writes `modulosCompletos` (array of completed module indices)
+        progressMap[d.id] = d.data().modulosCompletos || [];
       });
       const trails: Trail[] = trailsSnap.docs.map(d => {
         const tData = d.data();
-        const totalPhases = (tData.phases || []).length;
+        // Trail definitions use `modulos` (array of module objects), not `phases`
+        const totalPhases = (tData.modulos || tData.phases || []).length;
         const completed = progressMap[d.id] || [];
         const completedCount = completed.length;
         const progress = totalPhases > 0 ? Math.round((completedCount / totalPhases) * 100) : 0;
@@ -279,7 +266,10 @@ export default function ColaboradorDashboardPage() {
         totalEarned,
         totalSpent,
         redeemed: rescuesSnap.size,
-        availableRewards: rewardsSnap.docs.filter(d => d.data().status !== 'disabled').length,
+        availableRewards: rewardsSnap.docs.filter(d => {
+          const status = d.data().status;
+          return status !== 'disabled' && status !== 'Desativada';
+        }).length,
       });
 
       setIsLoading(false);
@@ -338,14 +328,14 @@ export default function ColaboradorDashboardPage() {
   const conquestProgress: { category: string; current: number; target: number; label: string; goalName: string }[] = [];
 
   for (const cat of conquestCategories) {
-    const nextTarget = getNextConquest(cat, data.completedConquests);
+    const nextTarget = getNextConquestTarget(cat, data.completedConquests);
     if (nextTarget !== null) {
       conquestProgress.push({
         category: cat,
         current: realCounts[cat] || 0,
         target: nextTarget,
         label: gamDash?.[`${cat}Category`] || cat,
-        goalName: GOAL_NAMES[cat]?.[nextTarget] || `${nextTarget} ${cat}`,
+        goalName: getConquestGoalName(cat, nextTarget),
       });
     }
   }

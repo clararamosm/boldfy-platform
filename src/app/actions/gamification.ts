@@ -6,7 +6,7 @@ import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireSelf } from '@/lib/auth-guard';
 import { getISOWeekId, getPreviousWeekId } from '@/lib/iso-week';
-import { getLevelFromCycles, CONQUEST_LADDERS } from '@/lib/gamification-constants';
+import { getLevelFromCycles, getNextConquestTarget } from '@/lib/gamification-constants';
 
 // ─── Constants ────────────────────────────────────────────────────
 const PUBLICATION_POINTS = 30;
@@ -17,14 +17,10 @@ const STREAK_POSTS_REQUIRED = 3;
 type ConquestCategory = 'pub' | 'trail' | 'mission' | 'seq';
 
 // ─── Helper: find next uncompleted conquest ───────────────────────
+// Delegates to shared infinite-ladder logic in gamification-constants.ts
 
 function getNextConquest(category: string, completed: string[]): number | null {
-  const ladder = CONQUEST_LADDERS[category];
-  if (!ladder) return null;
-  for (const target of ladder) {
-    if (!completed.includes(`${category}_${target}`)) return target;
-  }
-  return null; // all completed in this category
+  return getNextConquestTarget(category, completed);
 }
 
 // ─── Count totals per category (via pointsHistory / submissions) ──

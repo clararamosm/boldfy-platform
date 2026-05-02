@@ -26,7 +26,7 @@ export default function TrilhaFullscreenPage() {
   useEffect(() => {
     if (!player.loading && player.trail && !markedRef.current) {
       markedRef.current = true;
-      completeOnboardingItem(auth.currentUser?.uid, 'view-trail');
+      completeOnboardingItem(auth.currentUser?.uid, 'start-trail');
     }
   }, [player.loading, player.trail]);
 

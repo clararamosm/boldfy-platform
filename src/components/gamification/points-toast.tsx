@@ -4,12 +4,12 @@
 // Separate from the main toast system (use-toast.ts) to avoid conflicts.
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { doc, updateDoc, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { CoinIcon } from '@/components/coin-icon';
-import { FileText, Trophy, BookOpen, Flame, Award, Zap, Heart } from 'lucide-react';
+import { FileText, Trophy, BookOpen, Flame, Award, Zap, Heart, Gift } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConquestModal } from '@/components/gamification/conquest-modal';
 import { LevelUpModal } from '@/components/gamification/level-up-modal';
@@ -63,6 +63,7 @@ const SOURCE_CONFIG: Record<string, { icon: React.ElementType; color: string; bg
   conquest: { icon: Award, color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
   extract: { icon: Zap, color: 'text-orange-500', bgColor: 'bg-orange-500/10' },
   congratulation: { icon: Heart, color: 'text-pink-500', bgColor: 'bg-pink-500/10' },
+  resgate: { icon: Gift, color: 'text-primary', bgColor: 'bg-primary/10' },
 };
 
 const DEFAULT_CONFIG = { icon: CoinIcon, color: 'text-primary', bgColor: 'bg-primary/10' };
@@ -93,10 +94,12 @@ function PointToast({ item, onDismiss }: { item: ToastItem; onDismiss: (id: stri
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{item.description}</p>
-        {item.points != null && item.points > 0 && (
+        {item.points != null && item.points !== 0 && (
           <div className="flex items-center gap-1 mt-0.5">
             <CoinIcon size="xs" />
-            <span className="text-xs font-semibold text-primary">+{item.points} pts</span>
+            <span className={cn('text-xs font-semibold', item.points > 0 ? 'text-primary' : 'text-muted-foreground')}>
+              {item.points > 0 ? `+${item.points} pts` : `${item.points} pts`}
+            </span>
           </div>
         )}
       </div>
@@ -110,7 +113,6 @@ function PointToast({ item, onDismiss }: { item: ToastItem; onDismiss: (id: stri
 export function GamificationToastProvider() {
   const { user } = useAuth();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const [processed, setProcessed] = useState(false);
 
   // Conquest modal queue
   const [conquestQueue, setConquestQueue] = useState<ConquestQueueItem[]>([]);
@@ -120,28 +122,35 @@ export function GamificationToastProvider() {
   const [levelUpQueue, setLevelUpQueue] = useState<LevelUpQueueItem[]>([]);
   const [activeLevelUp, setActiveLevelUp] = useState<LevelUpQueueItem | null>(null);
 
-  // Read and process pendingNotifications once on mount
-  useEffect(() => {
-    if (!user?.uid || processed) return;
-    if (user.role !== 'colaborador') return;
+  // Track which notification createdAt timestamps we've already processed (dedupe)
+  const processedIdsRef = useRef<Set<number>>(new Set());
+  // Prevent concurrent processing
+  const processingRef = useRef(false);
 
-    const notifications = user.rawData?.pendingNotifications as PendingNotification[] | undefined;
-    if (!notifications || notifications.length === 0) {
-      setProcessed(true);
-      return;
+  // Process a batch of new notifications
+  const processNotifications = useCallback((notifications: PendingNotification[], uid: string) => {
+    if (notifications.length === 0) return;
+
+    // Filter out already-processed notifications (dedupe by createdAt)
+    const newNotifications = notifications.filter(n => !processedIdsRef.current.has(n.createdAt));
+    if (newNotifications.length === 0) return;
+
+    // Mark as processed
+    for (const n of newNotifications) {
+      processedIdsRef.current.add(n.createdAt);
     }
 
     // Sort by createdAt ascending so oldest shows first
-    const sorted = [...notifications].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    const sorted = [...newNotifications].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
     // Separate conquest/levelUp notifications from point toasts
     const pointNotifications: PendingNotification[] = [];
-    const conquestNotifications: ConquestQueueItem[] = [];
-    const levelUpNotifications: LevelUpQueueItem[] = [];
+    const newConquests: ConquestQueueItem[] = [];
+    const newLevelUps: LevelUpQueueItem[] = [];
 
     for (const notification of sorted) {
       if (notification.type === 'conquest' && notification.conquestId && notification.category != null) {
-        conquestNotifications.push({
+        newConquests.push({
           conquestId: notification.conquestId,
           category: notification.category,
           target: notification.target || 0,
@@ -154,7 +163,7 @@ export function GamificationToastProvider() {
           type: 'points', // override to show as regular toast
         });
       } else if (notification.type === 'levelUp' && notification.level != null) {
-        levelUpNotifications.push({
+        newLevelUps.push({
           level: notification.level,
           cyclesCompleted: notification.cyclesCompleted || 0,
         });
@@ -164,13 +173,13 @@ export function GamificationToastProvider() {
     }
 
     // Queue conquest modals
-    if (conquestNotifications.length > 0) {
-      setConquestQueue(conquestNotifications);
+    if (newConquests.length > 0) {
+      setConquestQueue(prev => [...prev, ...newConquests]);
     }
 
     // Queue level-up modals (shown after conquest modals)
-    if (levelUpNotifications.length > 0) {
-      setLevelUpQueue(levelUpNotifications);
+    if (newLevelUps.length > 0) {
+      setLevelUpQueue(prev => [...prev, ...newLevelUps]);
     }
 
     // Stagger toasts with delay
@@ -189,19 +198,46 @@ export function GamificationToastProvider() {
     });
 
     // Handle onboarding auto-complete for conquest notifications
-    for (const conquest of conquestNotifications) {
+    for (const conquest of newConquests) {
       if (conquest.onboardingItemId) {
-        completeOnboardingItem(user.uid, conquest.onboardingItemId)
+        completeOnboardingItem(uid, conquest.onboardingItemId)
           .catch(err => console.error('[GamificationToast] Failed to complete onboarding item:', err));
       }
     }
 
-    // Clear pendingNotifications from Firestore (fire-and-forget)
-    updateDoc(doc(db, 'users', user.uid), { pendingNotifications: [] })
-      .catch(err => console.error('[GamificationToast] Failed to clear notifications:', err));
+    // Handle onboarding auto-complete for point/other notifications (trail, reward, etc.)
+    for (const notification of pointNotifications) {
+      if (notification.onboardingItemId) {
+        completeOnboardingItem(uid, notification.onboardingItemId)
+          .catch(err => console.error('[GamificationToast] Failed to complete onboarding item:', err));
+      }
+    }
 
-    setProcessed(true);
-  }, [user, processed]);
+    // Clear only the processed notifications from Firestore (prevents race condition)
+    updateDoc(doc(db, 'users', uid), {
+      pendingNotifications: arrayRemove(...sorted),
+    }).catch(err => console.error('[GamificationToast] Failed to clear notifications:', err));
+  }, []);
+
+  // Real-time listener for pendingNotifications
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (user.role !== 'colaborador') return;
+
+    const unsub = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+      if (!snap.exists() || processingRef.current) return;
+      const data = snap.data();
+      const notifications = data?.pendingNotifications as PendingNotification[] | undefined;
+      if (!notifications || notifications.length === 0) return;
+
+      processingRef.current = true;
+      processNotifications(notifications, user.uid);
+      // Allow processing again after a short delay (debounce rapid updates)
+      setTimeout(() => { processingRef.current = false; }, 1000);
+    });
+
+    return () => unsub();
+  }, [user?.uid, user?.role, processNotifications]);
 
   // Process conquest queue — show one at a time
   useEffect(() => {

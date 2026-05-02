@@ -254,7 +254,7 @@ function EditorContent() {
 
         if (result.success) {
           toast({ title: t.colabNewPost.postScheduled, description: t.colabNewPost.postScheduledDescription });
-          completeOnboardingItem(userId ?? undefined, 'create-post');
+          completeOnboardingItem(userId ?? undefined, 'schedule-content');
           router.push('/colaborador/calendario');
         } else {
           toast({ variant: 'destructive', title: t.common.error, description: result.error });
@@ -356,7 +356,7 @@ function EditorContent() {
         if (result.success) {
           setPublishedUrl(result.postUrl || null);
           toast({ title: t.colabNewPost.publishedOnLinkedin, description: t.colabNewPost.publishedDescription });
-          completeOnboardingItem(userId ?? undefined, 'create-post');
+          completeOnboardingItem(userId ?? undefined, 'schedule-content');
         } else {
           toast({ variant: 'destructive', title: t.colabNewPost.publishError, description: result.error });
           if (result.needsReconnect) {

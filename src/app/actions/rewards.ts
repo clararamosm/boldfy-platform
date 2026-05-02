@@ -210,6 +210,7 @@ export async function redeemReward(
     }
 
     // User points update
+    const userRef = adminDb.collection('users').doc(userId);
     const userUpdateData: Record<string, unknown> = {
       points: Math.max(0, currentPoints - reward.points),
     };
@@ -219,7 +220,22 @@ export async function redeemReward(
       userUpdateData['aiCredits.bonusCredits'] = FieldValue.increment(reward.creditsAmount);
     }
 
-    batch.update(adminDb.collection('users').doc(userId), userUpdateData);
+    batch.update(userRef, userUpdateData);
+
+    // Toast notification for reward redemption
+    const isAiCredits = reward.type === 'ai_credits';
+    batch.update(userRef, {
+      pendingNotifications: FieldValue.arrayUnion({
+        type: 'points',
+        source: 'resgate',
+        points: -(reward.points as number),
+        description: isAiCredits
+          ? `+${reward.creditsAmount || 0} créditos de IA adicionados`
+          : `Resgate: ${reward.name}`,
+        createdAt: Date.now(),
+        onboardingItemId: 'buy-reward',
+      }),
+    });
 
     await batch.commit();
 

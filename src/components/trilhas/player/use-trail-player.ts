@@ -7,8 +7,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { db, auth } from '@/lib/firebase';
 import {
-  collection, doc, getDocs, getDoc, setDoc,
-  Timestamp, addDoc
+  collection, doc, getDocs, getDoc, setDoc, updateDoc,
+  Timestamp, addDoc, arrayUnion,
 } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { recalculatePoints } from '@/app/actions';
@@ -245,14 +245,26 @@ export function useTrailPlayer(trailId: string) {
       updatedProgress.concluidaEm = Timestamp.now();
       updatedProgress.pontosGanhos = totalPoints + (trail.pontuacaoBonus || 0);
 
-      // Register in pointsHistory
+      // Register in pointsHistory + toast notification
       try {
+        const trailDesc = interpolate(tp.trailCompletedHistory, { title: trail.titulo });
         await addDoc(collection(db, 'users', user!.uid, 'pointsHistory'), {
-          description: interpolate(tp.trailCompletedHistory, { title: trail.titulo }),
+          description: trailDesc,
           date: Timestamp.now(),
           points: updatedProgress.pontosGanhos,
           type: 'gain',
           source: 'trilha',
+        });
+        // Write pending notification for toast
+        await updateDoc(doc(db, 'users', user!.uid), {
+          pendingNotifications: arrayUnion({
+            type: 'points',
+            source: 'trilha',
+            points: updatedProgress.pontosGanhos,
+            description: trailDesc,
+            createdAt: Date.now(),
+            onboardingItemId: 'start-trail',
+          }),
         });
       } catch (err) { console.error('Error adding trail to pointsHistory:', err); }
 

@@ -13,4 +13,4 @@ export { saveContentStrategy, getContentStrategy, saveBrandManual, getBrandManua
 export { getSlackChannels, getSlackConfig, saveSlackConfig, testSlackNotification } from './actions/slack';
 export { seedNativeRewards, migrateAllCompaniesNativeRewards } from './actions/company-setup';
 export { awardPublicationPoints, checkAndAwardConquests, checkConquestsFromClient, sendCongratulation } from './actions/gamification';
-export { CONQUEST_LADDERS, getLevelFromCycles, LEVEL_THRESHOLDS } from '@/lib/gamification-constants';
+export { CONQUEST_LADDERS, getLevelFromCycles, LEVEL_THRESHOLDS, getNextConquestTarget, getConquestGoalName } from '@/lib/gamification-constants';

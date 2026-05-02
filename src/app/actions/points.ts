@@ -3,7 +3,7 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { requireSelf } from '@/lib/auth-guard';
-import { CONQUEST_LADDERS } from '@/lib/gamification-constants';
+import { CONQUEST_LADDERS, getNextConquestTarget } from '@/lib/gamification-constants';
 
 // ---- Server-Side Company Ranking ----
 
@@ -404,6 +404,7 @@ export async function getRankingPageData(
 
     for (const [category, ladder] of Object.entries(CONQUEST_LADDERS)) {
       const currentTotal = totalsByCategory[category] || 0;
+      // Add all base ladder targets
       for (const target of ladder) {
         const cId = `${category}_${target}`;
         myConquests.push({
@@ -413,6 +414,23 @@ export async function getRankingPageData(
           current: Math.min(currentTotal, target),
           completed: myCompleted.includes(cId),
         });
+      }
+      // For infinite categories (pub/trail/mission), if ALL base targets are completed,
+      // add the next target beyond the base ladder so the user sees their current progress
+      if (category !== 'seq') {
+        const allBaseCompleted = ladder.every(t => myCompleted.includes(`${category}_${t}`));
+        if (allBaseCompleted) {
+          const nextTarget = getNextConquestTarget(category, myCompleted);
+          if (nextTarget !== null && !ladder.includes(nextTarget)) {
+            myConquests.push({
+              conquestId: `${category}_${nextTarget}`,
+              category,
+              target: nextTarget,
+              current: Math.min(currentTotal, nextTarget),
+              completed: false,
+            });
+          }
+        }
       }
     }
 
