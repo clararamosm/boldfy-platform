@@ -11,6 +11,7 @@ import { generateSlug } from '@/lib/slugify';
 import { getDefaultBillingBlock } from '@/lib/billing/types';
 import { resyncPlatformSeats } from '@/lib/billing/seat-management';
 import { appendActivityLog } from '@/lib/billing/activity-log';
+import { seedNativeRewards } from '@/app/actions/company-setup';
 
 // Mascara email para uso em activity log (compliance: nao expor email cru).
 // Ex: 'joao.silva@boldfy.com' => 'jo***@boldfy.com'
@@ -524,18 +525,8 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       { idempotencyKey: companyId },
     );
 
-    // Seed default AI credits reward for the new company
-    await adminDb.collection('companies').doc(companyId).collection('rewards').add({
-      name: '5 Creditos de IA',
-      points: 200,
-      type: 'ai_credits',
-      creditsAmount: 5,
-      stock: 'Ilimitado',
-      status: 'Disponível',
-      imageUrl: null,
-      isDefault: true,
-      createdAt: FieldValue.serverTimestamp(),
-    });
+    // Seed native AI credits rewards for the new company (3-tier)
+    await seedNativeRewards(companyId);
 
     // When skipInvite is set, only create the company (no admin user yet)
     if (skipInvite) {

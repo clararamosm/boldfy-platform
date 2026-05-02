@@ -19,6 +19,7 @@ import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { OnboardingShell } from "@/components/onboarding";
 import { BillingWarningBanner } from "@/components/billing/billing-warning-banner";
+import { GamificationToastProvider } from "@/components/gamification/points-toast";
 
 // NOTA: useSubscription e SubscriptionGate legados foram removidos.
 // O sistema novo de billing (BillingWarningBanner + module-gate.ts server-side)
@@ -97,6 +98,7 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
         <LocaleProvider locale={locale}>
         <DashboardLayout sidebar={sidebarContent}>
             <BillingWarningBanner />
+            <GamificationToastProvider />
             <OnboardingShell role="colaborador" companyName={companyName}>
                 {children}
             </OnboardingShell>

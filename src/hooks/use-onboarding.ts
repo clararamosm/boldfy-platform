@@ -230,6 +230,12 @@ const COLABORADOR_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
     href: '/colaborador/calendario',
   },
   {
+    id: 'first-publication',
+    label: 'Fazer sua primeira publicação',
+    description: 'Publique no LinkedIn e ganhe +30 pts + Conquista',
+    href: '/colaborador/calendario',
+  },
+  {
     id: 'buy-reward',
     label: 'Fazer uma compra na loja',
     description: 'Troque seus pontos por uma recompensa',

@@ -5,6 +5,7 @@ import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireSelf, requireAdmin } from '@/lib/auth-guard';
 import { notifyMissionSubmitted, notifyMissionReviewed } from '@/lib/notifications';
+import { checkAndAwardConquests } from '@/app/actions/gamification';
 
 // ---- Mission Proof Submission ----
 
@@ -169,6 +170,11 @@ export async function completeMissionSelf(
     });
 
     await batch.commit();
+
+    // Check mission conquests (fire-and-forget)
+    checkAndAwardConquests(userId, 'mission')
+      .catch(err => console.error(`[Gamification] Conquest check failed after mission self-complete for user ${userId}:`, err));
+
     return { success: true };
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
@@ -244,6 +250,10 @@ export async function reviewMissionProof(
       });
 
       await batch.commit();
+
+      // Check mission conquests (fire-and-forget)
+      checkAndAwardConquests(subData.userId, 'mission')
+        .catch(err => console.error(`[Gamification] Conquest check failed after mission approval for user ${subData.userId}:`, err));
     } else {
       await subRef.update({
         status: 'rejected',

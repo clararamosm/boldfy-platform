@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { recalculatePoints } from '@/app/actions';
+import { checkConquestsFromClient } from '@/app/actions/gamification';
 import { getAuthToken } from '@/lib/auth-client';
 import { useT } from '@/lib/i18n/context';
 import { interpolate } from '@/lib/i18n';
@@ -288,6 +289,13 @@ export function useTrailPlayer(trailId: string) {
     // Recalculate points server-side
     if (user) {
       getAuthToken().then(token => recalculatePoints(token, user.uid)).catch(err => console.error('Error recalculating points:', err));
+    }
+
+    // Check trail conquests after completion (fire-and-forget)
+    if (allModulesDone && user) {
+      getAuthToken()
+        .then(token => checkConquestsFromClient(token, user.uid, 'trail'))
+        .catch(err => console.error('[Gamification] Trail conquest check failed:', err));
     }
 
     if (allModulesDone && updatedProgress.concluida) {

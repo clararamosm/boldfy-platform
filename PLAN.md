@@ -1,158 +1,221 @@
-# Plano: LinkedIn Performance Metrics em Todos os Dashboards
+# Sprint 2 — Conquistas + Pop-up de Celebração + Integração Onboarding
 
-## Visao Geral
-
-Criar um componente reutilizavel `<LinkedInPerformance />` com graficos visuais (Recharts, ja instalado) e filtro de periodo, e integra-lo em 5 pontos da plataforma. Alem disso, exibir metricas inline (reacoes + comentarios) nos cards do calendario e no feed do LinkedIn.
+## Escopo (seção 12.4 do plano)
+Sistema completo de conquistas renováveis (4 categorias), modal de celebração para conquistas, e integração das primeiras conquistas com o onboarding existente.
 
 ---
 
-## Componente Principal: `<LinkedInPerformance />`
+## Passo 1: Definições de conquistas + engine de verificação (`gamification.ts`)
 
-**Arquivo:** `src/components/linkedin-performance/linkedin-performance.tsx`
+**Arquivo:** `src/app/actions/gamification.ts` (editar)
 
-### Props
-```typescript
-type LinkedInPerformanceProps = {
-  userId: string;
-  hideIfNotConnected?: boolean;
-  showProfileFilter?: boolean;
-  profiles?: Array<{ id: string; name: string; picture?: string }>;
+Adicionar ao arquivo existente:
+
+### 1a. Constantes
+
+```ts
+const CONQUEST_POINTS = 50;
+
+const CONQUEST_LADDERS: Record<string, number[]> = {
+  pub:     [1, 10, 30, 50, 100],
+  trail:   [1, 5, 10, 20, 30, 40],
+  mission: [1, 5, 10, 20],
+  seq:     [7, 14, 28, 49, 70, 98, 140], // Sprint 3, mas já definida
 };
 ```
 
-### Conteudo Visual
+### 1b. Função helper `getNextConquest(category, completed)`
 
-**Filtro de Periodo** (topo, a direita do titulo):
-- Select com opcoes: "Esta semana", "Este mes", "Ultimo mes", "Ultimos 3 meses"
-- Filtro de perfil (apenas estrategista): dropdown com TLs
+Retorna o próximo threshold da escada que ainda não foi conquistado, ou `null` se todas foram.
 
-**KPI Cards** (grid 2x2 mobile, 4 colunas desktop):
-1. Posts Publicados (icone Send, fundo azul LinkedIn)
-2. Total de Reacoes (icone Heart, fundo rose)
-3. Total de Comentarios (icone MessageCircle, fundo blue)
-4. Media de Reacoes/Post (icone TrendingUp, fundo green)
+### 1c. Função principal `checkAndAwardConquests(userId, category)`
 
-**Grafico de Area** (Recharts `AreaChart`):
-- Eixo X: datas dos posts (agrupados por semana conforme periodo)
-- Duas areas: Reacoes (rose) e Comentarios (azul)
-- Tooltip com data + valores
-- Responsivo via `ResponsiveContainer`
-- Usa o wrapper `ChartContainer` do shadcn/ui que ja existe em `src/components/ui/chart.tsx`
+Fluxo:
+1. Buscar `user.conquests.completed` (array de strings, ex: `["pub_1", "trail_1"]`)
+2. Achar próxima meta ativa via `getNextConquest(category, completed)`
+3. Se não tem próxima → return (todas completas)
+4. Contar total da categoria via pointsHistory / missionSubmissions:
+   - `pub`: `count(pointsHistory where source='publicacao')`
+   - `trail`: `count(pointsHistory where source='trilha')` — cada trilha concluída gera 1 entry
+   - `mission`: `count(missionSubmissions where userId=X AND status='approved')` — precisa do companyId do user doc
+5. Se total >= threshold → **award**:
+   - Batch atômico:
+     - `conquests.completed` → arrayUnion(`"pub_10"`)
+     - `pointsHistory` → novo doc com `source: 'conquest'`, `points: 50`
+     - `points` → increment(50)
+     - `pendingNotifications` → arrayUnion com `type: 'conquest'`, conquestId, description
 
-**Lista dos 5 Posts Recentes** (abaixo do grafico):
-- Caption preview (120 chars)
-- Data de publicacao
-- Coracao + total reacoes | Comentario + total comentarios
-- Link externo para o post no LinkedIn
+### 1d. Função pública `checkConquestsFromClient(idToken, userId, category)`
+
+- Valida auth via `requireSelf(idToken, userId)`
+- Chama `checkAndAwardConquests(userId, category)`
+- Necessária porque trail completion roda no client
 
 ---
 
-## Mudancas no Backend (Server Action)
+## Passo 2: Integrar nos fluxos existentes
 
-**Arquivo:** `src/app/actions/linkedin.ts`
-
-### Modificar `getLinkedInDashboardMetrics()`
-
-Adicionar parametro opcional de periodo:
-```typescript
-export async function getLinkedInDashboardMetrics(
-  idToken: string,
-  userId: string,
-  dateRange?: { start: string; end: string }
-): Promise<DashboardMetrics>
+### 2a. Publicação — `gamification.ts` → `awardPublicationPoints()`
+Após `batch.commit()` (linha 69):
+```ts
+checkAndAwardConquests(userId, 'pub').catch(err => console.error(...));
 ```
 
-- Se `dateRange` fornecido: filtrar posts publicados cujo `publishedAt` cai dentro do range
-- Se nao fornecido: comportamento atual (ultimos 50 posts, sem filtro de data)
-
----
-
-## Onde o componente sera usado (5 pontos)
-
-### 1. Dashboard do Colaborador
-**Arquivo:** `src/app/colaborador/dashboard/page.tsx`
-- **Acao:** Substituir o bloco atual de LinkedIn Performance (linhas 352-470) + `LinkedInPostCard` inline pelo novo `<LinkedInPerformance userId={uid} />`
-- Remove ~120 linhas de codigo inline, substitui por 1 import + uso
-
-### 2. Dashboard do Thought Leader
-**Arquivo:** `src/app/thoughtleader/dashboard/page.tsx`
-- **Acao:** Substituir o card "Backlog de conteudo" (linhas 131-174) pelo `<LinkedInPerformance userId={uid} />`
-- Os 4 KPI cards do pipeline permanecem no topo (publicados, agendados, pendentes, total)
-- O bloco de LinkedIn Performance fica abaixo, no lugar do backlog
-
-### 3. Calendario do Thought Leader
-**Arquivo:** `src/app/thoughtleader/calendario/page.tsx`
-- **Acao:** Adicionar `<LinkedInPerformance userId={userId} />` APOS o `<PostListTable />`
-- Secao extra no final da pagina, abaixo da tabela de posts
-
-### 4. Calendario do Estrategista
-**Arquivo:** `src/app/strategist/calendario/page.tsx`
-- **Acao:** Adicionar o bloco APOS o `<PostListTable />`
-- **Props especiais:** `showProfileFilter={true}` + `profiles={tlProfiles}`
-- O filtro de perfil permite ao estrategista ver metricas de cada TL individualmente
-
-### 5. Dashboard do Estrategista
-**Arquivo:** `src/app/strategist/dashboard/page.tsx`
-- **Acao:** Substituir o Card "Em breve: metricas de todos os perfis" (linhas 349-360) pelo `<LinkedInPerformance />` com filtro de perfil
-- Usa o primeiro TL da lista como default
-
----
-
-## Metricas Inline nos Cards do Calendario
-
-**Arquivo:** `src/components/calendar/calendar-post-card.tsx`
-
-### Mudanca
-- Adicionar props opcionais: `reactions?: number` e `comments?: number`
-- Quando `post.status === 'postado'` E metricas existirem: exibir na mesma linha do horario, no lado direito:
-  - Heart icon (h-3 w-3, rose-500) + numero
-  - MessageCircle icon (h-3 w-3, blue-500) + numero
-- Se metricas nao disponiveis para aquele post: nao mostra nada
-
-### Dados para os cards
-- Nas paginas de calendario (TL e Estrategista): usar as metricas ja carregadas pelo `<LinkedInPerformance />`
-- Criar um estado compartilhado ou prop callback que passa o Map de `postId -> { reactions, comments }` para o calendario
-- Abordagem: o componente `<LinkedInPerformance />` expoe as metricas via callback `onMetricsLoaded` que o calendario usa para alimentar os cards
-
----
-
-## Metricas no Feed do LinkedIn
-
-**Arquivo:** `src/components/linkedin-feed/linkedin-feed-view.tsx`
-
-### Mudanca
-- Apos a midia do post e antes do footer, adicionar barra de engajamento:
-  - Heart icon + "42 reacoes" · MessageCircle icon + "5 comentarios"
-  - Texto muted, tamanho pequeno (text-xs text-muted-foreground)
-
-### Dados
-- Fetch separado e assincrono das metricas apos carregar os posts do feed
-- Mostra skeleton enquanto carrega as metricas
-- Nao bloqueia o carregamento do feed em si
-
----
-
-## Estrutura de Arquivos Novos
-
+### 2b. Trilha concluída — `use-trail-player.ts` → `completeModule()`
+Após `saveProgress()` (linha 286), dentro do bloco `allModulesDone`:
+```ts
+getAuthToken().then(token => checkConquestsFromClient(token, user.uid, 'trail')).catch(...);
 ```
-src/components/linkedin-performance/
-  linkedin-performance.tsx     -- Componente principal reutilizavel
-  metrics-chart.tsx            -- Grafico de area com Recharts
-  metrics-kpi-cards.tsx        -- Grid de 4 KPI cards
-  period-filter.tsx            -- Select de periodo + filtro de perfil
+Import: adicionar `checkConquestsFromClient` de `@/app/actions/gamification`
+
+### 2c. Missão auto-completada — `missions.ts` → `completeMissionSelf()`
+Após `batch.commit()` (linha 171):
+```ts
+checkAndAwardConquests(userId, 'mission').catch(err => console.error(...));
+```
+Import: adicionar `checkAndAwardConquests` de `@/app/actions/gamification`
+
+### 2d. Missão aprovada pelo admin — `missions.ts` → `reviewMissionProof()`
+Após `batch.commit()` dentro do `if (action === 'approve')` (linha 246):
+```ts
+checkAndAwardConquests(subData.userId, 'mission').catch(err => console.error(...));
 ```
 
 ---
 
-## Ordem de Implementacao
+## Passo 3: Modal de celebração de conquista
 
-1. Backend: Modificar `getLinkedInDashboardMetrics()` com suporte a `dateRange`
-2. Componente `<LinkedInPerformance />` com subcomponentes (KPI, grafico, lista, filtro)
-3. Dashboard Colaborador: Substituir bloco inline pelo componente
-4. Dashboard TL: Substituir backlog pelo componente
-5. Calendario TL: Adicionar componente apos tabela
-6. Calendario Estrategista: Adicionar componente com filtro de perfil
-7. Dashboard Estrategista: Substituir placeholder
-8. Calendar post cards: Adicionar metricas inline nos cards de posts postados
-9. Feed do LinkedIn: Adicionar barra de engajamento
-10. TypeScript check + commit
+**Arquivo novo:** `src/components/gamification/conquest-modal.tsx`
+
+Componente `ConquestModal`:
+- Props: `open`, `onClose`, `conquestId`, `category`, `description`, `points`
+- Dialog centralizado (shadcn Dialog) com overlay escuro
+- Ícone da categoria com animação scale-in (CSS `@keyframes`):
+  - `pub` → FileText (azul #3B82F6)
+  - `trail` → BookOpen (verde #10B981)
+  - `mission` → Zap (laranja #F97316)
+  - `seq` → Diamond (roxo, cor do nível)
+- Título: i18n `gamification.conquests.unlocked` → "Conquista desbloqueada!"
+- Subtítulo: nome da conquista (ex: "30 publicações")
+- Badge: "+50 pts adicionados ao seu saldo"
+- Botão primário: "Ver conquistas" → link para recompensas (futuro: aba conquistas)
+- Botão ghost: "Fechar"
+
+---
+
+## Passo 4: Atualizar GamificationToastProvider
+
+**Arquivo:** `src/components/gamification/points-toast.tsx` (editar)
+
+- Importar `ConquestModal`
+- Ao processar `pendingNotifications`, separar:
+  - `type === 'points'` → toast normal (comportamento atual)
+  - `type === 'conquest'` → abrir ConquestModal + toast de +50pts simultâneo
+- Adicionar state `conquestModal` para controlar qual conquista está sendo exibida
+- Processar conquistas uma de cada vez (queue), após fechar modal → próxima
+
+---
+
+## Passo 5: Integração com onboarding
+
+**Arquivo:** `src/hooks/use-onboarding.ts` (editar)
+
+Adicionar ao `COLABORADOR_CHECKLIST`:
+```ts
+{
+  id: 'first-publication',
+  label: t.gamification.onboarding.firstPublication,    // fallback hardcoded
+  description: t.gamification.onboarding.firstPublicationDesc,
+  href: '/colaborador/calendario',
+},
+```
+> Posição: entre 'schedule-content' e 'buy-reward' (publicar vem antes de comprar)
+
+**Auto-complete:** Na `checkAndAwardConquests`, quando `pub_1` for atingida:
+- Chamar `completeOnboardingItem` do server (precisa importar)
+- Ou: adicionar `onboardingItemId: 'first-publication'` na pendingNotification, e o toast provider chama `completeOnboardingItem` no client ao processar
+
+Escolha: **via pendingNotification** (mais desacoplado, client-side, segue padrão existente do onboarding que já usa client SDK).
+
+---
+
+## Passo 6: i18n
+
+**Arquivos:** `pt-BR.ts` e `en.ts` (editar)
+
+Expandir bloco `gamification`:
+```ts
+gamification: {
+  // Sprint 1 keys (mantidas)...
+  conquests: {
+    unlocked: 'Conquista desbloqueada!',
+    points: '+{points} pts adicionados ao seu saldo',
+    viewAll: 'Ver conquistas',
+    close: 'Fechar',
+    pub_1: '1ª publicação',
+    pub_10: '10 publicações',
+    pub_30: '30 publicações',
+    pub_50: '50 publicações',
+    pub_100: '100 publicações',
+    trail_1: '1ª trilha concluída',
+    trail_5: '5 trilhas concluídas',
+    trail_10: '10 trilhas concluídas',
+    trail_20: '20 trilhas concluídas',
+    trail_30: '30 trilhas concluídas',
+    trail_40: '40 trilhas concluídas',
+    mission_1: '1ª missão completa',
+    mission_5: '5 missões completas',
+    mission_10: '10 missões completas',
+    mission_20: '20 missões completas',
+  },
+  onboarding: {
+    firstPublication: 'Fazer sua primeira publicação',
+    firstPublicationDesc: 'Publique no LinkedIn e ganhe +30 pts + Conquista',
+  },
+},
+```
+
+---
+
+## Passo 7: Firestore rules
+
+**Arquivo:** `firestore.rules` (editar)
+
+- Adicionar `'conquests'` à lista em `isNotChangingProtectedFields()`:
+  ```
+  ['role', 'companyId', 'companyName', 'points', 'aiCredits', 'conquests']
+  ```
+- Somente Admin SDK pode escrever em `conquests`
+
+---
+
+## Passo 8: Barrel export
+
+**Arquivo:** `src/app/actions.ts` (editar)
+
+Adicionar `checkConquestsFromClient` ao export de gamification.
+
+---
+
+## Passo 9: TypeScript check
+
+`tsc --noEmit` → zero erros.
+
+---
+
+## Resumo de arquivos
+
+| Arquivo | Ação | O que muda |
+|---------|------|------------|
+| `src/app/actions/gamification.ts` | EDITAR | +CONQUEST_LADDERS, +checkAndAwardConquests, +checkConquestsFromClient, integrar em awardPublicationPoints |
+| `src/app/actions/missions.ts` | EDITAR | +import, fire-and-forget conquest check em completeMissionSelf + reviewMissionProof |
+| `src/components/trilhas/player/use-trail-player.ts` | EDITAR | +import, fire-and-forget conquest check em completeModule (quando allModulesDone) |
+| `src/components/gamification/conquest-modal.tsx` | CRIAR | Modal de celebração com ícone animado |
+| `src/components/gamification/points-toast.tsx` | EDITAR | Suportar type='conquest' → abrir ConquestModal |
+| `src/hooks/use-onboarding.ts` | EDITAR | +item 'first-publication' no checklist colaborador |
+| `src/lib/i18n/dictionaries/pt-BR.ts` | EDITAR | +chaves conquests + onboarding |
+| `src/lib/i18n/dictionaries/en.ts` | EDITAR | +chaves conquests + onboarding (inglês) |
+| `firestore.rules` | EDITAR | +conquests na lista protegida |
+| `src/app/actions.ts` | EDITAR | +export checkConquestsFromClient |
+
+**Arquivos novos: 1** · **Arquivos editados: 9**

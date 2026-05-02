@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Badges de Nível · Diamante Ilustrado · Boldfy</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Nunito+Sans:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #FAF7FF;
+    font-family: 'Inter', sans-serif;
+    color: #45336B;
+    padding: 60px 32px;
+  }
+  .page { max-width: 1200px; margin: 0 auto; }
+  .page-title {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 900;
+    font-size: 28px;
+    color: #5E2A67;
+    letter-spacing: -0.025em;
+    margin-bottom: 8px;
+  }
+  .page-sub {
+    font-size: 13px;
+    color: #9D85B3;
+    margin-bottom: 48px;
+    line-height: 1.5;
+  }
+  .size-section {
+    margin-bottom: 56px;
+    padding-bottom: 56px;
+    border-bottom: 1px solid #E4D8ED;
+  }
+  .size-section:last-child { border-bottom: none; }
+  .size-title {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 900;
+    font-size: 14px;
+    color: #5E2A67;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .levels-row {
+    display: flex;
+    gap: 24px;
+    align-items: flex-end;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .level-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+  .level-label {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 900;
+    font-size: 10px;
+    color: #9D85B3;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .gem {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .gem svg {
+    filter: drop-shadow(0 6px 16px var(--gem-shadow));
+  }
+  .gem .gem-num {
+    position: absolute;
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 900;
+    color: #fff;
+    z-index: 2;
+    line-height: 1;
+  }
+  .gem.sz-xl { --w: 100px; }
+  .gem.sz-xl .gem-num { font-size: 28px; margin-top: 6px; }
+  .gem.sz-lg { --w: 76px; }
+  .gem.sz-lg .gem-num { font-size: 22px; margin-top: 4px; }
+  .gem.sz-md { --w: 52px; }
+  .gem.sz-md .gem-num { font-size: 16px; margin-top: 3px; }
+  .gem.sz-sm { --w: 36px; }
+  .gem.sz-sm .gem-num { font-size: 12px; margin-top: 2px; }
+  .lvl-1 { --gem-top: #F5E6FF; --gem-left: #EAD0F9; --gem-right: #E0BCF3; --gem-bl: #D9ACF0; --gem-br: #D1A0EB; --gem-center: #E4C4F6; --gem-highlight: rgba(255,255,255,.7); --gem-shadow: rgba(228, 196, 246, .5); --num-color: #9840AD; }
+  .lvl-2 { --gem-top: #EACFFA; --gem-left: #DDB5F4; --gem-right: #D19DEE; --gem-bl: #C78BE8; --gem-br: #BD79E2; --gem-center: #D4A6F0; --gem-highlight: rgba(255,255,255,.55); --gem-shadow: rgba(212, 166, 240, .45); --num-color: #7E3FA6; }
+  .lvl-3 { --gem-top: #DDB5F4; --gem-left: #CD80F1; --gem-right: #C068E8; --gem-bl: #B556DF; --gem-br: #AA44D6; --gem-center: #C870EC; --gem-highlight: rgba(255,255,255,.45); --gem-shadow: rgba(200, 112, 236, .4); --num-color: #fff; }
+  .lvl-4 { --gem-top: #D494F0; --gem-left: #CD50F1; --gem-right: #B840D9; --gem-bl: #A838C8; --gem-br: #9840AD; --gem-center: #C050E5; --gem-highlight: rgba(255,255,255,.35); --gem-shadow: rgba(205, 80, 241, .4); --num-color: #fff; }
+  .lvl-5 { --gem-top: #C068E8; --gem-left: #AD42D0; --gem-right: #9840AD; --gem-bl: #8838A0; --gem-br: #7E3FA6; --gem-center: #A845C0; --gem-highlight: rgba(255,255,255,.28); --gem-shadow: rgba(168, 69, 192, .4); --num-color: #fff; }
+  .lvl-6 { --gem-top: #A848C5; --gem-left: #9240A8; --gem-right: #7E3FA6; --gem-bl: #6B3590; --gem-br: #5E2A67; --gem-center: #8A3CA0; --gem-highlight: rgba(255,255,255,.2); --gem-shadow: rgba(138, 60, 160, .4); --num-color: #fff; }
+  .lvl-7 { --gem-top: #8A3CA0; --gem-left: #6E3088; --gem-right: #5E2A67; --gem-bl: #4A2055; --gem-br: #3D1A45; --gem-center: #6E3088; --gem-highlight: rgba(255,255,255,.15); --gem-shadow: rgba(110, 48, 136, .45); --num-color: #fff; }
+  .lvl-8 { --gem-top: #6E3088; --gem-left: #4A2058; --gem-right: #3D1A45; --gem-bl: #2D1235; --gem-br: #1A0B22; --gem-center: #4E2260; --gem-highlight: rgba(255,255,255,.1); --gem-shadow: rgba(78, 34, 96, .5); --num-color: #fff; }
+  .lvl-1 .gem-num, .lvl-2 .gem-num { color: var(--num-color); text-shadow: none; }
+  .lvl-3 .gem-num, .lvl-4 .gem-num, .lvl-5 .gem-num, .lvl-6 .gem-num, .lvl-7 .gem-num, .lvl-8 .gem-num {
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,.25);
+  }
+  .dark-preview {
+    background: #1A0B22;
+    border-radius: 20px;
+    padding: 40px;
+    margin-top: 8px;
+  }
+  .dark-preview .level-label { color: rgba(255,255,255,.35); }
+  .dark-title {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 900;
+    font-size: 14px;
+    color: rgba(255,255,255,.5);
+    margin-bottom: 28px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="page-title">Badges de Nivel - Diamante Ilustrado</h1>
+  <p class="page-sub">8 gemas com facetas geometricas, brilho e reflexo. Do lilas mais claro (nivel 1) ao roxo profundo (nivel 8). Numero centralizado.</p>
+  <div class="size-section">
+    <div class="size-title">Tamanho grande (100px)</div>
+    <div class="levels-row">
+      <div class="level-wrap lvl-1"><div class="gem sz-xl"><svg width="100" height="116" viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg"><polygon points="50,0 85,36 50,48 15,36" fill="var(--gem-top)"/><polygon points="15,36 50,48 8,36" fill="var(--gem-highlight)"/><polygon points="15,36 50,48 50,116" fill="var(--gem-left)"/><polygon points="85,36 50,48 50,116" fill="var(--gem-right)"/><polygon points="15,36 50,116 8,56" fill="var(--gem-bl)"/><polygon points="85,36 50,116 92,56" fill="var(--gem-br)"/><polygon points="50,48 35,40 50,36 65,40" fill="var(--gem-center)" opacity=".6"/><polygon points="50,0 65,20 50,28 35,20" fill="var(--gem-highlight)" opacity=".5"/><polygon points="50,0 15,36 25,34" fill="var(--gem-highlight)" opacity=".3"/><polygon points="22,40 30,46 26,52" fill="var(--gem-highlight)" opacity=".25"/><polygon points="50,0 85,36 92,56 50,116 8,56 15,36" fill="none" stroke="rgba(255,255,255,.2)" stroke-width=".8"/></svg><span class="gem-num">1</span></div><div class="level-label">Nivel 1</div></div>
+      <div class="level-wrap lvl-2"><div class="gem sz-xl"><svg width="100" height="116" viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg"><polygon points="50,0 85,36 50,48 15,36" fill="var(--gem-top)"/><polygon points="15,36 50,48 8,36" fill="var(--gem-highlight)"/><polygon points="15,36 50,48 50,116" fill="var(--gem-left)"/><polygon points="85,36 50,48 50,116" fill="var(--gem-right)"/><polygon points="15,36 50,116 8,56" fill="var(--gem-bl)"/><polygon points="85,36 50,116 92,56" fill="var(--gem-br)"/><polygon points="50,48 35,40 50,36 65,40" fill="var(--gem-center)" opacity=".6"/><polygon points="50,0 65,20 50,28 35,20" fill="var(--gem-highlight)" opacity=".5"/><polygon points="50,0 15,36 25,34" fill="var(--gem-highlight)" opacity=".3"/><polygon points="22,40 30,46 26,52" fill="var(--gem-highlight)" opacity=".25"/><polygon points="50,0 85,36 92,56 50,116 8,56 15,36" fill="none" stroke="rgba(255,255,255,.2)" stroke-width=".8"/></svg><span class="gem-num">2</span></div><div class="level-label">Nivel 2</div></div>
+      <div class="level-wrap lvl-3"><div class="gem sz-xl"><svg width="100" height="116" viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg"><polygon points="50,0 85,36 50,48 15,36" fill="var(--gem-top)"/><polygon points="15,36 50,48 8,36" fill="var(--gem-highlight)"/><polygon points="15,36 50,48 50,116" fill="var(--gem-left)"/><polygon points="85,36 50,48 50,116" fill="var(--gem-right)"/><polygon points="15,36 50,116 8,56" fill="var(--gem-bl)"/><polygon points="85,36 50,116 92,56" fill="var(--gem-br)"/><polygon points="50,48 35,40 50,36 65,40" fill="var(--gem-center)" opacity=".6"/><polygon points="50,0 65,20 50,28 35,20" fill="var(--gem-highlight)" opacity=".5"/><polygon points="50,0 15,36 25,34" fill="var(--gem-highlight)" opacity=".3"/><polygon points="22,40 30,46 26,52" fill="var(--gem-highlight)" opacity=".25"/><polygon points="50,0 85,36 92,56 50,116 8,56 15,36" fill="none" stroke="rgba(255,255,255,.15)" stroke-width=".8"/></svg><span class="gem-num">3</span></div><div class="level-label">Nivel 3</div></div>
+      <div class="level-wrap lvl-4"><div class="gem sz-xl"><svg width="100" height="116" viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg"><polygon points="50,0 85,36 50,48 15,36" fill="var(--gem-top)"/><polygon points="15,36 50,48 8,36" fill="var(--gem-highlight)"/><polygon points="15,36 50,48 50,116" fill="var(--gem-left)"/><polygon points="85,36 50,48 50,116" fill="var(--gem-right)"/><polygon points="15,36 50,116 8,56" fill="var(--gem-bl)"/><polygon points="85,36 50,116 92,56" fill="var(--gem-br)"/><polygon points="50,48 35,40 50,36 65,40" fill="var(--gem-center)" opacity=".6"/><polygon points="50,0 65,20 50,28 35,20" fill="var(--gem-highlight)" opacity=".5"/><polygon points="50,0 15,36 25,34" fill="var(--gem-highlight)" opacity=".3"/><polygon points="22,40 30,46 26,52" fill="var(--gem-highlight)" opacity=".25"/><polygon points="50,0 85,36 92,56 50,116 8,56 15,36" fill="none" stroke="rgba(255,255,255,.12)" stroke-width=".8"/></svg><span class="gem-num">4</span></div><div class="level-label">Nivel 4</div></div>
+      <div class="level-wrap lvl-5"><div class="gem sz-xl"><svg width="100" height="116" viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg"><polygon points="50,0 85,36 50,48 15,36" fill="var(--gem-top)"/><polygon points="15,36 50,48 8,36" fill="var(--gem-highlight)"/><polygon points="15,36 50,48 50,116" fill="var(--gem-left)"/><polygon points="85,36 50,48 50,116" fill="var(--gem-right)"/><polygon points="15,36 50,116 8,56" fill="var(--gem-bl)"/><polygon points="85,36 50,116 92,56" fill="var(--gem-br)"/><polygon points="50,48 35,40 50,36 65,40" fill="var(--gem-center)" opacity=".6"/><polygon points="50,0 65,20 50,28 35,20" fill="var(--gem-highlight)" opacity=".5"/><polygon points="50,0 15,36 25,34" fill="var(--gem-highlight)" opacity=".3"/><polygon points="22,40 30,46 26,52" fill="var(--gem-highlight)" opacity=".25"/><polygon points="50,0 85,36 92,56 50,116 8,56 15,36" fill="none" stroke="rgba(255,255,255,.1)" stroke-width=".8"/></svg><span class="gem-num">5</span></div><div class="level-label">Nivel 5</div></div>
+      <div class="level-wrap lvl-6"><div class="gem sz-xl"><svg width="100" height="116" viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg"><polygon points="50,0 85,36 50,48 15,36" fill="var(--gem-top)"/><polygon points="15,36 50,48 8,36" fill="var(--gem-highlight)"/><polygon points="15,36 50,48 50,116" fill="var(--gem-left)"/><polygon points="85,36 50,48 50,116" fill="var(--gem-right)"/><polygon points="15,36 50,116 8,56" fill="var(--gem-bl)"/><polygon points="85,36 50,116 92,56" fill="var(--gem-br)"/><polygon points="50,48 35,40 50,36 65,40" fill="var(--gem-center)" opacity=".6"/><polygon points="50,0 65,20 50,28 35,20" fill="var(--gem-highlight)" opacity=".5"/><polygon points="50,0 15,36 25,34" fill="var(--gem-highlight)" opacity=".3"/><polygon points="22,40 30,46 26,52" fill="var(--gem-highlight)" opacity=".2"/><polygon points="50,0 85,36 92,56 50,116 8,56 15,36" fill="none" stroke="rgba(255,255,255,.08)" stroke-width=".8"/></svg><span class="gem-num">6</span></div><div class="level-label">Nivel 6</div></div>
+      <div class="level-wrap lvl-7"><div class="gem sz-xl"><svg width="100" height="116" viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg"><polygon points="50,0 85,36 50,48 15,36" fill="var(--gem-top)"/><polygon points="15,36 50,48 8,36" fill="var(--gem-highlight)"/><polygon points="15,36 50,48 50,116" fill="var(--gem-left)"/><polygon points="85,36 50,48 50,116" fill="var(--gem-right)"/><polygon points="15,36 50,116 8,56" fill="var(--gem-bl)"/><polygon points="85,36 50,116 92,56" fill="var(--gem-br)"/><polygon points="50,48 35,40 50,36 65,40" fill="var(--gem-center)" opacity=".6"/><polygon points="50,0 65,20 50,28 35,20" fill="var(--gem-highlight)" opacity=".5"/><polygon points="50,0 15,36 25,34" fill="var(--gem-highlight)" opacity=".2"/><polygon points="22,40 30,46 26,52" fill="var(--gem-highlight)" opacity=".15"/><polygon points="50,0 85,36 92,56 50,116 8,56 15,36" fill="none" stroke="rgba(255,255,255,.06)" stroke-width=".8"/></svg><span class="gem-num">7</span></div><div class="level-label">Nivel 7</div></div>
+      <div class="level-wrap lvl-8"><div class="gem sz-xl"><svg width="100" height="116" viewBox="0 0 100 116" xmlns="http://www.w3.org/2000/svg"><polygon points="50,0 85,36 50,48 15,36" fill="var(--gem-top)"/><polygon points="15,36 50,48 8,36" fill="var(--gem-highlight)"/><polygon points="15,36 50,48 50,116" fill="var(--gem-left)"/><polygon points="85,36 50,48 50,116" fill="var(--gem-right)"/><polygon points="15,36 50,116 8,56" fill="var(--gem-bl)"/><polygon points="85,36 50,116 92,56" fill="var(--gem-br)"/><polygon points="50,48 35,40 50,36 65,40" fill="var(--gem-center)" opacity=".5"/><polygon points="50,0 65,20 50,28 35,20" fill="var(--gem-highlight)" opacity=".4"/><polygon points="50,0 15,36 25,34" fill="var(--gem-highlight)" opacity=".15"/><polygon points="22,40 30,46 26,52" fill="var(--gem-highlight)" opacity=".1"/><polygon points="50,0 85,36 92,56 50,116 8,56 15,36" fill="none" stroke="rgba(205,80,241,.15)" stroke-width="1"/></svg><span class="gem-num">8</span></div><div class="level-label">Nivel 8</div></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -6,6 +6,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { generateAuthUrl, publishLinkedInPost, refreshAccessToken, buildConnectionData, isTokenExpired, type LinkedInConnection } from '@/lib/linkedin';
 import { requireSelf, requireAdmin } from '@/lib/auth-guard';
 import { requireActiveModuleByRole } from '@/lib/billing/module-gate';
+import { awardPublicationPoints } from '@/app/actions/gamification';
 import crypto from 'crypto';
 
 type LinkedInAuthResult = {
@@ -210,6 +211,10 @@ export async function publishToLinkedIn(
           publishedAt: now,
           updatedAt: now,
         });
+
+      // Award gamification points for collaborator publication (fire-and-forget)
+      awardPublicationPoints(userId, postId)
+        .catch(err => console.error(`[Gamification] Failed to award points:`, err));
     }
 
     return {

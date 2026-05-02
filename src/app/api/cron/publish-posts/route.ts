@@ -10,6 +10,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { db as adminDb } from '@/lib/firebase-admin';
 import { publishLinkedInPost, isTokenExpired, refreshAccessToken, buildConnectionData, type LinkedInConnection } from '@/lib/linkedin';
+import { awardPublicationPoints } from '@/app/actions/gamification';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // 60 second timeout
@@ -106,6 +107,10 @@ async function processScheduledPosts(
         publishedAt: now,
         updatedAt: now,
       });
+
+      // Award gamification points for collaborator publication (fire-and-forget)
+      awardPublicationPoints(userId, postDoc.id)
+        .catch(err => console.error(`[Gamification] Failed to award points for post ${postDoc.id}:`, err));
 
       counters.published++;
     } catch (error) {

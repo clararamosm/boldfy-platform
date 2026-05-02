@@ -341,6 +341,118 @@ export async function notifyRewardRedeemed({
 }
 
 /**
+ * Notify admin(s) that a reward is running low on voucher codes.
+ * Triggered after a redemption when ≤2 codes remain.
+ */
+export async function notifyLowStock({
+  companyId,
+  rewardName,
+  remainingCodes,
+}: {
+  companyId: string;
+  rewardName: string;
+  remainingCodes: number;
+}) {
+  const admins = await adminDb
+    .collection('users')
+    .where('companyId', '==', companyId)
+    .where('role', '==', 'admin')
+    .get();
+
+  const baseUrl = getBaseUrl();
+
+  for (const adminDoc of admins.docs) {
+    const data = adminDoc.data();
+    const prefs = await getUserNotifPrefs(adminDoc.id);
+    if (!prefs.reward_redeemed) continue; // reuse same pref
+
+    const email = data.profile?.email;
+    if (!email) continue;
+
+    const adminName = data.profile?.name?.split(' ')[0] || 'Admin';
+    const codesWord = remainingCodes === 0 ? 'nenhum código' : `apenas ${remainingCodes} código(s)`;
+
+    await sendNotificationEmail(
+      email,
+      `⚠️ Recompensa "${rewardName}" com poucos códigos`,
+      `
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        Oi, ${adminName}! 👋
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+        A recompensa <strong>"${rewardName}"</strong> tem ${codesWord} disponível(is).
+      </p>
+      <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+        ${remainingCodes === 0
+          ? 'A recompensa foi <strong>desativada automaticamente</strong>. Adicione mais códigos para reativá-la.'
+          : 'Quando acabarem, ela ficará indisponível automaticamente. É hora de comprar mais gift cards e cadastrar os códigos na plataforma.'}
+      </p>
+      <p style="margin: 0;">
+        <a href="${baseUrl}/admin/recompensas"
+           style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+          → Gerenciar códigos
+        </a>
+      </p>`,
+    );
+  }
+}
+
+/**
+ * Notify collaborator with the voucher code they just redeemed.
+ */
+export async function notifyCodeRedeemed({
+  userId,
+  rewardName,
+  code,
+}: {
+  userId: string;
+  rewardName: string;
+  code: string;
+}) {
+  const prefs = await getUserNotifPrefs(userId);
+  if (!prefs.reward_redeemed) return;
+
+  const userDoc = await adminDb.collection('users').doc(userId).get();
+  const data = userDoc.data();
+  const email = data?.profile?.email;
+  if (!email) return;
+
+  const name = data?.profile?.name?.split(' ')[0] || 'Colaborador';
+  const baseUrl = getBaseUrl();
+
+  await sendNotificationEmail(
+    email,
+    `🎁 Seu código de resgate: ${rewardName}`,
+    `
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+      Oi, ${name}! 🎉
+    </p>
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+      Sua recompensa <strong>"${rewardName}"</strong> foi resgatada com sucesso!
+      Aqui está o seu código:
+    </p>
+    <div style="margin: 20px 0; padding: 16px 24px; background-color: #f3f0ff; border: 2px solid #9333ea; border-radius: 10px; text-align: center;">
+      <p style="margin: 0; font-size: 22px; font-weight: 700; font-family: 'Courier New', monospace; color: #1F2937; letter-spacing: 2px;">
+        ${code}
+      </p>
+    </div>
+    <p style="font-size: 14px; line-height: 1.7; margin: 0 0 16px; color: #6B7280;">
+      ⚠️ Guarde este código com carinho — ele é único e não aparecerá
+      novamente na plataforma. Você também pode acessá-lo nos seus resgates.
+    </p>
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+      Aproveite! 💜
+    </p>
+    <p style="margin: 0;">
+      <a href="${baseUrl}/colaborador/recompensas"
+         style="color: #9333ea; font-weight: 600; text-decoration: none; font-size: 15px;">
+        → Ver meus resgates
+      </a>
+    </p>`,
+  );
+}
+
+/**
  * Notify a TL that their post is ready for review.
  */
 export async function notifyPostReadyForReview({

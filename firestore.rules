@@ -21,7 +21,7 @@ service cloud.firestore {
 
     // Fields that only server actions can modify (never client)
     function isNotChangingProtectedFields() {
-      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'companyName', 'points', 'aiCredits']);
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'companyName', 'points', 'aiCredits', 'conquests', 'streak', 'level']);
     }
 
     // Prevent excessively large documents (max 20 fields at root level)
@@ -117,6 +117,12 @@ service cloud.firestore {
         allow read: if hasRole(request.auth.uid, 'master');
       }
 
+      // Congratulations — written by server action (Admin SDK), readable by target user
+      match /congratulations/{congratId} {
+        allow read: if request.auth.uid == userId;
+        allow write: if false;
+      }
+
       // Generated content from AI assistant
       match /generatedContent/{contentId} {
         allow read, delete: if request.auth.uid == userId;
@@ -205,6 +211,12 @@ service cloud.firestore {
                     && hasRole(request.auth.uid, 'thoughtleader')
                     && getCompanyId(request.auth.uid) == companyId
                     && subcollection in ['contentStrategy', 'brandManual'];
+
+        // BLOCK: Voucher codes are monetary values — only server actions (Admin SDK) can access
+        // This rule MUST come before the generic deep subcollection match below
+        match /codes/{codeId} {
+          allow read, write: if false;
+        }
 
         // Deep subcollections (e.g., sessions/{id}/trails/{id})
         match /{deepSub}/{deepDocId} {
