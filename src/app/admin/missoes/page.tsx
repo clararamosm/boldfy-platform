@@ -103,7 +103,7 @@ export default function AdminMissoesPage() {
                 <CardDescription>Missões permanentes, sempre disponíveis para os colaboradores.</CardDescription>
               </CardHeader>
               <CardContent>
-                <MissionTable missions={m.fixedMissions} isLoading={m.isLoading} status="ativa" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={8} />
+                <MissionTable missions={m.fixedMissions} isLoading={m.isLoading} status="ativa" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={8} submissionsByMission={m.submissionsByMission} />
               </CardContent>
             </Card>
 
@@ -124,7 +124,7 @@ export default function AdminMissoesPage() {
                       <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">Ativas</Badge>
                       <span className="text-xs">{m.activeTimedMissions.length} missão(ões)</span>
                     </h4>
-                    <MissionTable missions={m.activeTimedMissions} isLoading={m.isLoading} status="ativa" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={8} />
+                    <MissionTable missions={m.activeTimedMissions} isLoading={m.isLoading} status="ativa" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={8} submissionsByMission={m.submissionsByMission} />
                   </div>
                 )}
 
@@ -135,7 +135,7 @@ export default function AdminMissoesPage() {
                       <Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-100">Agendadas</Badge>
                       <span className="text-xs">{m.scheduledTimedMissions.length} missão(ões)</span>
                     </h4>
-                    <MissionTable missions={m.scheduledTimedMissions} isLoading={m.isLoading} status="agendada" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={7} />
+                    <MissionTable missions={m.scheduledTimedMissions} isLoading={m.isLoading} status="agendada" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={7} submissionsByMission={m.submissionsByMission} />
                   </div>
                 )}
 
@@ -156,7 +156,7 @@ export default function AdminMissoesPage() {
                 <CardDescription>Missões encerradas e seus resultados.</CardDescription>
               </CardHeader>
               <CardContent>
-                <MissionTable missions={m.pastMissions} isLoading={m.isLoading} status="encerrada" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={7} />
+                <MissionTable missions={m.pastMissions} isLoading={m.isLoading} status="encerrada" companyId={m.companyId} isSubmitting={m.isSubmitting} formRef={m.formRef} onEdit={m.handleAction} onDelete={m.handleDelete} onOpenReview={() => m.setReviewSheetOpen(true)} cols={7} submissionsByMission={m.submissionsByMission} />
               </CardContent>
             </Card>
           </TabsContent>

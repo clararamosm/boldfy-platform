@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, getDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { getAuthToken } from '@/lib/auth-client';
@@ -36,10 +36,19 @@ export type Submission = {
   missionName: string;
   userId: string;
   userName: string;
+  avatarUrl?: string;
   proofUrl: string;
   proofFileName: string;
   status: string;
   submittedAt: FirestoreDate;
+};
+
+// Lightweight user info for the avatar stack in mission table
+export type SubmissionUser = {
+  userId: string;
+  userName: string;
+  avatarUrl?: string;
+  status: string;
 };
 
 export type DerivedStatus = 'ativa' | 'agendada' | 'encerrada';
@@ -89,6 +98,9 @@ export function useAdminMissions() {
   const [isReviewing, setIsReviewing] = useState(false);
   const [feedbackMap, setFeedbackMap] = useState<Record<string, string>>({});
 
+  // Per-mission submission users (for avatar stack in table)
+  const [submissionsByMission, setSubmissionsByMission] = useState<Record<string, SubmissionUser[]>>({});
+
   const { toast } = useToast();
   const t = useT();
   const { locale } = useFormat();
@@ -106,8 +118,30 @@ export function useAdminMissions() {
       const pendingSubs: Submission[] = [];
       const missionMap = Object.fromEntries(missions.map(m => [m.id, m.name]));
 
+      // Collect ALL submissions per mission (approved + pending) for the avatar stack
+      const subsByMission: Record<string, { userId: string; userName: string; status: string }[]> = {};
+      // Track unique user IDs so we can batch-fetch their avatar URLs
+      const userIdSet = new Set<string>();
+
       submissionsSnapshot.docs.forEach(d => {
         const data = d.data();
+
+        // Build avatar stack data (approved or pending submissions)
+        if (data.status === 'approved' || data.status === 'pending') {
+          if (!subsByMission[data.missionId]) subsByMission[data.missionId] = [];
+          // Deduplicate: only keep latest per user per mission
+          const existing = subsByMission[data.missionId].find(s => s.userId === data.userId);
+          if (!existing) {
+            subsByMission[data.missionId].push({
+              userId: data.userId,
+              userName: data.userName,
+              status: data.status,
+            });
+            userIdSet.add(data.userId);
+          }
+        }
+
+        // Pending submissions for the review sheet
         if (data.status === 'pending') {
           pendingCounts[data.missionId] = (pendingCounts[data.missionId] || 0) + 1;
           pendingSubs.push({
@@ -124,8 +158,35 @@ export function useAdminMissions() {
         }
       });
 
+      // Batch-fetch avatar URLs for all users with submissions
+      const avatarMap: Record<string, string | undefined> = {};
+      const userIds = Array.from(userIdSet);
+      // Fetch in parallel batches of 10
+      for (let i = 0; i < userIds.length; i += 10) {
+        const batch = userIds.slice(i, i + 10);
+        const results = await Promise.all(
+          batch.map(uid => getDoc(doc(db, 'users', uid)).catch(() => null))
+        );
+        results.forEach((snap, idx) => {
+          if (snap?.exists()) {
+            const data = snap.data();
+            avatarMap[batch[idx]] = data.profile?.avatarUrl || data.photoURL || data.linkedinConnection?.picture || undefined;
+          }
+        });
+      }
+
+      // Build final submissionsByMission with avatar URLs
+      const finalSubsByMission: Record<string, SubmissionUser[]> = {};
+      for (const [missionId, users] of Object.entries(subsByMission)) {
+        finalSubsByMission[missionId] = users.map(u => ({
+          ...u,
+          avatarUrl: avatarMap[u.userId],
+        }));
+      }
+
       setAllMissions(missions.map(m => ({ ...m, pendingSubmissions: pendingCounts[m.id] || 0 })));
       setPendingSubmissions(pendingSubs);
+      setSubmissionsByMission(finalSubsByMission);
     } catch (error) {
       console.error('Error fetching missions:', error);
       toast({ variant: 'destructive', title: t.adminMissions.toastFetchError });
@@ -342,7 +403,7 @@ export function useAdminMissions() {
     // Review
     reviewSheetOpen, setReviewSheetOpen,
     pendingSubmissions, isReviewing, feedbackMap, setFeedbackMap,
-    handleReview,
+    handleReview, submissionsByMission,
 
     // CRUD
     formRef, handleAction, handleDelete,
