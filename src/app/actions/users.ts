@@ -12,6 +12,7 @@ import { getDefaultBillingBlock } from '@/lib/billing/types';
 import { resyncPlatformSeats } from '@/lib/billing/seat-management';
 import { appendActivityLog } from '@/lib/billing/activity-log';
 import { seedNativeRewards } from '@/app/actions/company-setup';
+import { generateInviteLink } from '@/lib/invite-tokens';
 
 // Mascara email para uso em activity log (compliance: nao expor email cru).
 // Ex: 'joao.silva@boldfy.com' => 'jo***@boldfy.com'
@@ -55,24 +56,10 @@ function extractOobCode(firebaseLink: string): string | null {
 }
 
 /**
- * Constroi a URL da nossa pagina de primeiro acesso/criacao de senha,
- * que roda na mesma origem que o /login — assim o navegador consegue
- * oferecer autofill da senha recem criada.
- *
- * Fallback: se nao conseguir extrair o oobCode (formato inesperado),
- * devolve o proprio link do Firebase.
- */
-function buildPrimeiroAcessoUrl(firebaseLink: string, email: string): string {
-  const oobCode = extractOobCode(firebaseLink);
-  if (!oobCode) return firebaseLink;
-  const base = getInviteBaseUrl();
-  const params = new URLSearchParams({ oobCode, email });
-  return `${base}/primeiro-acesso?${params.toString()}`;
-}
-
-/**
- * Mesma logica de buildPrimeiroAcessoUrl, mas pra /redefinir-senha
- * (fluxo de "esqueci minha senha" — usuario ja existente).
+ * Constroi a URL de /redefinir-senha a partir do link do Firebase.
+ * Usado apenas no fluxo de "esqueci minha senha" (usuario ja existente).
+ * O fluxo de convite (primeiro acesso) usa generateInviteLink() de
+ * invite-tokens.ts com token customizado de 72h.
  */
 function buildRedefinirSenhaUrl(firebaseLink: string, email: string): string {
   const oobCode = extractOobCode(firebaseLink);
@@ -561,9 +548,7 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
       { idempotencyKey: userRecord.uid },
     );
 
-    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const firebaseLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
-    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, adminEmail);
+    const resetLink = await generateInviteLink(adminEmail, userRecord.uid);
     sendInvitationEmail({
       to: adminEmail,
       name: adminName,
@@ -652,9 +637,7 @@ export async function inviteAdminToCompany(
       { idempotencyKey: userRecord.uid },
     );
 
-    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const firebaseLink = await adminAuth.generatePasswordResetLink(adminEmail, { url: loginUrl });
-    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, adminEmail);
+    const resetLink = await generateInviteLink(adminEmail, userRecord.uid);
     sendInvitationEmail({
       to: adminEmail,
       name: adminName,
@@ -775,9 +758,7 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
       console.error('[inviteCollaborator] resyncPlatformSeats falhou:', seatErr);
     }
 
-    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
-    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
+    const resetLink = await generateInviteLink(email, userRecord.uid);
     sendInvitationEmail({
       to: email,
       name: name,
@@ -901,9 +882,7 @@ export async function inviteStrategist(prevState: InviteStrategistState, formDat
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
-    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
+    const resetLink = await generateInviteLink(email, userRecord.uid);
     sendInvitationEmail({
       to: email,
       name,
@@ -1178,9 +1157,7 @@ export async function inviteThoughtLeader(prevState: InviteThoughtLeaderState, f
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
-    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
+    const resetLink = await generateInviteLink(email, userRecord.uid);
     sendInvitationEmail({
       to: email,
       name,
@@ -1313,9 +1290,7 @@ export async function invitePendingThoughtLeader(
     await oldUserRef.delete();
 
     // 6. Send invitation email
-    const loginUrl = (process.env.NEXT_PUBLIC_BASE_URL || 'https://app.boldfy.com.br') + '/login';
-    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
-    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
+    const resetLink = await generateInviteLink(email, realUID);
     sendInvitationEmail({
       to: email,
       name: placeholderData.name,
@@ -1533,10 +1508,8 @@ export async function resendInvite(
     };
     const roleLabel = roleLabels[companyLocale]?.[role] || roleLabels['pt-BR']?.[role] || role;
 
-    // Generate fresh password reset link and send email
-    const loginUrl = getInviteBaseUrl() + '/login';
-    const firebaseLink = await adminAuth.generatePasswordResetLink(email, { url: loginUrl });
-    const resetLink = buildPrimeiroAcessoUrl(firebaseLink, email);
+    // Generate fresh invite link (token customizado, 72h de validade)
+    const resetLink = await generateInviteLink(email, userId);
 
     await sendInvitationEmail({
       to: email,

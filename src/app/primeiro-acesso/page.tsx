@@ -1,19 +1,15 @@
 'use client';
 
 // src/app/primeiro-acesso/page.tsx
-// Pagina hospedada no nosso dominio (em vez do dominio default do Firebase)
-// pra primeiro acesso de qualquer role (admin, colaborador, tl, strategist).
+// Pagina hospedada no nosso dominio pra primeiro acesso de qualquer
+// role (admin, colaborador, tl, strategist).
 //
-// Por que existir: o link gerado por `generatePasswordResetLink` aponta
-// pro dominio do Firebase. Quando o usuario salva a senha la, o browser
-// guarda a credencial em `<authDomain>.firebaseapp.com`, NAO em
-// `app.boldfy.com.br` — entao o autofill nao funciona quando ele cai
-// no /login da gente.
+// Usa token customizado (armazenado no Firestore) com validade de
+// 72 horas — em vez do oobCode do Firebase que expira em 1 hora.
 //
-// Aqui a gente parseia o `oobCode` (do email) e usa client SDK pra
-// confirmar a nova senha — depois redireciona pro /login com
-// ?primeiroAcesso=1. Tudo no nosso dominio: browser salva a senha aqui
-// e o autofill funciona quando ele logar.
+// O token e validado e consumido via API routes server-side:
+//   POST /api/invite/verify  → valida token, retorna email
+//   POST /api/invite/confirm → consome token, seta senha via Admin SDK
 //
 // IMPORTANTE: nao fazemos auto-login aqui. O usuario PRECISA passar
 // pelo /login pra que o trigger `triggerAdminFirstLogin` (e similares)
@@ -21,11 +17,6 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  verifyPasswordResetCode,
-  confirmPasswordReset,
-} from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -47,7 +38,7 @@ function PrimeiroAcessoForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const oobCode = searchParams.get('oobCode');
+  const token = searchParams.get('token');
   const emailFromUrl = searchParams.get('email');
 
   const [verifying, setVerifying] = useState(true);
@@ -59,11 +50,11 @@ function PrimeiroAcessoForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Verifica oobCode no mount.
+  // Verifica token no mount via API server-side.
   useEffect(() => {
     let cancelled = false;
     async function run() {
-      if (!oobCode) {
+      if (!token) {
         if (!cancelled) {
           setVerifyError(t.auth.firstAccess.errors.missingCode);
           setVerifying(false);
@@ -71,22 +62,30 @@ function PrimeiroAcessoForm() {
         return;
       }
       try {
-        const email = await verifyPasswordResetCode(auth, oobCode);
-        if (!cancelled) {
-          setVerifiedEmail(email);
-          setVerifying(false);
-        }
-      } catch (err: unknown) {
+        const res = await fetch('/api/invite/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        const data = await res.json();
+
         if (cancelled) return;
-        const code =
-          err && typeof err === 'object' && 'code' in err
-            ? (err as { code: string }).code
-            : '';
-        if (code === 'auth/expired-action-code') {
-          setVerifyError(t.auth.firstAccess.errors.expiredCode);
-        } else {
-          setVerifyError(t.auth.firstAccess.errors.invalidCode);
+
+        if (!res.ok) {
+          if (data.error === 'token-expired') {
+            setVerifyError(t.auth.firstAccess.errors.expiredCode);
+          } else {
+            setVerifyError(t.auth.firstAccess.errors.invalidCode);
+          }
+          setVerifying(false);
+          return;
         }
+
+        setVerifiedEmail(data.email);
+        setVerifying(false);
+      } catch {
+        if (cancelled) return;
+        setVerifyError(t.auth.firstAccess.errors.invalidCode);
         setVerifying(false);
       }
     }
@@ -94,13 +93,13 @@ function PrimeiroAcessoForm() {
     return () => {
       cancelled = true;
     };
-  }, [oobCode, t.auth.firstAccess.errors]);
+  }, [token, t.auth.firstAccess.errors]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitError(null);
 
-    if (!oobCode || !verifiedEmail) {
+    if (!token || !verifiedEmail) {
       setSubmitError(t.auth.firstAccess.errors.invalidCode);
       return;
     }
@@ -115,23 +114,30 @@ function PrimeiroAcessoForm() {
 
     setSubmitting(true);
 
-    // Define a senha. NAO fazemos auto-login: usuario precisa passar pelo
-    // /login pra disparar o trigger de "primeiro login" (ex.: ativacao
-    // da empresa visivel pro master).
+    // Define a senha via API server-side. NAO fazemos auto-login:
+    // usuario precisa passar pelo /login pra disparar o trigger de
+    // "primeiro login" (ex.: ativacao da empresa visivel pro master).
     try {
-      await confirmPasswordReset(auth, oobCode, password);
-    } catch (err: unknown) {
-      const code =
-        err && typeof err === 'object' && 'code' in err
-          ? (err as { code: string }).code
-          : '';
-      if (code === 'auth/expired-action-code') {
-        setSubmitError(t.auth.firstAccess.errors.expiredCode);
-      } else if (code === 'auth/weak-password') {
-        setSubmitError(t.auth.firstAccess.errors.weakPassword);
-      } else {
-        setSubmitError(t.auth.firstAccess.errors.confirmFailed);
+      const res = await fetch('/api/invite/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error === 'token-expired') {
+          setSubmitError(t.auth.firstAccess.errors.expiredCode);
+        } else if (data.error === 'weak-password') {
+          setSubmitError(t.auth.firstAccess.errors.weakPassword);
+        } else {
+          setSubmitError(t.auth.firstAccess.errors.confirmFailed);
+        }
+        setSubmitting(false);
+        return;
       }
+    } catch {
+      setSubmitError(t.auth.firstAccess.errors.confirmFailed);
       setSubmitting(false);
       return;
     }
