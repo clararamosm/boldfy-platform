@@ -19,6 +19,7 @@ import { interpolate } from '@/lib/i18n';
 import type {
   Trilha, Modulo, ModuloModo, ProgressoTrilha, QuestaoDesafio, MissaoGatilho
 } from '@/types/trilhas';
+import { isWorkbookModule } from '@/types/trilhas';
 
 const DESAFIO_FAIXA_MIN = 0.6;
 const DESAFIO_FAIXA_BONUS = 0.8;
@@ -205,7 +206,11 @@ export function useTrailPlayer(trailId: string) {
     if (index === 0) return true;
     const prevModule = sortedModules[index - 1];
     if (!prevModule) return true;
-    return isModuleCompleted(prevModule.id);
+    if (isModuleCompleted(prevModule.id)) return true;
+    // Workbook modules don't block progression — user can navigate freely
+    // and conclude the workbook at their own pace
+    if (prevModule.tipo === 'faca_voce_mesmo' && isWorkbookModule(prevModule.conteudo?.instrucao)) return true;
+    return false;
   }, [sortedModules, isModuleCompleted, reviewMode]);
 
   // ─── Progress persistence ─────────────────────────────

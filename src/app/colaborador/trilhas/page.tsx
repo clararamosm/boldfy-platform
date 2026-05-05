@@ -13,14 +13,14 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Play, BookOpen, HelpCircle, Wrench, Target,
-  ChevronLeft, ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2
+  ChevronLeft, ChevronRight, Loader2, FolderOpen, Trophy, Clock, Star, CheckCircle2, BookOpenCheck
 } from 'lucide-react';
 import { CoinIcon } from '@/components/coin-icon';
 import { Header } from '@/components/dashboard/header';
 import { SuggestTrailDialog } from '@/components/suggest-trail-dialog';
 import { MeusWorkbooksDialog } from '@/components/trilhas/meus-workbooks-dialog';
 import { useT } from '@/lib/i18n/context';
-import type { Sessao, Trilha, ProgressoTrilha, ModuloModo } from '@/types/trilhas';
+import { FIRESTORE_PATHS, type Sessao, type Trilha, type ProgressoTrilha, type ModuloModo } from '@/types/trilhas';
 
 const MODO_ICONS: Record<ModuloModo, any> = {
   aula: Play, leitura: BookOpen, desafio: HelpCircle,
@@ -99,7 +99,7 @@ export default function ColaboradorTrilhasPage() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionsWithTrails, setSessionsWithTrails] = useState<SessionWithTrails[]>([]);
-  const [stats, setStats] = useState({ total: 0, emProgresso: 0, concluidas: 0, pontos: 0 });
+  const [stats, setStats] = useState({ total: 0, emProgresso: 0, concluidas: 0, pontos: 0, workbooks: 0 });
   const router = useRouter();
   const t = useT();
 
@@ -194,6 +194,15 @@ export default function ColaboradorTrilhasPage() {
       console.error('Erro ao carregar progresso:', err);
     }
 
+    // 4. Count workbooks (isolated)
+    let workbookCount = 0;
+    try {
+      const wbSnap = await getDocs(collection(db, FIRESTORE_PATHS.userWorkbooks(authUser.uid)));
+      workbookCount = wbSnap.size;
+    } catch (err) {
+      console.error('Erro ao carregar workbooks:', err);
+    }
+
     // Merge progress into trails
     let totalTrails = 0, inProgress = 0, completed = 0, totalPts = 0;
     const merged = allSessions.map(sw => ({
@@ -210,7 +219,7 @@ export default function ColaboradorTrilhasPage() {
     }));
 
     setSessionsWithTrails(merged);
-    setStats({ total: totalTrails, emProgresso: inProgress, concluidas: completed, pontos: totalPts });
+    setStats({ total: totalTrails, emProgresso: inProgress, concluidas: completed, pontos: totalPts, workbooks: workbookCount });
     setLoading(false);
   }, [companyId, authUser?.uid]);
 
@@ -229,7 +238,7 @@ export default function ColaboradorTrilhasPage() {
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         <Card><CardContent className="pt-6 text-center">
           <BookOpen className="w-6 h-6 mx-auto mb-2 text-purple-500" />
           <p className="text-2xl font-bold">{stats.total}</p>
@@ -246,11 +255,23 @@ export default function ColaboradorTrilhasPage() {
           <p className="text-xs text-muted-foreground">{t.colabTrails.completed}</p>
         </CardContent></Card>
         <Card><CardContent className="pt-6 text-center">
+          <BookOpenCheck className="w-6 h-6 mx-auto mb-2 text-purple-400" />
+          <p className="text-2xl font-bold">{stats.workbooks}</p>
+          <p className="text-xs text-muted-foreground">Workbooks</p>
+        </CardContent></Card>
+        <Card><CardContent className="pt-6 text-center">
           <CoinIcon className="w-6 h-6 mx-auto mb-2" />
           <p className="text-2xl font-bold">{stats.pontos}</p>
           <p className="text-xs text-muted-foreground">{t.colabTrails.pointsEarned}</p>
         </CardContent></Card>
       </div>
+
+      {/* Quick access: Meus Workbooks */}
+      {authUser?.uid && (
+        <div className="flex items-center gap-3">
+          <MeusWorkbooksDialog userId={authUser.uid} />
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-purple-500" /></div>
@@ -342,9 +363,8 @@ export default function ColaboradorTrilhasPage() {
         ))
       )}
 
-      {/* Actions: Workbooks + Suggest */}
-      <div className="flex items-center justify-center gap-3 pt-4 pb-2">
-        {authUser?.uid && <MeusWorkbooksDialog userId={authUser.uid} />}
+      {/* Suggest new trails */}
+      <div className="flex justify-center pt-4 pb-2">
         <SuggestTrailDialog pagina="Trilhas Colaborador" />
       </div>
       </main>
