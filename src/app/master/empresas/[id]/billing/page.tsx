@@ -46,7 +46,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, ArrowLeft, CheckCircle2, Users, Mic, Palette, CreditCard, Construction, Copy, Upload, ImageIcon, UserPlus, Mail, Send, Trash2, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowLeft, CheckCircle2, Users, Mic, Palette, CreditCard, Construction, Copy, Upload, ImageIcon, UserPlus, Mail, Send, Trash2, AlertCircle, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { useScrollSpy } from '@/hooks/use-scroll-spy';
@@ -62,7 +64,8 @@ import {
   type BillingChargeType,
 } from '@/app/actions/billing';
 import { saveCompanyIdentity, deleteCompanyAdmin } from '@/app/actions/master-company';
-import { inviteAdminToCompany, resendInvite } from '@/app/actions/users';
+import { inviteAdminToCompany, resendInvite, invitePendingThoughtLeader, deleteThoughtLeader } from '@/app/actions/users';
+import { inviteThoughtLeader } from '@/app/actions';
 import type { ActivityLogEntry } from '@/lib/billing/activity-log-types';
 import { formatBRL } from '@/lib/billing/format';
 import { ActivityLogRow } from '@/components/master/activity-log-row';
@@ -180,6 +183,28 @@ export default function MasterCompanyBillingPage() {
   const [isResendingInvite, setIsResendingInvite] = useState(false);
   const [isRemovingAdmin, setIsRemovingAdmin] = useState(false);
   const [confirmRemoveAdmin, setConfirmRemoveAdmin] = useState(false);
+
+  // TL management
+  interface TLInfo {
+    id: string;
+    name: string;
+    emailMasked: string;
+    emailRaw: string;
+    status: string;
+    isPending: boolean;
+    pendingSetup: boolean;
+  }
+  const [tlList, setTlList] = useState<TLInfo[]>([]);
+  const [isLoadingTLs, setIsLoadingTLs] = useState(false);
+  const [tlName, setTlName] = useState('');
+  const [isCreatingTL, setIsCreatingTL] = useState(false);
+  const [inviteTLId, setInviteTLId] = useState<string | null>(null);
+  const [inviteTLEmail, setInviteTLEmail] = useState('');
+  const [isSendingTLInvite, setIsSendingTLInvite] = useState(false);
+  const [confirmDeleteTLId, setConfirmDeleteTLId] = useState<string | null>(null);
+  const [isDeletingTL, setIsDeletingTL] = useState(false);
+  const [isResendingTLInviteId, setIsResendingTLInviteId] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (!companyId) return;
@@ -376,6 +401,122 @@ export default function MasterCompanyBillingPage() {
     loadAdminInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
+
+  // ── TL management ────────────────────────────────────────────────
+
+  async function loadTLList() {
+    if (!companyId) return;
+    setIsLoadingTLs(true);
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(
+        usersRef,
+        where('companyId', '==', companyId),
+        where('role', '==', 'thoughtleader'),
+      );
+      const snap = await getDocs(q);
+      const list: TLInfo[] = snap.docs.map((d) => {
+        const data = d.data() ?? {};
+        const emailRaw =
+          (data.profile?.email as string) || (data.email as string) || '';
+        return {
+          id: d.id,
+          name: (data.profile?.name as string) || (data.name as string) || '—',
+          emailMasked: emailRaw ? maskEmailLocal(emailRaw) : '—',
+          emailRaw,
+          status: (data.status as string) || '—',
+          isPending: data.status === 'Pendente',
+          pendingSetup: data.pendingSetup === true,
+        };
+      });
+      setTlList(list);
+    } catch (e) {
+      console.error('[tl] load erro:', e);
+    } finally {
+      setIsLoadingTLs(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!companyId) return;
+    loadTLList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+
+  async function handleCreateTL() {
+    if (!companyId || !token || !tlName.trim()) {
+      toast({ variant: 'destructive', title: 'Nome do TL obrigatorio.' });
+      return;
+    }
+    setIsCreatingTL(true);
+    try {
+      const fd = new FormData();
+      fd.set('idToken', token);
+      fd.set('companyId', companyId);
+      fd.set('name', tlName.trim());
+      fd.set('skipInvite', 'true');
+      const res = await inviteThoughtLeader({ error: undefined, success: undefined }, fd);
+      if (res.error) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({ title: 'Thought Leader criado.', description: 'Envie o convite quando quiser.' });
+      setTlName('');
+      await loadTLList();
+    } finally {
+      setIsCreatingTL(false);
+    }
+  }
+
+  async function handleSendTLInvite() {
+    if (!inviteTLId || !inviteTLEmail.trim() || !token) return;
+    setIsSendingTLInvite(true);
+    try {
+      const res = await invitePendingThoughtLeader(token, inviteTLId, inviteTLEmail.trim());
+      if (res.error) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({ title: 'Convite enviado.' });
+      setInviteTLId(null);
+      setInviteTLEmail('');
+      await loadTLList();
+    } finally {
+      setIsSendingTLInvite(false);
+    }
+  }
+
+  async function handleResendTLInvite(tlId: string) {
+    if (!token) return;
+    setIsResendingTLInviteId(tlId);
+    try {
+      const res = await resendInvite(token, tlId);
+      if (res.error) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({ title: 'Convite reenviado.' });
+    } finally {
+      setIsResendingTLInviteId(null);
+    }
+  }
+
+  async function handleDeleteTL() {
+    if (!confirmDeleteTLId || !token) return;
+    setIsDeletingTL(true);
+    try {
+      const res = await deleteThoughtLeader(token, confirmDeleteTLId);
+      if (res.error) {
+        toast({ variant: 'destructive', title: 'Erro', description: res.error });
+        return;
+      }
+      toast({ title: 'Thought Leader removido.' });
+      setConfirmDeleteTLId(null);
+      await loadTLList();
+    } finally {
+      setIsDeletingTL(false);
+    }
+  }
 
   async function handleSaveIdentity() {
     if (!companyId || !token) return;
@@ -1092,6 +1233,213 @@ export default function MasterCompanyBillingPage() {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Card: Gestao de Thought Leaders */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Thought Leaders</CardTitle>
+                <CardDescription>
+                  Crie perfis de TL e envie convites quando estiver pronto.
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="text-xs font-normal">
+                {tlList.length} cadastrado{tlList.length !== 1 ? 's' : ''}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Lista de TLs existentes */}
+            {isLoadingTLs ? (
+              <div className="flex items-center text-sm text-muted-foreground py-4">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Carregando Thought Leaders...
+              </div>
+            ) : tlList.length > 0 ? (
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="w-[60px]"><span className="sr-only">Acoes</span></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tlList.map((tl) => (
+                      <TableRow key={tl.id}>
+                        <TableCell className="font-medium">{tl.name}</TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-xs">
+                          {tl.emailMasked}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={tl.pendingSetup ? 'outline' : tl.isPending ? 'secondary' : 'default'}
+                            className="text-[11px]"
+                          >
+                            {tl.pendingSetup
+                              ? 'Sem convite'
+                              : tl.isPending
+                              ? 'Convite pendente'
+                              : tl.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {tl.pendingSetup && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setInviteTLId(tl.id);
+                                    setInviteTLEmail('');
+                                  }}
+                                >
+                                  <Mail className="mr-2 h-4 w-4" />
+                                  Enviar convite
+                                </DropdownMenuItem>
+                              )}
+                              {!tl.pendingSetup && tl.isPending && (
+                                <DropdownMenuItem
+                                  disabled={isResendingTLInviteId === tl.id}
+                                  onClick={() => handleResendTLInvite(tl.id)}
+                                >
+                                  <Send className="mr-2 h-4 w-4" />
+                                  {isResendingTLInviteId === tl.id ? 'Reenviando...' : 'Reenviar convite'}
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => setConfirmDeleteTLId(tl.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed p-4 text-center">
+                <Users className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Nenhum Thought Leader cadastrado nesta empresa.
+                </p>
+              </div>
+            )}
+
+            {/* Formulario inline: enviar convite pra TL pendingSetup */}
+            {inviteTLId && (
+              <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                <p className="text-sm font-medium">
+                  Enviar convite para{' '}
+                  <span className="text-primary">
+                    {tlList.find((t) => t.id === inviteTLId)?.name ?? 'TL'}
+                  </span>
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="email@empresa.com"
+                    value={inviteTLEmail}
+                    onChange={(e) => setInviteTLEmail(e.target.value)}
+                    disabled={isSendingTLInvite}
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSendTLInvite}
+                    disabled={isSendingTLInvite || !inviteTLEmail.trim()}
+                  >
+                    {isSendingTLInvite ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-3 w-3" />
+                    )}
+                    Enviar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setInviteTLId(null); setInviteTLEmail(''); }}
+                    disabled={isSendingTLInvite}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Confirmacao de exclusao */}
+            {confirmDeleteTLId && (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3">
+                <p className="text-sm">
+                  Excluir o Thought Leader{' '}
+                  <strong>{tlList.find((t) => t.id === confirmDeleteTLId)?.name}</strong>?
+                  Esta acao nao pode ser desfeita.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmDeleteTLId(null)}
+                    disabled={isDeletingTL}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDeleteTL}
+                    disabled={isDeletingTL}
+                  >
+                    {isDeletingTL && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                    Confirmar
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Adicionar novo TL (sempre visivel) */}
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-3">Adicionar Thought Leader</p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nome do Thought Leader"
+                  value={tlName}
+                  onChange={(e) => setTlName(e.target.value)}
+                  disabled={isCreatingTL}
+                  className="flex-1"
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateTL(); } }}
+                />
+                <Button
+                  onClick={handleCreateTL}
+                  disabled={isCreatingTL || !tlName.trim()}
+                >
+                  {isCreatingTL ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <UserPlus className="mr-2 h-4 w-4" />
+                  )}
+                  Criar sem convite
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Cria o perfil do TL sem enviar e-mail. Voce podera enviar o convite depois.
+              </p>
+            </div>
           </CardContent>
         </Card>
 
