@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Eye, Rocket, Loader2, SkipForward, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CheckCircle2, Eye, Rocket, Loader2, SkipForward, ChevronLeft, ChevronRight, BookOpenCheck } from 'lucide-react';
 import { useT } from '@/lib/i18n/context';
 import type { MappedModule } from './use-trail-player';
 
@@ -15,6 +15,7 @@ type Props = {
   videoCompleted: boolean;
   activeModuleIndex: number | null;
   totalModules: number;
+  isWorkbook?: boolean;
   onPrev: () => void;
   onNext: () => void;
   onCompleteModule: (moduleId: string, points: number) => void;
@@ -23,7 +24,7 @@ type Props = {
 
 export function TrailBottomBar({
   currentModule, moduleCompleted, quizSubmitted, saving,
-  videoCompleted, activeModuleIndex, totalModules,
+  videoCompleted, activeModuleIndex, totalModules, isWorkbook,
   onPrev, onNext, onCompleteModule, onUnlockMission,
 }: Props) {
   const tp = useT().trailPlayer;
@@ -51,10 +52,15 @@ export function TrailBottomBar({
                   <CheckCircle2 className="mr-2 h-4 w-4" /> {tp.readingCompleted}
                 </Button>
               )}
-              {currentModule.tipo === 'faca_voce_mesmo' && (
+              {currentModule.tipo === 'faca_voce_mesmo' && !isWorkbook && (
                 <Button onClick={() => onCompleteModule(currentModule.id, 0)}>
                   <Eye className="mr-2 h-4 w-4" /> {tp.viewed}
                 </Button>
+              )}
+              {currentModule.tipo === 'faca_voce_mesmo' && isWorkbook && (
+                <Badge variant="outline" className="text-purple-700 border-purple-300">
+                  <BookOpenCheck className="h-3 w-3 mr-1" /> Workbook
+                </Badge>
               )}
               {currentModule.tipo === 'missao_conteudo' && (
                 <Button onClick={onUnlockMission} disabled={saving}>

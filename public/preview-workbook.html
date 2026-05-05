@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preview — Antes vs Depois · Workbook Interativo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f3f0f7;
+    color: #1a1a1a;
+    padding: 32px 24px;
+  }
+
+  /* ─── HEADER ─── */
+  .preview-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .preview-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #5D1683;
+    margin-bottom: 8px;
+  }
+  .preview-header p {
+    font-size: 15px;
+    color: #6b6b6b;
+    max-width: 640px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  /* ─── GRID LADO A LADO ─── */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+    align-items: start;
+  }
+
+  /* ─── COLUNA ─── */
+  .compare-col {
+    background: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    border: 1px solid #e8e0f0;
+  }
+
+  /* ─── LABEL DA COLUNA ─── */
+  .col-label {
+    padding: 16px 24px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .col-label .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .label-antes {
+    background: #fef3cd;
+    color: #856404;
+    border-bottom: 2px solid #ffc107;
+  }
+  .label-antes .dot { background: #ffc107; }
+  .label-depois {
+    background: #d4edda;
+    color: #155724;
+    border-bottom: 2px solid #28a745;
+  }
+  .label-depois .dot { background: #28a745; }
+
+  /* ─── MOCK: BARRA DA PLATAFORMA ─── */
+  .platform-bar {
+    background: #fafafa;
+    border-bottom: 1px solid #eee;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .platform-bar .back-arrow {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: #f0e8f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #5D1683;
+  }
+  .platform-bar .trail-name {
+    font-size: 12px;
+    color: #999;
+  }
+  .platform-bar .trail-name strong {
+    color: #5D1683;
+  }
+
+  /* ─── CONTEUDO DO MODULO ─── */
+  .module-content {
+    padding: 28px 24px 32px;
+  }
+
+  /* ─── TITULO + BADGES ─── */
+  .module-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 6px;
+  }
+  .module-badges {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .badge-pratica {
+    background: #f0e8f5;
+    color: #7c3aed;
+  }
+  .badge-workbook {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  /* ─── PROSE (texto do antes) ─── */
+  .prose-content {
+    font-size: 15px;
+    line-height: 1.75;
+    color: #374151;
+  }
+  .prose-content h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-top: 32px;
+    margin-bottom: 16px;
+  }
+  .prose-content h2:first-child {
+    margin-top: 0;
+  }
+  .prose-content h3 {
+    font-size: 17px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-top: 24px;
+    margin-bottom: 12px;
+  }
+  .prose-content p {
+    margin-bottom: 20px;
+  }
+  .prose-content ul, .prose-content ol {
+    margin-bottom: 20px;
+    padding-left: 24px;
+  }
+  .prose-content li {
+    margin-bottom: 8px;
+  }
+  .prose-content hr {
+    border: none;
+    height: 0;
+    margin: 32px 0;
+  }
+  .prose-content blockquote {
+    border-left: 3px solid #7c3aed;
+    background: #f5f0ff;
+    padding: 12px 20px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 20px;
+    font-style: normal;
+  }
+  .prose-content mark {
+    background: #ede4f7;
+    color: inherit;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+  .prose-content strong {
+    font-weight: 600;
+    color: #1a1a1a;
+  }
+  .prose-content em {
+    font-style: italic;
+    color: #666;
+  }
+
+  /* ─── NO POINTS FOOTER ─── */
+  .no-points {
+    text-align: center;
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  /* ============================================ */
+  /* DEPOIS — WORKBOOK INTERATIVO */
+  /* ============================================ */
+
+  /* Secao do workbook */
+  .wb-section {
+    margin-bottom: 28px;
+  }
+  .wb-section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .wb-section-num {
+    font-size: 32px;
+    font-weight: 800;
+    color: #B55EE4;
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+  .wb-section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #5D1683;
+    line-height: 1.2;
+  }
+  .wb-section-time {
+    font-size: 11px;
+    font-weight: 600;
+    color: #9D85B3;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+  .wb-instrucao {
+    font-size: 14px;
+    color: #5F5E5A;
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+  .wb-instrucao strong {
+    color: #5D1683;
+    font-weight: 600;
+  }
+
+  /* Input fields interativos */
+  .wb-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .wb-field-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #5D1683;
+    margin-bottom: 4px;
+  }
+  .wb-field-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .wb-field-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: #B55EE4;
+    letter-spacing: 1px;
+    min-width: 22px;
+  }
+  .wb-input {
+    flex: 1;
+    height: 42px;
+    border: 1.5px solid #e0d4ec;
+    border-radius: 8px;
+    padding: 0 14px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    color: #333;
+    background: #fdfbff;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  .wb-input:focus {
+    border-color: #B55EE4;
+    box-shadow: 0 0 0 3px rgba(181, 94, 228, 0.12);
+  }
+  .wb-input::placeholder {
+    color: #c4b5d3;
+    font-style: italic;
+  }
+  .wb-input.filled {
+    background: #f7f0ff;
+    border-color: #c9a8e8;
+    color: #5D1683;
+  }
+
+  /* Textarea */
+  .wb-textarea {
+    width: 100%;
+    min-height: 100px;
+    border: 1.5px dashed #d0bfe4;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    color: #333;
+    background: #fdfbff;
+    resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+    line-height: 1.6;
+  }
+  .wb-textarea:focus {
+    border-color: #B55EE4;
+    box-shadow: 0 0 0 3px rgba(181, 94, 228, 0.12);
+    border-style: solid;
+  }
+  .wb-textarea::placeholder {
+    color: #c4b5d3;
+    font-style: italic;
+  }
+  .wb-textarea.filled {
+    background: #f7f0ff;
+    border-color: #c9a8e8;
+    border-style: solid;
+    color: #5D1683;
+  }
+
+  /* Dica/callout */
+  .wb-dica {
+    background: #f7eefc;
+    border-left: 3px solid #B55EE4;
+    padding: 12px 18px;
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+    color: #5D1683;
+    font-style: italic;
+    margin-bottom: 20px;
+  }
+  .wb-dica strong {
+    font-style: normal;
+    font-weight: 700;
+  }
+
+  /* Template de frase com blanks */
+  .wb-frase-card {
+    background: #5D1683;
+    border-radius: 16px;
+    padding: 32px 28px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .wb-frase-card::before {
+    content: '\201C';
+    position: absolute;
+    top: -20px;
+    left: 12px;
+    font-size: 120px;
+    font-weight: 900;
+    color: #B55EE4;
+    opacity: 0.35;
+    line-height: 1;
+  }
+  .wb-frase-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    color: #F5B423;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .wb-frase-text {
+    font-size: 17px;
+    font-weight: 600;
+    color: #ffffff;
+    line-height: 1.8;
+    position: relative;
+  }
+  .wb-frase-blank {
+    display: inline-block;
+    background: rgba(245, 180, 35, 0.12);
+    border: 1.5px dashed #F5B423;
+    border-radius: 6px;
+    padding: 2px 12px;
+    color: #F5B423;
+    font-size: 15px;
+    font-weight: 600;
+    margin: 2px 4px;
+    min-width: 180px;
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* Select/dropdown */
+  .wb-select {
+    height: 42px;
+    border: 1.5px solid #e0d4ec;
+    border-radius: 8px;
+    padding: 0 12px;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    color: #333;
+    background: #fdfbff;
+    cursor: pointer;
+    outline: none;
+    min-width: 200px;
+    transition: border-color 0.2s;
+  }
+  .wb-select:focus {
+    border-color: #B55EE4;
+    box-shadow: 0 0 0 3px rgba(181, 94, 228, 0.12);
+  }
+
+  /* Tabela 3 colunas */
+  .wb-3col-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .wb-3col-card {
+    background: #fdfbff;
+    border: 1px solid #e0d4ec;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .wb-3col-card-num {
+    font-size: 10px;
+    font-weight: 700;
+    color: #B55EE4;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .wb-3col-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #5D1683;
+    margin-bottom: 4px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #B55EE4;
+  }
+  .wb-3col-card-hint {
+    font-size: 11px;
+    color: #9D85B3;
+    font-style: italic;
+    margin-bottom: 10px;
+  }
+
+  /* Legenda de cores */
+  .wb-legenda {
+    background: #f7eefc;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .wb-legenda-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    color: #5D1683;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .wb-legenda-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+  }
+  .wb-legenda-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .wb-legenda-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .wb-legenda-dot.verde { background: #10B981; }
+  .wb-legenda-dot.amarelo { background: #F5B423; }
+  .wb-legenda-dot.vermelho { background: #EE5A52; }
+  .wb-legenda-name {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .wb-legenda-name.verde { color: #047857; }
+  .wb-legenda-name.amarelo { color: #92611C; }
+  .wb-legenda-name.vermelho { color: #B91C1C; }
+  .wb-legenda-desc {
+    font-size: 11px;
+    color: #5F5E5A;
+    line-height: 1.4;
+  }
+
+  /* Color select row */
+  .wb-color-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  /* Divider */
+  .wb-divider {
+    border: none;
+    height: 1px;
+    background: #e8ddf0;
+    margin: 28px 0;
+  }
+
+  /* Save bar */
+  .wb-save-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: #f7f0ff;
+    border-radius: 12px;
+    margin-top: 24px;
+  }
+  .wb-save-info {
+    font-size: 12px;
+    color: #9D85B3;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .wb-save-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10B981;
+  }
+  .wb-save-btn {
+    padding: 8px 24px;
+    background: #5D1683;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background 0.2s;
+  }
+  .wb-save-btn:hover {
+    background: #4a1169;
+  }
+
+  /* ─── ANNOTATION ─── */
+  .annotation {
+    text-align: center;
+    margin: 12px 0 32px;
+    font-size: 13px;
+    color: #9D85B3;
+    font-style: italic;
+  }
+  .annotation strong {
+    color: #5D1683;
+    font-style: normal;
+  }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 1100px) {
+    .compare-grid {
+      grid-template-columns: 1fr;
+      max-width: 700px;
+    }
+    .wb-3col-grid {
+      grid-template-columns: 1fr;
+    }
+    .wb-legenda-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="preview-header">
+  <h1>Workbook Interativo — Preview</h1>
+  <p>Comparativo de como o mesmo conteudo do <strong>Faca Voce Mesmo</strong> aparece hoje (texto corrido) vs. como ficaria com campos interativos na plataforma.</p>
+</div>
+
+<p class="annotation">Conteudo: <strong>Discovery de Marca Pessoal — Exercicio do Espelho</strong></p>
+
+<div class="compare-grid">
+
+  <!-- ============================================ -->
+  <!-- COLUNA ANTES -->
+  <!-- ============================================ -->
+  <div class="compare-col">
+    <div class="col-label label-antes">
+      <span class="dot"></span>
+      Antes — Como esta hoje
+    </div>
+
+    <div class="platform-bar">
+      <div class="back-arrow">&larr;</div>
+      <div class="trail-name"><strong>Discovery de Marca Pessoal</strong> &middot; 3/5</div>
+    </div>
+
+    <div class="module-content">
+      <h2 class="module-title">O exercicio do espelho</h2>
+      <div class="module-badges">
+        <span class="badge badge-pratica">&#9881; Pratica</span>
+      </div>
+
+      <div class="prose-content">
+        <h2>Espelho e mapa: 3 partes, ~25 minutos</h2>
+        <p>Esse exercicio e o coracao da trilha. Tem tres partes: as duas primeiras voce faz agora, sem filtro. A terceira fica na sua agenda da semana. Nao pula, nao corre. Quanto mais cru, melhor.</p>
+        <hr>
+
+        <h3>Parte 1 — Como voce se ve (10 min)</h3>
+        <p>Pega uma folha e responde <strong>sem filtro</strong>. Nao tenta soar bonito.</p>
+        <p>5 adjetivos que descrevem como voce e no trabalho hoje (nao como queria ser).</p>
+        <p>2 ou 3 temas profissionais que as pessoas associam a voce.</p>
+        <p>Em uma frase, qual valor voce acredita que entrega no seu trabalho? (Nao como cargo: como contribuicao real.)</p>
+        <hr>
+
+        <h3>Parte 2 — Como quer ser visto (5 min)</h3>
+        <p>Daqui a <strong>2 anos</strong>, se desse tudo certo, como voce gostaria que falassem de voce em uma conversa de cafe onde voce nao ta presente?</p>
+        <p>3 adjetivos que voce quer que aparecam.</p>
+        <p>1 ou 2 temas que quer ser referencia.</p>
+        <p>1 palavra que resume a sensacao que quer deixar.</p>
+        <blockquote><strong>Importante:</strong> nao invente uma versao fantasiosa. Escolha um lugar onde poderia chegar a partir de quem ja e, com esforco real.</blockquote>
+        <hr>
+
+        <h3>Parte 3 — O retrato externo (ao longo da semana)</h3>
+        <p>Mande essa mensagem pra 3 pessoas diferentes que conhecem seu trabalho:</p>
+        <blockquote>"Oi! To fazendo um exercicio sobre como minha marca profissional aparece pros outros. Posso te pedir 3 coisas rapidas?"</blockquote>
+        <hr>
+
+        <h3>Fechando o gap</h3>
+        <p>Coloca os tres lados na mesa lado a lado. Ai voce marca o que conversa, o que ta em descompasso, e o que apareceu inesperado.</p>
+        <p>Complete a frase:</p>
+        <p><mark>"Hoje, profissionalmente, eu apareco como ___. Quero ser visto tambem como ___. E o que mais me surpreendeu foi ___."</mark></p>
+      </div>
+
+      <div class="no-points">Este modulo nao pontua</div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- COLUNA DEPOIS -->
+  <!-- ============================================ -->
+  <div class="compare-col">
+    <div class="col-label label-depois">
+      <span class="dot"></span>
+      Depois — Com workbook interativo
+    </div>
+
+    <div class="platform-bar">
+      <div class="back-arrow">&larr;</div>
+      <div class="trail-name"><strong>Discovery de Marca Pessoal</strong> &middot; 3/5</div>
+    </div>
+
+    <div class="module-content">
+      <h2 class="module-title">O exercicio do espelho</h2>
+      <div class="module-badges">
+        <span class="badge badge-pratica">&#9881; Pratica</span>
+        <span class="badge badge-workbook">&#128221; Workbook</span>
+      </div>
+
+      <!-- PARTE 1 -->
+      <div class="wb-section">
+        <div class="wb-section-header">
+          <span class="wb-section-num">01</span>
+          <span class="wb-section-title">O espelho — como voce se ve</span>
+          <span class="wb-section-time">10 min</span>
+        </div>
+        <p class="wb-instrucao">Responda <strong>sem filtro</strong>. Nao tenta soar bonito. O que sair cru e o material mais valioso.</p>
+
+        <div class="wb-field-label">5 adjetivos que descrevem como voce e no trabalho hoje:</div>
+        <div class="wb-field-group">
+          <div class="wb-field-row">
+            <span class="wb-field-num">01</span>
+            <input type="text" class="wb-input filled" value="Direto" />
+          </div>
+          <div class="wb-field-row">
+            <span class="wb-field-num">02</span>
+            <input type="text" class="wb-input filled" value="Estrategico" />
+          </div>
+          <div class="wb-field-row">
+            <span class="wb-field-num">03</span>
+            <input type="text" class="wb-input" placeholder="Adjetivo 3..." />
+          </div>
+          <div class="wb-field-row">
+            <span class="wb-field-num">04</span>
+            <input type="text" class="wb-input" placeholder="Adjetivo 4..." />
+          </div>
+          <div class="wb-field-row">
+            <span class="wb-field-num">05</span>
+            <input type="text" class="wb-input" placeholder="Adjetivo 5..." />
+          </div>
+        </div>
+
+        <div class="wb-field-label">2 ou 3 temas profissionais que as pessoas associam a voce:</div>
+        <div class="wb-field-group">
+          <div class="wb-field-row">
+            <span class="wb-field-num">01</span>
+            <input type="text" class="wb-input filled" value="Posicionamento de marca" />
+          </div>
+          <div class="wb-field-row">
+            <span class="wb-field-num">02</span>
+            <input type="text" class="wb-input" placeholder="Tema 2..." />
+          </div>
+          <div class="wb-field-row">
+            <span class="wb-field-num">03</span>
+            <input type="text" class="wb-input" placeholder="Tema 3 (opcional)..." />
+          </div>
+        </div>
+
+        <div class="wb-field-label">Em uma frase, qual valor voce acredita que entrega?</div>
+        <textarea class="wb-textarea" placeholder="Escreva sem filtrar. Nao como cargo: como contribuicao real..."></textarea>
+      </div>
+
+      <hr class="wb-divider">
+
+      <!-- PARTE 2 -->
+      <div class="wb-section">
+        <div class="wb-section-header">
+          <span class="wb-section-num">02</span>
+          <span class="wb-section-title">A aspiracao — como quer ser visto</span>
+          <span class="wb-section-time">5 min</span>
+        </div>
+        <p class="wb-instrucao">Daqui a <strong>2 anos</strong>, se desse tudo certo, como voce gostaria que falassem de voce?</p>
+
+        <div class="wb-field-label">3 adjetivos que voce quer que aparecam:</div>
+        <div class="wb-field-group">
+          <div class="wb-field-row">
+            <span class="wb-field-num">01</span>
+            <input type="text" class="wb-input" placeholder="Adjetivo 1..." />
+          </div>
+          <div class="wb-field-row">
+            <span class="wb-field-num">02</span>
+            <input type="text" class="wb-input" placeholder="Adjetivo 2..." />
+          </div>
+          <div class="wb-field-row">
+            <span class="wb-field-num">03</span>
+            <input type="text" class="wb-input" placeholder="Adjetivo 3..." />
+          </div>
+        </div>
+
+        <div class="wb-field-label">1 ou 2 temas que quer ser referencia:</div>
+        <div class="wb-field-group">
+          <div class="wb-field-row">
+            <input type="text" class="wb-input" placeholder="Tema 1..." />
+          </div>
+          <div class="wb-field-row">
+            <input type="text" class="wb-input" placeholder="Tema 2 (opcional)..." />
+          </div>
+        </div>
+
+        <div class="wb-field-label">1 palavra que resume a sensacao que quer deixar:</div>
+        <div class="wb-field-group">
+          <div class="wb-field-row">
+            <input type="text" class="wb-input" placeholder="A palavra..." />
+          </div>
+        </div>
+
+        <div class="wb-dica"><strong>Importante:</strong> nao invente uma versao fantasiosa. Escolha um lugar onde poderia chegar a partir de quem ja e.</div>
+      </div>
+
+      <hr class="wb-divider">
+
+      <!-- PARTE 3 — Fechando o gap -->
+      <div class="wb-section">
+        <div class="wb-section-header">
+          <span class="wb-section-num">03</span>
+          <span class="wb-section-title">Convergencia, gap e surpresa</span>
+          <span class="wb-section-time">10 min</span>
+        </div>
+        <p class="wb-instrucao">Coloca os tres lados na mesa lado a lado. Transcreve o que juntou e marca com as cores.</p>
+
+        <div class="wb-3col-grid">
+          <div class="wb-3col-card">
+            <div class="wb-3col-card-num">Coluna 01</div>
+            <div class="wb-3col-card-title">Como me vejo</div>
+            <div class="wb-3col-card-hint">5 adjetivos + temas + frase</div>
+            <textarea class="wb-textarea" placeholder="Copie suas respostas da Parte 1..." style="min-height: 120px; font-size: 13px;"></textarea>
+          </div>
+          <div class="wb-3col-card">
+            <div class="wb-3col-card-num">Coluna 02</div>
+            <div class="wb-3col-card-title">Como quero ser visto</div>
+            <div class="wb-3col-card-hint">3 adjetivos + temas + sensacao</div>
+            <textarea class="wb-textarea" placeholder="Copie suas respostas da Parte 2..." style="min-height: 120px; font-size: 13px;"></textarea>
+          </div>
+          <div class="wb-3col-card">
+            <div class="wb-3col-card-num">Coluna 03</div>
+            <div class="wb-3col-card-title">Como me veem</div>
+            <div class="wb-3col-card-hint">Respostas das 3 pessoas</div>
+            <textarea class="wb-textarea" placeholder="As palavras que apareceram..." style="min-height: 120px; font-size: 13px;"></textarea>
+          </div>
+        </div>
+
+        <p class="wb-instrucao">Agora marque cada palavra com uma cor. Use os dropdowns abaixo:</p>
+
+        <div class="wb-legenda">
+          <div class="wb-legenda-titulo">As tres cores</div>
+          <div class="wb-legenda-grid">
+            <div class="wb-legenda-item">
+              <span class="wb-legenda-dot verde"></span>
+              <div>
+                <div class="wb-legenda-name verde">Verde — Convergencia</div>
+                <div class="wb-legenda-desc">Aparece em 2+ colunas. Marca consolidada.</div>
+              </div>
+            </div>
+            <div class="wb-legenda-item">
+              <span class="wb-legenda-dot amarelo"></span>
+              <div>
+                <div class="wb-legenda-name amarelo">Amarelo — Gap</div>
+                <div class="wb-legenda-desc">So em 1 coluna. Direcao de trabalho.</div>
+              </div>
+            </div>
+            <div class="wb-legenda-item">
+              <span class="wb-legenda-dot vermelho"></span>
+              <div>
+                <div class="wb-legenda-name vermelho">Vermelho — Surpresa</div>
+                <div class="wb-legenda-desc">Inesperado. Costuma ser o ouro.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wb-field-label">Classifique suas palavras-chave:</div>
+        <div class="wb-field-group">
+          <div class="wb-color-row">
+            <input type="text" class="wb-input filled" value="Estrategico" style="max-width: 200px;" />
+            <select class="wb-select">
+              <option value="">Escolha a cor...</option>
+              <option value="verde" selected>&#9679; Verde — Convergencia</option>
+              <option value="amarelo">&#9679; Amarelo — Gap</option>
+              <option value="vermelho">&#9679; Vermelho — Surpresa</option>
+            </select>
+          </div>
+          <div class="wb-color-row">
+            <input type="text" class="wb-input filled" value="Direto" style="max-width: 200px;" />
+            <select class="wb-select">
+              <option value="">Escolha a cor...</option>
+              <option value="verde" selected>&#9679; Verde — Convergencia</option>
+              <option value="amarelo">&#9679; Amarelo — Gap</option>
+              <option value="vermelho">&#9679; Vermelho — Surpresa</option>
+            </select>
+          </div>
+          <div class="wb-color-row">
+            <input type="text" class="wb-input" placeholder="Palavra-chave..." style="max-width: 200px;" />
+            <select class="wb-select">
+              <option value="">Escolha a cor...</option>
+              <option value="verde">&#9679; Verde — Convergencia</option>
+              <option value="amarelo">&#9679; Amarelo — Gap</option>
+              <option value="vermelho">&#9679; Vermelho — Surpresa</option>
+            </select>
+          </div>
+          <div class="wb-color-row">
+            <input type="text" class="wb-input" placeholder="Palavra-chave..." style="max-width: 200px;" />
+            <select class="wb-select">
+              <option value="">Escolha a cor...</option>
+              <option value="verde">&#9679; Verde — Convergencia</option>
+              <option value="amarelo">&#9679; Amarelo — Gap</option>
+              <option value="vermelho">&#9679; Vermelho — Surpresa</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <hr class="wb-divider">
+
+      <!-- FRASE DE PARTIDA -->
+      <div class="wb-section">
+        <div class="wb-section-header">
+          <span class="wb-section-num">04</span>
+          <span class="wb-section-title">Sua frase de partida</span>
+          <span class="wb-section-time">5 min</span>
+        </div>
+        <p class="wb-instrucao">Olhando as tres colunas que voce marcou, complete o modelo abaixo. Essa frase nao e sua marca pronta — e o ponto zero do mapa.</p>
+
+        <div class="wb-frase-card">
+          <div class="wb-frase-eyebrow">Modelo &middot; preencha os 3 espacos</div>
+          <div class="wb-frase-text">
+            Hoje, profissionalmente, eu apareco como
+            <span class="wb-frase-blank">convergencia verde</span>.
+            <br><br>
+            Quero ser visto tambem como
+            <span class="wb-frase-blank">aspiracao que ainda e gap</span>.
+            <br><br>
+            E o que mais me surpreendeu foi
+            <span class="wb-frase-blank">resposta vermelha</span>.
+          </div>
+        </div>
+
+        <div class="wb-field-label">Sua frase de partida (com suas palavras):</div>
+        <textarea class="wb-textarea filled" style="min-height: 120px;">Hoje, profissionalmente, eu apareco como alguem estrategico e direto. Quero ser visto tambem como referencia em posicionamento. E o que mais me surpreendeu foi que me veem como criativo.</textarea>
+
+        <div class="wb-dica" style="margin-top: 16px;">
+          <strong>Lembrete:</strong> Daqui a 3 meses essa frase vai estar diferente. Ta tudo bem. Ela nao e tatuagem: e GPS. Guarde — voce vai voltar nela nas proximas trilhas.
+        </div>
+      </div>
+
+      <!-- SAVE BAR -->
+      <div class="wb-save-bar">
+        <div class="wb-save-info">
+          <span class="wb-save-dot"></span>
+          Salvo automaticamente &middot; 4 de 12 campos preenchidos
+        </div>
+        <button class="wb-save-btn">Concluir Workbook</button>
+      </div>
+
+      <div class="no-points">Este modulo nao pontua</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

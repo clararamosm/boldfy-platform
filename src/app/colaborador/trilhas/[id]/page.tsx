@@ -13,6 +13,7 @@ import { ModuleRenderer } from '@/components/trilhas/player/module-renderer';
 import { TrailBottomBar } from '@/components/trilhas/player/trail-bottom-bar';
 import { auth } from '@/lib/firebase';
 import { completeOnboardingItem } from '@/hooks/use-onboarding';
+import { isWorkbookModule } from '@/types/trilhas';
 
 export default function TrilhaFullscreenPage() {
   const { id } = useParams();
@@ -128,6 +129,10 @@ export default function TrilhaFullscreenPage() {
               onConfirmAnswer={player.handleConfirmAnswer}
               onNextQuestion={player.handleNextQuestion}
               onSubmitDesafio={player.handleSubmitDesafio}
+              trailId={id as string}
+              trailTitle={player.trail?.titulo || ''}
+              userId={player.user?.uid || ''}
+              onCompleteModule={player.completeModule}
             />
           </div>
 
@@ -139,6 +144,7 @@ export default function TrilhaFullscreenPage() {
             videoCompleted={player.videoCompleted}
             activeModuleIndex={player.activeModuleIndex}
             totalModules={player.totalModules}
+            isWorkbook={player.currentModule?.tipo === 'faca_voce_mesmo' && isWorkbookModule(player.currentModule?.conteudo?.instrucao)}
             onPrev={player.goPrev}
             onNext={player.goNext}
             onCompleteModule={player.completeModule}

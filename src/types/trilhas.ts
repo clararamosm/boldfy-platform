@@ -151,6 +151,24 @@ export interface FiltrosDashboardTrilhas {
   ordem: 'asc' | 'desc';
 }
 
+// --- Workbook Responses (respostas de exercicios interativos) ---
+export interface WorkbookResponse {
+  trailId: string;
+  moduleId: string;
+  trailTitle: string;
+  moduleTitle: string;
+  respostas: Record<string, string | string[]>; // id do campo → valor
+  concluido: boolean;
+  atualizadoEm: Timestamp;
+  criadoEm: Timestamp;
+}
+
+// --- Helper: detectar se modulo e workbook (contem tags interativas) ---
+export function isWorkbookModule(instrucaoCard?: string): boolean {
+  if (!instrucaoCard) return false;
+  return /<input-(field|area|list|select)\s/i.test(instrucaoCard);
+}
+
 // --- Helper: labels para modos ---
 export const MODO_LABELS: Record<ModuloModo, string> = {
   aula: 'Aula (Video)',
@@ -199,4 +217,9 @@ export const FIRESTORE_PATHS = {
 
   // Progresso do colaborador
   userTrailProgress: (userId: string) => `users/${userId}/trailProgress`,
+
+  // Workbook responses
+  userWorkbooks: (userId: string) => `users/${userId}/workbookResponses`,
+  userWorkbook: (userId: string, trailId: string, moduleId: string) =>
+    `users/${userId}/workbookResponses/${trailId}_${moduleId}`,
 };

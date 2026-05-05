@@ -18,6 +18,7 @@ import {
 import { CoinIcon } from '@/components/coin-icon';
 import { Header } from '@/components/dashboard/header';
 import { SuggestTrailDialog } from '@/components/suggest-trail-dialog';
+import { MeusWorkbooksDialog } from '@/components/trilhas/meus-workbooks-dialog';
 import { useT } from '@/lib/i18n/context';
 import type { Sessao, Trilha, ProgressoTrilha, ModuloModo } from '@/types/trilhas';
 
@@ -341,8 +342,9 @@ export default function ColaboradorTrilhasPage() {
         ))
       )}
 
-      {/* Suggest new trails */}
-      <div className="flex justify-center pt-4 pb-2">
+      {/* Actions: Workbooks + Suggest */}
+      <div className="flex items-center justify-center gap-3 pt-4 pb-2">
+        {authUser?.uid && <MeusWorkbooksDialog userId={authUser.uid} />}
         <SuggestTrailDialog pagina="Trilhas Colaborador" />
       </div>
       </main>

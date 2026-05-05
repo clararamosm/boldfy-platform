@@ -123,6 +123,21 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Workbook responses (interactive exercise answers)
+      match /workbookResponses/{docId} {
+        allow read, write: if request.auth.uid == userId;
+
+        // Admin can read workbook responses of users in their company
+        allow read: if hasRole(request.auth.uid, 'admin')
+                    && getCompanyId(request.auth.uid) == getCompanyId(userId);
+
+        // Strategist can read workbook responses of users in assigned companies
+        allow read: if isStrategistForCompany(request.auth.uid, getCompanyId(userId));
+
+        // Master can read any workbook responses
+        allow read: if hasRole(request.auth.uid, 'master');
+      }
+
       // Generated content from AI assistant
       match /generatedContent/{contentId} {
         allow read, delete: if request.auth.uid == userId;
