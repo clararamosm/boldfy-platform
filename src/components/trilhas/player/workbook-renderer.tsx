@@ -46,6 +46,7 @@ export function WorkbookRenderer({
   const [responses, setResponses] = useState<Record<string, string | string[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [concluido, setConcluido] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasExistingDoc, setHasExistingDoc] = useState(false);
@@ -53,6 +54,12 @@ export function WorkbookRenderer({
 
   // Debounce timer ref
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Keep latest responses in ref for flush-on-unmount
+  const responsesRef = useRef<Record<string, string | string[]>>(responses);
+  const hasPendingSave = useRef(false);
+  const concluidoRef = useRef(concluido);
+  responsesRef.current = responses;
+  concluidoRef.current = concluido;
 
   // ─── Firestore doc path ─────────────────────────────────
   const docPath = useMemo(
@@ -85,20 +92,25 @@ export function WorkbookRenderer({
   }, [userId, trailId, currentModule.id, docPath]);
 
   // ─── Save to Firestore ──────────────────────────────────
-  const saveToFirestore = useCallback(async (currentResponses: Record<string, string | string[]>) => {
+  const persistToFirestore = useCallback(async (
+    currentResponses: Record<string, string | string[]>,
+    isConcluido?: boolean,
+  ) => {
     if (!userId || !trailId) return;
     setSaving(true);
+    setSaveError(false);
     try {
-      await setDoc(doc(db, docPath), {
+      const payload: WorkbookResponse = {
         trailId,
         moduleId: currentModule.id,
         trailTitle: trailTitle,
         moduleTitle: currentModule.titulo,
         respostas: currentResponses,
-        concluido: concluido,
+        concluido: isConcluido ?? concluidoRef.current,
         atualizadoEm: Timestamp.now(),
         criadoEm: existingCreatedAt.current || Timestamp.now(),
-      } satisfies WorkbookResponse, { merge: true });
+      };
+      await setDoc(doc(db, docPath), payload, { merge: true });
       setHasExistingDoc(true);
       if (!existingCreatedAt.current) {
         existingCreatedAt.current = Timestamp.now();
@@ -106,25 +118,36 @@ export function WorkbookRenderer({
       setLastSaved(new Date());
     } catch (err) {
       console.error('Error saving workbook responses:', err);
+      setSaveError(true);
     }
     setSaving(false);
-  }, [userId, trailId, currentModule.id, currentModule.titulo, trailTitle, concluido, docPath]);
+  }, [userId, trailId, currentModule.id, currentModule.titulo, trailTitle, docPath]);
+
+  // Ref to always have latest persistToFirestore without stale closures in timers
+  const persistRef = useRef(persistToFirestore);
+  persistRef.current = persistToFirestore;
 
   // ─── Debounced save (2s after last change) ──────────────
   const debouncedSave = useCallback((newResponses: Record<string, string | string[]>) => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
     }
+    hasPendingSave.current = true;
     saveTimerRef.current = setTimeout(() => {
-      saveToFirestore(newResponses);
+      hasPendingSave.current = false;
+      persistRef.current(newResponses);
     }, 2000);
-  }, [saveToFirestore]);
+  }, []);
 
-  // Cleanup timer on unmount
+  // Flush pending save on unmount (when navigating away)
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
+      }
+      if (hasPendingSave.current) {
+        // Fire-and-forget save with latest responses
+        persistRef.current(responsesRef.current);
       }
     };
   }, []);
@@ -144,28 +167,13 @@ export function WorkbookRenderer({
     // Cancel any pending debounced save
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
+      hasPendingSave.current = false;
     }
-    setSaving(true);
-    try {
-      await setDoc(doc(db, docPath), {
-        trailId,
-        moduleId: currentModule.id,
-        trailTitle: trailTitle,
-        moduleTitle: currentModule.titulo,
-        respostas: responses,
-        concluido: true,
-        atualizadoEm: Timestamp.now(),
-        criadoEm: existingCreatedAt.current || Timestamp.now(),
-      } satisfies WorkbookResponse);
-      setConcluido(true);
-      setLastSaved(new Date());
-      // Mark module as completed in trail progress (0 points)
-      onCompleteModule(currentModule.id, 0);
-    } catch (err) {
-      console.error('Error concluding workbook:', err);
-    }
-    setSaving(false);
-  }, [userId, trailId, currentModule.id, currentModule.titulo, trailTitle, responses, docPath, onCompleteModule]);
+    await persistToFirestore(responses, true);
+    setConcluido(true);
+    // Mark module as completed in trail progress (0 points)
+    onCompleteModule(currentModule.id, 0);
+  }, [userId, trailId, responses, persistToFirestore, currentModule.id, onCompleteModule]);
 
   // ─── Computed values ────────────────────────────────────
   const filledCount = useMemo(() => countFilledFields(chunks, responses), [chunks, responses]);
@@ -238,7 +246,11 @@ export function WorkbookRenderer({
       {/* Save bar */}
       <div className="flex items-center justify-between p-4 bg-purple-50/60 rounded-xl mt-6">
         <div className="flex items-center gap-2 text-xs text-purple-400">
-          {saving ? (
+          {saveError ? (
+            <span className="text-red-600 font-medium">
+              Erro ao salvar. Verifique sua conexao.
+            </span>
+          ) : saving ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Salvando...
