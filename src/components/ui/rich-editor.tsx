@@ -66,7 +66,7 @@ export function RichEditor({
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-base max-w-none min-h-[200px] p-4 focus:outline-none prose-p:leading-relaxed prose-p:mb-5 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 [&_mark]:bg-purple-100 [&_mark]:text-inherit [&_mark]:px-0.5 [&_mark]:rounded-sm [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-6 prose-a:text-purple-600 prose-a:underline [&_u]:underline',
+        class: 'prose prose-base max-w-none min-h-[200px] p-4 focus:outline-none prose-p:leading-relaxed prose-p:mb-7 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 [&_mark]:bg-purple-100 [&_mark]:text-inherit [&_mark]:px-0.5 [&_mark]:rounded-sm [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-6 prose-a:text-purple-600 prose-a:underline [&_u]:underline',
       },
     },
   });

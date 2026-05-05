@@ -21,7 +21,7 @@ import type { QuestaoDesafio } from '@/types/trilhas';
 import type { MappedModule, QuizScore } from './use-trail-player';
 
 // ─── Shared prose styling & DOMPurify config ──────────────
-const PROSE_CLASSES = "prose prose-base max-w-none prose-p:leading-relaxed prose-p:mb-5 prose-h1:text-2xl prose-h1:font-bold prose-h1:mt-10 prose-h1:mb-5 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-h4:text-base prose-h4:font-medium prose-h4:mt-4 prose-h4:mb-2 prose-li:mb-2 prose-ul:mb-5 prose-ol:mb-5 prose-hr:border-transparent prose-hr:my-8 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50 prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:rounded-r-lg prose-blockquote:not-italic [&_mark]:bg-purple-100 [&_mark]:text-inherit [&_mark]:px-0.5 [&_mark]:rounded-sm [&_svg]:max-w-full [&_svg]:mx-auto [&_svg]:block [&_svg]:my-6 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-6 prose-a:text-purple-600 prose-a:underline [&_u]:underline";
+const PROSE_CLASSES = "prose prose-base max-w-none prose-p:leading-relaxed prose-p:mb-7 prose-h1:text-2xl prose-h1:font-bold prose-h1:mt-10 prose-h1:mb-5 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-h4:text-base prose-h4:font-medium prose-h4:mt-4 prose-h4:mb-2 prose-li:mb-2 prose-ul:mb-5 prose-ol:mb-5 prose-hr:border-transparent prose-hr:my-8 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50 prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:rounded-r-lg prose-blockquote:not-italic [&_mark]:bg-purple-100 [&_mark]:text-inherit [&_mark]:px-0.5 [&_mark]:rounded-sm [&_svg]:max-w-full [&_svg]:mx-auto [&_svg]:block [&_svg]:my-6 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-6 prose-a:text-purple-600 prose-a:underline [&_u]:underline";
 
 const SANITIZE_CONFIG = {
   ADD_TAGS: ['svg', 'path', 'rect', 'circle', 'line', 'text', 'g', 'defs', 'marker', 'polygon', 'polyline', 'ellipse', 'use', 'symbol', 'clipPath', 'linearGradient', 'radialGradient', 'stop', 'foreignObject', 'h2', 'h3', 'strong', 'em', 's', 'u', 'a', 'mark', 'img', 'ul', 'ol', 'li', 'blockquote'],
@@ -239,6 +239,9 @@ export function ModuleRenderer({
   // ─── MISSAO CONTEUDO ──────────────────────────
   if (currentModule.tipo === 'missao_conteudo') {
     const missionPoints = currentModule.missaoGatilho?.pontosRecompensa || 0;
+    const missionContent = currentModule.conteudo?.instrucao || '';
+    const isMissionHtml = missionContent.trim().startsWith('<');
+    const missionProseClasses = "prose prose-sm max-w-none prose-p:text-sm prose-p:leading-relaxed prose-p:mb-6 prose-li:text-sm prose-li:mb-1 prose-ul:mb-4 prose-ol:mb-4 prose-strong:font-semibold prose-hr:border-transparent prose-hr:my-5 prose-h1:text-lg prose-h1:font-bold prose-h1:mt-8 prose-h1:mb-4 prose-h2:text-base prose-h2:font-bold prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-5 prose-h3:mb-2 prose-h4:text-sm prose-h4:font-medium prose-h4:mt-3 prose-h4:mb-1 prose-blockquote:border-l-blue-400 prose-blockquote:bg-blue-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r prose-blockquote:not-italic [&_mark]:bg-purple-100 [&_mark]:text-inherit [&_mark]:px-0.5 [&_mark]:rounded-sm [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-4 prose-a:text-blue-600 prose-a:underline [&_u]:underline";
     return (
       <div className="space-y-6">
         <div>
@@ -260,9 +263,16 @@ export function ModuleRenderer({
               <Target className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-blue-800 mb-2">{tp.contentMission}</p>
-                <div className="prose prose-sm max-w-none prose-p:text-sm prose-p:leading-relaxed prose-p:mb-4 prose-li:text-sm prose-li:mb-1 prose-ul:mb-4 prose-ol:mb-4 prose-strong:font-semibold prose-hr:border-transparent prose-hr:my-5 prose-h1:text-lg prose-h1:font-bold prose-h1:mt-8 prose-h1:mb-4 prose-h2:text-base prose-h2:font-bold prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-5 prose-h3:mb-2 prose-h4:text-sm prose-h4:font-medium prose-h4:mt-3 prose-h4:mb-1 prose-blockquote:border-l-blue-400 prose-blockquote:bg-blue-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r prose-blockquote:not-italic [&_mark]:bg-purple-100 [&_mark]:text-inherit [&_mark]:px-0.5 [&_mark]:rounded-sm">
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkHighlight]}>{currentModule.conteudo?.instrucao || ''}</ReactMarkdown>
-                </div>
+                {isMissionHtml ? (
+                  <div
+                    className={missionProseClasses}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(missionContent, SANITIZE_CONFIG) }}
+                  />
+                ) : (
+                  <div className={missionProseClasses}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkHighlight]}>{missionContent}</ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
             {currentModule.conteudo?.exemplos && (
