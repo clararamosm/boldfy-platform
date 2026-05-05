@@ -12,12 +12,21 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
   Play, CheckCircle2, Trophy, AlertCircle,
-  Wrench, Target, ChevronRight,
+  Wrench, Target, ChevronRight, BookOpen,
 } from 'lucide-react';
+import { CoinIcon } from '@/components/coin-icon';
 import { useT } from '@/lib/i18n/context';
 import { interpolate } from '@/lib/i18n';
 import type { QuestaoDesafio } from '@/types/trilhas';
 import type { MappedModule, QuizScore } from './use-trail-player';
+
+// ─── Shared prose styling & DOMPurify config ──────────────
+const PROSE_CLASSES = "prose prose-base max-w-none prose-p:leading-relaxed prose-p:mb-5 prose-h1:text-2xl prose-h1:font-bold prose-h1:mt-10 prose-h1:mb-5 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-h4:text-base prose-h4:font-medium prose-h4:mt-4 prose-h4:mb-2 prose-li:mb-2 prose-ul:mb-5 prose-ol:mb-5 prose-hr:border-transparent prose-hr:my-8 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50 prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:rounded-r-lg prose-blockquote:not-italic [&_mark]:bg-purple-100 [&_mark]:text-inherit [&_mark]:px-0.5 [&_mark]:rounded-sm [&_svg]:max-w-full [&_svg]:mx-auto [&_svg]:block [&_svg]:my-6 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-6 prose-a:text-purple-600 prose-a:underline [&_u]:underline";
+
+const SANITIZE_CONFIG = {
+  ADD_TAGS: ['svg', 'path', 'rect', 'circle', 'line', 'text', 'g', 'defs', 'marker', 'polygon', 'polyline', 'ellipse', 'use', 'symbol', 'clipPath', 'linearGradient', 'radialGradient', 'stop', 'foreignObject', 'h2', 'h3', 'strong', 'em', 's', 'u', 'a', 'mark', 'img', 'ul', 'ol', 'li', 'blockquote'],
+  ADD_ATTR: ['viewBox', 'xmlns', 'fill', 'stroke', 'stroke-width', 'd', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'x1', 'y1', 'x2', 'y2', 'points', 'transform', 'opacity', 'rx', 'ry', 'font-size', 'font-weight', 'text-anchor', 'dominant-baseline', 'marker-end', 'marker-start', 'refX', 'refY', 'markerWidth', 'markerHeight', 'orient', 'gradientUnits', 'offset', 'stop-color', 'stop-opacity', 'clip-path', 'href', 'class', 'target', 'rel', 'src', 'alt'],
+};
 
 type Props = {
   currentModule: MappedModule;
@@ -107,16 +116,21 @@ export function ModuleRenderer({
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
-          {moduleCompleted && (
-            <Badge className="bg-green-100 text-green-800">
-              <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
+          <h2 className="text-2xl font-bold mb-1">{currentModule.titulo}</h2>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              <BookOpen className="h-3 w-3 mr-1" /> Leitura
             </Badge>
-          )}
+            {moduleCompleted && (
+              <Badge className="bg-green-100 text-green-800">
+                <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
+              </Badge>
+            )}
+          </div>
         </div>
         <div
-          className="prose prose-base max-w-none prose-p:leading-relaxed prose-p:mb-5 prose-h1:text-2xl prose-h1:font-bold prose-h1:mt-10 prose-h1:mb-5 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-h4:text-base prose-h4:font-medium prose-h4:mt-4 prose-h4:mb-2 prose-li:mb-2 prose-ul:mb-5 prose-ol:mb-5 prose-hr:border-transparent prose-hr:my-8 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50 prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:rounded-r-lg prose-blockquote:not-italic [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:px-1 [&_mark]:rounded-sm [&_svg]:max-w-full [&_svg]:mx-auto [&_svg]:block [&_svg]:my-6"
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentModule.conteudo?.texto || `<p>${tp.contentUnavailable}</p>`, { ADD_TAGS: ['svg', 'path', 'rect', 'circle', 'line', 'text', 'g', 'defs', 'marker', 'polygon', 'polyline', 'ellipse', 'use', 'symbol', 'clipPath', 'linearGradient', 'radialGradient', 'stop', 'foreignObject'], ADD_ATTR: ['viewBox', 'xmlns', 'fill', 'stroke', 'stroke-width', 'd', 'cx', 'cy', 'r', 'x', 'y', 'width', 'height', 'x1', 'y1', 'x2', 'y2', 'points', 'transform', 'opacity', 'rx', 'ry', 'font-size', 'font-weight', 'text-anchor', 'dominant-baseline', 'marker-end', 'marker-start', 'refX', 'refY', 'markerWidth', 'markerHeight', 'orient', 'gradientUnits', 'offset', 'stop-color', 'stop-opacity', 'clip-path', 'href'] }) }}
+          className={PROSE_CLASSES}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentModule.conteudo?.texto || `<p>${tp.contentUnavailable}</p>`, SANITIZE_CONFIG) }}
         />
       </div>
     );
@@ -138,13 +152,14 @@ export function ModuleRenderer({
         {alreadyAttempted && !quizSubmitted ? (
           <Card className="border-amber-200 bg-amber-50">
             <CardContent className="p-6 text-center space-y-3">
-              <AlertCircle className="h-8 w-8 text-amber-600 mx-auto" />
-              <p className="font-semibold text-amber-800">{tp.scoreAlreadyFixed}</p>
-              <p className="text-sm text-amber-700">
-                {tp.alreadyAttemptedMsg}
-                {quizScore && <strong> {quizScore.percent}% = {quizScore.points} {tp.points}</strong>}
-              </p>
-              <p className="text-xs text-amber-600">{tp.alreadyAttemptedNote}</p>
+              <CheckCircle2 className="h-8 w-8 text-amber-600 mx-auto" />
+              <p className="font-semibold text-amber-800">Voce ja completou este desafio.</p>
+              {quizScore && (
+                <p className="text-lg text-amber-700">
+                  Sua nota: <strong>{quizScore.percent}%</strong> · Pontos: <strong>{quizScore.points}</strong>
+                </p>
+              )}
+              <p className="text-xs text-amber-600">Voce pode revisar as perguntas, mas a pontuacao nao sera alterada.</p>
             </CardContent>
           </Card>
         ) : quizSubmitted && quizScore ? (
@@ -189,29 +204,33 @@ export function ModuleRenderer({
 
   // ─── FACA VOCE MESMO ──────────────────────────
   if (currentModule.tipo === 'faca_voce_mesmo') {
+    const content = currentModule.conteudo?.instrucao || tp.followInstructions;
+    const isHtml = content.trim().startsWith('<');
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
-          {moduleCompleted && (
-            <Badge className="bg-green-100 text-green-800">
-              <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
+          <h2 className="text-2xl font-bold mb-1">{currentModule.titulo}</h2>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              <Wrench className="h-3 w-3 mr-1" /> Pratica
             </Badge>
-          )}
+            {moduleCompleted && (
+              <Badge className="bg-green-100 text-green-800">
+                <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.completed}
+              </Badge>
+            )}
+          </div>
         </div>
-        <Card className="border-amber-200">
-          <CardContent className="p-6">
-            <div className="flex items-start gap-3">
-              <Wrench className="h-6 w-6 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-amber-800 mb-2">{tp.practice}</p>
-                <div className="prose prose-sm max-w-none prose-p:text-sm prose-p:leading-relaxed prose-p:mb-4 prose-li:text-sm prose-li:mb-1 prose-ul:mb-4 prose-ol:mb-4 prose-strong:font-semibold prose-hr:border-transparent prose-hr:my-5 prose-h1:text-lg prose-h1:font-bold prose-h1:mt-8 prose-h1:mb-4 prose-h2:text-base prose-h2:font-bold prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-5 prose-h3:mb-2 prose-h4:text-sm prose-h4:font-medium prose-h4:mt-3 prose-h4:mb-1 prose-blockquote:border-l-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r prose-blockquote:not-italic [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:px-1 [&_mark]:rounded-sm">
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkHighlight]}>{currentModule.conteudo?.instrucao || tp.followInstructions}</ReactMarkdown>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {isHtml ? (
+          <div
+            className={PROSE_CLASSES}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content, SANITIZE_CONFIG) }}
+          />
+        ) : (
+          <div className={PROSE_CLASSES}>
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkHighlight]}>{content}</ReactMarkdown>
+          </div>
+        )}
         <p className="text-xs text-muted-foreground text-center">{tp.noPointsModule}</p>
       </div>
     );
@@ -219,15 +238,21 @@ export function ModuleRenderer({
 
   // ─── MISSAO CONTEUDO ──────────────────────────
   if (currentModule.tipo === 'missao_conteudo') {
+    const missionPoints = currentModule.missaoGatilho?.pontosRecompensa || 0;
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-bold mb-2">{currentModule.titulo}</h2>
-          {moduleCompleted && (
-            <Badge className="bg-green-100 text-green-800">
-              <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.missionUnlocked}
+          <h2 className="text-2xl font-bold mb-1">{currentModule.titulo}</h2>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              <Target className="h-3 w-3 mr-1" /> Missao
             </Badge>
-          )}
+            {moduleCompleted && (
+              <Badge className="bg-green-100 text-green-800">
+                <CheckCircle2 className="h-3 w-3 mr-1" /> {tp.missionUnlocked}
+              </Badge>
+            )}
+          </div>
         </div>
         <Card className="border-blue-200">
           <CardContent className="p-6 space-y-4">
@@ -235,7 +260,7 @@ export function ModuleRenderer({
               <Target className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-blue-800 mb-2">{tp.contentMission}</p>
-                <div className="prose prose-sm max-w-none prose-p:text-sm prose-p:leading-relaxed prose-p:mb-4 prose-li:text-sm prose-li:mb-1 prose-ul:mb-4 prose-ol:mb-4 prose-strong:font-semibold prose-hr:border-transparent prose-hr:my-5 prose-h1:text-lg prose-h1:font-bold prose-h1:mt-8 prose-h1:mb-4 prose-h2:text-base prose-h2:font-bold prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-5 prose-h3:mb-2 prose-h4:text-sm prose-h4:font-medium prose-h4:mt-3 prose-h4:mb-1 prose-blockquote:border-l-amber-400 prose-blockquote:bg-amber-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r prose-blockquote:not-italic [&_mark]:bg-yellow-200 [&_mark]:text-yellow-900 [&_mark]:px-1 [&_mark]:rounded-sm">
+                <div className="prose prose-sm max-w-none prose-p:text-sm prose-p:leading-relaxed prose-p:mb-4 prose-li:text-sm prose-li:mb-1 prose-ul:mb-4 prose-ol:mb-4 prose-strong:font-semibold prose-hr:border-transparent prose-hr:my-5 prose-h1:text-lg prose-h1:font-bold prose-h1:mt-8 prose-h1:mb-4 prose-h2:text-base prose-h2:font-bold prose-h2:mt-6 prose-h2:mb-3 prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-5 prose-h3:mb-2 prose-h4:text-sm prose-h4:font-medium prose-h4:mt-3 prose-h4:mb-1 prose-blockquote:border-l-blue-400 prose-blockquote:bg-blue-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:rounded-r prose-blockquote:not-italic [&_mark]:bg-purple-100 [&_mark]:text-inherit [&_mark]:px-0.5 [&_mark]:rounded-sm">
                   <ReactMarkdown remarkPlugins={[remarkGfm, remarkHighlight]}>{currentModule.conteudo?.instrucao || ''}</ReactMarkdown>
                 </div>
               </div>
@@ -254,7 +279,14 @@ export function ModuleRenderer({
             )}
           </CardContent>
         </Card>
-        <p className="text-xs text-muted-foreground text-center">{tp.noPointsMission}</p>
+        {missionPoints > 0 ? (
+          <div className="flex items-center justify-center gap-2 text-sm text-blue-700 bg-blue-50 rounded-lg p-3">
+            <CoinIcon className="h-4 w-4 text-yellow-500" />
+            <span>Complete a missao em ate 15 dias para ganhar <strong>{missionPoints} pontos</strong></span>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground text-center">{tp.noPointsMission}</p>
+        )}
       </div>
     );
   }

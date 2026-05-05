@@ -89,6 +89,12 @@ export function TrailTopBar({
                 : (currentModule.pontuacaoBase || 0) + ' ' + tp.points}
             </Badge>
           )}
+          {currentModule.tipo === 'missao_conteudo' && (currentModule.missaoGatilho?.pontosRecompensa || 0) > 0 && (
+            <Badge variant="outline" className="border-blue-300 text-blue-700">
+              <Star className="h-3 w-3 mr-1" />
+              {currentModule.missaoGatilho?.pontosRecompensa} pts na missao
+            </Badge>
+          )}
           {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
         </div>
       </div>

@@ -172,10 +172,10 @@ export const MODO_ICONS: Record<ModuloModo, string> = {
 // --- Helper: pontuacao por modo ---
 export const MODO_CONFIG: Record<ModuloModo, { temPontuacao: boolean; pontosPadrao: number; pontosBonus: number }> = {
   aula: { temPontuacao: true, pontosPadrao: 80, pontosBonus: 0 },
-  leitura: { temPontuacao: true, pontosPadrao: 40, pontosBonus: 0 },
-  desafio: { temPontuacao: true, pontosPadrao: 100, pontosBonus: 50 },
+  leitura: { temPontuacao: true, pontosPadrao: 20, pontosBonus: 0 },
+  desafio: { temPontuacao: true, pontosPadrao: 40, pontosBonus: 30 },
   faca_voce_mesmo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
-  missao_conteudo: { temPontuacao: true, pontosPadrao: 50, pontosBonus: 0 },
+  missao_conteudo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
 };
 
 // --- Constantes de Scoring do Desafio ---

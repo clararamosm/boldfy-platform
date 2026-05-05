@@ -14,13 +14,16 @@ import {
 } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 import { CoinIcon } from '@/components/coin-icon';
-import { SimpleRichEditor } from '@/components/ui/simple-rich-editor';
+import dynamic from 'next/dynamic';
+const RichEditor = dynamic(() => import('@/components/ui/rich-editor').then(m => m.RichEditor), { ssr: false, loading: () => <div className="border rounded-lg p-4 min-h-[200px] bg-muted/20 animate-pulse" /> });
 import type { Modulo, ModuloModo, QuestaoDesafio } from '@/types/trilhas';
 import { MODO_LABELS, MODO_CONFIG } from '@/types/trilhas';
 
 // ─── Types ────────────────────────────────────────────────────
 
-export type ModuloFormData = Partial<Modulo>;
+export type ModuloFormData = Partial<Modulo> & {
+  missaoRecompensa?: number;
+};
 
 export type ModuloDialogProps = {
   open: boolean;
@@ -31,6 +34,7 @@ export type ModuloDialogProps = {
   questoes: QuestaoDesafio[];
   onQuestoesChange: (questoes: QuestaoDesafio[]) => void;
   onSave: () => void;
+  onImageUpload?: (file: File) => Promise<string>;
 };
 
 // ─── Component ────────────────────────────────────────────────
@@ -38,6 +42,7 @@ export type ModuloDialogProps = {
 export function ModuloDialog({
   open, onOpenChange, editingIndex,
   form, onFormChange, questoes, onQuestoesChange, onSave,
+  onImageUpload,
 }: ModuloDialogProps) {
   const modo = form.modo as ModuloModo;
 
@@ -111,10 +116,11 @@ export function ModuloDialog({
           {modo === 'leitura' && (
             <div>
               <Label>Conteudo</Label>
-              <SimpleRichEditor
+              <RichEditor
                 value={form.conteudoHtml || ''}
                 onChange={(html) => onFormChange({ ...form, conteudoHtml: html })}
                 placeholder="Escreva o conteudo da leitura aqui..."
+                onImageUpload={onImageUpload}
               />
             </div>
           )}
@@ -156,8 +162,13 @@ export function ModuloDialog({
           {/* MODO: FACA VOCE MESMO */}
           {modo === 'faca_voce_mesmo' && (
             <div>
-              <Label>Instrucoes do Card</Label>
-              <Textarea value={form.instrucaoCard || ''} onChange={e => onFormChange({ ...form, instrucaoCard: e.target.value })} placeholder="Descreva a atividade pratica..." rows={6} />
+              <Label>Instrucoes da Pratica</Label>
+              <RichEditor
+                value={form.instrucaoCard || ''}
+                onChange={(html) => onFormChange({ ...form, instrucaoCard: html })}
+                placeholder="Descreva a atividade pratica..."
+                onImageUpload={onImageUpload}
+              />
               <p className="text-xs text-muted-foreground mt-1">Sem pontuacao - o colaborador marca como visualizado</p>
             </div>
           )}
@@ -169,7 +180,11 @@ export function ModuloDialog({
                 <Label>Instrucoes da Missao</Label>
                 <Textarea value={form.instrucaoCard || ''} onChange={e => onFormChange({ ...form, instrucaoCard: e.target.value })} placeholder="Descreva o que o colaborador deve postar..." rows={4} />
               </div>
-              <p className="text-xs text-muted-foreground">Sem pontuacao direta - cria uma missao na aba Missoes ao desbloquear</p>
+              <div>
+                <Label className="flex items-center gap-1"><CoinIcon className="w-4 h-4 text-yellow-500" />Pontos da Missao</Label>
+                <Input type="number" value={form.missaoRecompensa ?? 100} onChange={e => onFormChange({ ...form, missaoRecompensa: parseInt(e.target.value) || 0 })} />
+                <p className="text-xs text-muted-foreground mt-1">Pontos que o colaborador ganha ao completar a missao na aba Missoes (nao conta no total da trilha)</p>
+              </div>
             </div>
           )}
 

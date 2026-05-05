@@ -42,6 +42,7 @@ export type TrailBuilderProps = {
   saving: boolean;
   onSave: () => void;
   onBack: () => void;
+  onImageUpload?: (file: File) => Promise<string>;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -52,8 +53,8 @@ export function calcPontuacao(mods: Modulo[]) {
   mods.forEach(m => {
     const cfg = MODO_CONFIG[m.modo];
     if (cfg && cfg.temPontuacao) {
-      total += (m.pontuacaoBase || cfg.pontosPadrao);
-      bonus += (m.pontuacaoBonus || cfg.pontosBonus);
+      total += (m.pontuacaoBase ?? cfg.pontosPadrao);
+      bonus += (m.pontuacaoBonus ?? cfg.pontosBonus);
     }
   });
   return { total, bonus };
@@ -64,6 +65,7 @@ export function calcPontuacao(mods: Modulo[]) {
 export function TrailBuilder({
   session, isEditing, trailForm, onTrailFormChange,
   modulos, onModulosChange, saving, onSave, onBack,
+  onImageUpload,
 }: TrailBuilderProps) {
   // Modulo dialog state
   const [moduloDialogOpen, setModuloDialogOpen] = useState(false);
@@ -89,9 +91,10 @@ export function TrailBuilder({
       setModuloForm({
         titulo: m.titulo, modo: m.modo, videoUrl: m.videoUrl || '',
         conteudoHtml: m.conteudoHtml || '', instrucaoCard: m.instrucaoCard || '',
-        pontuacaoBase: m.pontuacaoBase || MODO_CONFIG[m.modo].pontosPadrao,
-        pontuacaoBonus: m.pontuacaoBonus || MODO_CONFIG[m.modo].pontosBonus,
+        pontuacaoBase: m.pontuacaoBase ?? MODO_CONFIG[m.modo].pontosPadrao,
+        pontuacaoBonus: m.pontuacaoBonus ?? MODO_CONFIG[m.modo].pontosBonus,
         materialPdfUrl: m.materialPdfUrl,
+        missaoRecompensa: m.missaoGatilho?.pontosRecompensa ?? 100,
       });
       setQuestoes(m.questoes || []);
     } else {
@@ -114,10 +117,14 @@ export function TrailBuilder({
       materialPdfUrl: modo === 'aula' ? moduloForm.materialPdfUrl : undefined,
       conteudoHtml: modo === 'leitura' ? moduloForm.conteudoHtml : undefined,
       questoes: modo === 'desafio' ? questoes : undefined,
-      pontuacaoBase: MODO_CONFIG[modo].temPontuacao ? (moduloForm.pontuacaoBase || MODO_CONFIG[modo].pontosPadrao) : undefined,
-      pontuacaoBonus: MODO_CONFIG[modo].temPontuacao ? (moduloForm.pontuacaoBonus || MODO_CONFIG[modo].pontosBonus) : undefined,
+      pontuacaoBase: MODO_CONFIG[modo].temPontuacao ? (moduloForm.pontuacaoBase ?? MODO_CONFIG[modo].pontosPadrao) : undefined,
+      pontuacaoBonus: MODO_CONFIG[modo].temPontuacao ? (moduloForm.pontuacaoBonus ?? MODO_CONFIG[modo].pontosBonus) : undefined,
       instrucaoCard: (modo === 'faca_voce_mesmo' || modo === 'missao_conteudo') ? moduloForm.instrucaoCard : undefined,
-      missaoGatilho: modo === 'missao_conteudo' ? { tipo: 'postar_linkedin', instrucoes: moduloForm.instrucaoCard || '' } : undefined,
+      missaoGatilho: modo === 'missao_conteudo' ? {
+        tipo: 'postar_linkedin' as const,
+        instrucoes: moduloForm.instrucaoCard || '',
+        pontosRecompensa: moduloForm.missaoRecompensa ?? 100,
+      } : undefined,
     };
     if (editingModuloIdx !== null) {
       const u = [...modulos];
@@ -253,6 +260,7 @@ export function TrailBuilder({
         questoes={questoes}
         onQuestoesChange={setQuestoes}
         onSave={saveModulo}
+        onImageUpload={onImageUpload}
       />
     </div>
   );

@@ -58,6 +58,9 @@ export function TrailConclusionScreen({ trail, progress, onBack, onReview, onGoT
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
                 <Rocket className="h-6 w-6 text-blue-600 mx-auto mb-2" />
                 <p className="text-sm font-semibold text-blue-800">{tp.newMissionCreated}</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Complete em ate {trail.missaoGatilho.prazoDias || 14} dias para ganhar os pontos
+                </p>
                 <Button
                   variant="outline"
                   className="mt-2 border-blue-300 text-blue-700"

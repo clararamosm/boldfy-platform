@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import {
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, Timestamp, writeBatch,
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -183,6 +184,13 @@ export default function MasterTrilhasPage() {
     }
     setViewMode('builder');
   };
+
+  const handleImageUpload = useCallback(async (file: File): Promise<string> => {
+    const path = `globalTrails/images/${Date.now()}_${file.name}`;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    return getDownloadURL(storageRef);
+  }, []);
 
   const saveTrail = async () => {
     if (!selectedSession) return;
@@ -419,6 +427,7 @@ export default function MasterTrilhasPage() {
             saving={saving}
             onSave={saveTrail}
             onBack={() => setViewMode('trails')}
+            onImageUpload={handleImageUpload}
           />
         )}
 

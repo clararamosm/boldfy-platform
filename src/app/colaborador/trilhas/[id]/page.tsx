@@ -62,7 +62,8 @@ export default function TrilhaFullscreenPage() {
     return (
       <TrailIntroScreen
         trail={player.trail}
-        sortedModulesCount={player.sortedModules.length}
+        sortedModules={player.sortedModules}
+        isModuleCompleted={player.isModuleCompleted}
         completedCount={player.completedCount}
         totalModules={player.totalModules}
         progressPercent={player.progressPercent}

@@ -4,15 +4,30 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, BookOpen, Clock, Rocket, Trophy } from 'lucide-react';
+import {
+  ArrowLeft, ArrowRight, BookOpen, Clock, Rocket, Trophy,
+  Play, HelpCircle, Wrench, Target, CheckCircle2,
+} from 'lucide-react';
 import { CoinIcon } from '@/components/coin-icon';
 import { useT } from '@/lib/i18n/context';
 import { interpolate } from '@/lib/i18n';
-import type { Trilha } from '@/types/trilhas';
+import type { Trilha, ModuloModo } from '@/types/trilhas';
+import type { MappedModule } from './use-trail-player';
+
+const MODO_ICONS: Record<ModuloModo, React.ComponentType<{ className?: string }>> = {
+  aula: Play, leitura: BookOpen, desafio: HelpCircle,
+  faca_voce_mesmo: Wrench, missao_conteudo: Target,
+};
+
+const MODO_TAG: Record<ModuloModo, string> = {
+  aula: 'Aula', leitura: 'Leitura', desafio: 'Desafio',
+  faca_voce_mesmo: 'Prática', missao_conteudo: 'Missão',
+};
 
 type Props = {
   trail: Trilha;
-  sortedModulesCount: number;
+  sortedModules: MappedModule[];
+  isModuleCompleted: (id: string) => boolean;
   completedCount: number;
   totalModules: number;
   progressPercent: number;
@@ -20,7 +35,7 @@ type Props = {
   onBack: () => void;
 };
 
-export function TrailIntroScreen({ trail, sortedModulesCount, completedCount, totalModules, progressPercent, onStart, onBack }: Props) {
+export function TrailIntroScreen({ trail, sortedModules, isModuleCompleted, completedCount, totalModules, progressPercent, onStart, onBack }: Props) {
   const tp = useT().trailPlayer;
   const hasStarted = completedCount > 0;
 
@@ -53,7 +68,7 @@ export function TrailIntroScreen({ trail, sortedModulesCount, completedCount, to
               <div className="space-y-1">
                 <div className="flex items-center justify-center gap-1 text-2xl font-bold">
                   <BookOpen className="h-5 w-5" />
-                  {sortedModulesCount}
+                  {sortedModules.length}
                 </div>
                 <p className="text-xs text-muted-foreground">{tp.modulesLabel}</p>
               </div>
@@ -75,6 +90,30 @@ export function TrailIntroScreen({ trail, sortedModulesCount, completedCount, to
                 <Progress value={progressPercent} className="h-2" />
               </div>
             )}
+
+            {/* Module summary list */}
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">{tp.modulesLabel}</p>
+              <div className="max-h-64 overflow-y-auto space-y-1 rounded-lg border p-2">
+                {sortedModules.map((mod) => {
+                  const Icon = MODO_ICONS[mod.tipo];
+                  const completed = isModuleCompleted(mod.id);
+                  return (
+                    <div key={mod.id} className="flex items-center gap-3 p-2 rounded-md text-sm">
+                      <div className={`flex h-7 w-7 items-center justify-center rounded-full shrink-0 ${
+                        completed ? 'bg-green-100 text-green-700' : 'bg-muted'
+                      }`}>
+                        {completed ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-3.5 w-3.5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`truncate ${completed ? 'text-green-700' : ''}`}>{mod.titulo}</p>
+                        <p className="text-xs text-muted-foreground">{MODO_TAG[mod.tipo]}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             {trail.pontuacaoBonus > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">

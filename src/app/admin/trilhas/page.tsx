@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import {
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, Timestamp, setDoc,
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -251,6 +252,13 @@ export default function AdminTrilhasPage() {
     setBuilderOpen(true);
   };
 
+  const handleImageUpload = useCallback(async (file: File): Promise<string> => {
+    const path = `companies/${companyId}/trails/images/${Date.now()}_${file.name}`;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    return getDownloadURL(storageRef);
+  }, [companyId]);
+
   const saveCompanyTrail = async () => {
     if (!companyId || !selectedSession) return;
     if (!trailForm.titulo.trim()) {
@@ -305,6 +313,7 @@ export default function AdminTrilhasPage() {
         saving={saving}
         onSave={saveCompanyTrail}
         onBack={() => setBuilderOpen(false)}
+        onImageUpload={handleImageUpload}
       />
     );
   }
