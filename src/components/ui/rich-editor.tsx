@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import {
   Bold, Italic, Strikethrough, Underline as UnderlineIcon,
   Heading2, Heading3, Link as LinkIcon, Highlighter,
-  ImageIcon, X,
+  ImageIcon, X, Film,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -37,6 +37,8 @@ export function RichEditor({
 }: RichEditorProps) {
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
+  const [showImageUrlInput, setShowImageUrlInput] = useState(false);
+  const [imageUrl, setImageUrl] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -55,7 +57,7 @@ export function RichEditor({
         HTMLAttributes: { class: 'bg-purple-100 text-inherit px-0.5 rounded-sm' },
       }),
       Image.configure({
-        inline: false,
+        inline: true,
         allowBase64: false,
       }),
       Placeholder.configure({ placeholder }),
@@ -90,6 +92,16 @@ export function RichEditor({
     setShowLinkInput(false);
     setLinkUrl('');
   }, [editor, linkUrl]);
+
+  const handleImageUrlSubmit = useCallback(() => {
+    if (!editor || !imageUrl) return;
+    const url = imageUrl.trim();
+    if (url) {
+      editor.chain().focus().setImage({ src: url }).run();
+    }
+    setShowImageUrlInput(false);
+    setImageUrl('');
+  }, [editor, imageUrl]);
 
   const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -187,17 +199,25 @@ export function RichEditor({
           <Highlighter className="h-4 w-4" />
         </ToolbarButton>
 
-        {/* Image */}
+        {/* Image upload */}
         {onImageUpload && (
           <ToolbarButton
             active={false}
             onClick={() => fileInputRef.current?.click()}
-            title="Imagem"
+            title="Upload imagem"
             disabled={uploading}
           >
             <ImageIcon className="h-4 w-4" />
           </ToolbarButton>
         )}
+        {/* Image / GIF by URL */}
+        <ToolbarButton
+          active={showImageUrlInput}
+          onClick={() => { setShowImageUrlInput(!showImageUrlInput); setImageUrl(''); }}
+          title="GIF / Imagem por URL"
+        >
+          <Film className="h-4 w-4" />
+        </ToolbarButton>
         <input
           ref={fileInputRef}
           type="file"
@@ -222,6 +242,27 @@ export function RichEditor({
             OK
           </Button>
           <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setShowLinkInput(false)}>
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      )}
+
+      {/* Image / GIF URL input */}
+      {showImageUrlInput && (
+        <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20">
+          <Film className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Input
+            value={imageUrl}
+            onChange={e => setImageUrl(e.target.value)}
+            placeholder="Cole a URL da imagem ou GIF (ex: https://media.giphy.com/...)"
+            className="flex-1 h-8 text-sm"
+            onKeyDown={e => { if (e.key === 'Enter') handleImageUrlSubmit(); }}
+            autoFocus
+          />
+          <Button size="sm" variant="ghost" className="h-8 px-2" onClick={handleImageUrlSubmit}>
+            OK
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setShowImageUrlInput(false)}>
             <X className="h-3 w-3" />
           </Button>
         </div>
