@@ -11,7 +11,7 @@ import { generateSlug } from '@/lib/slugify';
 import { getDefaultBillingBlock } from '@/lib/billing/types';
 import { resyncPlatformSeats } from '@/lib/billing/seat-management';
 import { appendActivityLog } from '@/lib/billing/activity-log';
-import { seedNativeRewards } from '@/app/actions/company-setup';
+import { seedNativeRewards, seedTemplatePersonalizado } from '@/app/actions/company-setup';
 import { generateInviteLink } from '@/lib/invite-tokens';
 
 // Mascara email para uso em activity log (compliance: nao expor email cru).
@@ -514,6 +514,16 @@ export async function inviteAdmin(prevState: InviteAdminState, formData: FormDat
 
     // Seed native AI credits rewards for the new company (3-tier)
     await seedNativeRewards(companyId);
+
+    // Seed sessao "Trilhas Personalizadas — Template" (5 trilhas-esqueleto).
+    // Wrap em try/catch porque trilhas template sao guia de onboarding —
+    // empresa criada sem elas ainda funciona perfeitamente. Migration pareada
+    // (migrateAllCompaniesTemplatePersonalizado) cobre eventuais falhas.
+    try {
+      await seedTemplatePersonalizado(companyId);
+    } catch (err) {
+      console.error('[inviteAdmin] seedTemplatePersonalizado falhou (nao bloqueante):', err);
+    }
 
     // When skipInvite is set, only create the company (no admin user yet)
     if (skipInvite) {

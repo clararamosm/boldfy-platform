@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { getAuthToken } from '@/lib/auth-client';
 import { inviteAdmin } from '@/app/actions';
 import { deleteCompany } from '@/app/deleteCompanyAction';
+import { MigrateTemplatePersonalizadoButton } from '@/components/master/migrate-template-personalizado-button';
 
 type MaybeFsTimestamp = { toDate?: () => Date } | string | null | undefined;
 
@@ -344,21 +345,25 @@ export default function MasterEmpresasPage() {
                     <CardTitle className="font-headline">Gerenciamento de Empresas</CardTitle>
                     <CardDescription>Crie um novo ambiente de empresa e convide um administrador.</CardDescription>
                 </div>
-                 <ActionDialog
-                    title="Adicionar Nova Empresa"
-                    description="Preencha os dados para criar uma nova empresa. Ela começará com um teste gratuito."
-                    trigger={addCompanyButton}
-                    actionText="Criar e Convidar Admin"
-                    onAction={() => formRef.current?.requestSubmit()}
-                    formId="company-form"
-                    open={isDialogOpen}
-                    onOpenChange={setIsDialogOpen}
-                >
-                    <form ref={formRef} action={formAction} id="company-form">
-                        <input type="hidden" name="idToken" value={cachedToken} />
-                        <CompanyFormContent />
-                    </form>
-                </ActionDialog>
+                <div className="flex items-center gap-2">
+                    {/* Botao temporario de backfill — ver migrate-template-personalizado-button.tsx */}
+                    <MigrateTemplatePersonalizadoButton />
+                    <ActionDialog
+                        title="Adicionar Nova Empresa"
+                        description="Preencha os dados para criar uma nova empresa. Ela começará com um teste gratuito."
+                        trigger={addCompanyButton}
+                        actionText="Criar e Convidar Admin"
+                        onAction={() => formRef.current?.requestSubmit()}
+                        formId="company-form"
+                        open={isDialogOpen}
+                        onOpenChange={setIsDialogOpen}
+                    >
+                        <form ref={formRef} action={formAction} id="company-form">
+                            <input type="hidden" name="idToken" value={cachedToken} />
+                            <CompanyFormContent />
+                        </form>
+                    </ActionDialog>
+                </div>
             </CardHeader>
             <CardContent>
                 <div className="overflow-x-auto">

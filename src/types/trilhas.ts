@@ -79,6 +79,11 @@ export interface Trilha {
   // Campo para trilhas de empresa (custom)
   isGlobal?: boolean;
   globalTrailId?: string; // referencia a trilha global original
+
+  // Trilha esqueleto criada pelo seed do template personalizado
+  // (ver seedTemplatePersonalizado em src/app/actions/company-setup.ts).
+  // undefined em trilhas existentes = false (retrocompat).
+  isTemplate?: boolean;
 }
 
 // --- Sessao (agrupador de Trilhas) ---
@@ -91,6 +96,11 @@ export interface Sessao {
   locale?: 'pt-BR' | 'en';
   criadaEm: Timestamp;
   atualizadaEm?: Timestamp;
+
+  // Tipo da sessao. undefined em sessoes existentes = 'customizada' (retrocompat).
+  // 'template_personalizado' identifica a sessao seedada na criacao da empresa
+  // (ver seedTemplatePersonalizado em src/app/actions/company-setup.ts).
+  tipo?: 'global' | 'customizada' | 'template_personalizado';
 }
 
 // --- Progresso do Colaborador em uma Trilha ---

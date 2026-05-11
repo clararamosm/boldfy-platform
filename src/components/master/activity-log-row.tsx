@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   RefreshCw,
   Sparkles,
+  BookOpen,
   type LucideIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +43,7 @@ const KIND_META: Record<ActivityLogKind, KindMeta> = {
   'payment.received': { label: 'Pagamento recebido', icon: CreditCard, variant: 'default' },
   'payment.failed': { label: 'Pagamento falhou', icon: AlertTriangle, variant: 'destructive' },
   'subscription.updated': { label: 'Assinatura', icon: RefreshCw, variant: 'outline' },
+  'template_personalizado.seeded': { label: 'Trilhas template criadas', icon: BookOpen, variant: 'secondary' },
   'system.log_started': { label: 'Inicio', icon: Sparkles, variant: 'outline' },
 };
 

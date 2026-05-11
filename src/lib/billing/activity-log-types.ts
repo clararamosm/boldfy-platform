@@ -39,6 +39,8 @@ export type ActivityLogKind =
   | 'payment.received'
   | 'payment.failed'
   | 'subscription.updated'
+  // Trilhas
+  | 'template_personalizado.seeded'
   // Sistema — placeholders
   | 'system.log_started';
 
