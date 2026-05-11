@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { db, storage } from '@/lib/firebase';
 import {
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
-  query, orderBy, Timestamp, setDoc,
+  query, orderBy, Timestamp, setDoc, writeBatch,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useResolvedCompanyId } from '@/hooks/use-resolved-company-id';
@@ -14,12 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
-import { Plus, Pencil, Globe, Building2, FolderOpen, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Globe, Building2, FolderOpen, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import type { Sessao, Trilha, Modulo } from '@/types/trilhas';
@@ -75,6 +76,15 @@ export default function AdminTrilhasPage() {
 
   // Delete confirmation
   const [deleteTrailTarget, setDeleteTrailTarget] = useState<{ trailId: string; sessionId: string } | null>(null);
+  const [deleteSessionTarget, setDeleteSessionTarget] = useState<Sessao | null>(null);
+  const [deletingSession, setDeletingSession] = useState(false);
+
+  // Accordion: sessoes expandidas (multiplas simultaneas, separado por aba).
+  const [expandedGlobalSessions, setExpandedGlobalSessions] = useState<Set<string>>(new Set());
+  const [expandedCompanySessions, setExpandedCompanySessions] = useState<Set<string>>(new Set());
+
+  // Bulk toggle de trilhas globais por sessao (ativar/desativar todas).
+  const [togglingSessionBulk, setTogglingSessionBulk] = useState<string | null>(null);
 
   // ============================================================
   // Load global sessions + trails + activated status
@@ -299,6 +309,94 @@ export default function AdminTrilhasPage() {
   };
 
   // ============================================================
+  // ACCORDION: toggle expandir/colapsar sessoes
+  // ============================================================
+  const toggleGlobalSessionExpanded = (sessionId: string) => {
+    setExpandedGlobalSessions(prev => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  };
+
+  const toggleCompanySessionExpanded = (sessionId: string) => {
+    setExpandedCompanySessions(prev => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else next.add(sessionId);
+      return next;
+    });
+  };
+
+  // ============================================================
+  // BULK TOGGLE: ativa/desativa todas as trilhas de uma sessao global
+  // ============================================================
+  // Comportamento: se TODAS estao ativas, desativa todas. Senao (zero ou
+  // algumas), ativa todas. Usa writeBatch pra performance e atomicidade.
+  const toggleAllTrailsInGlobalSession = async (session: Sessao) => {
+    if (!companyId || !user) return;
+    const trails = globalTrailsBySession[session.id] || [];
+    if (trails.length === 0) return;
+
+    const allActive = trails.every(t => activatedTrailIds.has(t.id));
+    setTogglingSessionBulk(session.id);
+    try {
+      const batch = writeBatch(db);
+      const newActivatedIds = new Set(activatedTrailIds);
+
+      for (const trail of trails) {
+        const ref = doc(db, `companies/${companyId}/activatedGlobalTrails`, trail.id);
+        if (allActive) {
+          // Desativa todas
+          batch.delete(ref);
+          newActivatedIds.delete(trail.id);
+        } else {
+          // Ativa todas (incluindo as que ja estao ativas — setDoc e idempotente)
+          batch.set(ref, {
+            trailId: trail.id, sessionId: session.id, titulo: trail.titulo,
+            ativadaEm: Timestamp.now(), ativadaPor: user.uid,
+          });
+          newActivatedIds.add(trail.id);
+        }
+      }
+
+      await batch.commit();
+      setActivatedTrailIds(newActivatedIds);
+      if (!allActive) completeOnboardingItem(user?.uid, 'activate-trails');
+      toast({ title: allActive ? t.adminTrails.toastTrailDeactivated : t.adminTrails.toastTrailActivated });
+    } catch (err) {
+      console.error('Erro no bulk toggle de sessao global:', err);
+      toast({ variant: 'destructive', title: t.adminTrails.toastTrailToggleError, description: err instanceof Error ? err.message : '' });
+    } finally {
+      setTogglingSessionBulk(null);
+    }
+  };
+
+  // ============================================================
+  // DELETE: excluir sessao da empresa (cascade — apaga trilhas dentro)
+  // ============================================================
+  const deleteCompanySession = async (session: Sessao) => {
+    if (!companyId) return;
+    setDeletingSession(true);
+    try {
+      const trailsSnap = await getDocs(collection(db, `companies/${companyId}/sessions/${session.id}/trails`));
+      const batch = writeBatch(db);
+      trailsSnap.docs.forEach(d => batch.delete(d.ref));
+      batch.delete(doc(db, `companies/${companyId}/sessions`, session.id));
+      await batch.commit();
+      toast({ title: 'Sessao excluida com sucesso' });
+      setDeleteSessionTarget(null);
+      loadCompanyData();
+    } catch (err) {
+      console.error('Erro ao excluir sessao da empresa:', err);
+      toast({ variant: 'destructive', title: 'Erro ao excluir sessao', description: err instanceof Error ? err.message : '' });
+    } finally {
+      setDeletingSession(false);
+    }
+  };
+
+  // ============================================================
   // BUILDER VIEW
   // ============================================================
   if (builderOpen) {
@@ -350,35 +448,86 @@ export default function AdminTrilhasPage() {
                 </CardContent>
               </Card>
             ) : (
-              globalSessions.map(session => (
-                <Card key={session.id}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FolderOpen className="w-5 h-5 text-purple-500" />
-                      {session.titulo}
-                    </CardTitle>
-                    <CardDescription>{session.descricao}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {(globalTrailsBySession[session.id] || []).length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4 text-center">{t.adminTrails.noTrailsInSession}</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {(globalTrailsBySession[session.id] || []).map(trail => (
-                          <TrailCard
-                            key={trail.id}
-                            trail={trail}
-                            isActive={activatedTrailIds.has(trail.id)}
-                            isToggling={togglingTrail === trail.id}
-                            onToggle={() => toggleGlobalTrail(trail, session.id)}
-                            onAnalytics={() => openAnalytics(trail)}
-                          />
-                        ))}
+              globalSessions.map(session => {
+                const trails = globalTrailsBySession[session.id] || [];
+                const isExpanded = expandedGlobalSessions.has(session.id);
+                const activeCount = trails.filter(t => activatedTrailIds.has(t.id)).length;
+                const total = trails.length;
+                const allActive = total > 0 && activeCount === total;
+                const someActive = activeCount > 0 && activeCount < total;
+                const isBulkToggling = togglingSessionBulk === session.id;
+
+                return (
+                  <Card key={session.id} className="overflow-hidden">
+                    {/* Header: clicavel pra expandir + toggle bulk + contador */}
+                    <div className="flex items-center justify-between p-4">
+                      <div
+                        className="flex items-center gap-3 flex-1 cursor-pointer min-w-0"
+                        onClick={() => toggleGlobalSessionExpanded(session.id)}
+                      >
+                        <FolderOpen className="w-5 h-5 text-purple-500 shrink-0" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold">{session.titulo}</h3>
+                            {someActive && (
+                              <Badge variant="outline" className="text-xs">{activeCount} de {total} ativas</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">{session.descricao}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {total > 0 && (
+                          <div className="flex items-center gap-2">
+                            {isBulkToggling ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Switch
+                                checked={allActive}
+                                onCheckedChange={() => toggleAllTrailsInGlobalSession(session)}
+                                aria-label={allActive ? 'Desativar todas as trilhas' : 'Ativar todas as trilhas'}
+                              />
+                            )}
+                            <span className="text-xs text-muted-foreground w-20">
+                              {allActive ? t.adminTrails.sessionActive : t.adminTrails.sessionInactive}
+                            </span>
+                          </div>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleGlobalSessionExpanded(session.id)}
+                          aria-label={isExpanded ? 'Colapsar' : 'Expandir'}
+                        >
+                          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Conteudo expandido: trilhas individuais */}
+                    {isExpanded && (
+                      <div className="border-t bg-muted/30 px-4 py-3">
+                        {trails.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-4 text-center">{t.adminTrails.noTrailsInSession}</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {trails.map(trail => (
+                              <TrailCard
+                                key={trail.id}
+                                trail={trail}
+                                isActive={activatedTrailIds.has(trail.id)}
+                                isToggling={togglingTrail === trail.id}
+                                onToggle={() => toggleGlobalTrail(trail, session.id)}
+                                onAnalytics={() => openAnalytics(trail)}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              ))
+                  </Card>
+                );
+              })
             )}
           </TabsContent>
 
@@ -405,53 +554,75 @@ export default function AdminTrilhasPage() {
               companySessions.map(session => {
                 const sessionTrails = companyTrailsBySession[session.id] || [];
                 const isSessionToggling = togglingSession === session.id;
+                const isExpanded = expandedCompanySessions.has(session.id);
                 return (
-                <Card key={session.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <FolderOpen className="w-5 h-5 text-purple-500" />
-                        {session.titulo}
-                      </CardTitle>
+                <Card key={session.id} className="overflow-hidden">
+                  {/* Header: clicavel pra expandir + acoes da sessao */}
+                  <div className="flex items-center justify-between p-4">
+                    <div
+                      className="flex items-center gap-3 flex-1 cursor-pointer min-w-0"
+                      onClick={() => toggleCompanySessionExpanded(session.id)}
+                    >
+                      <FolderOpen className="w-5 h-5 text-purple-500 shrink-0" />
+                      <div className="min-w-0">
+                        <h3 className="font-semibold">{session.titulo}</h3>
+                        <p className="text-sm text-muted-foreground truncate">{session.descricao}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-2">
-                          {isSessionToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-                            <Switch checked={session.ativa} onCheckedChange={() => toggleCompanySessionActive(session)} />
-                          )}
-                          <span className="text-xs text-muted-foreground w-16">{session.ativa ? t.adminTrails.sessionActive : t.adminTrails.sessionInactive}</span>
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={() => {
-                          setEditingCompanySession(session);
-                          setEditSessionForm({ titulo: session.titulo, descricao: session.descricao });
-                          setEditSessionDialogOpen(true);
-                        }}>
-                          <Pencil className="w-4 h-4" />
-                        </Button>
+                        {isSessionToggling ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                          <Switch checked={session.ativa} onCheckedChange={() => toggleCompanySessionActive(session)} />
+                        )}
+                        <span className="text-xs text-muted-foreground w-16">{session.ativa ? t.adminTrails.sessionActive : t.adminTrails.sessionInactive}</span>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => {
+                        setEditingCompanySession(session);
+                        setEditSessionForm({ titulo: session.titulo, descricao: session.descricao });
+                        setEditSessionDialogOpen(true);
+                      }}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteSessionTarget(session)} aria-label="Excluir sessao">
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => toggleCompanySessionExpanded(session.id)}
+                        aria-label={isExpanded ? 'Colapsar' : 'Expandir'}
+                      >
+                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Conteudo expandido: trilhas + botao Nova Trilha */}
+                  {isExpanded && (
+                    <div className="border-t bg-muted/30 px-4 py-3 space-y-3">
+                      <div className="flex justify-end">
                         <Button size="sm" onClick={() => openBuilder(session)} className="bg-purple-600 hover:bg-purple-700">
                           <Plus className="w-4 h-4 mr-2" /> {t.adminTrails.newTrail}
                         </Button>
                       </div>
+                      {sessionTrails.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">{t.adminTrails.noTrailsInSessionCreate}</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {sessionTrails.map(trail => (
+                            <TrailCard
+                              key={trail.id}
+                              trail={trail}
+                              onEdit={() => openBuilder(session, trail)}
+                              onDelete={() => setDeleteTrailTarget({ trailId: trail.id, sessionId: session.id })}
+                              onAnalytics={() => openAnalytics(trail)}
+                              onToggle={() => toggleCompanyTrailActive(trail, session.id)}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <CardDescription>{session.descricao}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {sessionTrails.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">{t.adminTrails.noTrailsInSessionCreate}</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {sessionTrails.map(trail => (
-                          <TrailCard
-                            key={trail.id}
-                            trail={trail}
-                            onEdit={() => openBuilder(session, trail)}
-                            onDelete={() => setDeleteTrailTarget({ trailId: trail.id, sessionId: session.id })}
-                            onAnalytics={() => openAnalytics(trail)}
-                            onToggle={() => toggleCompanyTrailActive(trail, session.id)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
+                  )}
                 </Card>
                 );
               })
@@ -501,6 +672,25 @@ export default function AdminTrilhasPage() {
       <div className="flex justify-center pt-4 pb-2">
         <SuggestTrailDialog pagina="Trilhas Admin" />
       </div>
+
+      {/* DELETE SESSION CONFIRMATION */}
+      <Dialog open={!!deleteSessionTarget} onOpenChange={(open) => { if (!open) setDeleteSessionTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir sessao</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir a sessao &quot;{deleteSessionTarget?.titulo}&quot;? Todas as trilhas dentro dela tambem serao excluidas. Esta acao nao pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteSessionTarget(null)} disabled={deletingSession}>{t.common.cancel || 'Cancelar'}</Button>
+            <Button variant="destructive" onClick={() => deleteSessionTarget && deleteCompanySession(deleteSessionTarget)} disabled={deletingSession}>
+              {deletingSession ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              {t.common.delete || 'Excluir'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* DELETE TRAIL CONFIRMATION */}
       <Dialog open={!!deleteTrailTarget} onOpenChange={(open) => { if (!open) setDeleteTrailTarget(null); }}>
