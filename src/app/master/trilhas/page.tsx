@@ -22,15 +22,18 @@ import {
   DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  Plus, Pencil, Trash2, ChevronRight, BookOpen,
-  ArrowLeft, Loader2, FolderOpen, Upload,
+  Plus, Pencil, Trash2, ChevronRight, ChevronDown, BookOpen,
+  Loader2, FolderOpen, Upload,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Sessao, Trilha, Modulo, TrilhaAnalytics } from '@/types/trilhas';
 import { TrailBuilder, TrailCard, AnalyticsDialog, calcPontuacao, type TrailFormData } from '@/components/trilhas';
 import { Header } from '@/components/dashboard/header';
 
-type ViewMode = 'sessions' | 'trails' | 'builder';
+// 'sessions' = lista principal com accordion inline.
+// 'builder'  = Trail Builder fullscreen (editar/criar trilha — UI densa
+//              merece tela inteira, nao cabe inline).
+type ViewMode = 'sessions' | 'builder';
 
 export default function MasterTrilhasPage() {
   const { toast } = useToast();
@@ -40,7 +43,13 @@ export default function MasterTrilhasPage() {
 
   // Data
   const [sessions, setSessions] = useState<Sessao[]>([]);
-  const [trails, setTrails] = useState<Trilha[]>([]);
+  // Trilhas indexadas por sessionId — suporta multiplas sessoes expandidas
+  // ao mesmo tempo. Cada sessao carrega lazy quando o usuario expande.
+  const [trailsBySessionId, setTrailsBySessionId] = useState<Record<string, Trilha[]>>({});
+  // Sessoes atualmente expandidas (multiplas simultaneas).
+  const [expandedSessionIds, setExpandedSessionIds] = useState<Set<string>>(new Set());
+  // Loading por sessao (mostra spinner so na sessao que esta carregando).
+  const [loadingTrailsBySessionId, setLoadingTrailsBySessionId] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   // Session Dialog
@@ -167,7 +176,8 @@ export default function MasterTrilhasPage() {
   // ============================================================
   // TRAIL BUILDER - Open / Save / Delete
   // ============================================================
-  const openTrailBuilder = (trail?: Trilha) => {
+  const openTrailBuilder = (session: Sessao, trail?: Trilha) => {
+    setSelectedSession(session);
     if (trail) {
       setSelectedTrail(trail);
       setTrailForm({
@@ -214,10 +224,12 @@ export default function MasterTrilhasPage() {
       } else {
         await addDoc(collection(db, `globalSessions/${selectedSession.id}/trails`), { ...trailData, criadaEm: Timestamp.now() });
       }
-      setViewMode('trails');
+      setViewMode('sessions');
+      // Garante que a sessao volta expandida pra mostrar a trilha salva.
+      setExpandedSessionIds(prev => new Set(prev).add(selectedSession.id));
       toast({ title: 'Trilha salva com sucesso!' });
       const updatedTrails = await loadTrails(selectedSession.id);
-      setTrails(updatedTrails);
+      setTrailsBySessionId(prev => ({ ...prev, [selectedSession.id]: updatedTrails }));
     } catch (err) {
       console.error('Erro ao salvar trilha:', err);
       toast({ variant: 'destructive', title: 'Erro ao salvar trilha', description: err instanceof Error ? err.message : 'Erro desconhecido' });
@@ -226,27 +238,42 @@ export default function MasterTrilhasPage() {
     }
   };
 
-  const deleteTrail = async (trailId: string) => {
-    if (!selectedSession || !confirm('Excluir esta trilha?')) return;
+  const deleteTrail = async (sessionId: string, trailId: string) => {
+    if (!confirm('Excluir esta trilha?')) return;
     try {
-      await deleteDoc(doc(db, `globalSessions/${selectedSession.id}/trails`, trailId));
+      await deleteDoc(doc(db, `globalSessions/${sessionId}/trails`, trailId));
       toast({ title: 'Trilha excluida com sucesso!' });
-      const updatedTrails = await loadTrails(selectedSession.id);
-      setTrails(updatedTrails);
+      const updatedTrails = await loadTrails(sessionId);
+      setTrailsBySessionId(prev => ({ ...prev, [sessionId]: updatedTrails }));
     } catch (err) {
       console.error('Erro ao excluir trilha:', err);
       toast({ variant: 'destructive', title: 'Erro ao excluir trilha', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     }
   };
 
-  // Navigate to session trails
-  const openSessionTrails = async (session: Sessao) => {
-    setSelectedSession(session);
-    setLoading(true);
-    const sessionTrails = await loadTrails(session.id);
-    setTrails(sessionTrails);
-    setViewMode('trails');
-    setLoading(false);
+  // Toggle accordion: expande/colapsa uma sessao. Carrega trilhas lazy
+  // na primeira expansao; expansoes seguintes reaproveitam o cache local.
+  const toggleSessionExpansion = async (session: Sessao) => {
+    setExpandedSessionIds(prev => {
+      const next = new Set(prev);
+      if (next.has(session.id)) {
+        next.delete(session.id);
+      } else {
+        next.add(session.id);
+      }
+      return next;
+    });
+
+    // Lazy load: carrega trilhas dessa sessao se ainda nao foi carregado.
+    if (!trailsBySessionId[session.id] && !loadingTrailsBySessionId[session.id]) {
+      setLoadingTrailsBySessionId(prev => ({ ...prev, [session.id]: true }));
+      try {
+        const sessionTrails = await loadTrails(session.id);
+        setTrailsBySessionId(prev => ({ ...prev, [session.id]: sessionTrails }));
+      } finally {
+        setLoadingTrailsBySessionId(prev => ({ ...prev, [session.id]: false }));
+      }
+    }
   };
 
   const openAnalytics = (trail: Trilha) => {
@@ -285,7 +312,7 @@ export default function MasterTrilhasPage() {
       setImportDialogOpen(false);
       setImportJson('');
       const updatedTrails = await loadTrails(selectedSession.id);
-      setTrails(updatedTrails);
+      setTrailsBySessionId(prev => ({ ...prev, [selectedSession.id]: updatedTrails }));
     } catch (err) {
       console.error('Erro ao importar trilha:', err);
       toast({ variant: 'destructive', title: 'Erro ao importar', description: err instanceof Error ? err.message : 'JSON inválido ou erro de rede' });
@@ -295,7 +322,7 @@ export default function MasterTrilhasPage() {
   };
 
   // ============================================================
-  // RENDER: Sessions View
+  // RENDER: Sessions View (com accordion inline)
   // ============================================================
   const renderSessionsView = () => (
     <div className="space-y-6">
@@ -324,84 +351,84 @@ export default function MasterTrilhasPage() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {sessions.map(session => (
-            <Card key={session.id} className="overflow-hidden">
-              <div className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => openSessionTrails(session)}>
-                  <FolderOpen className="w-5 h-5 text-purple-500" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{session.titulo}</h3>
-                      <Badge variant="outline" className="text-xs">{session.locale === 'en' ? '🇺🇸 EN' : '🇧🇷 PT'}</Badge>
+          {sessions.map(session => {
+            const isExpanded = expandedSessionIds.has(session.id);
+            const sessionTrails = trailsBySessionId[session.id];
+            const isLoadingTrails = loadingTrailsBySessionId[session.id];
+
+            return (
+              <Card key={session.id} className="overflow-hidden">
+                {/* Header da sessao — clicavel pra expandir */}
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => toggleSessionExpansion(session)}>
+                    <FolderOpen className="w-5 h-5 text-purple-500" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">{session.titulo}</h3>
+                        <Badge variant="outline" className="text-xs">{session.locale === 'en' ? '🇺🇸 EN' : '🇧🇷 PT'}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{session.descricao}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">{session.descricao}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch checked={session.ativa} onCheckedChange={() => toggleSessionActive(session)} />
+                    <Button variant="ghost" size="icon" onClick={() => openSessionDialog(session)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteSession(session.id)}>
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleSessionExpansion(session)}
+                      aria-label={isExpanded ? 'Colapsar trilhas' : 'Expandir trilhas'}
+                    >
+                      {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={session.ativa} onCheckedChange={() => toggleSessionActive(session)} />
-                  <Button variant="ghost" size="icon" onClick={() => openSessionDialog(session)}>
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => deleteSession(session.id)}>
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => openSessionTrails(session)}>
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 
-  // ============================================================
-  // RENDER: Trails List View
-  // ============================================================
-  const renderTrailsView = () => (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={() => { setViewMode('sessions'); setSelectedSession(null); }}>
-          <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
-        </Button>
-        <div className="flex-1">
-          <h2 className="text-2xl font-bold">{selectedSession?.titulo}</h2>
-          <p className="text-muted-foreground">{selectedSession?.descricao}</p>
-        </div>
-        <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-          <Upload className="w-4 h-4 mr-2" /> Importar JSON
-        </Button>
-        <Button onClick={() => openTrailBuilder()} className="bg-purple-600 hover:bg-purple-700">
-          <Plus className="w-4 h-4 mr-2" /> Nova Trilha
-        </Button>
-      </div>
+                {/* Bloco expandido: trilhas + acoes */}
+                {isExpanded && (
+                  <div className="border-t bg-muted/30 px-4 py-4 space-y-3">
+                    <div className="flex items-center justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => { setSelectedSession(session); setImportDialogOpen(true); }}>
+                        <Upload className="w-4 h-4 mr-2" /> Importar JSON
+                      </Button>
+                      <Button size="sm" onClick={() => openTrailBuilder(session)} className="bg-purple-600 hover:bg-purple-700">
+                        <Plus className="w-4 h-4 mr-2" /> Nova Trilha
+                      </Button>
+                    </div>
 
-      {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-purple-500" /></div>
-      ) : trails.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <BookOpen className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">Nenhuma trilha nesta sessao</p>
-            <p className="text-muted-foreground mb-4">Crie a primeira trilha de aprendizagem</p>
-            <Button onClick={() => openTrailBuilder()} variant="outline">
-              <Plus className="w-4 h-4 mr-2" /> Criar Trilha
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {trails.map(trail => (
-            <TrailCard
-              key={trail.id}
-              trail={trail}
-              onEdit={() => openTrailBuilder(trail)}
-              onDelete={() => deleteTrail(trail.id)}
-              onAnalytics={() => openAnalytics(trail)}
-            />
-          ))}
+                    {isLoadingTrails ? (
+                      <div className="flex justify-center py-6">
+                        <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                      </div>
+                    ) : !sessionTrails || sessionTrails.length === 0 ? (
+                      <div className="text-center py-6 text-muted-foreground">
+                        <BookOpen className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Nenhuma trilha nesta sessao</p>
+                        <p className="text-xs">Clique em &quot;Nova Trilha&quot; para comecar</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {sessionTrails.map(trail => (
+                          <TrailCard
+                            key={trail.id}
+                            trail={trail}
+                            onEdit={() => openTrailBuilder(session, trail)}
+                            onDelete={() => deleteTrail(session.id, trail.id)}
+                            onAnalytics={() => openAnalytics(trail)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -415,7 +442,6 @@ export default function MasterTrilhasPage() {
       <Header title="Trilhas" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         {viewMode === 'sessions' && renderSessionsView()}
-        {viewMode === 'trails' && renderTrailsView()}
         {viewMode === 'builder' && (
           <TrailBuilder
             session={selectedSession}
@@ -426,7 +452,13 @@ export default function MasterTrilhasPage() {
             onModulosChange={setModulos}
             saving={saving}
             onSave={saveTrail}
-            onBack={() => setViewMode('trails')}
+            onBack={() => {
+              setViewMode('sessions');
+              // Mantem a sessao expandida ao voltar pra lista.
+              if (selectedSession) {
+                setExpandedSessionIds(prev => new Set(prev).add(selectedSession.id));
+              }
+            }}
             onImageUpload={handleImageUpload}
           />
         )}

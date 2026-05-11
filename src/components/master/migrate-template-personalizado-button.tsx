@@ -31,7 +31,7 @@ export function MigrateTemplatePersonalizadoButton() {
 
   const handleClick = () => {
     const ok = window.confirm(
-      'Criar a sessão "Trilhas Personalizadas — Template" em todas as empresas existentes que ainda não têm?\n\n' +
+      'Criar a sessão "Marca Corporativa" em todas as empresas existentes que ainda não têm?\n\n' +
         'Esta ação é idempotente — empresas que já receberam serão ignoradas. ' +
         'Empresas novas (criadas a partir de hoje) já recebem automaticamente.',
     );
@@ -73,7 +73,7 @@ export function MigrateTemplatePersonalizadoButton() {
       ) : (
         <BookOpen className="mr-2 h-4 w-4" />
       )}
-      {hasRun ? 'Rodar de novo' : 'Backfill template'}
+      {hasRun ? 'Rodar de novo' : 'Backfill Marca Corporativa'}
     </Button>
   );
 }

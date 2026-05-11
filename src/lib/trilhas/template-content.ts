@@ -34,7 +34,7 @@ export type TemplateContent = {
 };
 
 const PT_BR: TemplateContent = {
-  sessaoTitulo: 'Trilhas Personalizadas — Template',
+  sessaoTitulo: 'Marca Corporativa',
   sessaoDescricao:
     'Estas trilhas são esqueletos para você adaptar com o conteúdo da sua empresa.\n\n' +
     'Cada trilha tem uma descrição explicando por que ela existe e o que você poderia colocar ali. ' +
@@ -92,7 +92,7 @@ const PT_BR: TemplateContent = {
 };
 
 const EN: TemplateContent = {
-  sessaoTitulo: 'Personalized Trails — Template',
+  sessaoTitulo: 'Corporate Brand',
   sessaoDescricao:
     'These trails are skeletons for you to adapt with your company content.\n\n' +
     'Each trail has a description explaining why it exists and what you could put there. ' +

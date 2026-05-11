@@ -155,12 +155,26 @@ export async function seedTemplatePersonalizado(
       kind: 'template_personalizado.seeded',
       actorRole: 'system',
       actorUid: null,
-      summary: `Sessão "Trilhas Personalizadas — Template" criada com ${content.trilhas.length} trilhas`,
+      summary: `Sessão "Marca Corporativa" criada com ${content.trilhas.length} trilhas`,
     },
     { idempotencyKey: companyId },
   );
 
   return { created: content.trilhas.length, skipped: false };
+}
+
+// ─── Seed template em UMA empresa especifica (chamado pelo master) ─────
+// Wrapper com auth check em volta de seedTemplatePersonalizado.
+// Usado pelo botao "Criar Marca Corporativa" no menu de acoes de cada
+// linha da tabela master/empresas — permite testar o seed em uma empresa
+// antes de rodar em todas.
+
+export async function seedTemplatePersonalizadoForCompany(
+  idToken: string,
+  companyId: string,
+): Promise<{ created: number; skipped: boolean }> {
+  await requireMaster(idToken);
+  return seedTemplatePersonalizado(companyId);
 }
 
 // ─── Migration endpoint: seed template em todas as empresas existentes ──

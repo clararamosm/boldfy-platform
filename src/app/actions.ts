@@ -11,6 +11,6 @@ export { createScheduledPost, updateScheduledPost, deleteScheduledPost, getSched
 export { createPipelinePost, updatePipelinePost, deletePipelinePost, getPipelinePosts, approvePipelineIdea, approvePipelinePost, requestPipelineAdjustment, resolvePipelineAdjustment, markPipelinePostPublished, getAllPipelinePostsForStrategist, getRecentActivitiesForStrategist, getStrategistSidebarData, type PipelinePost, type PipelineStatus, type CalendarPipelinePost, type StrategistSidebarCompany, type Activity } from './actions/content-pipeline';
 export { saveContentStrategy, getContentStrategy, saveBrandManual, getBrandManual, getCompanyBrandContext, saveCompanyBrandContext, type ContentStrategyData, type BrandManualData, type BrandContextData } from './actions/content-strategy';
 export { getSlackChannels, getSlackConfig, saveSlackConfig, testSlackNotification } from './actions/slack';
-export { seedNativeRewards, migrateAllCompaniesNativeRewards, seedTemplatePersonalizado, migrateAllCompaniesTemplatePersonalizado } from './actions/company-setup';
+export { seedNativeRewards, migrateAllCompaniesNativeRewards, seedTemplatePersonalizado, seedTemplatePersonalizadoForCompany, migrateAllCompaniesTemplatePersonalizado } from './actions/company-setup';
 export { awardPublicationPoints, checkAndAwardConquests, checkConquestsFromClient, catchUpConquests, sendCongratulation } from './actions/gamification';
 export { CONQUEST_LADDERS, getLevelFromCycles, LEVEL_THRESHOLDS, getNextConquestTarget, getConquestGoalName } from '@/lib/gamification-constants';

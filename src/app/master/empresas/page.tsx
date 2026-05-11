@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, PlusCircle, LogIn, Loader2, Trash2, Globe, Settings2 } from "lucide-react";
+import { MoreHorizontal, PlusCircle, LogIn, Loader2, Trash2, Globe, Settings2, BookOpen } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,7 @@ import Link from "next/link";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { getAuthToken } from '@/lib/auth-client';
-import { inviteAdmin } from '@/app/actions';
+import { inviteAdmin, seedTemplatePersonalizadoForCompany } from '@/app/actions';
 import { deleteCompany } from '@/app/deleteCompanyAction';
 import { MigrateTemplatePersonalizadoButton } from '@/components/master/migrate-template-personalizado-button';
 
@@ -138,6 +138,8 @@ export default function MasterEmpresasPage() {
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [confirmDeleteName, setConfirmDeleteName] = useState("");
     const [cachedToken, setCachedToken] = useState('');
+    // Loading state pro seed individual de Marca Corporativa por empresa.
+    const [seedingCompanyId, setSeedingCompanyId] = useState<string | null>(null);
     const formRef = useRef<HTMLFormElement>(null);
 
     const [inviteState, formAction] = useActionState(inviteAdmin, { error: undefined, success: undefined });
@@ -317,6 +319,38 @@ export default function MasterEmpresasPage() {
     setConfirmDeleteName(company.companyName);
   };
 
+  // Cria a sessao "Marca Corporativa" + 5 trilhas em UMA empresa especifica.
+  // Idempotente: se a empresa ja tem a sessao, action retorna skipped: true
+  // e nada e duplicado.
+  const handleSeedMarcaCorporativa = async (company: Company) => {
+    if (seedingCompanyId) return; // ja tem um rodando
+    setSeedingCompanyId(company.id);
+    try {
+      const token = await getAuthToken();
+      const result = await seedTemplatePersonalizadoForCompany(token, company.id);
+      if (result.skipped) {
+        toast({
+          title: 'Já existe',
+          description: `${company.companyName} já tem a sessão "Marca Corporativa".`,
+        });
+      } else {
+        toast({
+          title: 'Marca Corporativa criada!',
+          description: `${result.created} trilhas adicionadas em ${company.companyName}.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error seeding Marca Corporativa:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao criar sessão',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+      });
+    } finally {
+      setSeedingCompanyId(null);
+    }
+  };
+
   const handleDeleteCompany = async () => {
     if (!confirmDeleteId) return;
     try {
@@ -456,6 +490,17 @@ export default function MasterEmpresasPage() {
                                                         <Settings2 className="mr-2 h-4 w-4" />
                                                         Gerenciar
                                                     </Link>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                  onClick={() => handleSeedMarcaCorporativa(company)}
+                                                  disabled={seedingCompanyId === company.id}
+                                                >
+                                                  {seedingCompanyId === company.id ? (
+                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                  ) : (
+                                                    <BookOpen className="mr-2 h-4 w-4" />
+                                                  )}
+                                                  Criar Marca Corporativa
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteCompanyConfirm(company)}>
                                                   <Trash2 className="mr-2 h-4 w-4" />
