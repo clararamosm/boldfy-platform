@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   BookOpen, Gift, LayoutDashboard, Library, Trophy, Users,
@@ -22,6 +22,21 @@ import { cn } from '@/lib/utils';
 import { useUnreadFeed } from '@/hooks/use-unread-feed';
 import { useT } from '@/lib/i18n/context';
 
+// Preserva ?companyId= ou ?c= na navegacao do sidebar.
+// Sem isto, master/strategist visualizando uma empresa perdem o contexto
+// ao clicar em qualquer item — useAuthGuard nao acha companyId na URL e
+// redireciona pra /master/empresas (ou /strategist/empresas).
+function useCompanyAwareHref() {
+  const searchParams = useSearchParams();
+  const companySlug = searchParams.get('c');
+  const companyId = searchParams.get('companyId');
+  return (href: string) => {
+    if (companySlug) return `${href}?c=${companySlug}`;
+    if (companyId) return `${href}?companyId=${companyId}`;
+    return href;
+  };
+}
+
 // Item simples (sem submenu)
 function SimpleItem({
   href,
@@ -37,6 +52,7 @@ function SimpleItem({
   disabled?: boolean;
 }) {
   const pathname = usePathname();
+  const buildHref = useCompanyAwareHref();
   const isActive = pathname.startsWith(href);
 
   if (disabled) {
@@ -63,7 +79,7 @@ function SimpleItem({
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={isActive}>
-        <Link href={href}>
+        <Link href={buildHref(href)}>
           <Icon className="h-4 w-4" />
           <span className="flex items-center gap-2 font-medium">
             {title}
@@ -93,6 +109,7 @@ function CollapsibleGroup({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const pathname = usePathname();
+  const buildHref = useCompanyAwareHref();
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -109,7 +126,7 @@ function CollapsibleGroup({
             {items.map(item => (
               <SidebarMenuSubItem key={item.href}>
                 <SidebarMenuSubButton asChild isActive={pathname.startsWith(item.href)}>
-                  <Link href={item.href}>
+                  <Link href={buildHref(item.href)}>
                     <item.icon className="h-3.5 w-3.5" />
                     <span>{item.title}</span>
                   </Link>

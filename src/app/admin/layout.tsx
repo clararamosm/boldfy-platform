@@ -11,7 +11,7 @@ import { AdminSidebarNav } from "@/components/dashboard/admin-sidebar-nav";
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { User as UserIcon, Loader2, ArrowLeft, Shield, HelpCircle, Palette, CreditCard } from "lucide-react";
 import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { AuthProvider } from "@/contexts/auth-context";
@@ -30,9 +30,22 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const t = useT();
     const { user, companyId, locale, loading, ready, isMasterMode, masterCompanyName } = useAuthGuard({ role: 'admin' });
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [companyLogoUrl, setCompanyLogoUrl] = useState<string | undefined>();
     const [companyName, setCompanyName] = useState('');
     const [licensesCount, setLicensesCount] = useState(5);
+
+    // Preserva ?companyId= (master) ou ?c= (slug) nos links do footer.
+    // Sem isto, master clica em Configuracoes/Billing/etc e perde o contexto
+    // da empresa que estava visualizando — useAuthGuard nao acha companyId
+    // na URL e redireciona pra /master/empresas.
+    const buildAdminHref = (href: string) => {
+      const companySlug = searchParams.get('c');
+      const urlCompanyId = searchParams.get('companyId');
+      if (companySlug) return `${href}?c=${companySlug}`;
+      if (urlCompanyId) return `${href}?companyId=${urlCompanyId}`;
+      return href;
+    };
 
     useEffect(() => {
         if (!companyId) return;
@@ -80,10 +93,10 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                     avatarOverride={companyLogoUrl}
                     feedbackPage="Sidebar"
                     menuItems={[
-                        { href: '/admin/configuracoes', label: t.nav.settings, icon: UserIcon },
-                        { href: '/admin/billing', label: 'Planos e cobrança', icon: CreditCard },
-                        { href: '/admin/brand-context', label: 'Brand Context', icon: Palette },
-                        { href: '/admin/suporte', label: t.nav.support, icon: HelpCircle },
+                        { href: buildAdminHref('/admin/configuracoes'), label: t.nav.settings, icon: UserIcon },
+                        { href: buildAdminHref('/admin/billing'), label: 'Planos e cobrança', icon: CreditCard },
+                        { href: buildAdminHref('/admin/brand-context'), label: 'Brand Context', icon: Palette },
+                        { href: buildAdminHref('/admin/suporte'), label: t.nav.support, icon: HelpCircle },
                     ]}
                     onLogout={handleLogout}
                     logoutLabel={t.nav.signOut}
