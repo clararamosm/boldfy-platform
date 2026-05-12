@@ -119,6 +119,10 @@ export default function TrilhaFullscreenPage() {
               videoRef={player.videoRef}
               videoProgress={player.videoProgress}
               onVideoTimeUpdate={player.handleVideoTimeUpdate}
+              isYouTube={player.videoState.isYouTube}
+              isVimeo={player.videoState.isVimeo}
+              hasRealTracking={player.videoState.hasRealTracking}
+              playerLoadError={player.playerLoadError}
               currentQuestionIndex={player.currentQuestionIndex}
               selectedAnswers={player.selectedAnswers}
               answeredQuestions={player.answeredQuestions}
@@ -142,6 +146,8 @@ export default function TrilhaFullscreenPage() {
             quizSubmitted={player.quizSubmitted}
             saving={player.saving}
             videoCompleted={player.videoCompleted}
+            hasRealTracking={player.videoState.hasRealTracking}
+            playerLoadError={player.playerLoadError}
             activeModuleIndex={player.activeModuleIndex}
             totalModules={player.totalModules}
             isWorkbook={player.currentModule?.tipo === 'faca_voce_mesmo' && isWorkbookModule(player.currentModule?.conteudo?.instrucao)}

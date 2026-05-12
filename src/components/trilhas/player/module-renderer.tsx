@@ -36,6 +36,10 @@ type Props = {
   videoRef: React.RefObject<HTMLVideoElement>;
   videoProgress: number;
   onVideoTimeUpdate: () => void;
+  isYouTube: boolean;
+  isVimeo: boolean;
+  hasRealTracking: boolean;
+  playerLoadError: boolean;
   // Quiz
   currentQuestionIndex: number;
   selectedAnswers: Record<number, number>;
@@ -57,6 +61,7 @@ type Props = {
 export function ModuleRenderer({
   currentModule, moduleCompleted,
   videoRef, videoProgress, onVideoTimeUpdate,
+  isYouTube, isVimeo, hasRealTracking, playerLoadError,
   currentQuestionIndex, selectedAnswers, answeredQuestions,
   quizSubmitted, quizScore, alreadyAttempted,
   onAnswerSelect, onConfirmAnswer, onNextQuestion, onSubmitDesafio,
@@ -78,33 +83,33 @@ export function ModuleRenderer({
         </div>
 
         <div className="aspect-video bg-black rounded-lg overflow-hidden">
-          {currentModule.conteudo?.videoUrl ? (
-            currentModule.conteudo.videoUrl.includes('youtube') ||
-            currentModule.conteudo.videoUrl.includes('youtu.be') ||
-            currentModule.conteudo.videoUrl.includes('vimeo') ? (
-              <iframe
-                src={currentModule.conteudo.videoUrl}
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            ) : (
-              <video
-                ref={videoRef}
-                src={currentModule.conteudo.videoUrl}
-                controls
-                className="w-full h-full"
-                onTimeUpdate={onVideoTimeUpdate}
-              />
-            )
-          ) : (
+          {!currentModule.conteudo?.videoUrl ? (
             <div className="w-full h-full flex items-center justify-center text-white/50">
               <Play className="h-16 w-16" />
             </div>
+          ) : isYouTube ? (
+            // YouTube IFrame Player API substitui essa div pelo iframe
+            // gerenciado. Tracking real de 80% acontece no useEffect do hook.
+            <div id="yt-player-mount" className="w-full h-full" />
+          ) : isVimeo ? (
+            <iframe
+              src={currentModule.conteudo.videoUrl}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <video
+              ref={videoRef}
+              src={currentModule.conteudo.videoUrl}
+              controls
+              className="w-full h-full"
+              onTimeUpdate={onVideoTimeUpdate}
+            />
           )}
         </div>
 
-        {!moduleCompleted && (
+        {!moduleCompleted && hasRealTracking && !playerLoadError && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>{tp.videoProgress}</span>
@@ -112,6 +117,13 @@ export function ModuleRenderer({
             </div>
             <Progress value={videoProgress} className="h-2" />
             <p className="text-xs text-muted-foreground">{tp.videoMinWatch}</p>
+          </div>
+        )}
+
+        {!moduleCompleted && isYouTube && playerLoadError && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+            <AlertCircle className="inline h-4 w-4 mr-1" />
+            Não conseguimos verificar o progresso desse vídeo. Confirme abaixo que você assistiu antes de marcar como concluído.
           </div>
         )}
       </div>

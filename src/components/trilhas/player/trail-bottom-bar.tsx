@@ -13,6 +13,8 @@ type Props = {
   quizSubmitted: boolean;
   saving: boolean;
   videoCompleted: boolean;
+  hasRealTracking: boolean;
+  playerLoadError: boolean;
   activeModuleIndex: number | null;
   totalModules: number;
   isWorkbook?: boolean;
@@ -24,7 +26,8 @@ type Props = {
 
 export function TrailBottomBar({
   currentModule, moduleCompleted, quizSubmitted, saving,
-  videoCompleted, activeModuleIndex, totalModules, isWorkbook,
+  videoCompleted, hasRealTracking, playerLoadError,
+  activeModuleIndex, totalModules, isWorkbook,
   onPrev, onNext, onCompleteModule, onUnlockMission,
 }: Props) {
   const tp = useT().trailPlayer;
@@ -42,7 +45,7 @@ export function TrailBottomBar({
               {currentModule.tipo === 'aula' && (
                 <Button
                   onClick={() => onCompleteModule(currentModule.id, currentModule.pontuacaoBase || 0)}
-                  disabled={!videoCompleted && !(currentModule.conteudo?.videoUrl?.includes('youtube') || currentModule.conteudo?.videoUrl?.includes('vimeo'))}
+                  disabled={hasRealTracking && !videoCompleted && !playerLoadError}
                 >
                   <CheckCircle2 className="mr-2 h-4 w-4" /> {tp.moduleCompleted}
                 </Button>

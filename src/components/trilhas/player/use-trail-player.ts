@@ -20,6 +20,12 @@ import type {
   Trilha, Modulo, ModuloModo, ProgressoTrilha, QuestaoDesafio, MissaoGatilho
 } from '@/types/trilhas';
 import { isWorkbookModule } from '@/types/trilhas';
+import {
+  extractYouTubeVideoId,
+  loadYouTubeAPI,
+  YT_PLAYER_STATE,
+  type YTPlayer,
+} from '@/lib/youtube-player';
 
 const DESAFIO_FAIXA_MIN = 0.6;
 const DESAFIO_FAIXA_BONUS = 0.8;
@@ -83,6 +89,13 @@ export function useTrailPlayer(trailId: string) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoCompleted, setVideoCompleted] = useState(false);
+
+  // YouTube player state (instanciado via YouTube IFrame API quando o módulo
+  // é aula + URL YouTube). Veja /specs/trilha-video-tracking.md.
+  const playerRef = useRef<YTPlayer | null>(null);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [tempoAssistido, setTempoAssistido] = useState(0);
+  const [playerLoadError, setPlayerLoadError] = useState(false);
 
   // ─── Auth ───────────────────────────────────────────────
   useEffect(() => {
@@ -411,6 +424,9 @@ export function useTrailPlayer(trailId: string) {
     setAlreadyAttempted(false);
     setVideoProgress(0);
     setVideoCompleted(false);
+    setVideoDuration(0);
+    setTempoAssistido(0);
+    setPlayerLoadError(false);
   }, []);
 
   const startTrail = useCallback(() => {
@@ -481,6 +497,111 @@ export function useTrailPlayer(trailId: string) {
     if (percent >= 80) setVideoCompleted(true);
   }, []);
 
+  // ─── YouTube tracking ─────────────────────────────────
+  // Derived: que tipo de vídeo o módulo atual usa?
+  const videoState = useMemo(() => {
+    if (!currentModule || currentModule.tipo !== 'aula') {
+      return {
+        youtubeVideoId: null as string | null,
+        isYouTube: false,
+        isVimeo: false,
+        isHtml5Video: false,
+        hasRealTracking: false,
+      };
+    }
+    const videoUrl = currentModule.conteudo?.videoUrl || '';
+    const youtubeVideoId = extractYouTubeVideoId(videoUrl);
+    const isYouTube = !!youtubeVideoId;
+    const isVimeo = !isYouTube && videoUrl.includes('vimeo');
+    const isHtml5Video = !!videoUrl && !isYouTube && !isVimeo;
+    return {
+      youtubeVideoId,
+      isYouTube,
+      isVimeo,
+      isHtml5Video,
+      hasRealTracking: isYouTube || isHtml5Video,
+    };
+  }, [currentModule]);
+
+  // Instancia YT.Player quando o módulo é aula + YouTube. Rastreia tempo
+  // cumulativo em estado PLAYING (não confia em currentTime pra evitar
+  // burla por seek). Libera o botão quando passa de 80%.
+  useEffect(() => {
+    if (!videoState.isYouTube || !videoState.youtubeVideoId) return;
+    if (typeof window === 'undefined') return;
+
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let lastPlayingTimestamp: number | null = null;
+    let accumulatedSeconds = 0;
+    let knownDuration = 0;
+
+    // Fallback de 30s: se o player não carregar (rede bloqueia youtube.com
+    // etc), libera o botão com aviso pra não travar o módulo pra sempre.
+    const fallbackTimer = setTimeout(() => {
+      if (cancelled) return;
+      if (!playerRef.current) setPlayerLoadError(true);
+    }, 30000);
+
+    loadYouTubeAPI().then((YT) => {
+      if (cancelled) return;
+      const mount = document.getElementById('yt-player-mount');
+      if (!mount) return;
+
+      playerRef.current = new YT.Player('yt-player-mount', {
+        videoId: videoState.youtubeVideoId!,
+        playerVars: { rel: 0, modestbranding: 1 },
+        events: {
+          onReady: (e) => {
+            if (cancelled) return;
+            knownDuration = e.target.getDuration();
+            setVideoDuration(knownDuration);
+          },
+          onStateChange: (e) => {
+            if (cancelled) return;
+            if (e.data === YT_PLAYER_STATE.PLAYING) {
+              lastPlayingTimestamp = Date.now();
+              if (intervalId) clearInterval(intervalId);
+              intervalId = setInterval(() => {
+                if (lastPlayingTimestamp === null) return;
+                const now = Date.now();
+                const delta = (now - lastPlayingTimestamp) / 1000;
+                lastPlayingTimestamp = now;
+                accumulatedSeconds += delta;
+                setTempoAssistido(accumulatedSeconds);
+                const pct = knownDuration > 0
+                  ? (accumulatedSeconds / knownDuration) * 100
+                  : 0;
+                setVideoProgress(Math.min(pct, 100));
+                if (pct >= 80) setVideoCompleted(true);
+              }, 1000);
+            } else {
+              // PAUSED, ENDED, BUFFERING — para o contador
+              if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+              }
+              lastPlayingTimestamp = null;
+            }
+          },
+        },
+      });
+    }).catch((err) => {
+      console.error('Erro ao carregar YouTube API:', err);
+      if (!cancelled) setPlayerLoadError(true);
+    });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(fallbackTimer);
+      if (intervalId) clearInterval(intervalId);
+      if (playerRef.current?.destroy) {
+        try { playerRef.current.destroy(); } catch { /* ignore */ }
+      }
+      playerRef.current = null;
+    };
+  }, [videoState.isYouTube, videoState.youtubeVideoId]);
+
   return {
     // Data
     trail, progress, loading, user, companyId,
@@ -497,6 +618,7 @@ export function useTrailPlayer(trailId: string) {
 
     // Video state
     videoRef, videoProgress, videoCompleted,
+    videoState, playerLoadError,
 
     // Module helpers
     isModuleCompleted, canAccessModule,
