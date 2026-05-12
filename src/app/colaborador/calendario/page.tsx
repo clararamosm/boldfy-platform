@@ -19,8 +19,6 @@ import {
   ChevronRight,
   Plus,
   Clock,
-  CheckCircle2,
-  AlertCircle,
   Trash2,
   Edit3,
   Linkedin,
@@ -45,10 +43,10 @@ import {
 } from 'date-fns';
 import { useT, useLocale } from '@/lib/i18n/context';
 import { getDateLocale } from '@/lib/i18n/date-utils';
-import type { Dictionary } from '@/lib/i18n/dictionaries/pt-BR';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 import { resolvePersonalBrand } from '@/lib/personal-brand';
+import { getPostStatusConfig } from '@/lib/post-status-config';
 import type { PersonalBrandPillar } from '@/types/personal-brand';
 
 // ─── Types ──────
@@ -67,51 +65,9 @@ type CalendarItem =
   | { kind: 'post'; data: ScheduledPost }
   | { kind: 'mission'; data: CalendarMission };
 
-// ─── Config ──────
-function getPostStatusConfig(t: Dictionary) {
-  return {
-    published: {
-      tag: t.colabCalendar.tagPostPublished,
-      color: 'bg-[#0A66C2]/10 text-[#0A66C2] dark:bg-[#0A66C2]/20',
-      cardBorder: 'border-l-4 border-l-[#0A66C2]',
-      badge: 'bg-[#0A66C2]/10 text-[#0A66C2]',
-      dot: 'bg-[#0A66C2]',
-      icon: CheckCircle2,
-    },
-    scheduled: {
-      tag: t.colabCalendar.tagPostScheduled,
-      color: 'bg-[#0A66C2]/10 text-[#0A66C2] dark:bg-[#0A66C2]/20',
-      cardBorder: 'border-l-4 border-l-[#0A66C2]/60',
-      badge: 'bg-[#0A66C2]/10 text-[#0A66C2]',
-      dot: 'bg-[#0A66C2]/60',
-      icon: Clock,
-    },
-    in_progress: {
-      tag: t.colabCalendar.tagPostInProgress,
-      color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-      cardBorder: 'border-l-4 border-l-yellow-500',
-      badge: 'bg-yellow-100 text-yellow-700',
-      dot: 'bg-yellow-500',
-      icon: Edit3,
-    },
-    draft: {
-      tag: t.colabCalendar.tagPostIdea,
-      color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-      cardBorder: 'border-l-4 border-l-gray-400',
-      badge: 'bg-gray-100 text-gray-600',
-      dot: 'bg-gray-400',
-      icon: Edit3,
-    },
-    failed: {
-      tag: t.colabCalendar.tagPostFailed,
-      color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-      cardBorder: 'border-l-4 border-l-red-500',
-      badge: 'bg-red-100 text-red-700',
-      dot: 'bg-red-500',
-      icon: AlertCircle,
-    },
-  };
-}
+// Config visual dos status — extraida pra src/lib/post-status-config.ts
+// pra reuso com o editor (rodada de feedback do Clara: tag de status visivel
+// no editor pra colaborador saber em que pe o conteudo esta).
 
 // ─── Helpers ──────
 const toDate = (d: { toDate?: () => Date } | string | null | undefined): Date | null => {

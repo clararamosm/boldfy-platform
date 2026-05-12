@@ -40,6 +40,8 @@ import { useT, useLocale } from '@/lib/i18n/context';
 import { getDateLocale } from '@/lib/i18n/date-utils';
 import { resolvePersonalBrand } from '@/lib/personal-brand';
 import { getPillarClasses } from '@/lib/pillar-colors';
+import { getStatusConfig, type PostStatus } from '@/lib/post-status-config';
+import { Badge } from '@/components/ui/badge';
 import { mergePostFormats, isDefaultFormat, DEFAULT_POST_FORMATS } from '@/lib/post-formats';
 import { saveCustomPostFormats } from '@/app/actions/posts';
 import {
@@ -100,6 +102,11 @@ function EditorContent() {
   // save cria como draft (sem data = draft); saves seguintes atualizam.
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
+  // Status do post (rascunho/agendado/postado/falhou). Mostrado como badge
+  // no header pro colaborador saber em que pé o conteúdo está. Atualizado
+  // (a) ao carregar post em edit mode, (b) inferido após cada auto-save,
+  // (c) trocado quando publica/agenda manualmente.
+  const [postStatus, setPostStatus] = useState<PostStatus | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAutoSavingRef = useRef(false);
   // Guarda referencia ao primeiro render — nao dispara auto-save logo
@@ -255,6 +262,10 @@ function EditorContent() {
           }
           if (result.post.contentPillar) setContentPillar(result.post.contentPillar);
           if (result.post.formato) setFormato(result.post.formato);
+          // Hidrata status pra badge — quando o post existente ja foi
+          // postado, o user sabe que esta vendo um post imutavel.
+          setPostStatus(result.post.status as PostStatus);
+          if (result.post.linkedinPostUrl) setPublishedUrl(result.post.linkedinPostUrl);
         } else if (result.error) {
           toast({ variant: 'destructive', title: t.common.error, description: result.error });
           router.push('/colaborador/calendario');
@@ -394,6 +405,12 @@ function EditorContent() {
           ...(formato && { formato }),
         });
         if (!result.success) throw new Error(result.error || 'Update falhou');
+        // Server faz auto-bump de status (draft <-> scheduled) baseado
+        // em scheduledFor. Espelha aqui pra badge ficar em sync. Não
+        // sobrescreve se ja era 'published' ou 'failed' (post imutavel).
+        if (postStatus !== 'published' && postStatus !== 'failed') {
+          setPostStatus(scheduledFor ? 'scheduled' : 'draft');
+        }
       } else {
         const result = await createScheduledPost(token, userId, {
           caption,
@@ -408,6 +425,7 @@ function EditorContent() {
         });
         if (!result.success || !result.postId) throw new Error(result.error || 'Create falhou');
         setCurrentPostId(result.postId);
+        setPostStatus(scheduledFor ? 'scheduled' : 'draft');
         // Atualiza URL pra refletir o post (sem refresh) — assim se o user
         // der refresh, volta no mesmo doc em vez de criar duplicado.
         router.replace(`/colaborador/calendario/novo?edit=${result.postId}`);
@@ -572,6 +590,7 @@ function EditorContent() {
 
         if (result.success) {
           setPublishedUrl(result.postUrl || null);
+          setPostStatus('published');
           toast({ title: t.colabNewPost.publishedOnLinkedin, description: t.colabNewPost.publishedDescription });
         } else {
           toast({ variant: 'destructive', title: t.colabNewPost.publishError, description: result.error });
@@ -604,6 +623,7 @@ function EditorContent() {
 
         if (result.success) {
           setPublishedUrl(result.postUrl || null);
+          setPostStatus('published');
           toast({ title: t.colabNewPost.publishedOnLinkedin, description: t.colabNewPost.publishedDescription });
           completeOnboardingItem(userId ?? undefined, 'schedule-content');
         } else {
@@ -668,6 +688,20 @@ function EditorContent() {
             <span className="text-sm font-medium text-foreground truncate">
               {isEditMode ? t.colabNewPost.editTitle : t.colabNewPost.title}
             </span>
+
+            {/* Badge de status — mesmas cores/labels do calendário.
+                Aparece após primeiro auto-save (postStatus deixa de ser null).
+                Render só se há postStatus e ele bate com algum dos status válidos. */}
+            {postStatus && (() => {
+              const cfg = getStatusConfig(t, postStatus);
+              const StatusIcon = cfg.icon;
+              return (
+                <Badge className={`${cfg.color} gap-1 text-[10px] h-5 shrink-0 hidden sm:inline-flex`}>
+                  <StatusIcon className="h-3 w-3" />
+                  {cfg.tag}
+                </Badge>
+              );
+            })()}
           </div>
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
