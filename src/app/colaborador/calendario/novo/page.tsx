@@ -741,11 +741,17 @@ function EditorContent() {
       <main className="max-w-4xl mx-auto px-4 md:px-6 py-8 space-y-6">
         {/* Properties grid — mesmo padrao visual do PostProperties do
             estrategista: grid-cols-2 sm:grid-cols-4, labels text-xs
-            muted-foreground, inputs h-8 text-xs. */}
+            muted-foreground, inputs h-8 text-xs.
+            Cada coluna usa um <div h-4> envolvendo o label pra garantir
+            que TODAS as 4 colunas tenham exatamente a mesma altura de
+            header — assim os Selects/Inputs ficam alinhados na mesma
+            baseline mesmo quando uma coluna tem um link extra ("Gerenciar"). */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4 border-y">
           {/* Pilar */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Pilar</Label>
+            <div className="flex items-center justify-between h-4">
+              <Label className="text-xs text-muted-foreground">Pilar</Label>
+            </div>
             <Select
               value={contentPillar || 'none'}
               onValueChange={(v) => setContentPillar(v === 'none' ? '' : v)}
@@ -772,12 +778,12 @@ function EditorContent() {
 
           {/* Formato */}
           <div className="space-y-1">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between h-4">
               <Label className="text-xs text-muted-foreground">Formato</Label>
               <button
                 type="button"
                 onClick={() => setManageOpen(true)}
-                className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                className="text-[10px] text-muted-foreground hover:text-foreground underline leading-none"
               >
                 Gerenciar
               </button>
@@ -800,7 +806,9 @@ function EditorContent() {
 
           {/* Data */}
           <div className="space-y-1">
-            <Label htmlFor="date" className="text-xs text-muted-foreground">Data</Label>
+            <div className="flex items-center justify-between h-4">
+              <Label htmlFor="date" className="text-xs text-muted-foreground">Data</Label>
+            </div>
             <Input
               id="date"
               type="date"
@@ -813,7 +821,9 @@ function EditorContent() {
 
           {/* Horario */}
           <div className="space-y-1">
-            <Label htmlFor="time" className="text-xs text-muted-foreground">Horário</Label>
+            <div className="flex items-center justify-between h-4">
+              <Label htmlFor="time" className="text-xs text-muted-foreground">Horário</Label>
+            </div>
             <Input
               id="time"
               type="time"
