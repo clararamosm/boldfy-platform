@@ -94,6 +94,12 @@ export async function getPostWithAccess(
       contentPillar: data.contentPillar,
       mediaUrl: data.mediaUrl,
       mediaType: data.mediaType,
+      // Multi-image gallery (rodada 6): se nao incluir aqui, o load
+      // perde o array e o editor cai no fallback singular ao reabrir o
+      // post — exatamente o bug que a Clara reportou (salva 3 imagens,
+      // reabre, ve 1).
+      mediaUrls: Array.isArray(data.mediaUrls) ? data.mediaUrls : undefined,
+      mediaTypes: Array.isArray(data.mediaTypes) ? data.mediaTypes : undefined,
       tlFeedback: data.tlFeedback,
       tlApprovedAt: data.tlApprovedAt,
       linkedinPostId: data.linkedinPostId,
