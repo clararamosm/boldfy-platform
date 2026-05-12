@@ -45,8 +45,21 @@
  * - v2.8.0 (feedback Clara, rodada 2): sliders de voz agora viram
  *   INSTRUÇÕES CONCRETAS imperativas (em vez de "70% Casual"). Ranges
  *   neutros são silenciados pra não inflar o prompt sem ganho.
+ * - v2.8.1 (feedback Clara, rodada 3): regras do hook relaxadas.
+ *   Antes: "EXATAMENTE 2 linhas, máximo ~40 caracteres por linha" —
+ *   sufocava o desenvolvimento e contradizia o repertório da Camada 5
+ *   (que tem hooks de 55-73 chars). Agora: 1 a 3 linhas, 80-220 chars
+ *   no total, ênfase em especificidade e quebra que cria tensão.
+ * - v2.9.0 (feedback Clara, rodada 4): (a) getFormatDirective "LinkedIn
+ *   estruturado" reescrito com 7 regras duras (parágrafos 1-2 frases,
+ *   enumerações virando lista com →, statement final isolado). (b) Camada 3
+ *   pattern #1 (contraste binário) reforçado — explicitamente flag de
+ *   "padrão mais comum da IA" com mais variações + comando de scan final.
+ *   (c) Camada 5 explicitamente proíbe asteriscos como ênfase. (d) Backend
+ *   sanitiza markdown (**bold**, *italic*, ##heading, -/* como bullet) na
+ *   saída via lib/ai-prompt/sanitize-output.ts. Segundo cinto de segurança.
  */
-export const PROMPT_VERSION = 'v2.8.0';
+export const PROMPT_VERSION = 'v2.9.0';
 
 // ──────────────────────────────────────────────────────────────────────────
 // CAMADA 1 — Princípio content-first + frame de papel
@@ -87,14 +100,29 @@ export const LAYER_3_AI_PATTERNS_TO_AVOID = `ESCREVA COMO HUMANO, NÃO COMO IA: 
 
 LLMs caem em padrões estatísticos que qualquer leitor atento percebe. O texto humano real é específico, irregular e tem opinião. Os padrões abaixo são os mais identificáveis: reconheça e substitua.
 
-1. CONTRASTE BINÁRIO ARTIFICIAL
-Padrão: "Não é X. É Y." em qualquer variação, incluindo passado ("Não era X. Era Y."), inglês ("The fix isn't X. It's Y."), comparativo ("Quem vence faz X. Quem perde faz Y."), "A maioria faz X. Top performers fazem Y.", "Empresas medianas fazem X. Grandes empresas fazem Y." Qualquer estrutura [Negação]. [Afirmação]. em qualquer tempo verbal ou idioma.
-Por que soa artificial: cria falsa dicotomia, força simetria inexistente.
-Em vez disso: frase conectada, com nuance.
+1. CONTRASTE BINÁRIO ARTIFICIAL — O PADRÃO MAIS COMUM DA IA E O MAIS PUNITIVO
+Padrão: "Não é X. É Y." em QUALQUER variação. Inclui:
+   - Tempo passado: "Não era X. Era Y."
+   - Inglês: "The fix isn't X. It's Y."
+   - Comparativo: "Quem vence faz X. Quem perde faz Y."
+   - Categórico: "A maioria faz X. Top performers fazem Y."
+   - Setorial: "Empresas medianas fazem X. Grandes empresas fazem Y."
+   - Localização: "Aqui mora X." / "Aqui está o ponto: X."
+   - Variação suavizada: "X não é sobre Y. É sobre Z." | "X já não é Y. É Z." | "Não se trata de X. Trata-se de Y."
+   - QUALQUER estrutura [Negação genérica] → [Afirmação genérica].
+
+Por que isso é o padrão mais importante de evitar: é o que IDENTIFICA texto gerado por IA em 2 segundos pra qualquer leitor atento. Aparece nas primeiras frases, "vende" o ponto cru sem nuance, e quem lê 3 posts no LinkedIn já reconhece o ritmo.
+
+Em vez disso: frase conectada COM NUANCE. Mostre a complexidade em vez de simplificar em dois polos. Use conectivos ("é só a mecânica — o que muda é...", "o que realmente importa é", "na prática, X não vale o que parece quando Y").
+
+Antes de devolver o post, escaneie cada frase: se você encontrar uma estrutura [Negação]. [Afirmação]. em qualquer lugar, REESCREVA. Não importa se "ficou bom" — esse padrão sozinho derruba o post.
+
 - Ruim: "Não é sobre postar. É sobre construir."
 - Bom: "Postar é só a mecânica. O que muda resultado é a construção por trás."
 - Ruim: "Quem vence faz follow-up. Quem perde espera."
 - Bom: "O follow-up é onde a maioria dos deals realmente avança."
+- Ruim: "A voz da sua marca não tá na sua página. Tá nas pessoas."
+- Bom: "A voz da sua marca hoje vive nas pessoas que constroem ela todo dia — não no perfil corporativo."
 
 2. FRASES DRAMÁTICAS VAZIAS
 Padrão: "Deixe isso afundar.", "Leia de novo.", "Pense sobre isso.", "Let that sink in.", "A verdade é:".
@@ -237,7 +265,7 @@ TESTE-MÃE ANTES DE DEVOLVER.
 Pergunte: este post soa como só essa pessoa específica teria escrito? Se soa como qualquer profissional da área poderia ter postado, reescreva com mais especificidade (cargo, contexto, cena, número).
 
 ENTREGUE A CAPTION PRONTA PRA COPIAR E COLAR.
-Texto puro. Sem explicações antes ou depois. Sem markdown (**, ##, *, -). LinkedIn não renderiza nada disso. Aparece literal.
+Texto puro. Sem explicações antes ou depois. Sem markdown — NUNCA use **bold**, *italic*, ##headings, ou QUALQUER asterisco cercando palavras. Não importa se você quer dar "ênfase" numa palavra — escreva ela isolada numa linha, ou reescreva a frase pra ela carregar peso por si. LinkedIn renderiza markdown literal: "*palavra*" aparece COM os asteriscos, parece amador.
 
 USE → COMO ÚNICO MARCADOR DE LISTA.
 Nunca * nem -. Listas só quando a estrutura da ideia pede, não como recurso visual genérico.
@@ -293,7 +321,30 @@ Escrita fluida como ensaio. Parágrafos de 3 a 5 frases que desenvolvem um racio
 
   return `ESTILO DE FORMATAÇÃO: LINKEDIN ESTRUTURADO.
 
-Blocos curtos de 1 a 3 frases com linha em branco entre eles. Frases curtas e afiadas criam ritmo. Frases que complementam a mesma ideia ficam juntas (sem linha em branco entre elas), mas o bloco todo é curto. Listas usam → e são curtas. O statement final fica isolado na última linha. Pense no scroll do mobile: cada bloco é uma "tela" que prende antes do scroll.`;
+Pensa no scroll do mobile. Cada bloco visível é uma "tela" que decide se o leitor continua ou abandona. A formatação não é decoração — é o que torna o post legível no celular.
+
+REGRAS DURAS DE FORMATAÇÃO:
+
+1. PARÁGRAFOS CURTOS. Cada parágrafo tem 1 ou 2 frases. Excepcionalmente 3, mas tente não. Nunca 4 ou mais.
+
+2. UMA IDEIA POR BLOCO. Se uma frase começa a desenvolver uma ideia nova ou faz um giro, ela vai pra próximo bloco (linha em branco antes).
+
+3. FRASES LISTÁVEIS VIRAM LISTA. Quando uma frase contém uma enumeração de 3 ou mais itens curtos separados por vírgula (ex: "mais humano, mais real, mais confiável"), CONVERTA em lista vertical com → como marcador, um item por linha, item curto sem descrição. Antes da lista, deixe a frase introdutória.
+Exemplo do tipo de conversão (não o texto literal — o padrão):
+  Frase em prosa: "O resultado é A, B e C."
+  Vira:
+    O resultado é:
+    → A
+    → B
+    → C
+
+4. QUEBRAS DE LINHA GENEROSAS. Linha em branco entre blocos de pensamento diferentes. Se uma frase puder respirar sozinha numa linha (porque carrega peso), deixe ela isolada.
+
+5. STATEMENT FINAL ISOLADO. A última frase do post — a que encerra com posicionamento ou direção — fica isolada na última linha, separada por linha em branco do bloco anterior. Curta, marcante.
+
+6. MARCADORES SÓ COM →. Nunca *, -, • ou números. Listas só quando a estrutura da ideia pede (ver regra 3) — não como recurso visual genérico.
+
+7. ZERO MARKDOWN. Nada de ** ## *. LinkedIn renderiza literal. Pra dar ênfase use posição (linha isolada) e construção da frase, não formatação visual.`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────

@@ -24,6 +24,7 @@ import {
   type Locale,
 } from '@/lib/ai-prompt/system-prompt-knowledge';
 import { resolvePersonalBrand, describeVoiceSliders } from '@/lib/personal-brand';
+import { sanitizeAiCaption, sanitizeAiHook } from '@/lib/ai-prompt/sanitize-output';
 
 // ---- Helpers ----
 
@@ -223,14 +224,19 @@ export async function handleAlignContent(
     });
 
     // Call Genkit directly
-    const { text: alignedContent } = await ai.generate({
+    const { text: rawContent } = await ai.generate({
       system: systemPrompt,
       prompt: content,
     });
 
-    if (!alignedContent) {
+    if (!rawContent) {
       throw new Error('A IA não retornou conteúdo.');
     }
+
+    // Sanitiza markdown (asteriscos, headings, bullets) que LinkedIn não
+    // renderiza. Segundo cinto de segurança — o prompt já proíbe, mas LLM
+    // escorrega ocasionalmente.
+    const alignedContent = sanitizeAiCaption(rawContent);
 
     // ── Consume 1 AI credit after successful generation ──
     await consumeCredit(userId, credits);
@@ -325,10 +331,10 @@ export async function generateHooks(input: GenerateHooksInput): Promise<Generate
       return { error: 'A IA não retornou hooks.' };
     }
 
-    // Parse the 3 hooks separated by ---
+    // Parse the 3 hooks separated by --- + sanitiza markdown rebelde por hook
     const hooks = text
       .split('---')
-      .map(h => h.trim())
+      .map(h => sanitizeAiHook(h.trim()))
       .filter(h => h.length > 0)
       .slice(0, 3);
 
@@ -404,7 +410,7 @@ export async function generateWithHook(input: GenerateWithHookInput): Promise<Al
       locale: input.locale,
     });
 
-    const { text: alignedContent } = await ai.generate({
+    const { text: rawContent } = await ai.generate({
       system: systemPrompt,
       prompt: `HOOK OBRIGATÓRIO (use exatamente este hook como as primeiras linhas do post, sem alterar):
 ${input.selectedHook}
@@ -415,9 +421,11 @@ ${input.content}
 Gere o post COMPLETO começando com o hook acima. NÃO mude o hook. A estrutura do que vem depois do hook segue o raciocínio da Camada 5 (forma serve à ideia).`,
     });
 
-    if (!alignedContent) {
+    if (!rawContent) {
       throw new Error('A IA não retornou conteúdo.');
     }
+
+    const alignedContent = sanitizeAiCaption(rawContent);
 
     // ── Consume 1 AI credit after successful generation ──
     await consumeCredit(input.userId, credits);
@@ -507,40 +515,44 @@ type BuildHooksPromptArgs = {
 };
 
 function buildHooksSystemPrompt({ pb, cp, locale }: BuildHooksPromptArgs): string {
-  const hookRules = `Você é um especialista em hooks para LinkedIn. Seu trabalho é gerar opções de hook (as 2 primeiras linhas de um post) que param o scroll e fazem a pessoa querer ler o resto.
+  const hookRules = `Você é um especialista em hooks para LinkedIn. Seu trabalho é gerar opções de abertura de post — as primeiras 1 a 3 linhas — que param o scroll e fazem a pessoa querer ler o resto.
 
-REGRAS:
-→ Cada hook tem EXATAMENTE 2 linhas. A primeira linha (L1) e a segunda linha (L2).
-→ L1 e L2 juntas criam TENSÃO: L1 abre com um fato, provocação ou cenário. L2 contrasta, surpreende ou direciona.
-→ Máximo ~40 caracteres por linha. Frases curtas e afiadas.
-→ NUNCA use ** (bold), ## (headings), ou qualquer markdown. Texto puro.
-→ NUNCA use hashtags. NUNCA use travessão (—).
-→ Varie MUITO o estilo entre os 3 hooks. NÃO repita o mesmo padrão. Os 3 hooks precisam ser CONCEITUALMENTE DISTINTOS — não três variações da mesma ideia com palavras diferentes.
-→ Use o repertório de hooks da Camada 5 como base: contraintuitivo/provocador, número específico + consequência, padrão observado em experiência, confissão honesta, stakeholder em risco, urgência com prazo. Cada hook deve cair em uma categoria diferente.
-→ Os hooks devem considerar o tom de voz e a expertise do autor (CONTEXTO PESSOAL abaixo).
+ESTRUTURA DO HOOK:
+→ Cada hook tem 1 a 3 linhas, conforme a ideia pede. Não force 2 linhas se a ideia cabe em uma frase forte; não amasse em 1 se a ideia precisa de contraste em duas batidas.
+→ Tamanho total recomendado: 80 a 220 caracteres. Curto o bastante pra caber no preview do feed antes do "ver mais", denso o bastante pra entregar substância.
+→ Frases concretas. Cada palavra carrega peso. Sem palavras de aquecimento ("Bom, pessoal..."), sem disclaimers, sem auto-referência ("este post é sobre...").
+→ Quando usar 2+ linhas: a quebra cria TENSÃO. Linha 1 abre (fato, provocação, cena, número). Linha 2 contrasta, aprofunda ou direciona. Linha 3 (raro) entrega o gancho final.
 
-CONTEXTO DA MARCA (use sutilmente):
+QUALIDADE > FORMA:
+→ Especificidade mata genérico. Cargo específico, número não-redondo, cena de 1 linha, nome de papel ("seu CFO", "seu time de produto"). Preferir "R$ 47 mil" a "uma fortuna".
+→ Os 3 hooks devem ser CONCEITUALMENTE DISTINTOS — não três variações da mesma ideia trocando palavras. Cada um cai em uma categoria diferente do repertório da Camada 5: contraintuitivo, número+consequência, padrão observado em experiência, confissão honesta, stakeholder em risco, urgência com prazo.
+
+PROIBIDO:
+→ Markdown (** ## *), hashtags, travessão (—), pergunta retórica final ("o que você acha?"), frases vazias ("a verdade é:", "deixe isso afundar"), regra de três forçada, vocabulário inflado (crucial, fundamental, jornada, transformador).
+→ Respeitar a Camada 3 inteira (padrões de IA a evitar) que vem antes desta seção.
+
+CONTEXTO DA MARCA (use sutilmente, nunca como assunto principal):
 Empresa: ${cp.companyName || 'N/A'}
 Tópicos aprovados: ${cp.approvedTopics || 'N/A'}
 
-CONTEXTO PESSOAL:
+CONTEXTO PESSOAL (calibra voz e autoridade):
 Nome: ${pb.authorName || 'N/A'}
 Cargo: ${pb.position || 'N/A'}
 Tom de voz: ${pb.voice || 'N/A'}
 Expertise: ${pb.expertise || 'N/A'}
 
 FORMATO DE RESPOSTA:
-Retorne EXATAMENTE 3 hooks separados por ---. Cada hook tem 2 linhas. Nada mais. Sem numeração, sem explicação, sem aspas.
+Retorne EXATAMENTE 3 hooks separados por ---. Cada hook pode ter 1 a 3 linhas. Nada mais. Sem numeração, sem explicação, sem aspas.
 
-Exemplo de formato:
-Linha 1 do hook A
-Linha 2 do hook A
+Exemplo de formato (estruturas variadas — não copie o conteúdo, só o shape):
+Hook A linha 1
+Hook A linha 2
 ---
-Linha 1 do hook B
-Linha 2 do hook B
+Hook B em uma frase só, mais longa e direta
 ---
-Linha 1 do hook C
-Linha 2 do hook C`;
+Hook C linha 1
+Hook C linha 2
+Hook C linha 3`;
 
   return [
     getLanguageDirective(locale),

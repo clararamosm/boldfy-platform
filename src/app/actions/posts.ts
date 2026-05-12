@@ -5,6 +5,7 @@ import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { requireSelf, requireAuth } from '@/lib/auth-guard';
 import { requireActiveModuleByRole } from '@/lib/billing/module-gate';
+import { isDefaultFormat } from '@/lib/post-formats';
 
 export type ScheduledPost = {
   id: string;
@@ -19,13 +20,19 @@ export type ScheduledPost = {
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;
-  // PR 3: pilar e formato do post (alimenta as tags no calendario - PR 4).
-  // contentPillar guarda o ID do pilar definido em
-  // users/{uid}.personalBrand.strategy.pillars; formato espelha o que o
-  // colaborador escolheu no Assistente (LinkedIn estruturado / Texto Denso).
+  // PR 3 + rodada 4 do feedback: pilar e tipo de midia do post.
+  //   contentPillar — guarda o ID do pilar (users/{uid}.personalBrand.strategy.pillars).
+  //   formato       — tipo de midia/formato pretendido. Texto livre.
+  //                   Defaults sugeridos: "Só texto", "Foto", "Infografico",
+  //                   "Carrossel", "Meme". User pode adicionar customs via
+  //                   users/{uid}.customPostFormats.
   // Ambos opcionais — posts antigos continuam validos sem esses campos.
+  // OBS retrocompat: posts criados antes da rodada 4 podem ter
+  // `formato` = 'linkedin' | 'text-heavy' | 'hybrid' (estilo de escrita).
+  // O calendario continua mostrando o valor literal — esses ficam
+  // esquisitos ate o user editar. Sem migration automatica.
   contentPillar?: string;
-  formato?: 'linkedin' | 'text-heavy' | 'hybrid';
+  formato?: string;
 };
 
 export async function createScheduledPost(
@@ -37,7 +44,7 @@ export async function createScheduledPost(
     mediaType?: string;
     scheduledFor: string;
     contentPillar?: string;
-    formato?: 'linkedin' | 'text-heavy' | 'hybrid';
+    formato?: string;
   }
 ): Promise<{ success?: boolean; postId?: string; error?: string }> {
   try {
@@ -82,7 +89,7 @@ export async function updateScheduledPost(
     scheduledFor?: string;
     status?: 'draft' | 'scheduled' | 'in_progress';
     contentPillar?: string;
-    formato?: 'linkedin' | 'text-heavy' | 'hybrid';
+    formato?: string;
   }
 ): Promise<{ success?: boolean; error?: string }> {
   try {
@@ -407,6 +414,54 @@ export async function getUnreadFeedCount(
   } catch (error) {
     console.error('Error counting unread feed:', error);
     return { count: 0, error: 'Erro ao contar posts não lidos.' };
+  }
+}
+
+// ─── Custom Post Formats ────────────────────────────────────────
+
+/**
+ * Salva a lista de formatos customizados do user (rodada 4).
+ * Vive em `users/{uid}.customPostFormats: string[]`. Defaults nao
+ * entram aqui — sao injetados em runtime via `mergePostFormats`.
+ *
+ * Filtra automaticamente customs que colidem com defaults (case-insensitive)
+ * pra evitar duplicacao na lista renderizada.
+ */
+export async function saveCustomPostFormats(
+  idToken: string,
+  userId: string,
+  formats: string[],
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    await requireSelf(idToken, userId);
+    const cleaned = formats
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && s.length <= 40)
+      .filter((s) => !isDefaultFormat(s)) // remove colisao com default
+      .slice(0, 20); // cap arbitrario pra evitar lista absurda
+
+    // Dedupe case-insensitive mantendo ordem
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const f of cleaned) {
+      const key = f.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(f);
+      }
+    }
+
+    await adminDb.collection('users').doc(userId).set(
+      {
+        customPostFormats: deduped,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving custom post formats:', error);
+    return { error: error instanceof Error ? error.message : 'Erro desconhecido.' };
   }
 }
 

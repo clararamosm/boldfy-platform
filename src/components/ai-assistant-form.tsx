@@ -438,10 +438,13 @@ export function AiAssistantForm({
 
   const handleUseLegenda = () => {
     if (finalContent) {
-      // PR 3+5: propaga pilar e formato pro editor pre-popular os dropdowns.
+      // Propaga só o que faz sentido cruzar entre Assistente e Editor:
+      // pilar (mesmo conceito nos dois lugares) + caption gerado. Não
+      // propaga `format` porque no Assistente é "estilo de escrita"
+      // (linkedin/text-heavy) e no Editor é "tipo de mídia" (foto/etc) —
+      // são campos distintos. O user escolhe o tipo de mídia no editor.
       const params = new URLSearchParams({ caption: finalContent });
       if (selectedPillarId) params.set('pillar', selectedPillarId);
-      if (format) params.set('formato', format);
       router.push(`/colaborador/calendario/novo?${params.toString()}`);
     }
   };
@@ -528,7 +531,10 @@ export function AiAssistantForm({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2.5">
-                <Label className="text-xs font-medium">Formato</Label>
+                {/* "Estilo de escrita" (não "Formato") — afeta como a IA estrutura
+                    o texto. O campo "Formato" no editor de post agora significa
+                    tipo de mídia (foto/carrossel/etc), coisa diferente. */}
+                <Label className="text-xs font-medium">Estilo de escrita</Label>
                 <RadioGroup value={format} onValueChange={setFormat} className="gap-1.5" disabled={isEditorDisabled}>
                   {[
                     { value: 'linkedin', label: 'LinkedIn estruturado' },

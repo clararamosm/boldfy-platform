@@ -41,10 +41,15 @@ import Image from 'next/image';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import { useT, useLocale } from '@/lib/i18n/context';
 import { getDateLocale } from '@/lib/i18n/date-utils';
 import { resolvePersonalBrand } from '@/lib/personal-brand';
 import { getPillarClasses } from '@/lib/pillar-colors';
+import { mergePostFormats, isDefaultFormat, DEFAULT_POST_FORMATS } from '@/lib/post-formats';
+import { saveCustomPostFormats } from '@/app/actions/posts';
 import type { PersonalBrandPillar } from '@/types/personal-brand';
 
 function EditorContent() {
@@ -67,11 +72,19 @@ function EditorContent() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('10:00');
   const [showTip, setShowTip] = useState(false);
-  // PR 3: pilar e formato do post (persistidos em ScheduledPost.contentPillar / .formato).
+  // Pilar e formato do post (persistidos em ScheduledPost.contentPillar / .formato).
   // Strings vazias = "nao definido"; campos opcionais no doc Firestore.
+  // Rodada 4: `formato` agora e tipo de midia (texto livre — "Foto", "Carrossel",
+  // ou custom do user). Pre-rodada-4 podia ser 'linkedin/text-heavy/hybrid' — posts
+  // antigos ficam com esse valor literal ate o user editar.
   const [contentPillar, setContentPillar] = useState<string>('');
-  const [formato, setFormato] = useState<'' | 'linkedin' | 'text-heavy' | 'hybrid'>('');
+  const [formato, setFormato] = useState<string>('');
   const [pillars, setPillars] = useState<PersonalBrandPillar[]>([]);
+  // Customs do user (gerenciados pelo Dialog "Gerenciar formatos")
+  const [customFormats, setCustomFormats] = useState<string[]>([]);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [savingFormats, setSavingFormats] = useState(false);
+  const [newFormatInput, setNewFormatInput] = useState('');
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -84,13 +97,14 @@ function EditorContent() {
   const [existingMediaType, setExistingMediaType] = useState<string | null>(null);
   const [mediaRemoved, setMediaRemoved] = useState(false);
 
-  // Populate from query params (only in create mode)
+  // Populate from query params (only in create mode).
+  // `formato` NÃO vem por query — assistente envia "estilo de escrita"
+  // (conceito diferente). User escolhe tipo de mídia no editor mesmo.
   useEffect(() => {
     if (editPostId) return; // Skip — edit mode loads via separate effect
     const captionParam = searchParams.get('caption');
     const dateParam = searchParams.get('date');
     const pillarParam = searchParams.get('pillar');
-    const formatoParam = searchParams.get('formato');
 
     if (captionParam) {
       setCaption(captionParam);
@@ -104,12 +118,9 @@ function EditorContent() {
       }
     }
     if (pillarParam) setContentPillar(pillarParam);
-    if (formatoParam && ['linkedin', 'text-heavy', 'hybrid'].includes(formatoParam)) {
-      setFormato(formatoParam as 'linkedin' | 'text-heavy' | 'hybrid');
-    }
   }, [searchParams, editPostId]);
 
-  // Fetch pilares do colaborador pra popular o dropdown
+  // Fetch pilares do colaborador + customs de formato pra popular dropdowns.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
@@ -120,12 +131,67 @@ function EditorContent() {
         const data = snap.exists() ? snap.data() : {};
         const { brand } = resolvePersonalBrand(data);
         setPillars(brand.strategy?.pillars ?? []);
+        const customs = Array.isArray(data?.customPostFormats)
+          ? (data.customPostFormats as string[])
+          : [];
+        setCustomFormats(customs);
       } catch (err) {
-        console.error('Failed to load pillars:', err);
+        console.error('Failed to load pillars / custom formats:', err);
       }
     })();
     return () => { cancelled = true; };
   }, [userId]);
+
+  // Lista mesclada (defaults + custom) usada pelo Select.
+  const allFormats = mergePostFormats(customFormats);
+
+  // Handlers do dialog "Gerenciar formatos"
+  const handleAddFormat = () => {
+    const v = newFormatInput.trim();
+    if (!v || v.length > 40) return;
+    if (isDefaultFormat(v)) {
+      toast({
+        variant: 'destructive',
+        title: 'Formato ja existe',
+        description: `"${v}" ja esta nos formatos padrao.`,
+      });
+      return;
+    }
+    if (customFormats.some((c) => c.toLowerCase() === v.toLowerCase())) {
+      toast({
+        variant: 'destructive',
+        title: 'Duplicado',
+        description: 'Esse formato ja esta na sua lista.',
+      });
+      return;
+    }
+    setCustomFormats([...customFormats, v]);
+    setNewFormatInput('');
+  };
+
+  const handleRemoveCustomFormat = (target: string) => {
+    setCustomFormats(customFormats.filter((c) => c !== target));
+  };
+
+  const handlePersistFormats = async () => {
+    if (!userId) return;
+    setSavingFormats(true);
+    try {
+      const token = await getAuthToken();
+      const result = await saveCustomPostFormats(token, userId, customFormats);
+      if (result.success) {
+        toast({ title: 'Formatos salvos' });
+        setManageOpen(false);
+      } else {
+        toast({ variant: 'destructive', title: 'Erro ao salvar formatos', description: result.error });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido.';
+      toast({ variant: 'destructive', title: 'Erro', description: msg });
+    } finally {
+      setSavingFormats(false);
+    }
+  };
 
   // Load existing post when in edit mode
   useEffect(() => {
@@ -257,7 +323,7 @@ function EditorContent() {
           mediaUrl?: string;
           mediaType?: string;
           contentPillar?: string;
-          formato?: 'linkedin' | 'text-heavy' | 'hybrid';
+          formato?: string;
         } = {
           caption,
           scheduledFor,
@@ -527,18 +593,30 @@ function EditorContent() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Formato</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium">Formato</Label>
+                    <button
+                      type="button"
+                      onClick={() => setManageOpen(true)}
+                      className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                    >
+                      Gerenciar
+                    </button>
+                  </div>
                   <Select
                     value={formato || 'none'}
-                    onValueChange={(v) => setFormato(v === 'none' ? '' : (v as 'linkedin' | 'text-heavy' | 'hybrid'))}
+                    onValueChange={(v) => setFormato(v === 'none' ? '' : v)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione um formato" />
+                      <SelectValue placeholder="Tipo de midia (foto, carrossel, etc)" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sem formato</SelectItem>
-                      <SelectItem value="linkedin">LinkedIn estruturado</SelectItem>
-                      <SelectItem value="text-heavy">Texto Denso</SelectItem>
+                      {allFormats.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {f}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -820,6 +898,92 @@ function EditorContent() {
           )}
         </div>
       </div>
+
+      {/* Dialog: gerenciar formatos personalizados.
+          Defaults nao sao removiveis nesta rodada — so customs.
+          Salva em users/{uid}.customPostFormats via server action. */}
+      <Dialog open={manageOpen} onOpenChange={setManageOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gerenciar formatos</DialogTitle>
+            <DialogDescription>
+              Adicione formatos personalizados ao seu menu. Os formatos padrao nao podem ser removidos.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Defaults — read-only */}
+            <div>
+              <Label className="text-xs text-muted-foreground">Padrao (nao removiveis)</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {DEFAULT_POST_FORMATS.map((d) => (
+                  <span
+                    key={d}
+                    className="inline-flex items-center px-2 py-1 rounded text-xs bg-muted text-muted-foreground"
+                  >
+                    {d}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Customs */}
+            <div>
+              <Label className="text-xs text-muted-foreground">Meus formatos</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1.5 min-h-[28px]">
+                {customFormats.length === 0 ? (
+                  <span className="text-xs text-muted-foreground italic">Nenhum formato personalizado ainda.</span>
+                ) : (
+                  customFormats.map((c) => (
+                    <span
+                      key={c}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-purple-100 text-purple-700"
+                    >
+                      {c}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCustomFormat(c)}
+                        aria-label={`Remover ${c}`}
+                        className="hover:text-purple-900"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Adicionar novo */}
+            <div className="flex items-center gap-2 pt-2 border-t">
+              <Input
+                placeholder="Ex: Reels, Live, Citacao..."
+                value={newFormatInput}
+                onChange={(e) => setNewFormatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddFormat();
+                  }
+                }}
+                maxLength={40}
+              />
+              <Button onClick={handleAddFormat} disabled={!newFormatInput.trim()} size="sm">
+                Adicionar
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setManageOpen(false)}>Cancelar</Button>
+            <Button onClick={handlePersistFormats} disabled={savingFormats}>
+              {savingFormats ? (
+                <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Salvando</>
+              ) : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

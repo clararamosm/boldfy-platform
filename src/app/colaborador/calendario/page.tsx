@@ -658,17 +658,14 @@ export default function CalendarioPage() {
                     >
                       {/* Post cards — draggable */}
                       {postItems.slice(0, 2).map(item => {
-                        // PR 4: resolve pilar (ID -> {name, color}) e formato pra render
+                        // PR 4: resolve pilar (ID -> {name, color}) e formato pra render.
+                        // Pos-rodada-4: formato e texto livre (tipo de midia tipo "Foto",
+                        // "Carrossel"). Posts antigos com 'linkedin'/'text-heavy'/'hybrid'
+                        // continuam renderizando literal — feio mas nao quebra.
                         const pillar = item.data.contentPillar
                           ? pillarsMap.get(item.data.contentPillar)
                           : undefined;
-                        const formatoLabel = item.data.formato === 'text-heavy'
-                          ? 'Texto Denso'
-                          : item.data.formato === 'linkedin'
-                            ? 'LinkedIn'
-                            : item.data.formato === 'hybrid'
-                              ? 'Híbrido'
-                              : undefined;
+                        const formatoLabel = item.data.formato || undefined;
                         return (
                           <CalendarPostCard
                             key={`p-${item.data.id}`}

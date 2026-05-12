@@ -7,7 +7,7 @@ export { handleAlignContent, toggleStarContent, generateHooks, generateWithHook 
 export { submitMissionProof, completeMissionSelf, reviewMissionProof } from './actions/missions';
 export { redeemReward, markRescueAsPaid, addVoucherCodes, getCodeStats, getCodeHistory } from './actions/rewards';
 export { getCompanyRanking, recalculatePoints, getRankingPageData, type RankedUser, type RankingPageData, type MonthlyPublisher, type MonthlyConquest, type ConquestProgress } from './actions/points';
-export { createScheduledPost, updateScheduledPost, deleteScheduledPost, getScheduledPosts, type ScheduledPost } from './actions/posts';
+export { createScheduledPost, updateScheduledPost, deleteScheduledPost, getScheduledPosts, saveCustomPostFormats, type ScheduledPost } from './actions/posts';
 export { createPipelinePost, updatePipelinePost, deletePipelinePost, getPipelinePosts, approvePipelineIdea, approvePipelinePost, requestPipelineAdjustment, resolvePipelineAdjustment, markPipelinePostPublished, getAllPipelinePostsForStrategist, getRecentActivitiesForStrategist, getStrategistSidebarData, type PipelinePost, type PipelineStatus, type CalendarPipelinePost, type StrategistSidebarCompany, type Activity } from './actions/content-pipeline';
 export { saveContentStrategy, getContentStrategy, saveBrandManual, getBrandManual, getCompanyBrandContext, saveCompanyBrandContext, type ContentStrategyData, type BrandManualData, type BrandContextData } from './actions/content-strategy';
 export { getSlackChannels, getSlackConfig, saveSlackConfig, testSlackNotification } from './actions/slack';
