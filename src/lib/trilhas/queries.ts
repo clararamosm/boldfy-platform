@@ -6,84 +6,100 @@
 //
 // Client SDK only — use `@/lib/firebase-admin` para queries server-side.
 
-import {
-  collection,
-  collectionGroup,
-  getDocs,
-  limit,
-  query,
-  where,
-} from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { TRAIL_CODE_REGEX, type Trilha } from '@/types/trilhas';
+import type { Trilha } from '@/types/trilhas';
 
-export type TrailByCodeHit = {
+// ──────────────────────────────────────────────────────────────────────────
+// Normalização de títulos (match por nome em vez de id/code)
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * Normaliza um título de trilha pra comparação: lowercase, sem acentos,
+ * espaços colapsados, trim. Suficiente pra tolerar variações de
+ * capitalização/acento mas falha em tradução (PT vs EN — por enquanto a
+ * Boldfy só opera em PT, então OK).
+ *
+ * Ex: "Discovery de Marca Pessoal" → "discovery de marca pessoal"
+ *     "Promessa e Proposta de Valor" → "promessa e proposta de valor"
+ */
+export function normalizeTrailTitle(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export type TrailHit = {
   trailId: string;
   sessionId: string;
   trail: Trilha;
 };
 
 /**
- * Busca uma trilha global pelo seu `code` (ex: 'MP01', 'EC02').
+ * Busca uma trilha global pelo título (match normalizado).
  *
- * Faz `collectionGroup('trails').where('code', '==', code)` no Firestore.
- * Como `collectionGroup` retorna trilhas globais E customizadas de empresa,
- * filtramos pelo path do parent — só trilhas globais (`globalSessions/{sid}/trails/{tid}`)
- * podem ser referenciadas por código (essa é a regra de unicidade do PR 1.5).
+ * Match-by-title é o caminho oficial para referenciar trilhas a partir de
+ * outras telas (ex: import workbook pra Marca Pessoal). O campo `code`
+ * foi descartado depois que a UI no Master não chegou a estabilizar; como
+ * o universo de trilhas relevantes é pequeno e os títulos são estáveis em
+ * PT-BR, match-by-title é suficiente e tem menos partes móveis.
  *
- * Retorna `null` quando:
- * - o código não bate o formato esperado
- * - nenhuma trilha global tem esse código (gracefully degrades — chamador
- *   esconde o link/feature)
+ * Se você renomear uma trilha referenciada, o match quebra — mantenha os
+ * títulos congelados ou atualize as chamadas que dependem desse nome.
  *
- * Precisa do índice `trails (code ASC)` em collectionGroup — Firestore
- * cria automaticamente na primeira chamada (vai aparecer o link de criar
- * índice no console se faltar).
+ * Itera por todas as sessões globais e suas trilhas — custo O(N) Firestore
+ * reads, mas N é pequeno (~5 sessões * ~5 trilhas).
  */
-export async function getTrailByCode(code: string): Promise<TrailByCodeHit | null> {
-  const normalized = code.trim().toUpperCase();
-  if (!TRAIL_CODE_REGEX.test(normalized)) return null;
+export async function getTrailByTitle(title: string): Promise<TrailHit | null> {
+  const target = normalizeTrailTitle(title);
+  if (!target) return null;
 
-  const q = query(
-    collectionGroup(db, 'trails'),
-    where('code', '==', normalized),
-    limit(5), // collectionGroup pode retornar customizadas duplicadas; pegamos a primeira global
-  );
-
-  const snap = await getDocs(q);
-  for (const docSnap of snap.docs) {
-    // docSnap.ref.path === `globalSessions/{sessionId}/trails/{trailId}` quando global
-    const parentPath = docSnap.ref.parent.parent?.path ?? '';
-    if (!parentPath.startsWith('globalSessions/')) continue;
-
-    const sessionId = parentPath.replace(/^globalSessions\//, '');
-    return {
-      trailId: docSnap.id,
-      sessionId,
-      trail: { id: docSnap.id, ...(docSnap.data() as Omit<Trilha, 'id'>) },
-    };
+  const sessionsSnap = await getDocs(collection(db, 'globalSessions'));
+  for (const sess of sessionsSnap.docs) {
+    const trailsSnap = await getDocs(collection(db, 'globalSessions', sess.id, 'trails'));
+    for (const t of trailsSnap.docs) {
+      const data = t.data() as Partial<Trilha>;
+      const candidate = data.titulo ? normalizeTrailTitle(data.titulo) : '';
+      if (candidate === target) {
+        return {
+          trailId: t.id,
+          sessionId: sess.id,
+          trail: { id: t.id, ...(data as Omit<Trilha, 'id'>) },
+        };
+      }
+    }
   }
-
   return null;
 }
 
 /**
- * Versão batch — recebe múltiplos códigos e retorna um Map.
- * Útil pra telas que precisam linkar 4-5 trilhas de uma vez (ex: Setup de
- * Marca Pessoal precisa de MP01, MP03, MP07, EC01, EC02).
- *
- * Faz uma query por código (Firestore não tem `where IN` com `collectionGroup`
- * confiável + filtro por path). Chamadas paralelas via Promise.all.
+ * Versão batch — recebe vários títulos e retorna um Map.
+ * Usa o mesmo iterar-uma-vez pra economizar Firestore reads.
  */
-export async function getTrailsByCodes(codes: string[]): Promise<Map<string, TrailByCodeHit>> {
-  const uniqueCodes = Array.from(new Set(codes.map((c) => c.trim().toUpperCase())));
-  const results = await Promise.all(uniqueCodes.map((c) => getTrailByCode(c)));
+export async function getTrailsByTitles(titles: string[]): Promise<Map<string, TrailHit>> {
+  const targets = titles.map((t) => ({ raw: t, normalized: normalizeTrailTitle(t) }));
+  const map = new Map<string, TrailHit>();
 
-  const map = new Map<string, TrailByCodeHit>();
-  uniqueCodes.forEach((code, i) => {
-    const hit = results[i];
-    if (hit) map.set(code, hit);
-  });
+  const sessionsSnap = await getDocs(collection(db, 'globalSessions'));
+  for (const sess of sessionsSnap.docs) {
+    const trailsSnap = await getDocs(collection(db, 'globalSessions', sess.id, 'trails'));
+    for (const t of trailsSnap.docs) {
+      const data = t.data() as Partial<Trilha>;
+      const candidate = data.titulo ? normalizeTrailTitle(data.titulo) : '';
+      if (!candidate) continue;
+      const hit = targets.find((tt) => tt.normalized === candidate);
+      if (hit) {
+        map.set(hit.raw, {
+          trailId: t.id,
+          sessionId: sess.id,
+          trail: { id: t.id, ...(data as Omit<Trilha, 'id'>) },
+        });
+      }
+    }
+  }
   return map;
 }
 
@@ -91,32 +107,6 @@ export async function getTrailsByCodes(codes: string[]): Promise<Map<string, Tra
  * Atalho pra montar URL do player de trilha a partir de um hit.
  * Hoje a URL é só `/colaborador/trilhas/[id]` sem deep-link a módulo.
  */
-export function getTrailPlayerUrl(hit: TrailByCodeHit): string {
+export function getTrailPlayerUrl(hit: TrailHit): string {
   return `/colaborador/trilhas/${hit.trailId}`;
-}
-
-/**
- * Versão que aceita `null` (saída padrão de `getTrailByCode`) e retorna
- * fallback pra `/colaborador/trilhas` quando a trilha não está cadastrada.
- * Use isso na UI pra degradar graciosamente.
- */
-export function getTrailPlayerUrlOrFallback(hit: TrailByCodeHit | null): string {
-  return hit ? getTrailPlayerUrl(hit) : '/colaborador/trilhas';
-}
-
-// Re-export pra facilitar import (`import { getTrailByCode, listGlobalTrailCodes }`).
-export async function listGlobalTrailCodes(): Promise<string[]> {
-  // Busca os códigos existentes — usado pelo TrailBuilder pra avisar
-  // sobre conflito antes do save (UX), embora o save em si confie no
-  // server action `setGlobalTrailCode` pra validação autoritativa.
-  const sessionsSnap = await getDocs(collection(db, 'globalSessions'));
-  const codes: string[] = [];
-  for (const sess of sessionsSnap.docs) {
-    const trailsSnap = await getDocs(collection(db, 'globalSessions', sess.id, 'trails'));
-    for (const t of trailsSnap.docs) {
-      const c = (t.data() as Partial<Trilha>).code;
-      if (c) codes.push(c);
-    }
-  }
-  return codes;
 }

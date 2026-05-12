@@ -15,8 +15,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BookOpenCheck, CheckCircle2, Clock, Loader2, ExternalLink, FileText } from 'lucide-react';
+import { BookOpenCheck, CheckCircle2, Clock, Loader2, ExternalLink, FileText, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { isBrandImportTrail, BRAND_IMPORT_URL } from '@/lib/trilhas/brand-import';
 
 type Props = {
   userId: string;
@@ -109,11 +110,22 @@ export function MeusWorkbooksDialog({ userId }: Props) {
             <div className="space-y-3 pb-2">
               {workbooks.map((wb) => {
                 const filledCount = countResponses(wb.respostas);
+                const canImportToBrand = isBrandImportTrail(wb.trailTitle) && filledCount > 0;
+                // div+role="button" (em vez de <button>) pra permitir <button>
+                // aninhado pro CTA de Marca Pessoal sem HTML invalido.
                 return (
-                  <button
+                  <div
                     key={wb.docId}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => handleOpen(wb.trailId)}
-                    className="w-full text-left p-4 rounded-xl border border-border hover:border-purple-300 hover:bg-purple-50/30 transition-all group"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleOpen(wb.trailId);
+                      }
+                    }}
+                    className="w-full text-left p-4 rounded-xl border border-border hover:border-purple-300 hover:bg-purple-50/30 transition-all group cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-300"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -141,7 +153,26 @@ export function MeusWorkbooksDialog({ userId }: Props) {
                       </div>
                       <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
-                  </button>
+
+                    {/* CTA "Aplicar a Marca Pessoal" — so quando esse workbook
+                        e de trilha de Marca Pessoal E ja tem campo preenchido.
+                        stopPropagation pra nao abrir a trilha junto. */}
+                    {canImportToBrand && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-3 w-full gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(false);
+                          router.push(BRAND_IMPORT_URL);
+                        }}
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Aplicar a Marca Pessoal
+                      </Button>
+                    )}
+                  </div>
                 );
               })}
             </div>

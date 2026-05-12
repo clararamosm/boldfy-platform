@@ -18,7 +18,12 @@ import {
   type PersonalBrand,
   type PersonalBrandDiscovery,
 } from '@/types/personal-brand';
-import { TRAIL_CODE_REGEX } from '@/types/trilhas';
+
+// Normalizacao de titulo replicada aqui (server-side, sem depender do
+// client SDK do lib/trilhas/queries.ts). Mantenha em sync com aquele.
+function normalizeTrailTitle(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+}
 
 // ──────────────────────────────────────────────────────────────────────────
 // Schemas Zod
@@ -29,18 +34,18 @@ const SliderValueSchema = z.number().int().min(0).max(100);
 const BasicsSchema = z.object({
   position: z.string().trim().max(200),
   expertise: z.string().trim().max(1000),
+  experience: z.string().trim().max(2000).optional(),
 });
 
 const DiscoverySchema = z.object({
-  convergence: z.string().trim().max(2000),
   aspiration: z.string().trim().max(2000),
-  surprise: z.string().trim().max(2000),
   startingPhrase: z.string().trim().max(500),
   valueProposition: z.object({
     who: z.string().trim().max(500),
     problem: z.string().trim().max(500),
     how: z.string().trim().max(500),
     result: z.string().trim().max(500),
+    differential: z.string().trim().max(500).optional(),
   }),
 });
 
@@ -171,44 +176,53 @@ export async function savePersonalBrand(
 /**
  * MAPPING workbook → PersonalBrand v2.
  *
- * Trilhas relevantes:
- *  - MP01 (Discovery de Marca Pessoal) → campos do bloco Discovery
- *  - MP03 (Proposta de Valor)          → valueProposition estruturada
+ * Trilhas relevantes (match por TITULO normalizado — `code` foi descartado):
+ *  - "Discovery de Marca Pessoal"   → bloco Discovery (posicionamento)
+ *  - "Promessa e Proposta de Valor" → valueProposition estruturada
  *
- * As CHAVES (`convergence`, `aspiration`, etc.) referem-se ao `id` de cada
- * <input-field> / <input-area> dentro do HTML do módulo `faca_voce_mesmo`
+ * As CHAVES (`aspiration`, `who`, etc.) sao os `id` dos input tags
+ * (<input-field> / <input-area>) dentro do HTML do módulo `faca_voce_mesmo`
  * da trilha (ver `src/components/trilhas/player/workbook-parser.ts`).
  *
- * IMPORTANTE: quando criar/editar a trilha MP01 ou MP03 no Master, use estes
- * IDs exatos nos atributos `id` dos input tags pra o import funcionar. Se um
- * ID nao bate, o campo correspondente fica vazio (degrada graciosamente —
- * nao quebra o import).
+ * REGRA: quando criar/editar essas trilhas no Master, use estes IDs nos
+ * atributos `id` dos input tags. Se um ID nao bate, o campo correspondente
+ * fica vazio (degrada graciosamente). Se voce renomear a trilha, o match
+ * por titulo quebra — sincronize o `WORKBOOK_TRAIL_TITLES` abaixo.
  */
+// Titulos das trilhas que alimentam a Marca Pessoal. A LISTA AUTORITATIVA
+// vive em src/lib/trilhas/brand-import.ts — duplicada aqui apenas pra
+// fazer o mapping "qual trilha alimenta qual bloco do PersonalBrand v2".
+// Se renomear, sincronize com o brand-import.ts.
+const WORKBOOK_TRAIL_TITLES = {
+  discovery: 'Discovery de Marca Pessoal',
+  valueProposition: 'Promessa e Proposta de Valor',
+} as const;
+
 const WORKBOOK_FIELD_MAP = {
-  // Trilha MP01 → bloco Discovery
-  MP01: {
-    convergence: 'mp1_convergence',
-    aspiration: 'mp1_aspiration',
-    surprise: 'mp1_surprise',
-    startingPhrase: 'mp1_starting_phrase',
+  discovery: {
+    // So o que a IA precisa pro prompt: aspiracao projetada + sintese.
+    // O workbook pode ter outros campos (convergence, surprise) — esses
+    // ficam la como ferramentas internas e nao sao puxados pra ca.
+    aspiration: 'aspiration',
+    startingPhrase: 'starting_phrase',
   },
-  // Trilha MP03 → bloco Discovery.valueProposition
-  MP03: {
-    who: 'mp3_who',
-    problem: 'mp3_problem',
-    how: 'mp3_how',
-    result: 'mp3_result',
+  valueProposition: {
+    who: 'vp_who',
+    problem: 'vp_problem',
+    how: 'vp_how',
+    result: 'vp_result',
+    differential: 'vp_differential',
   },
 } as const;
 
 export type ImportWorkbookPreview = {
   // Bloco preenchido a partir do workbook (vazio se nada bateu).
   discovery: Partial<PersonalBrandDiscovery>;
-  // Quais trilhas foram encontradas/lidas.
-  trailsFound: { code: string; trailId: string }[];
-  // Quais codigos da trilha existem cadastrados mas o user nao respondeu.
+  // Titulos de trilha encontrados (no formato cadastrado pelo Master).
+  trailsFound: { title: string; trailId: string }[];
+  // Titulos que tem trilha cadastrada mas o user ainda nao respondeu.
   trailsNotAnswered: string[];
-  // Codigos que nao tem trilha cadastrada (Master precisa criar).
+  // Titulos esperados mas nao cadastrados (Master precisa criar).
   trailsMissing: string[];
 };
 
@@ -217,10 +231,10 @@ export type ImportWorkbookResult =
   | { ok: false; error: string };
 
 /**
- * Le os workbookResponses do colaborador pras trilhas relevantes (MP01,
- * MP03) e devolve um preview do que o import preencheria no PersonalBrand.
- * NAO grava — a tela mostra o diff e o user confirma o save (que vai via
- * `savePersonalBrand` normal).
+ * Le os workbookResponses do colaborador pras trilhas relevantes (match
+ * por titulo) e devolve um preview do que o import preencheria no
+ * PersonalBrand. NAO grava — a UI mostra o diff e o user confirma o save
+ * (que vai via `savePersonalBrand` normal).
  */
 export async function previewWorkbookImport(
   idToken: string,
@@ -229,42 +243,44 @@ export async function previewWorkbookImport(
   try {
     await requireSelf(idToken, userId);
 
-    const codes = Object.keys(WORKBOOK_FIELD_MAP);
-    const found: { code: string; trailId: string }[] = [];
-    const missing: string[] = [];
-    const notAnswered: string[] = [];
+    // Resolve trilhas alvo por titulo (case/accent-insensitive).
+    const wanted = [
+      { key: 'discovery' as const, title: WORKBOOK_TRAIL_TITLES.discovery },
+      { key: 'valueProposition' as const, title: WORKBOOK_TRAIL_TITLES.valueProposition },
+    ];
 
-    // Resolve trilhas pelos codigos via collectionGroup (admin SDK).
-    const codeToTrailId = new Map<string, string>();
-    for (const code of codes) {
-      if (!TRAIL_CODE_REGEX.test(code)) {
-        missing.push(code);
-        continue;
-      }
-      const snap = await adminDb
-        .collectionGroup('trails')
-        .where('code', '==', code)
-        .limit(5)
-        .get();
+    // Itera 1x pelas sessoes globais buscando matches por titulo normalizado.
+    const sessionsSnap = await adminDb.collection('globalSessions').get();
+    const titleToTrailId = new Map<string, string>(); // normalized title → trailId
 
-      // Filtra so trilhas globais (Boldfy)
-      const globalDoc = snap.docs.find((d) => {
-        const parentPath = d.ref.parent.parent?.path ?? '';
-        return parentPath.startsWith('globalSessions/');
-      });
-
-      if (!globalDoc) {
-        missing.push(code);
-      } else {
-        codeToTrailId.set(code, globalDoc.id);
-        found.push({ code, trailId: globalDoc.id });
+    for (const sess of sessionsSnap.docs) {
+      const trailsSnap = await sess.ref.collection('trails').get();
+      for (const t of trailsSnap.docs) {
+        const data = t.data() as { titulo?: string };
+        if (!data.titulo) continue;
+        titleToTrailId.set(normalizeTrailTitle(data.titulo), t.id);
       }
     }
 
-    // Le `workbookResponses` de cada trilha encontrada. O ID do doc segue
-    // o padrao `{trailId}_{moduleId}` (varios modulos por trilha).
-    const allAnswers: Record<string, Record<string, string | string[]>> = {};
-    for (const { code, trailId } of found) {
+    const found: { title: string; trailId: string; key: 'discovery' | 'valueProposition' }[] = [];
+    const missing: string[] = [];
+    for (const w of wanted) {
+      const trailId = titleToTrailId.get(normalizeTrailTitle(w.title));
+      if (trailId) {
+        found.push({ title: w.title, trailId, key: w.key });
+      } else {
+        missing.push(w.title);
+      }
+    }
+
+    // Le `workbookResponses` (todos os modulos) de cada trilha encontrada.
+    const notAnswered: string[] = [];
+    const allAnswers: Record<'discovery' | 'valueProposition', Record<string, string | string[]>> = {
+      discovery: {},
+      valueProposition: {},
+    };
+
+    for (const { title, trailId, key } of found) {
       const wbSnap = await adminDb
         .collection('users')
         .doc(userId)
@@ -273,18 +289,17 @@ export async function previewWorkbookImport(
         .get();
 
       if (wbSnap.empty) {
-        notAnswered.push(code);
+        notAnswered.push(title);
         continue;
       }
-      // Mergeia respostas de todos os modulos da trilha (o mapping abaixo
-      // procura por ID de campo individual; o `id` precisa ser unico
-      // dentro da trilha pra isso funcionar sem ambiguidade).
+      // Mergeia respostas de todos os modulos da trilha — o `id` do campo
+      // precisa ser unico dentro da trilha pra evitar collision.
       const merged: Record<string, string | string[]> = {};
       for (const docSnap of wbSnap.docs) {
         const respostas = (docSnap.data() as { respostas?: Record<string, string | string[]> }).respostas ?? {};
         Object.assign(merged, respostas);
       }
-      allAnswers[code] = merged;
+      allAnswers[key] = merged;
     }
 
     const pickString = (m: Record<string, string | string[]> | undefined, key: string): string | undefined => {
@@ -295,42 +310,36 @@ export async function previewWorkbookImport(
       return undefined;
     };
 
-    const mp1 = allAnswers.MP01;
-    const mp3 = allAnswers.MP03;
-    const mp1Map = WORKBOOK_FIELD_MAP.MP01;
-    const mp3Map = WORKBOOK_FIELD_MAP.MP03;
+    const discMap = WORKBOOK_FIELD_MAP.discovery;
+    const vpMap = WORKBOOK_FIELD_MAP.valueProposition;
 
     const discovery: Partial<PersonalBrandDiscovery> = {};
-    if (mp1) {
-      const conv = pickString(mp1, mp1Map.convergence);
-      const asp = pickString(mp1, mp1Map.aspiration);
-      const surp = pickString(mp1, mp1Map.surprise);
-      const start = pickString(mp1, mp1Map.startingPhrase);
-      if (conv) discovery.convergence = conv;
-      if (asp) discovery.aspiration = asp;
-      if (surp) discovery.surprise = surp;
-      if (start) discovery.startingPhrase = start;
-    }
-    if (mp3) {
-      const who = pickString(mp3, mp3Map.who);
-      const problem = pickString(mp3, mp3Map.problem);
-      const how = pickString(mp3, mp3Map.how);
-      const result = pickString(mp3, mp3Map.result);
-      if (who || problem || how || result) {
-        discovery.valueProposition = {
-          who: who ?? '',
-          problem: problem ?? '',
-          how: how ?? '',
-          result: result ?? '',
-        };
-      }
+
+    const asp = pickString(allAnswers.discovery, discMap.aspiration);
+    const start = pickString(allAnswers.discovery, discMap.startingPhrase);
+    if (asp) discovery.aspiration = asp;
+    if (start) discovery.startingPhrase = start;
+
+    const who = pickString(allAnswers.valueProposition, vpMap.who);
+    const problem = pickString(allAnswers.valueProposition, vpMap.problem);
+    const how = pickString(allAnswers.valueProposition, vpMap.how);
+    const result = pickString(allAnswers.valueProposition, vpMap.result);
+    const differential = pickString(allAnswers.valueProposition, vpMap.differential);
+    if (who || problem || how || result || differential) {
+      discovery.valueProposition = {
+        who: who ?? '',
+        problem: problem ?? '',
+        how: how ?? '',
+        result: result ?? '',
+        ...(differential && { differential }),
+      };
     }
 
     return {
       ok: true,
       preview: {
         discovery,
-        trailsFound: found,
+        trailsFound: found.map(({ title, trailId }) => ({ title, trailId })),
         trailsNotAnswered: notAnswered,
         trailsMissing: missing,
       },

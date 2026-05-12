@@ -2,9 +2,10 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Wrench, BookOpenCheck, CheckCircle2, Loader2, Save } from 'lucide-react';
+import { Wrench, BookOpenCheck, CheckCircle2, Loader2, Save, Sparkles } from 'lucide-react';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { FIRESTORE_PATHS, type WorkbookResponse } from '@/types/trilhas';
@@ -12,6 +13,7 @@ import { parseWorkbookHtml, countWorkbookFields, countFilledFields } from './wor
 import { WorkbookField } from './workbook-fields';
 import type { MappedModule } from './use-trail-player';
 import { useT } from '@/lib/i18n/context';
+import { isBrandImportTrail, BRAND_IMPORT_URL } from '@/lib/trilhas/brand-import';
 
 // ─── PROSE_CLASSES (same as module-renderer) ────────────────
 const PROSE_CLASSES = "prose prose-base max-w-none prose-p:leading-relaxed prose-p:mb-7 prose-h1:text-2xl prose-h1:font-bold prose-h1:mt-10 prose-h1:mb-5 prose-h2:text-xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-h3:mt-6 prose-h3:mb-3 prose-h4:text-base prose-h4:font-medium prose-h4:mt-4 prose-h4:mb-2 prose-li:mb-2 prose-ul:mb-5 prose-ol:mb-5 prose-hr:border-transparent prose-hr:my-8 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50 prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:rounded-r-lg prose-blockquote:not-italic [&_mark]:bg-purple-100 [&_mark]:text-inherit [&_mark]:px-0.5 [&_mark]:rounded-sm [&_svg]:max-w-full [&_svg]:mx-auto [&_svg]:block [&_svg]:my-6 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-6 prose-a:text-purple-600 prose-a:underline [&_u]:underline";
@@ -290,6 +292,30 @@ export function WorkbookRenderer({
           </Badge>
         )}
       </div>
+
+      {/* CTA: aplicar respostas a Marca Pessoal.
+          Aparece quando esta trilha esta na lista de brand-import
+          (Discovery de Marca Pessoal / Promessa e Proposta de Valor)
+          E o user ja preencheu pelo menos 1 campo. Nao bloqueia nem
+          obriga — e um atalho. */}
+      {isBrandImportTrail(trailTitle) && filledCount > 0 && (
+        <div className="flex items-start gap-3 p-4 rounded-xl border border-purple-200 bg-purple-50/40">
+          <Sparkles className="h-5 w-5 text-purple-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-purple-900">
+              Quer aplicar essas respostas a sua Marca Pessoal?
+            </p>
+            <p className="text-xs text-purple-700/80 mt-0.5">
+              A IA vai usar isso pra gerar conteudo mais alinhado com voce.
+            </p>
+          </div>
+          <Link href={BRAND_IMPORT_URL}>
+            <Button size="sm" variant="default" className="bg-purple-700 hover:bg-purple-800">
+              Aplicar a Marca Pessoal
+            </Button>
+          </Link>
+        </div>
+      )}
 
       <p className="text-xs text-muted-foreground text-center">{tp.noPointsModule}</p>
     </div>

@@ -84,19 +84,7 @@ export interface Trilha {
   // (ver seedTemplatePersonalizado em src/app/actions/company-setup.ts).
   // undefined em trilhas existentes = false (retrocompat).
   isTemplate?: boolean;
-
-  // Codigo curto e estavel da trilha (ex: 'MP01', 'EC02', 'OL03').
-  // Formato: 2 letras maiusculas (codigo da sessao) + 2 digitos.
-  // Editado apenas pelo Master, com validacao de unicidade entre trilhas
-  // globais (collectionGroup `trails`). Empresas podem deixar vazio em
-  // trilhas customizadas.
-  // Usado por `getTrailByCode` para deep-link (ex: tela de Marca Pessoal
-  // referenciar a trilha MP01 sem hardcodar Firestore IDs).
-  code?: string;
 }
-
-// Regex que valida formato do `Trilha.code` ('MP01', 'EC02', etc.)
-export const TRAIL_CODE_REGEX = /^[A-Z]{2}\d{2}$/;
 
 // --- Sessao (agrupador de Trilhas) ---
 export interface Sessao {

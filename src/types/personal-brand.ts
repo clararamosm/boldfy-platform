@@ -21,8 +21,11 @@ import type { PillarColorKey } from '@/lib/pillar-colors';
 // ──────────────────────────────────────────────────────────────────────────
 
 export type PersonalBrandBasics = {
-  position: string;   // Cargo atual
-  expertise: string;  // Areas que domina (texto curto, 1-2 frases)
+  position: string;    // Cargo atual
+  expertise: string;   // Areas que domina (texto curto, 1-2 frases)
+  experience?: string; // Resumo de experiencias previas — alimenta autoridade do autor.
+                       // Ex: "10 anos liderando vendas em fintechs B2B; fundou e vendeu
+                       // empresa X". A IA usa isso pra justificar afirmacoes do autor.
 };
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -30,18 +33,20 @@ export type PersonalBrandBasics = {
 // ──────────────────────────────────────────────────────────────────────────
 
 export type PersonalBrandDiscovery = {
-  // MP1 — Frase de partida
-  convergence: string;     // Como aparece hoje (verde no workbook)
-  aspiration: string;      // Como quer ser visto (amarelo)
-  surprise: string;        // O que surpreendeu nas respostas externas (vermelho)
-  startingPhrase: string;  // Frase composta livre (opcional)
+  // Frase de partida — so o que o autor QUER projetar (aspiracao + sintese).
+  // Removido na revisao pos-feedback: `convergence` (como aparece hoje) e
+  // `surprise` (o que surpreendeu nas respostas externas) — esses ficam no
+  // workbook como ferramentas de auto-conhecimento mas nao alimentam a IA.
+  aspiration: string;      // Como quer ser visto
+  startingPhrase: string;  // Frase que sintetiza o posicionamento (opcional)
 
-  // MP3 — Proposta de Valor estruturada
+  // Proposta de Valor estruturada — coracao da Marca Pessoal.
   valueProposition: {
-    who: string;       // Pra quem gera valor
-    problem: string;   // Que problema resolve
-    how: string;       // O que torna o jeito diferente
-    result: string;    // Resultado/transformacao
+    who: string;          // Pra quem gera valor
+    problem: string;      // Que problema resolve
+    how: string;          // O que torna o jeito diferente
+    result: string;       // Resultado/transformacao
+    differential?: string; // O diferencial: o que ele faz/tem que mais ninguem faz/tem (opcional)
   };
 };
 
@@ -166,7 +171,7 @@ export function isBasicsFilled(b?: PersonalBrandBasics): boolean {
 export function isDiscoveryFilled(d?: PersonalBrandDiscovery): boolean {
   if (!d) return false;
   const vp = d.valueProposition;
-  return [d.convergence, d.aspiration, d.surprise, vp.who, vp.problem, vp.how, vp.result]
+  return [d.aspiration, d.startingPhrase, vp.who, vp.problem, vp.how, vp.result, vp.differential ?? '']
     .some((s) => s && s.trim().length > 0);
 }
 

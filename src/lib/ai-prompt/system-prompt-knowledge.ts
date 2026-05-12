@@ -39,8 +39,14 @@
  * - v2.6.0 (PR 6): Camada 4 estendida pra consumir PersonalBrand v2
  *   (discovery, valueProposition estruturada, sliders, pilares com
  *   ângulos). Aceita `selectedPillar` e `angle` opcionais por geração.
+ * - v2.7.0 (feedback Clara, rodada 1): Discovery enxuto pra `aspiration`
+ *   + `startingPhrase` (sai `convergence` e `surprise`). Adiciona
+ *   `experience` no AUTOR e `differential` na valueProposition.
+ * - v2.8.0 (feedback Clara, rodada 2): sliders de voz agora viram
+ *   INSTRUÇÕES CONCRETAS imperativas (em vez de "70% Casual"). Ranges
+ *   neutros são silenciados pra não inflar o prompt sem ganho.
  */
-export const PROMPT_VERSION = 'v2.6.0';
+export const PROMPT_VERSION = 'v2.8.0';
 
 // ──────────────────────────────────────────────────────────────────────────
 // CAMADA 1 — Princípio content-first + frame de papel
@@ -316,20 +322,25 @@ export type PersonalBrandContext = {
   contentPillars?: string;
 
   /**
+   * Experiência prévia do autor — alimenta autoridade do que ele afirma.
+   * Quando presente, vira a seção EXPERIÊNCIA no bloco AUTOR.
+   */
+  experience?: string;
+
+  /**
    * Bloco v2 estruturado (PR 1). Quando presente, sobrescreve o que vier
    * dos campos flat acima.
    */
   v2?: {
     discovery?: {
-      convergence?: string;       // Como aparece hoje
-      aspiration?: string;        // Como quer ser visto
-      surprise?: string;          // O que surpreendeu nas respostas externas
-      startingPhrase?: string;    // Frase composta livre
+      aspiration?: string;        // Como quer ser visto (o que o autor quer projetar)
+      startingPhrase?: string;    // Frase que sintetiza o posicionamento
       valueProposition?: {
         who?: string;
         problem?: string;
         how?: string;
         result?: string;
+        differential?: string;    // Diferencial — o que faz/tem que mais ninguem faz/tem
       };
     };
     voiceDescription?: string;    // Prosa derivada dos sliders + descrição livre
@@ -407,14 +418,17 @@ export function buildLayer4BrandContext(
     `Expertise: ${fallback(pb.expertise)}`,
   ];
 
+  if (pb.experience) {
+    authorLines.push(`Experiência prévia: ${pb.experience}`);
+    authorLines.push('Use a experiência prévia pra ancorar afirmações do autor (ex: "ja vi X empresas..."). Nao invente cargos/empresas que não estão aqui.');
+  }
+
   if (hasV2 && v2?.discovery) {
     const d = v2.discovery;
     authorLines.push('');
-    authorLines.push('POSICIONAMENTO PESSOAL (Discovery)');
-    if (d.convergence) authorLines.push(`Como aparece hoje: ${d.convergence}`);
-    if (d.aspiration) authorLines.push(`Onde quer chegar: ${d.aspiration}`);
-    if (d.surprise) authorLines.push(`O que surpreendeu nas respostas externas: ${d.surprise}`);
-    if (d.startingPhrase) authorLines.push(`Frase de partida: ${d.startingPhrase}`);
+    authorLines.push('POSICIONAMENTO PROJETADO');
+    if (d.aspiration) authorLines.push(`Como ele quer ser visto: ${d.aspiration}`);
+    if (d.startingPhrase) authorLines.push(`Frase-sintese: ${d.startingPhrase}`);
 
     if (d.valueProposition) {
       const vp = d.valueProposition;
@@ -424,6 +438,7 @@ export function buildLayer4BrandContext(
       if (vp.problem) authorLines.push(`A resolver: ${vp.problem}`);
       if (vp.how) authorLines.push(`Através de: ${vp.how}`);
       if (vp.result) authorLines.push(`Gerando: ${vp.result}`);
+      if (vp.differential) authorLines.push(`Diferencial dele: ${vp.differential}`);
     }
   } else if (pb.value) {
     authorLines.push(`Proposta de valor pessoal: ${pb.value}`);

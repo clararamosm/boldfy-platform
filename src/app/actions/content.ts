@@ -64,14 +64,13 @@ type PersonalBrandingForPrompt = {
   value: string;
   languageStyle: string;
   contentPillars: string;
+  experience?: string;
   // Bloco v2 — Camada 4 prioriza este quando presente
   v2?: {
     discovery?: {
-      convergence?: string;
       aspiration?: string;
-      surprise?: string;
       startingPhrase?: string;
-      valueProposition?: { who?: string; problem?: string; how?: string; result?: string };
+      valueProposition?: { who?: string; problem?: string; how?: string; result?: string; differential?: string };
     };
     voiceDescription?: string;
     voiceKeywords?: string[];
@@ -100,14 +99,18 @@ async function getPersonalBranding(userId: string): Promise<PersonalBrandingForP
   // String composta com a proposta de valor (campo `value` legado).
   const vp = brand.discovery?.valueProposition;
   const composedValue = vp && (vp.who || vp.problem)
-    ? `Ajuda ${vp.who || 'profissionais'} a resolver ${vp.problem}${vp.how ? ` atraves de ${vp.how}` : ''}${vp.result ? `, gerando ${vp.result}` : ''}.`
+    ? `Ajuda ${vp.who || 'profissionais'} a resolver ${vp.problem}${vp.how ? ` atraves de ${vp.how}` : ''}${vp.result ? `, gerando ${vp.result}` : ''}${vp.differential ? `. Diferencial: ${vp.differential}` : ''}.`
     : (data.value as string | undefined) ?? '';
 
-  // Prosa derivada dos sliders + descricao livre, separadas por ". ".
+  // describeVoiceSliders ja retorna bloco multilinha com instrucoes
+  // imperativas + (opcional) "OBSERVACAO DO AUTOR" derivado de
+  // brand.voice.description. Nao concatenamos a description separadamente.
+  // O `voice` legado v1 entra como segunda linha de fallback quando o v2
+  // nao foi preenchido.
   const sliderProse = brand.voice ? describeVoiceSliders(brand) : '';
-  const voiceText = [sliderProse, brand.voice?.description, (data.voice as string | undefined)]
+  const voiceText = [sliderProse, (data.voice as string | undefined)]
     .filter((s) => !!s && s.trim().length > 0)
-    .join('. ');
+    .join('\n');
 
   const pillarsText = brand.strategy?.pillars && brand.strategy.pillars.length > 0
     ? brand.strategy.pillars.map((p) => p.name).filter(Boolean).join(', ')
@@ -120,9 +123,7 @@ async function getPersonalBranding(userId: string): Promise<PersonalBrandingForP
   const hasRealV2 = source === 'v2';
   const v2Block = hasRealV2 ? {
     discovery: brand.discovery ? {
-      convergence: brand.discovery.convergence,
       aspiration: brand.discovery.aspiration,
-      surprise: brand.discovery.surprise,
       startingPhrase: brand.discovery.startingPhrase,
       valueProposition: brand.discovery.valueProposition,
     } : undefined,
@@ -144,6 +145,7 @@ async function getPersonalBranding(userId: string): Promise<PersonalBrandingForP
     value: composedValue,
     languageStyle: (data?.languageStyle as string | undefined) ?? '',
     contentPillars: pillarsText,
+    ...(brand.basics.experience && { experience: brand.basics.experience }),
     ...(v2Block && { v2: v2Block }),
   };
 }

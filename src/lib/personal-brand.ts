@@ -144,32 +144,89 @@ function slugify(s: string): string {
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Traduz os sliders 0-100 pra uma descricao em prosa que o prompt da IA
- * consome. Usado pela Camada 4 (PR 6).
+ * Traduz os sliders 0-100 em INSTRUÇÕES CONCRETAS pra IA. Usado pela
+ * Camada 4 (PR 6).
  *
- * Exemplo: { formality: 70, tone: 40 } → "Casual (70/100), levemente serio (40/100)..."
+ * Cada slider tem 3 ranges com texto acionável (em vez de "70% Casual",
+ * que LLMs interpretam frouxamente). Sliders no range "neutro" (~50) são
+ * silenciados — a IA decide sozinha — pra não inflar o prompt sem ganho.
+ *
+ * Devolve um bloco multilinhas:
+ *   FORMALIDADE — Use contrações ('tá', 'pra'), frases curtas e cotidianas...
+ *   TOM — Sem trocadilhos, sem ironia. Tom de quem trata assunto importante...
+ *   ...
+ *
+ * Mantenha as traduções específicas e mensuráveis (verbos imperativos,
+ * exemplos concretos). LLMs seguem instrução melhor do que percentual.
  */
 export function describeVoiceSliders(brand: PersonalBrand): string {
   const v = brand.voice;
   if (!v) return '';
 
-  const labels: Array<{ key: keyof typeof v.sliders; left: string; right: string }> = [
-    { key: 'formality', left: 'Formal', right: 'Casual' },
-    { key: 'tone', left: 'Serio', right: 'Divertido' },
-    { key: 'complexity', left: 'Tecnico', right: 'Acessivel' },
-    { key: 'brevity', left: 'Direto', right: 'Detalhado' },
-    { key: 'stance', left: 'Contido', right: 'Provocador' },
-    { key: 'register', left: 'Analitico', right: 'Emocional' },
-    { key: 'outlook', left: 'Cetico', right: 'Otimista' },
-  ];
+  type SliderRule = {
+    label: string;
+    low: string;    // 0-30
+    mid?: string;   // 31-69 — opcional; quando ausente, range neutro nao gera instrucao
+    high: string;   // 70-100
+  };
 
-  const parts: string[] = [];
-  for (const { key, left, right } of labels) {
+  const RULES: Record<keyof typeof v.sliders, SliderRule> = {
+    formality: {
+      label: 'FORMALIDADE',
+      low: "Vocabulario formal e tratamento por 'voce' ou pronomes neutros. Sem contracoes ('esta' em vez de 'ta'). Sem girias. Sintaxe completa.",
+      high: "Use contracoes ('ta', 'pra', 'ne', 'rolar'), girias profissionais leves, frases cotidianas. Evite jargao pomposo.",
+    },
+    tone: {
+      label: 'TOM',
+      low: "Sem trocadilhos, sem ironia, sem humor. Tom de quem trata assunto importante com peso. Frases que carregam seriedade.",
+      high: "Use humor inteligente, ironia leve, analogias inusitadas. O leitor pode rir sozinho. Sem palhacada — humor de quem sabe do que fala.",
+    },
+    complexity: {
+      label: 'COMPLEXIDADE',
+      low: "Use vocabulario tecnico da area sem explicar. Assume o leitor e par do autor (mesma profissao/expertise). Pode citar conceitos avancados de cabeca.",
+      high: "Explique termos tecnicos com analogias do dia a dia. Frases simples. Assuma o leitor e curioso mas leigo.",
+    },
+    brevity: {
+      label: 'BREVIDADE',
+      low: "Va direto ao ponto. Cada frase entrega algo. Sem rodeios, sem contexto desnecessario, sem aquecimento.",
+      high: "Aprofunde com cenas, exemplos concretos, contexto. O leitor entra na situacao antes de ouvir o ponto principal.",
+    },
+    stance: {
+      label: 'POSTURA',
+      low: "Tom neutro, sem polarizar. Apresenta o ponto sem desafiar o leitor. Evite afirmacoes binarias.",
+      high: "Desafie consensos. Tome posicao forte. Nao tenha medo de irritar quem pensa diferente. Linguagem de quem assina embaixo.",
+    },
+    register: {
+      label: 'REGISTRO',
+      low: "Argumente com logica, dados, padroes observados. Sem apelo emocional. Frases que partem de evidencia concreta.",
+      high: "Apele pra sentimento, frustracao compartilhada, experiencia vivida. Cenas humanas no lugar de numeros. Voz pessoal.",
+    },
+    outlook: {
+      label: 'PERSPECTIVA',
+      low: "Tom critico, questionador. Aponta o que nao esta funcionando. Sem otimismo gratuito. Voz de quem desconfia primeiro.",
+      high: "Foque em possibilidades, evolucao, o que pode dar certo. Energia positiva sem ser ingenuo. Voz de quem ve abertura.",
+    },
+  };
+
+  const lines: string[] = [];
+  for (const [key, rule] of Object.entries(RULES) as Array<[keyof typeof v.sliders, SliderRule]>) {
     const val = v.sliders[key];
     if (val === undefined) continue;
-    const pick = val >= 50 ? right : left;
-    const intensity = val >= 50 ? val : 100 - val;
-    parts.push(`${pick} (${intensity}/100 em ${left} ↔ ${right})`);
+    if (val <= 30) {
+      lines.push(`${rule.label} — ${rule.low}`);
+    } else if (val >= 70) {
+      lines.push(`${rule.label} — ${rule.high}`);
+    } else if (rule.mid) {
+      lines.push(`${rule.label} — ${rule.mid}`);
+    }
+    // Range neutro (31-69 sem `mid` definido) e silenciado de proposito —
+    // injetar "equilibrado" so inflaria o prompt sem direcionar nada.
   }
-  return parts.join(', ');
+
+  // Descricao livre do autor (se preencheu) entra por ultimo como reforco.
+  if (v.description?.trim()) {
+    lines.push(`OBSERVACAO DO AUTOR — ${v.description.trim()}`);
+  }
+
+  return lines.join('\n');
 }

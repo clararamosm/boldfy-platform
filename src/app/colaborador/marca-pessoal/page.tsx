@@ -44,9 +44,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, BookOpen, Plus, Trash2, Download } from 'lucide-react';
+import { Loader2, BookOpen, Plus, Trash2 } from 'lucide-react';
 import { savePersonalBrand, previewWorkbookImport } from '@/app/actions/personal-brand';
 import { resolvePersonalBrand } from '@/lib/personal-brand';
 import {
@@ -73,7 +74,7 @@ import { PILLAR_COLORS, type PillarColorKey, getPillarClasses } from '@/lib/pill
 // ──────────────────────────────────────────────────────────────────────────
 
 type FormState = {
-  basics: { position: string; expertise: string };
+  basics: { position: string; expertise: string; experience: string };
   discovery: PersonalBrandDiscovery;
   voice: PersonalBrandVoice;
   strategy: PersonalBrandStrategy;
@@ -81,13 +82,11 @@ type FormState = {
 
 function emptyForm(): FormState {
   return {
-    basics: { position: '', expertise: '' },
+    basics: { position: '', expertise: '', experience: '' },
     discovery: {
-      convergence: '',
       aspiration: '',
-      surprise: '',
       startingPhrase: '',
-      valueProposition: { who: '', problem: '', how: '', result: '' },
+      valueProposition: { who: '', problem: '', how: '', result: '', differential: '' },
     },
     voice: {
       sliders: defaultPersonalBrandVoiceSliders(),
@@ -106,8 +105,22 @@ function emptyForm(): FormState {
 function brandToForm(brand: PersonalBrand): FormState {
   const empty = emptyForm();
   return {
-    basics: { ...empty.basics, ...brand.basics },
-    discovery: brand.discovery ?? empty.discovery,
+    basics: {
+      ...empty.basics,
+      position: brand.basics.position,
+      expertise: brand.basics.expertise,
+      experience: brand.basics.experience ?? '',
+    },
+    discovery: brand.discovery
+      ? {
+          ...empty.discovery,
+          ...brand.discovery,
+          valueProposition: {
+            ...empty.discovery.valueProposition,
+            ...brand.discovery.valueProposition,
+          },
+        }
+      : empty.discovery,
     voice: brand.voice
       ? {
           sliders: { ...empty.voice.sliders, ...brand.voice.sliders },
@@ -288,14 +301,15 @@ export default function MarcaPessoalPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
-  // PR 2: estado do import-workbook flow
-  const [isImporting, setIsImporting] = useState(false);
+  // Import workbook flow (acionado por ?fromWorkbook=1 — botao vive no player
+  // de trilha e no dialog "Meus Workbooks", nao mais aqui).
   const [importPreview, setImportPreview] = useState<{
     discovery: Partial<FormState['discovery']>;
-    foundCodes: string[];
-    missingCodes: string[];
-    notAnsweredCodes: string[];
+    foundTitles: string[];
+    missingTitles: string[];
+    notAnsweredTitles: string[];
   } | null>(null);
+  const searchParams = useSearchParams();
 
   const fetchData = useCallback(
     async (uid: string) => {
@@ -322,6 +336,65 @@ export default function MarcaPessoalPage() {
   useEffect(() => {
     if (userId) void fetchData(userId);
   }, [userId, fetchData]);
+
+  // Quando vier com ?fromWorkbook=1 (botoes do player/dialog), dispara
+  // o preview do import e abre o dialog de confirmacao automaticamente.
+  useEffect(() => {
+    if (!userId || isLoading) return;
+    if (searchParams.get('fromWorkbook') !== '1') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken) return;
+        const result = await previewWorkbookImport(idToken, userId);
+        if (cancelled || !result.ok) return;
+        const preview = result.preview;
+        const hasAny =
+          Object.keys(preview.discovery).length > 0 ||
+          preview.trailsFound.length > 0;
+        if (!hasAny) {
+          toast({
+            title: 'Nada a importar',
+            description:
+              preview.trailsMissing.length > 0
+                ? `Trilhas nao cadastradas: ${preview.trailsMissing.join(', ')}.`
+                : 'Voce ainda nao respondeu as trilhas relevantes.',
+          });
+          return;
+        }
+        setImportPreview({
+          discovery: preview.discovery,
+          foundTitles: preview.trailsFound.map((t) => t.title),
+          missingTitles: preview.trailsMissing,
+          notAnsweredTitles: preview.trailsNotAnswered,
+        });
+      } catch (err) {
+        console.error('importWorkbook preview failed:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId, isLoading, searchParams, toast]);
+
+  const handleConfirmImport = () => {
+    if (!importPreview) return;
+    const { discovery } = importPreview;
+    setForm((current) => ({
+      ...current,
+      discovery: {
+        aspiration: discovery.aspiration ?? current.discovery.aspiration,
+        startingPhrase: discovery.startingPhrase ?? current.discovery.startingPhrase,
+        valueProposition: discovery.valueProposition
+          ? { ...current.discovery.valueProposition, ...discovery.valueProposition }
+          : current.discovery.valueProposition,
+      },
+    }));
+    setImportPreview(null);
+    toast({
+      title: 'Workbook aplicado',
+      description: 'Revise os campos e clique em "Salvar marca pessoal" pra commitar.',
+    });
+  };
 
   const handleSave = async () => {
     if (!userId) return;
@@ -389,71 +462,6 @@ export default function MarcaPessoalPage() {
         ...form.strategy,
         pillars: form.strategy.pillars.filter((_, i) => i !== idx),
       },
-    });
-  };
-
-  // ── PR 2: Import workbook ──
-  const handleStartImport = async () => {
-    if (!userId) return;
-    setIsImporting(true);
-    try {
-      const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) throw new Error('Sessao expirada. Faca login novamente.');
-      const result = await previewWorkbookImport(idToken, userId);
-      if (!result.ok) {
-        toast({ variant: 'destructive', title: 'Erro ao importar', description: result.error });
-        return;
-      }
-      const preview = result.preview;
-      const hasAny =
-        Object.keys(preview.discovery).length > 0 ||
-        preview.trailsFound.length > 0;
-      if (!hasAny) {
-        toast({
-          variant: 'default',
-          title: 'Nada a importar',
-          description:
-            preview.trailsMissing.length > 0
-              ? `As trilhas (${preview.trailsMissing.join(', ')}) ainda nao foram cadastradas pelo Master.`
-              : 'Voce ainda nao respondeu as trilhas relevantes (MP01, MP03).',
-        });
-        return;
-      }
-      setImportPreview({
-        discovery: preview.discovery,
-        foundCodes: preview.trailsFound.map((t) => t.code),
-        missingCodes: preview.trailsMissing,
-        notAnsweredCodes: preview.trailsNotAnswered,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro desconhecido.';
-      toast({ variant: 'destructive', title: 'Erro ao importar', description: msg });
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  const handleConfirmImport = () => {
-    if (!importPreview) return;
-    const { discovery } = importPreview;
-    // Aplica o preview por cima do estado atual. NAO salva — usuario
-    // ainda precisa clicar "Salvar marca pessoal" pra commitar.
-    setForm((current) => ({
-      ...current,
-      discovery: {
-        convergence: discovery.convergence ?? current.discovery.convergence,
-        aspiration: discovery.aspiration ?? current.discovery.aspiration,
-        surprise: discovery.surprise ?? current.discovery.surprise,
-        startingPhrase: discovery.startingPhrase ?? current.discovery.startingPhrase,
-        valueProposition: discovery.valueProposition
-          ? { ...current.discovery.valueProposition, ...discovery.valueProposition }
-          : current.discovery.valueProposition,
-      },
-    }));
-    setImportPreview(null);
-    toast({
-      title: 'Workbook importado',
-      description: 'Revise os campos e clique em "Salvar marca pessoal" pra commitar.',
     });
   };
 
@@ -526,6 +534,22 @@ export default function MarcaPessoalPage() {
                       rows={3}
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="experience">Experiencias previas</Label>
+                    <Textarea
+                      id="experience"
+                      placeholder="Resumo das experiencias que dao autoridade ao que voce fala. Ex: '10 anos liderando vendas em fintechs B2B; fundou e vendeu a empresa X; mentor de 30+ founders'."
+                      value={form.basics.experience ?? ''}
+                      onChange={(e) =>
+                        setForm({ ...form, basics: { ...form.basics, experience: e.target.value } })
+                      }
+                      maxLength={2000}
+                      rows={3}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      A IA usa isso pra justificar afirmacoes do tipo &ldquo;ja vi X empresas cometerem...&rdquo;.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -534,75 +558,36 @@ export default function MarcaPessoalPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>2. Discovery e Proposta de Valor</CardTitle>
-                      <CardDescription>Frase de partida (MP1) + Proposta de Valor estruturada (MP3).</CardDescription>
+                      <CardTitle>2. Posicionamento e Proposta de Valor</CardTitle>
+                      <CardDescription>O que voce projeta + como gera valor pro seu publico.</CardDescription>
                     </div>
                     <BlockStatusBadge status={isDiscoveryFilled(form.discovery) ? 'filled' : 'in-progress'} />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="flex items-start gap-3 flex-col md:flex-row md:items-center">
-                    <TrilhaHint>
-                      Essas perguntas ficam mais claras depois da trilha <strong>Discovery de Marca Pessoal</strong>.
-                    </TrilhaHint>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleStartImport}
-                      disabled={isImporting}
-                      className="shrink-0"
-                    >
-                      {isImporting ? (
-                        <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Lendo workbook</>
-                      ) : (
-                        <><Download className="w-3.5 h-3.5 mr-1.5" /> Importar do workbook</>
-                      )}
-                    </Button>
-                  </div>
+                  <TrilhaHint>
+                    Essas perguntas ficam mais claras depois da trilha <strong>Discovery de Marca Pessoal</strong>.
+                  </TrilhaHint>
 
                   <div className="space-y-4">
-                    <h3 className="text-sm font-semibold">Frase de partida (MP1)</h3>
-                    <div className="space-y-2">
-                      <Label htmlFor="convergence">Como voce aparece hoje</Label>
-                      <Textarea
-                        id="convergence"
-                        placeholder="O que as pessoas ja te associam — visivel e atual."
-                        value={form.discovery.convergence}
-                        onChange={(e) =>
-                          setForm({ ...form, discovery: { ...form.discovery, convergence: e.target.value } })
-                        }
-                        rows={2}
-                      />
-                    </div>
+                    <h3 className="text-sm font-semibold">Posicionamento</h3>
                     <div className="space-y-2">
                       <Label htmlFor="aspiration">Como voce quer ser visto</Label>
                       <Textarea
                         id="aspiration"
-                        placeholder="A imagem aspiracional que ainda nao alcancou."
+                        placeholder="A imagem que voce quer projetar no LinkedIn — o lugar profissional que voce quer ocupar na cabeca de quem te le."
                         value={form.discovery.aspiration}
                         onChange={(e) =>
                           setForm({ ...form, discovery: { ...form.discovery, aspiration: e.target.value } })
                         }
-                        rows={2}
+                        rows={3}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="surprise">O que surpreendeu nas respostas externas</Label>
-                      <Textarea
-                        id="surprise"
-                        placeholder="Algo que terceiros disseram sobre voce que voce nao esperava."
-                        value={form.discovery.surprise}
-                        onChange={(e) =>
-                          setForm({ ...form, discovery: { ...form.discovery, surprise: e.target.value } })
-                        }
-                        rows={2}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="startingPhrase">Frase composta (opcional)</Label>
+                      <Label htmlFor="startingPhrase">Frase que sintetiza esse posicionamento (opcional)</Label>
                       <Textarea
                         id="startingPhrase"
-                        placeholder="Frase livre que sintetiza os tres pontos acima."
+                        placeholder="1 frase curta que poderia abrir a sua bio. Ex: 'Ajudo C-levels de scale-ups a converter discurso em previsibilidade financeira'."
                         value={form.discovery.startingPhrase}
                         onChange={(e) =>
                           setForm({ ...form, discovery: { ...form.discovery, startingPhrase: e.target.value } })
@@ -613,7 +598,7 @@ export default function MarcaPessoalPage() {
                   </div>
 
                   <div className="space-y-4 border-t pt-4">
-                    <h3 className="text-sm font-semibold">Proposta de Valor estruturada (MP3)</h3>
+                    <h3 className="text-sm font-semibold">Proposta de Valor</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="vp-who">Pra quem gera valor</Label>
@@ -650,7 +635,7 @@ export default function MarcaPessoalPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="vp-how">Como (o que torna o jeito diferente)</Label>
+                        <Label htmlFor="vp-how">Como resolve</Label>
                         <Input
                           id="vp-how"
                           placeholder="Ex: documentacao narrativa"
@@ -683,6 +668,23 @@ export default function MarcaPessoalPage() {
                           }
                         />
                       </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label htmlFor="vp-differential">Diferencial</Label>
+                        <Input
+                          id="vp-differential"
+                          placeholder="O que voce faz/tem que mais ninguem faz/tem. Ex: 'metodo aplicado em +30 scale-ups pos-Series B'."
+                          value={form.discovery.valueProposition.differential ?? ''}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              discovery: {
+                                ...form.discovery,
+                                valueProposition: { ...form.discovery.valueProposition, differential: e.target.value },
+                              },
+                            })
+                          }
+                        />
+                      </div>
                     </div>
                     {form.discovery.valueProposition.who && form.discovery.valueProposition.problem && (
                       <p className="text-xs text-muted-foreground italic pt-2">
@@ -690,6 +692,7 @@ export default function MarcaPessoalPage() {
                         {form.discovery.valueProposition.problem}
                         {form.discovery.valueProposition.how && ` atraves de ${form.discovery.valueProposition.how}`}
                         {form.discovery.valueProposition.result && `, gerando ${form.discovery.valueProposition.result}`}
+                        {form.discovery.valueProposition.differential && `. Diferencial: ${form.discovery.valueProposition.differential}`}
                         .&rdquo;
                       </p>
                     )}
@@ -703,7 +706,7 @@ export default function MarcaPessoalPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle>3. Voz</CardTitle>
-                      <CardDescription>Calibre os sliders pra IA encontrar o seu tom (MP7).</CardDescription>
+                      <CardDescription>Calibre os sliders pra IA encontrar o seu tom.</CardDescription>
                     </div>
                     <BlockStatusBadge status={isVoiceFilled(form.voice) ? 'filled' : 'in-progress'} />
                   </div>
@@ -836,7 +839,7 @@ export default function MarcaPessoalPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle>4. Estrategia de Conteudo</CardTitle>
-                      <CardDescription>Objetivo (EC1) e Pilares (EC2) do seu conteudo.</CardDescription>
+                      <CardDescription>Objetivo e Pilares do seu conteudo.</CardDescription>
                     </div>
                     <BlockStatusBadge status={isStrategyFilled(form.strategy) ? 'filled' : 'in-progress'} />
                   </div>
@@ -951,7 +954,9 @@ export default function MarcaPessoalPage() {
         </div>
       </main>
 
-      {/* PR 2: dialogo de confirmacao do import-workbook */}
+      {/* Dialog de confirmacao do import — acionado por ?fromWorkbook=1.
+          Botoes que disparam o flow vivem no player de trilha e no
+          dialog "Meus Workbooks", nao mais aqui na Marca Pessoal. */}
       <AlertDialog open={!!importPreview} onOpenChange={(o) => !o && setImportPreview(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -959,24 +964,24 @@ export default function MarcaPessoalPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-left">
                 <p>
-                  Vamos sobrescrever os campos de Discovery e Proposta de Valor com o que voce respondeu
-                  nas trilhas. Voce pode revisar e editar antes de salvar.
+                  Vamos puxar suas respostas do workbook pros campos correspondentes da Marca Pessoal.
+                  Voce pode revisar e editar antes de salvar.
                 </p>
                 {importPreview && (
                   <>
-                    {importPreview.foundCodes.length > 0 && (
+                    {importPreview.foundTitles.length > 0 && (
                       <p className="text-xs text-muted-foreground">
-                        Lendo de: <strong>{importPreview.foundCodes.join(', ')}</strong>
+                        Lendo de: <strong>{importPreview.foundTitles.join(' + ')}</strong>
                       </p>
                     )}
-                    {importPreview.notAnsweredCodes.length > 0 && (
+                    {importPreview.notAnsweredTitles.length > 0 && (
                       <p className="text-xs text-amber-700 dark:text-amber-400">
-                        Trilhas sem resposta sua: {importPreview.notAnsweredCodes.join(', ')}
+                        Trilhas sem resposta sua: {importPreview.notAnsweredTitles.join(', ')}
                       </p>
                     )}
-                    {importPreview.missingCodes.length > 0 && (
+                    {importPreview.missingTitles.length > 0 && (
                       <p className="text-xs text-amber-700 dark:text-amber-400">
-                        Trilhas nao cadastradas pelo Master: {importPreview.missingCodes.join(', ')}
+                        Trilhas nao cadastradas: {importPreview.missingTitles.join(', ')}
                       </p>
                     )}
                   </>
@@ -986,7 +991,7 @@ export default function MarcaPessoalPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmImport}>Importar</AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmImport}>Aplicar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
