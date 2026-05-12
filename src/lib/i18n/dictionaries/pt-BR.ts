@@ -135,7 +135,7 @@ const ptBR = {
     library: 'Biblioteca',
     linkedinFeed: 'LinkedIn Feed',
     linkedinLeads: 'LinkedIn Leads',
-    contentAssistant: 'Assistente de Conteúdo',
+    contentAssistant: 'IA de Conteúdo',
     calendar: 'Calendário',
     rankings: 'Rankings',
     content: 'Conteúdo',

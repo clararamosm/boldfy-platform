@@ -137,7 +137,7 @@ const en: Dictionary = {
     library: 'Library',
     linkedinFeed: 'LinkedIn Feed',
     linkedinLeads: 'LinkedIn Leads',
-    contentAssistant: 'Content Assistant',
+    contentAssistant: 'Content AI',
     calendar: 'Calendar',
     rankings: 'Rankings',
     content: 'Content',
