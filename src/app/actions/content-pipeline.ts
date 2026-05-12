@@ -43,8 +43,14 @@ export type PipelinePost = {
   formato: string;
   leadMagnet: boolean;
   contentPillar?: string;
+  // Media singular (legado / primeira midia da galeria)
   mediaUrl?: string;
   mediaType?: string;
+  // Multi-image gallery (rodada 6): arrays paralelos pra galerias de
+  // ate 10 imagens. Quando preenchidos, sobrescrevem mediaUrl/mediaType
+  // na hora de publicar. PDF/video/GIF sempre singular em mediaUrl/mediaType.
+  mediaUrls?: string[];
+  mediaTypes?: string[];
   tlFeedback?: string;
   tlApprovedAt?: string;
   linkedinPostId?: string;
@@ -197,6 +203,8 @@ export async function updatePipelinePost(
     contentPillar: string;
     mediaUrl: string | null;
     mediaType: string | null;
+    mediaUrls: string[] | null;
+    mediaTypes: string[] | null;
   }>
 ): Promise<ActionResult> {
   try {
@@ -214,10 +222,34 @@ export async function updatePipelinePost(
       return { error: 'Post nao encontrado.' };
     }
 
-    await docRef.update({
-      ...data,
-      updatedAt: new Date().toISOString(),
-    });
+    // Multi-image: quando mediaUrls vem no payload, sincroniza mediaUrl/
+    // mediaType pra apontar pra primeira midia (retrocompat com leitores).
+    // Quando array tem so 1 item, prefere singular e apaga o array — mantem
+    // shape consistente.
+    const updatePayload: Record<string, unknown> = { ...data };
+    if (Array.isArray(data.mediaUrls)) {
+      const urls = data.mediaUrls;
+      const types = Array.isArray(data.mediaTypes) ? data.mediaTypes : [];
+      if (urls.length === 0) {
+        updatePayload.mediaUrl = null;
+        updatePayload.mediaType = null;
+        updatePayload.mediaUrls = FieldValue.delete();
+        updatePayload.mediaTypes = FieldValue.delete();
+      } else if (urls.length === 1) {
+        updatePayload.mediaUrl = urls[0];
+        updatePayload.mediaType = types[0] ?? null;
+        updatePayload.mediaUrls = FieldValue.delete();
+        updatePayload.mediaTypes = FieldValue.delete();
+      } else {
+        updatePayload.mediaUrl = urls[0];
+        updatePayload.mediaType = types[0] ?? null;
+        updatePayload.mediaUrls = urls;
+        updatePayload.mediaTypes = types;
+      }
+    }
+    updatePayload.updatedAt = new Date().toISOString();
+
+    await docRef.update(updatePayload);
 
     // Fire-and-forget: Slack notification when status changes to pronto_pra_postar
     if (data.status === 'pronto_pra_postar') {

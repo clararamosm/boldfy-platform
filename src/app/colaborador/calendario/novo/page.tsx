@@ -41,7 +41,27 @@ import { resolvePersonalBrand } from '@/lib/personal-brand';
 import { getPillarClasses } from '@/lib/pillar-colors';
 import { mergePostFormats, isDefaultFormat, DEFAULT_POST_FORMATS } from '@/lib/post-formats';
 import { saveCustomPostFormats } from '@/app/actions/posts';
+import {
+  ACCEPTED_MEDIA_INPUT,
+  classifyMimeType,
+  validateNewMedia,
+  MAX_GALLERY_IMAGES,
+} from '@/lib/media-rules';
 import type { PersonalBrandPillar } from '@/types/personal-brand';
+
+// Item de midia interno do editor. Pode ser um File local (ainda nao
+// uploaded) ou uma URL ja no Firebase Storage (vinda do edit mode).
+type MediaItem = {
+  // File presente apenas em items novos. Null quando ja foi uploaded.
+  file: File | null;
+  // URL pra preview no DOM: blob:// pra video, data:// pra imagem nova,
+  // ou https:// pra item ja no Firebase Storage.
+  previewUrl: string;
+  // MIME type — sempre presente.
+  mimeType: string;
+  // URL final no Firebase Storage. Null pra items novos (ainda nao subiram).
+  uploadedUrl: string | null;
+};
 
 function EditorContent() {
   const t = useT();
@@ -55,8 +75,10 @@ function EditorContent() {
   const [linkedinConnected, setLinkedinConnected] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  // mediaItems: array de items (galeria). Substitui mediaFile/mediaPreview
+  // singulares do schema antigo. Sempre array — mesmo single image vira
+  // [{ ... }] de 1 item. Persistencia decide single vs galeria ao salvar.
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('10:00');
   const [showTip, setShowTip] = useState(false);
@@ -81,9 +103,6 @@ function EditorContent() {
   const editPostId = searchParams.get('edit');
   const isEditMode = !!editPostId;
   const [isLoadingPost, setIsLoadingPost] = useState(!!editPostId);
-  const [existingMediaUrl, setExistingMediaUrl] = useState<string | null>(null);
-  const [existingMediaType, setExistingMediaType] = useState<string | null>(null);
-  const [mediaRemoved, setMediaRemoved] = useState(false);
 
   // Populate from query params (only in create mode).
   // `formato` NÃO vem por query — assistente envia "estilo de escrita"
@@ -196,10 +215,24 @@ function EditorContent() {
             setScheduledDate(format(date, 'yyyy-MM-dd'));
             setScheduledTime(format(date, 'HH:mm'));
           }
-          if (result.post.mediaUrl) {
-            setExistingMediaUrl(result.post.mediaUrl);
-            setExistingMediaType(result.post.mediaType || null);
-            setMediaPreview(result.post.mediaUrl);
+          // Hidrata mediaItems do post existente. Galeria (mediaUrls/mediaTypes)
+          // tem prioridade; cai pro singular legado se ausente.
+          const galleryUrls = Array.isArray(result.post.mediaUrls) ? result.post.mediaUrls : [];
+          const galleryTypes = Array.isArray(result.post.mediaTypes) ? result.post.mediaTypes : [];
+          if (galleryUrls.length > 0) {
+            setMediaItems(galleryUrls.map((url, i) => ({
+              file: null,
+              previewUrl: url,
+              mimeType: galleryTypes[i] ?? 'image/jpeg',
+              uploadedUrl: url,
+            })));
+          } else if (result.post.mediaUrl) {
+            setMediaItems([{
+              file: null,
+              previewUrl: result.post.mediaUrl,
+              mimeType: result.post.mediaType ?? 'image/jpeg',
+              uploadedUrl: result.post.mediaUrl,
+            }]);
           }
           if (result.post.contentPillar) setContentPillar(result.post.contentPillar);
           if (result.post.formato) setFormato(result.post.formato);
@@ -228,45 +261,82 @@ function EditorContent() {
     checkLinkedIn();
   }, [userId]);
 
-  // Media file handling
-  const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Media file handling — aceita múltiplos arquivos (multi-image gallery).
+  // Cada arquivo passa por validateNewMedia que checa tamanho, mistura de
+  // tipos, e cap de 10 imagens. Se algum falhar, mostra toast e ignora ele.
+  const handleMediaChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
 
-    // Size limits: 200MB for video, 10MB for image/gif
-    const isVideo = file.type.startsWith('video/');
-    const maxSize = isVideo ? 200 * 1024 * 1024 : 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      toast({
-        variant: 'destructive',
-        title: t.colabNewPost.fileTooLarge,
-        description: isVideo ? 'Vídeo muito grande. Máximo: 200MB.' : t.colabNewPost.fileTooLargeDescription,
-      });
-      return;
+    // Validação sequencial — acumula items conforme passam.
+    const acceptedNew: MediaItem[] = [];
+    const currentSnapshot = [...mediaItems];
+
+    for (const file of files) {
+      const result = validateNewMedia(
+        { mimeType: file.type, sizeBytes: file.size },
+        [...currentSnapshot, ...acceptedNew].map((m) => ({ mimeType: m.mimeType })),
+      );
+      if (!result.ok) {
+        toast({ variant: 'destructive', title: 'Mídia não aceita', description: result.reason });
+        continue;
+      }
+
+      const kind = classifyMimeType(file.type);
+      const previewUrl = kind === 'video'
+        ? URL.createObjectURL(file)
+        : await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(file);
+          });
+
+      acceptedNew.push({ file, previewUrl, mimeType: file.type, uploadedUrl: null });
     }
 
-    setMediaFile(file);
-    setMediaRemoved(false);
-    if (isVideo) {
-      // For video, create object URL instead of data URL (more efficient)
-      setMediaPreview(URL.createObjectURL(file));
-    } else {
-      const reader = new FileReader();
-      reader.onloadend = () => setMediaPreview(reader.result as string);
-      reader.readAsDataURL(file);
+    if (acceptedNew.length > 0) {
+      setMediaItems((prev) => [...prev, ...acceptedNew]);
     }
+
+    // Reset input pra permitir adicionar o mesmo arquivo novamente
+    e.target.value = '';
   };
 
-  const removeMedia = () => {
-    // Revoke object URL if it was created for video
-    if (mediaPreview && mediaPreview.startsWith('blob:')) {
-      URL.revokeObjectURL(mediaPreview);
+  const removeMediaAt = (idx: number) => {
+    setMediaItems((prev) => {
+      const item = prev[idx];
+      // Revoke object URL se foi criado pra video local
+      if (item?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  /**
+   * Sobe pro Firebase Storage todos os itens de mediaItems que ainda não têm
+   * uploadedUrl. Retorna arrays paralelos urls[] / types[] na ordem dos items.
+   * Em modo single (1 item), o saver downstream coloca em mediaUrl/mediaType.
+   */
+  const uploadPendingMedia = async (): Promise<{ urls: string[]; types: string[] }> => {
+    if (!userId) return { urls: [], types: [] };
+    const urls: string[] = [];
+    const types: string[] = [];
+    for (const item of mediaItems) {
+      if (item.uploadedUrl) {
+        urls.push(item.uploadedUrl);
+      } else if (item.file) {
+        const fileName = `${Date.now()}_${item.file.name}`;
+        const storageRef = ref(storage, `users/${userId}/posts/${fileName}`);
+        const snapshot = await uploadBytes(storageRef, item.file);
+        const downloadUrl = await getDownloadURL(snapshot.ref);
+        urls.push(downloadUrl);
+      } else {
+        continue; // shouldn't happen — defensive
+      }
+      types.push(item.mimeType);
     }
-    setMediaFile(null);
-    setMediaPreview(null);
-    setExistingMediaUrl(null);
-    setExistingMediaType(null);
-    setMediaRemoved(true);
+    return { urls, types };
   };
 
   // Submit (schedule for later)
@@ -284,16 +354,8 @@ function EditorContent() {
     setIsSaving(true);
 
     try {
-      // Upload media if present
-      let mediaUrl: string | undefined;
-      let mediaType: string | undefined;
-
-      if (mediaFile) {
-        const storageRef = ref(storage, `users/${userId}/posts/${Date.now()}_${mediaFile.name}`);
-        const snapshot = await uploadBytes(storageRef, mediaFile);
-        mediaUrl = await getDownloadURL(snapshot.ref);
-        mediaType = mediaFile.type;
-      }
+      // Upload de toda midia pendente em sequencia.
+      const { urls, types } = await uploadPendingMedia();
 
       // Create ISO date from date + time
       const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString();
@@ -302,32 +364,17 @@ function EditorContent() {
 
       if (isEditMode && editPostId) {
         // ─── Update existing post ──────────────────
-        const updateData: {
-          caption: string;
-          scheduledFor: string;
-          mediaUrl?: string;
-          mediaType?: string;
-          contentPillar?: string;
-          formato?: string;
-        } = {
+        // Sempre enviamos mediaUrls (mesmo vazio) pra que o server action
+        // saiba se houve remoção. O server action faz a sincronização
+        // entre array e singular automaticamente.
+        const result = await updateScheduledPost(token, userId, editPostId, {
           caption,
           scheduledFor,
           contentPillar,
           ...(formato && { formato }),
-        };
-
-        if (mediaFile) {
-          // New media uploaded
-          updateData.mediaUrl = mediaUrl;
-          updateData.mediaType = mediaType;
-        } else if (mediaRemoved) {
-          // Media was removed — send empty string so server action clears it (|| null)
-          updateData.mediaUrl = '';
-          updateData.mediaType = '';
-        }
-        // If neither: don't send media fields, preserves existing
-
-        const result = await updateScheduledPost(token, userId, editPostId, updateData);
+          mediaUrls: urls,
+          mediaTypes: types,
+        });
         if (result.success) {
           toast({ title: t.colabNewPost.postUpdated, description: t.colabNewPost.postUpdatedDescription });
           router.push('/colaborador/calendario');
@@ -338,8 +385,12 @@ function EditorContent() {
         // ─── Create new post ──────────────────────
         const result = await createScheduledPost(token, userId, {
           caption,
-          mediaUrl,
-          mediaType,
+          // Mantém os single fields pra retrocompat — o create salva como
+          // singular quando 1 item, como galeria quando 2+.
+          mediaUrl: urls[0],
+          mediaType: types[0],
+          mediaUrls: urls,
+          mediaTypes: types,
           scheduledFor,
           ...(contentPillar && { contentPillar }),
           ...(formato && { formato }),
@@ -372,51 +423,32 @@ function EditorContent() {
     setIsPublishing(true);
 
     try {
-      // Upload media to Firebase Storage first if present
-      let mediaUrl: string | undefined;
-
-      if (mediaFile) {
-        const storageRef = ref(storage, `users/${userId}/posts/${Date.now()}_${mediaFile.name}`);
-        const snapshot = await uploadBytes(storageRef, mediaFile);
-        mediaUrl = await getDownloadURL(snapshot.ref);
-      } else if (existingMediaUrl && !mediaRemoved) {
-        // Use existing media from edit mode
-        mediaUrl = existingMediaUrl;
-      }
-
+      // Upload de todas as midias pendentes
+      const { urls, types } = await uploadPendingMedia();
       const token = await getAuthToken();
 
       if (isEditMode && editPostId) {
         // ─── Edit mode: update post then publish ──────
-        const updateData: {
-          caption: string;
-          scheduledFor: string;
-          mediaUrl?: string;
-          mediaType?: string;
-        } = {
+        const updateResult = await updateScheduledPost(token, userId, editPostId, {
           caption,
           scheduledFor: new Date().toISOString(),
-        };
-
-        if (mediaFile) {
-          updateData.mediaUrl = mediaUrl;
-          updateData.mediaType = mediaFile.type;
-        } else if (mediaRemoved) {
-          updateData.mediaUrl = '';
-          updateData.mediaType = '';
-        }
-
-        const updateResult = await updateScheduledPost(token, userId, editPostId, updateData);
+          mediaUrls: urls,
+          mediaTypes: types,
+        });
         if (!updateResult.success) {
           toast({ variant: 'destructive', title: t.common.error, description: updateResult.error || t.colabNewPost.scheduleError });
           setIsPublishing(false);
           return;
         }
 
-        // Publish to LinkedIn
+        // Publish to LinkedIn (passa arrays — single ou multi)
         const result = await publishToLinkedIn(
-          token, userId, caption, mediaUrl, editPostId,
-          mediaFile?.type || (existingMediaType && !mediaRemoved ? existingMediaType : undefined)
+          token, userId, caption,
+          urls[0], // legado: 1a midia
+          editPostId,
+          types[0], // legado
+          urls,
+          types,
         );
 
         if (result.success) {
@@ -432,8 +464,10 @@ function EditorContent() {
         // ─── Create mode: create post then publish ──────
         const createResult = await createScheduledPost(token, userId, {
           caption,
-          mediaUrl,
-          mediaType: mediaFile?.type,
+          mediaUrl: urls[0],
+          mediaType: types[0],
+          mediaUrls: urls,
+          mediaTypes: types,
           scheduledFor: new Date().toISOString(),
         });
 
@@ -443,8 +477,11 @@ function EditorContent() {
           return;
         }
 
-        // Publish to LinkedIn and update the post status
-        const result = await publishToLinkedIn(token, userId, caption, mediaUrl, createResult.postId, mediaFile?.type);
+        const result = await publishToLinkedIn(
+          token, userId, caption,
+          urls[0], createResult.postId, types[0],
+          urls, types,
+        );
 
         if (result.success) {
           setPublishedUrl(result.postUrl || null);
@@ -466,8 +503,11 @@ function EditorContent() {
     setIsPublishing(false);
   };
 
-  // Determine if media is video (new file or existing)
-  const isVideoMedia = mediaFile?.type.startsWith('video/') || (!mediaFile && existingMediaType?.startsWith('video/'));
+  // Helpers de render — galeria atual.
+  // primaryKind = tipo do primeiro item (todos devem ser do mesmo tipo).
+  const primaryKind = mediaItems.length > 0 ? classifyMimeType(mediaItems[0].mimeType) : null;
+  const isGallery = primaryKind === 'image' && mediaItems.length > 1;
+  const canAddMore = mediaItems.length === 0 || (primaryKind === 'image' && mediaItems.length < MAX_GALLERY_IMAGES);
 
   if (isLoading || isLoadingPost) {
     return (
@@ -650,41 +690,105 @@ function EditorContent() {
           <p className="text-xs text-muted-foreground text-right mt-1">{caption.length} {t.colabNewPost.characters}</p>
         </div>
 
-        {/* Media upload */}
+        {/* Media upload — suporta galeria multi-image. PDF/video/GIF sempre single. */}
         <div className="space-y-1.5">
-          <Label>{t.colabNewPost.media}</Label>
-          {mediaPreview ? (
+          <div className="flex items-center justify-between">
+            <Label>{t.colabNewPost.media}</Label>
+            {isGallery && (
+              <span className="text-xs text-muted-foreground">
+                {mediaItems.length} de {MAX_GALLERY_IMAGES} imagens
+              </span>
+            )}
+          </div>
+
+          {mediaItems.length === 0 ? (
+            <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/30 transition-colors">
+              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+              <span className="text-sm text-muted-foreground">{t.colabNewPost.clickToAdd}</span>
+              <span className="text-xs text-muted-foreground mt-0.5">
+                Imagens (JPG/PNG/WEBP, até 5MB cada, até {MAX_GALLERY_IMAGES} numa galeria) · GIF/PDF (até 5MB) · Vídeo MP4/MOV (até 200MB)
+              </span>
+              <input
+                type="file"
+                accept={ACCEPTED_MEDIA_INPUT}
+                multiple
+                className="hidden"
+                onChange={handleMediaChange}
+              />
+            </label>
+          ) : isGallery ? (
+            // Galeria de imagens: grid responsivo + slot pra adicionar mais
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {mediaItems.map((item, idx) => (
+                <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.previewUrl} alt={`Imagem ${idx + 1}`} className="w-full h-full object-cover" />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => removeMediaAt(idx)}
+                    aria-label={`Remover imagem ${idx + 1}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              {canAddMore && (
+                <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/30 transition-colors">
+                  <Upload className="h-6 w-6 text-muted-foreground mb-1" />
+                  <span className="text-xs text-muted-foreground">Adicionar</span>
+                  <input
+                    type="file"
+                    accept={ACCEPTED_MEDIA_INPUT}
+                    multiple
+                    className="hidden"
+                    onChange={handleMediaChange}
+                  />
+                </label>
+              )}
+            </div>
+          ) : (
+            // Single image / video / GIF / PDF
             <div className="relative rounded-lg overflow-hidden border">
-              {isVideoMedia ? (
-                <video src={mediaPreview} controls className="w-full max-h-[400px] object-cover" />
-              ) : mediaPreview.startsWith('http') ? (
+              {primaryKind === 'video' ? (
+                <video src={mediaItems[0].previewUrl} controls className="w-full max-h-[400px] object-cover" />
+              ) : primaryKind === 'pdf' ? (
+                <div className="flex flex-col items-center justify-center h-40 bg-muted/30 gap-2 text-muted-foreground">
+                  <Upload className="h-8 w-8" />
+                  <span className="text-sm">PDF carregado</span>
+                </div>
+              ) : mediaItems[0].previewUrl.startsWith('http') ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={mediaPreview} alt="Preview" className="w-full max-h-[400px] object-cover" />
+                <img src={mediaItems[0].previewUrl} alt="Preview" className="w-full max-h-[400px] object-cover" />
               ) : (
-                <Image src={mediaPreview} alt="Preview" width={1200} height={800} className="w-full max-h-[400px] object-cover" />
+                <Image src={mediaItems[0].previewUrl} alt="Preview" width={1200} height={800} className="w-full max-h-[400px] object-cover" />
               )}
               <Button
                 type="button"
                 variant="destructive"
                 size="icon"
                 className="absolute top-2 right-2 h-7 w-7"
-                onClick={removeMedia}
+                onClick={() => removeMediaAt(0)}
               >
                 <X className="h-3.5 w-3.5" />
               </Button>
+              {/* Quando é 1 imagem só, oferece adicionar mais pra virar galeria */}
+              {primaryKind === 'image' && (
+                <label className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-background/95 backdrop-blur border text-xs cursor-pointer hover:bg-accent transition-colors">
+                  <Upload className="h-3.5 w-3.5" />
+                  Adicionar imagem
+                  <input
+                    type="file"
+                    accept={ACCEPTED_MEDIA_INPUT}
+                    multiple
+                    className="hidden"
+                    onChange={handleMediaChange}
+                  />
+                </label>
+              )}
             </div>
-          ) : (
-            <label className="flex flex-col items-center justify-center h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/30 transition-colors">
-              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">{t.colabNewPost.clickToAdd}</span>
-              <span className="text-xs text-muted-foreground mt-0.5">JPG, PNG, GIF (até 10MB) · MP4, MOV (até 200MB)</span>
-              <input
-                type="file"
-                accept="image/*,video/mp4,video/quicktime"
-                className="hidden"
-                onChange={handleMediaChange}
-              />
-            </label>
           )}
         </div>
 

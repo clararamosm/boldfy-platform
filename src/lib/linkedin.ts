@@ -442,36 +442,60 @@ export function classifyMediaType(mediaType?: string): 'image' | 'gif' | 'video'
 
 /**
  * Publish a post to LinkedIn using the Posts API v2.
- * Supports text-only, text + image/GIF, or text + video.
+ * Supports text-only, text + image/GIF, text + video, or text + multi-image gallery.
  *
- * @param mediaType - MIME type or category: 'image', 'gif', 'video', 'pdf', or full MIME like 'video/mp4'
+ * @param mediaUrls - Array de URLs Firebase Storage. Single = imagem/video/gif/pdf normal.
+ *                   Array com 2+ items = galeria multi-image (sÃ³ JPG/PNG/WEBP).
+ * @param mediaTypes - MIME types paralelos a `mediaUrls`. Mesma ordem, mesmo tamanho.
+ *
+ * Retrocompat: aceita tambÃ©m a forma antiga `(text, mediaUrl: string, mediaType: string)`
+ * via wrapper `publishLinkedInPostLegacy` mais abaixo â callers nÃ£o migrados
+ * podem continuar a chamÃ¡-lo. NOVOS callers devem usar a forma array.
  */
 export async function publishLinkedInPost(
   accessToken: string,
   linkedinId: string,
   text: string,
-  mediaUrl?: string,
-  mediaType?: string
+  mediaUrls?: string[],
+  mediaTypes?: string[]
 ): Promise<LinkedInPostResult> {
   const authorUrn = `urn:li:person:${linkedinId}`;
 
   // Sanitize: convert any HTML to plain text for LinkedIn API
   const cleanText = htmlToLinkedInText(text);
 
-  const category = classifyMediaType(mediaType);
+  // Normaliza: arrays paralelos com nÃºmeros iguais de items.
+  const urls = (mediaUrls ?? []).filter(Boolean);
+  const types = (mediaTypes ?? []).slice(0, urls.length);
+  while (types.length < urls.length) types.push('');
 
   // Upload media if provided
-  let mediaUrn: string | undefined;
-  if (mediaUrl && category === 'video') {
-    mediaUrn = await uploadVideoToLinkedIn(accessToken, linkedinId, mediaUrl);
-  } else if (mediaUrl && (category === 'image' || category === 'gif')) {
-    // GIF uses the same Images API as regular images
-    mediaUrn = await uploadImageToLinkedIn(accessToken, linkedinId, mediaUrl);
-  } else if (mediaUrl && !category) {
-    // Fallback: if mediaType is unknown but URL is provided, try image upload
-    mediaUrn = await uploadImageToLinkedIn(accessToken, linkedinId, mediaUrl);
+  let mediaUrns: string[] = [];
+  const primaryCategory = urls.length > 0 ? classifyMediaType(types[0]) : null;
+  const isMultiImage = urls.length > 1 && primaryCategory === 'image';
+
+  if (isMultiImage) {
+    // MULTI_IMAGE gallery: upload sequencial de cada imagem.
+    // Sequencial (em vez de Promise.all) pra evitar rate-limit do LinkedIn
+    // e dar oportunidade de retry granular se uma falhar.
+    for (let i = 0; i < urls.length; i++) {
+      const urn = await uploadImageToLinkedIn(accessToken, linkedinId, urls[i]);
+      if (urn) mediaUrns.push(urn);
+    }
+  } else if (urls.length > 0) {
+    // Single media (image, video, gif, or unknown fallback).
+    const url = urls[0];
+    const cat = classifyMediaType(types[0]);
+    let urn: string | undefined;
+    if (cat === 'video') {
+      urn = await uploadVideoToLinkedIn(accessToken, linkedinId, url);
+    } else if (cat === 'image' || cat === 'gif' || !cat) {
+      // GIF e fallback usam a mesma Images API
+      urn = await uploadImageToLinkedIn(accessToken, linkedinId, url);
+    }
+    // PDF: skip upload (LinkedIn nÃ£o suporta via API)
+    if (urn) mediaUrns = [urn];
   }
-  // If category === 'pdf', we skip media upload (LinkedIn doesn't support PDF via API)
 
   // Build post body (Posts API v2 format)
   // IMPORTANT: commentary goes through escapeLittleText to prevent LinkedIn's
@@ -489,9 +513,19 @@ export async function publishLinkedInPost(
     },
   };
 
-  if (mediaUrn) {
+  if (mediaUrns.length > 1) {
+    // MULTI_IMAGE shape: content.multiImage.images: [{ id: urn }, ...]
     body.content = {
-      media: { title: category === 'video' ? 'Post video' : 'Post image', id: mediaUrn },
+      multiImage: {
+        images: mediaUrns.map((urn) => ({ id: urn })),
+      },
+    };
+  } else if (mediaUrns.length === 1) {
+    body.content = {
+      media: {
+        title: primaryCategory === 'video' ? 'Post video' : 'Post image',
+        id: mediaUrns[0],
+      },
     };
   }
 
@@ -520,6 +554,7 @@ export async function publishLinkedInPost(
 }
 
 // ─── LinkedIn Post Metrics (socialMetadata API) ─────────────────
+
 
 export type LinkedInReactionSummary = {
   LIKE?: number;

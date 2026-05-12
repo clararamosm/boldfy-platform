@@ -11,8 +11,16 @@ export type ScheduledPost = {
   id: string;
   userId: string;
   caption: string;
+  // Media singular (legado pre-galeria). Sempre primeira midia da galeria
+  // ou o unico arquivo quando e video/PDF/GIF/single image.
   mediaUrl?: string;
   mediaType?: string;
+  // Multi-image gallery (rodada 6 do feedback): arrays paralelos pra galerias
+  // de ate 10 imagens JPG/PNG/WEBP. Quando preenchidos, sobrescrevem
+  // mediaUrl/mediaType na hora de publicar. PDF/video/GIF nunca usam
+  // estes campos — sempre single em mediaUrl/mediaType.
+  mediaUrls?: string[];
+  mediaTypes?: string[];
   scheduledFor: string; // ISO date string
   status: 'draft' | 'scheduled' | 'in_progress' | 'published' | 'failed';
   linkedinPostId?: string;
@@ -45,6 +53,8 @@ export async function createScheduledPost(
     scheduledFor: string;
     contentPillar?: string;
     formato?: string;
+    mediaUrls?: string[];
+    mediaTypes?: string[];
   }
 ): Promise<{ success?: boolean; postId?: string; error?: string }> {
   try {
@@ -56,11 +66,18 @@ export async function createScheduledPost(
     if (!data.scheduledFor) return { error: 'Data de agendamento é obrigatória.' };
 
     const now = new Date().toISOString();
+    // Multi-image: quando ha array com 2+ imagens, salva mediaUrls/mediaTypes
+    // e usa o primeiro como mediaUrl/mediaType pra retrocompat de leitura.
+    const hasGallery = Array.isArray(data.mediaUrls) && data.mediaUrls.length > 0;
+    const firstUrl = hasGallery ? data.mediaUrls![0] : (data.mediaUrl || null);
+    const firstType = hasGallery ? (data.mediaTypes?.[0] ?? null) : (data.mediaType || null);
+
     const postRef = await adminDb.collection('users').doc(userId).collection('scheduledPosts').add({
       userId,
       caption: data.caption,
-      mediaUrl: data.mediaUrl || null,
-      mediaType: data.mediaType || null,
+      mediaUrl: firstUrl,
+      mediaType: firstType,
+      ...(hasGallery && { mediaUrls: data.mediaUrls, mediaTypes: data.mediaTypes ?? [] }),
       scheduledFor: data.scheduledFor,
       status: 'scheduled',
       linkedinPostId: null,
@@ -90,6 +107,8 @@ export async function updateScheduledPost(
     status?: 'draft' | 'scheduled' | 'in_progress';
     contentPillar?: string;
     formato?: string;
+    mediaUrls?: string[];
+    mediaTypes?: string[];
   }
 ): Promise<{ success?: boolean; error?: string }> {
   try {
@@ -102,8 +121,6 @@ export async function updateScheduledPost(
     };
 
     if (data.caption !== undefined) updateData.caption = data.caption;
-    if (data.mediaUrl !== undefined) updateData.mediaUrl = data.mediaUrl || null;
-    if (data.mediaType !== undefined) updateData.mediaType = data.mediaType || null;
     if (data.scheduledFor !== undefined) updateData.scheduledFor = data.scheduledFor;
     if (data.status !== undefined) updateData.status = data.status;
     // contentPillar/formato podem ser '' pra remover o campo do post.
@@ -111,6 +128,38 @@ export async function updateScheduledPost(
       updateData.contentPillar = data.contentPillar || FieldValue.delete();
     }
     if (data.formato !== undefined) updateData.formato = data.formato;
+
+    // Media: se vier mediaUrls (galeria), prevalece. Senao, usa mediaUrl singular.
+    // Importante manter mediaUrl/mediaType como primeira midia pra retrocompat
+    // com leitores antigos (calendario, feed) que ainda consultam o singular.
+    const hasGalleryUpdate = Array.isArray(data.mediaUrls);
+    if (hasGalleryUpdate) {
+      const urls = data.mediaUrls ?? [];
+      const types = data.mediaTypes ?? [];
+      if (urls.length === 0) {
+        // Limpar tudo
+        updateData.mediaUrl = null;
+        updateData.mediaType = null;
+        updateData.mediaUrls = FieldValue.delete();
+        updateData.mediaTypes = FieldValue.delete();
+      } else if (urls.length === 1) {
+        // Single — guarda no campo legado e apaga o array (mantem consistencia)
+        updateData.mediaUrl = urls[0];
+        updateData.mediaType = types[0] ?? null;
+        updateData.mediaUrls = FieldValue.delete();
+        updateData.mediaTypes = FieldValue.delete();
+      } else {
+        // Galeria
+        updateData.mediaUrl = urls[0];
+        updateData.mediaType = types[0] ?? null;
+        updateData.mediaUrls = urls;
+        updateData.mediaTypes = types;
+      }
+    } else {
+      // Sem novo array — caller usou a forma singular antiga.
+      if (data.mediaUrl !== undefined) updateData.mediaUrl = data.mediaUrl || null;
+      if (data.mediaType !== undefined) updateData.mediaType = data.mediaType || null;
+    }
 
     await adminDb.collection('users').doc(userId).collection('scheduledPosts').doc(postId).update(updateData);
     return { success: true };

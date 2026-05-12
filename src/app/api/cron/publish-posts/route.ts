@@ -92,12 +92,21 @@ async function processScheduledPosts(
         continue;
       }
 
+      // Multi-image gallery support: prioriza mediaUrls[] (novo schema),
+      // cai pro mediaUrl singular (legado) se ausente.
+      const mediaUrlsArr: string[] = Array.isArray(post.mediaUrls) && post.mediaUrls.length > 0
+        ? post.mediaUrls
+        : post.mediaUrl ? [post.mediaUrl] : [];
+      const mediaTypesArr: string[] = Array.isArray(post.mediaTypes) && post.mediaTypes.length > 0
+        ? post.mediaTypes
+        : post.mediaType ? [post.mediaType] : [];
+
       const result = await publishLinkedInPost(
         connResult.accessToken,
         connResult.linkedinId,
         post.caption,
-        post.mediaUrl || undefined,
-        post.mediaType || undefined,
+        mediaUrlsArr,
+        mediaTypesArr,
       );
 
       await postDoc.ref.update({
@@ -168,12 +177,20 @@ async function processPipelinePosts(
         continue;
       }
 
+      // Multi-image gallery support (mesma lógica do scheduledPosts acima).
+      const mediaUrlsArr: string[] = Array.isArray(post.mediaUrls) && post.mediaUrls.length > 0
+        ? post.mediaUrls
+        : post.mediaUrl ? [post.mediaUrl] : [];
+      const mediaTypesArr: string[] = Array.isArray(post.mediaTypes) && post.mediaTypes.length > 0
+        ? post.mediaTypes
+        : post.mediaType ? [post.mediaType] : [];
+
       const result = await publishLinkedInPost(
         connResult.accessToken,
         connResult.linkedinId,
         post.caption,
-        post.mediaUrl || undefined,
-        post.mediaType || undefined,
+        mediaUrlsArr,
+        mediaTypesArr,
       );
 
       await postDoc.ref.update({

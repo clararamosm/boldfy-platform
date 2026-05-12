@@ -361,8 +361,16 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
   }, []);
 
   // ---- Handle media update ----
-  const handleMediaUpdate = useCallback((mediaUrl: string | undefined, mediaType: string | undefined) => {
-    setPost(prev => prev ? { ...prev, mediaUrl, mediaType } : prev);
+  // mediaUrls/mediaTypes opcionais — preenchidos quando ha galeria multi-image.
+  // Mantemos mediaUrl/mediaType sempre apontando pra primeira midia
+  // (retrocompat com leitores antigos).
+  const handleMediaUpdate = useCallback((
+    mediaUrl: string | undefined,
+    mediaType: string | undefined,
+    mediaUrls?: string[],
+    mediaTypes?: string[],
+  ) => {
+    setPost(prev => prev ? { ...prev, mediaUrl, mediaType, mediaUrls, mediaTypes } : prev);
   }, []);
 
   // ---- TL Approve / Request Adjustment ----

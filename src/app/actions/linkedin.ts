@@ -132,7 +132,12 @@ export async function publishToLinkedIn(
   content: string,
   mediaUrl?: string,
   postId?: string,
-  mediaType?: string
+  mediaType?: string,
+  // Multi-image (rodada 6): quando ha 2+ imagens, mediaUrl/mediaType ficam
+  // vazios e mediaUrls/mediaTypes carregam o array. Pra retrocompat com
+  // chamadas single, ambas as formas sao aceitas.
+  mediaUrls?: string[],
+  mediaTypes?: string[]
 ): Promise<PublishResult> {
   try {
     const user = await requireSelf(idToken, userId);
@@ -193,8 +198,14 @@ export async function publishToLinkedIn(
       }
     }
 
-    // 3. Publish the post (with optional image/video)
-    const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim(), mediaUrl, mediaType);
+    // 3. Publish the post — normaliza single/multi pra arrays paralelos.
+    const urls: string[] = mediaUrls && mediaUrls.length > 0
+      ? mediaUrls
+      : mediaUrl ? [mediaUrl] : [];
+    const types: string[] = mediaTypes && mediaTypes.length > 0
+      ? mediaTypes
+      : mediaType ? [mediaType] : [];
+    const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim(), urls, types);
 
     // 4. Update the post document in Firestore with published status
     const now = new Date().toISOString();
