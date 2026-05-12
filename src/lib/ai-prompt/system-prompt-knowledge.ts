@@ -33,8 +33,14 @@
  * Versão do conjunto de camadas. Bump SEMPRE que mudar qualquer constante
  * deste arquivo. Salvo no campo `promptVersion` de cada doc em
  * `users/{uid}/generatedContent` pra rastrear qual versão gerou cada output.
+ *
+ * Histórico:
+ * - v2.5.0 (PR 7): refatoração inicial em 4 camadas + parametrização.
+ * - v2.6.0 (PR 6): Camada 4 estendida pra consumir PersonalBrand v2
+ *   (discovery, valueProposition estruturada, sliders, pilares com
+ *   ângulos). Aceita `selectedPillar` e `angle` opcionais por geração.
  */
-export const PROMPT_VERSION = 'v2.5.0';
+export const PROMPT_VERSION = 'v2.6.0';
 
 // ──────────────────────────────────────────────────────────────────────────
 // CAMADA 1 — Princípio content-first + frame de papel
@@ -289,10 +295,16 @@ Blocos curtos de 1 a 3 frases com linha em branco entre eles. Frases curtas e af
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
- * Campos que compõem o brand context do autor.
- * Reflete o schema v1 atual de `users/{uid}` (PersonalBrand v2 chega no PR 1).
- * Quando PR 1 sair, basta estender este tipo com os novos blocos
- * (discovery, valueProposition estruturada, sliders, strategy.pillars).
+ * Campos que compõem o brand context do autor (Camada 4 dinâmica).
+ *
+ * Os campos "flat" (voice, expertise, value, languageStyle, contentPillars)
+ * cobrem o schema v1 legado e continuam aceitos pra retrocompat com usuários
+ * que ainda não migraram pro PersonalBrand v2.
+ *
+ * Os campos do bloco `v2` (a partir do PR 1) carregam o brand estruturado —
+ * discovery, valueProposition, sliders e pilares com ângulos. Quando
+ * presentes, a Camada 4 montada por `buildLayer4BrandContext` usa esses
+ * campos prioritariamente.
  */
 export type PersonalBrandContext = {
   authorName?: string;
@@ -302,6 +314,53 @@ export type PersonalBrandContext = {
   value?: string;
   languageStyle?: string;
   contentPillars?: string;
+
+  /**
+   * Bloco v2 estruturado (PR 1). Quando presente, sobrescreve o que vier
+   * dos campos flat acima.
+   */
+  v2?: {
+    discovery?: {
+      convergence?: string;       // Como aparece hoje
+      aspiration?: string;        // Como quer ser visto
+      surprise?: string;          // O que surpreendeu nas respostas externas
+      startingPhrase?: string;    // Frase composta livre
+      valueProposition?: {
+        who?: string;
+        problem?: string;
+        how?: string;
+        result?: string;
+      };
+    };
+    voiceDescription?: string;    // Prosa derivada dos sliders + descrição livre
+    voiceKeywords?: string[];     // Palavras-assinatura
+    voiceAvoidWords?: string[];   // Palavras a evitar
+    strategy?: {
+      primaryObjective?: string;
+      secondaryObjectives?: string[];
+      pillars?: Array<{
+        id?: string;
+        name: string;
+        description?: string;
+        color?: string;
+      }>;
+    };
+  };
+
+  /**
+   * Pilar selecionado para esta geração específica (PR 5). Vem do dropdown
+   * no Assistente. Permite à IA focar conscientemente no pilar.
+   */
+  selectedPillar?: {
+    name: string;
+    description?: string;
+  };
+
+  /**
+   * Ângulo selecionado para esta geração específica (PR 5). Mercado vs
+   * Pessoal vs Institucional. Define a lente narrativa do post.
+   */
+  angle?: 'market' | 'personal' | 'institutional';
 };
 
 export type CompanyBrandContext = {
@@ -319,28 +378,128 @@ export type CompanyBrandContext = {
 const fallback = (v: string | undefined) => (v && v.trim().length > 0 ? v : 'N/A');
 
 /**
- * Monta a Camada 4 (brand context) no formato definido pela spec v2.5.
+ * Monta a Camada 4 (brand context) no formato definido pela spec v2.5/v2.6.
+ *
  * Campos ausentes aparecem como "N/A" — a IA tem instrução de não fabricar
  * em cima desses gaps (ver Camada 5, princípio NADA FABRICADO).
+ *
+ * Comportamento:
+ * - Se `pb.v2` está preenchido (PersonalBrand v2 do PR 1), renderiza blocos
+ *   ricos (discovery, valueProposition estruturada, pillars com ângulos).
+ * - Caso contrário, cai no shape v1 flat.
+ * - Se `pb.selectedPillar` está presente, adiciona seção "PILAR DESTE POST".
+ * - Se `pb.angle` está presente, adiciona instrução de ângulo (lente narrativa).
  */
 export function buildLayer4BrandContext(
   pb: PersonalBrandContext,
   cp: CompanyBrandContext,
 ): string {
-  return `QUEM ESTÁ ESCREVENDO E SOBRE QUE EMPRESA
+  const v2 = pb.v2;
+  const hasV2 = !!v2 && (
+    !!v2.discovery || !!v2.voiceDescription || !!v2.strategy?.pillars?.length
+  );
 
-AUTOR
-Nome: ${fallback(pb.authorName)}
-Cargo: ${fallback(pb.position)}
-Expertise: ${fallback(pb.expertise)}
-Proposta de valor pessoal: ${fallback(pb.value)}
-Tom de voz: ${fallback(pb.voice)}
-Estilo de linguagem: ${fallback(pb.languageStyle)}
-Pilares de conteúdo: ${fallback(pb.contentPillars)}
+  // ── Seção AUTOR ──
+  const authorLines: string[] = [
+    'AUTOR',
+    `Nome: ${fallback(pb.authorName)}`,
+    `Cargo: ${fallback(pb.position)}`,
+    `Expertise: ${fallback(pb.expertise)}`,
+  ];
 
-A voz do autor é soberana. O conteúdo precisa soar como ele.
+  if (hasV2 && v2?.discovery) {
+    const d = v2.discovery;
+    authorLines.push('');
+    authorLines.push('POSICIONAMENTO PESSOAL (Discovery)');
+    if (d.convergence) authorLines.push(`Como aparece hoje: ${d.convergence}`);
+    if (d.aspiration) authorLines.push(`Onde quer chegar: ${d.aspiration}`);
+    if (d.surprise) authorLines.push(`O que surpreendeu nas respostas externas: ${d.surprise}`);
+    if (d.startingPhrase) authorLines.push(`Frase de partida: ${d.startingPhrase}`);
 
-EMPRESA ONDE ELE TRABALHA
+    if (d.valueProposition) {
+      const vp = d.valueProposition;
+      authorLines.push('');
+      authorLines.push('PROPOSTA DE VALOR');
+      if (vp.who) authorLines.push(`Ele ajuda: ${vp.who}`);
+      if (vp.problem) authorLines.push(`A resolver: ${vp.problem}`);
+      if (vp.how) authorLines.push(`Através de: ${vp.how}`);
+      if (vp.result) authorLines.push(`Gerando: ${vp.result}`);
+    }
+  } else if (pb.value) {
+    authorLines.push(`Proposta de valor pessoal: ${pb.value}`);
+  }
+
+  // ── VOZ ──
+  authorLines.push('');
+  authorLines.push('VOZ');
+  if (hasV2 && v2?.voiceDescription) {
+    authorLines.push(v2.voiceDescription);
+  } else {
+    authorLines.push(`Tom de voz: ${fallback(pb.voice)}`);
+    authorLines.push(`Estilo de linguagem: ${fallback(pb.languageStyle)}`);
+  }
+  if (v2?.voiceKeywords?.length) {
+    authorLines.push(`Palavras-assinatura: ${v2.voiceKeywords.join(', ')}`);
+  }
+  if (v2?.voiceAvoidWords?.length) {
+    authorLines.push(`Palavras a EVITAR (preferência do autor): ${v2.voiceAvoidWords.join(', ')}`);
+  }
+
+  // ── ESTRATÉGIA / PILARES ──
+  authorLines.push('');
+  authorLines.push('ESTRATÉGIA DE CONTEÚDO');
+  if (hasV2 && v2?.strategy) {
+    const s = v2.strategy;
+    if (s.primaryObjective) authorLines.push(`Objetivo primário: ${s.primaryObjective}`);
+    if (s.secondaryObjectives?.length) {
+      authorLines.push(`Objetivos secundários: ${s.secondaryObjectives.join(', ')}`);
+    }
+    if (s.pillars?.length) {
+      authorLines.push('Pilares:');
+      for (const p of s.pillars) {
+        const desc = p.description ? ` — ${p.description}` : '';
+        authorLines.push(`  • ${p.name}${desc}`);
+      }
+    }
+  } else if (pb.contentPillars) {
+    authorLines.push(`Pilares de conteúdo: ${pb.contentPillars}`);
+  } else {
+    authorLines.push('Pilares de conteúdo: N/A');
+  }
+
+  authorLines.push('');
+  authorLines.push('A voz do autor é soberana. O conteúdo precisa soar como ele.');
+
+  // ── PILAR DO POST ATUAL (se selecionado) ──
+  let pillarBlock = '';
+  if (pb.selectedPillar) {
+    const desc = pb.selectedPillar.description
+      ? `\nDescrição: ${pb.selectedPillar.description}`
+      : '';
+    pillarBlock = `
+
+PILAR DESTE POST
+Nome: ${pb.selectedPillar.name}${desc}
+
+A ideia entregue pelo autor cabe especificamente neste pilar. Não desvie pra outro tema.`;
+  }
+
+  // ── ÂNGULO (se selecionado) ──
+  let angleBlock = '';
+  if (pb.angle) {
+    const angleMap: Record<NonNullable<PersonalBrandContext['angle']>, string> = {
+      market: 'MERCADO — análise de tendência, dado, observação setorial. Voz de quem observa o mercado de fora pra dentro.',
+      personal: 'PESSOAL — história vivida, decisão tomada, aprendizado próprio. Voz de quem traz a cena vivida.',
+      institutional: 'INSTITUCIONAL — ponto de vista da empresa/marca que o autor representa. Voz de quem fala em nome de um time/produto.',
+    };
+    angleBlock = `
+
+ÂNGULO DESTE POST
+${angleMap[pb.angle]}`;
+  }
+
+  // ── Seção EMPRESA ──
+  const companyBlock = `EMPRESA ONDE ELE TRABALHA
 Nome: ${fallback(cp.companyName)}
 Proposta de valor: ${fallback(cp.valueProposition)}
 Tagline: ${fallback(cp.tagline)}
@@ -352,6 +511,12 @@ Tópicos aprovados: ${fallback(cp.approvedTopics)}
 Frases/tópicos proibidos: ${fallback(cp.prohibitedPhrases)}
 
 Como usar o brand corporativo: o autor conta uma história ou opinião pessoal. Você conecta a narrativa com as dores, soluções ou keywords da empresa de forma natural. A marca corporativa NUNCA é o assunto principal. Se não há conexão natural, NÃO force.`;
+
+  return `QUEM ESTÁ ESCREVENDO E SOBRE QUE EMPRESA
+
+${authorLines.join('\n')}${pillarBlock}${angleBlock}
+
+${companyBlock}`;
 }
 
 // ──────────────────────────────────────────────────────────────────────────

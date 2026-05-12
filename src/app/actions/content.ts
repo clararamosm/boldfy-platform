@@ -23,6 +23,7 @@ import {
   type PostFormat,
   type Locale,
 } from '@/lib/ai-prompt/system-prompt-knowledge';
+import { resolvePersonalBrand, describeVoiceSliders } from '@/lib/personal-brand';
 
 // ---- Helpers ----
 
@@ -48,30 +49,102 @@ async function getCompanyProfile(companyId: string): Promise<Record<string, stri
   throw new Error('Perfil da empresa não encontrado.');
 }
 
-async function getPersonalBranding(userId: string): Promise<Record<string, string>> {
+/**
+ * Le brand pessoal do colaborador e devolve no shape `PersonalBrandContext`
+ * que o `buildSystemPrompt` consome. Faz dual-read v2→v1 via
+ * `resolvePersonalBrand`. Quando o brand v2 esta preenchido, expoe os
+ * blocos estruturados em `v2.*` pra Camada 4 montar contexto rico.
+ */
+type PersonalBrandingForPrompt = {
+  // Campos flat consumidos pela Camada 4 quando v2 esta vazio (retrocompat)
+  authorName: string;
+  position: string;
+  voice: string;
+  expertise: string;
+  value: string;
+  languageStyle: string;
+  contentPillars: string;
+  // Bloco v2 — Camada 4 prioriza este quando presente
+  v2?: {
+    discovery?: {
+      convergence?: string;
+      aspiration?: string;
+      surprise?: string;
+      startingPhrase?: string;
+      valueProposition?: { who?: string; problem?: string; how?: string; result?: string };
+    };
+    voiceDescription?: string;
+    voiceKeywords?: string[];
+    voiceAvoidWords?: string[];
+    strategy?: {
+      primaryObjective?: string;
+      secondaryObjectives?: string[];
+      pillars?: Array<{ id?: string; name: string; description?: string; color?: string }>;
+    };
+  };
+};
+
+async function getPersonalBranding(userId: string): Promise<PersonalBrandingForPrompt> {
   const userDocSnap = await adminDb.collection("users").doc(userId).get();
 
-  if (userDocSnap.exists) {
-    const data = userDocSnap.data();
-    const arrToStr = (v: unknown) => Array.isArray(v) ? v.join(', ') : (v as string || '');
+  if (!userDocSnap.exists) {
     return {
-      authorName: data?.profile?.name || data?.name || '',
-      position: data?.position || '',
-      voice: data?.voice || '',
-      expertise: data?.expertise || '',
-      value: data?.value || '',
-      languageStyle: data?.languageStyle || '',
-      contentPillars: arrToStr(data?.contentPillars),
+      authorName: '', position: '', voice: '', expertise: '', value: '',
+      languageStyle: '', contentPillars: '',
     };
   }
+
+  const data = userDocSnap.data() ?? {};
+  const { brand, source } = resolvePersonalBrand(data);
+
+  // String composta com a proposta de valor (campo `value` legado).
+  const vp = brand.discovery?.valueProposition;
+  const composedValue = vp && (vp.who || vp.problem)
+    ? `Ajuda ${vp.who || 'profissionais'} a resolver ${vp.problem}${vp.how ? ` atraves de ${vp.how}` : ''}${vp.result ? `, gerando ${vp.result}` : ''}.`
+    : (data.value as string | undefined) ?? '';
+
+  // Prosa derivada dos sliders + descricao livre, separadas por ". ".
+  const sliderProse = brand.voice ? describeVoiceSliders(brand) : '';
+  const voiceText = [sliderProse, brand.voice?.description, (data.voice as string | undefined)]
+    .filter((s) => !!s && s.trim().length > 0)
+    .join('. ');
+
+  const pillarsText = brand.strategy?.pillars && brand.strategy.pillars.length > 0
+    ? brand.strategy.pillars.map((p) => p.name).filter(Boolean).join(', ')
+    : Array.isArray(data.contentPillars)
+      ? (data.contentPillars as string[]).join(', ')
+      : ((data.contentPillars as string | undefined) ?? '');
+
+  // Bloco v2 estruturado — exposto pra Camada 4 quando ha conteudo v2 real
+  // (nao apenas fallback do v1).
+  const hasRealV2 = source === 'v2';
+  const v2Block = hasRealV2 ? {
+    discovery: brand.discovery ? {
+      convergence: brand.discovery.convergence,
+      aspiration: brand.discovery.aspiration,
+      surprise: brand.discovery.surprise,
+      startingPhrase: brand.discovery.startingPhrase,
+      valueProposition: brand.discovery.valueProposition,
+    } : undefined,
+    voiceDescription: voiceText || undefined,
+    voiceKeywords: brand.voice?.keywords,
+    voiceAvoidWords: brand.voice?.avoidWords,
+    strategy: brand.strategy ? {
+      primaryObjective: brand.strategy.primaryObjective,
+      secondaryObjectives: brand.strategy.secondaryObjectives,
+      pillars: brand.strategy.pillars,
+    } : undefined,
+  } : undefined;
+
   return {
-    authorName: '',
-    position: '',
-    voice: '',
-    expertise: '',
-    value: '',
-    languageStyle: '',
-    contentPillars: '',
+    authorName: (data?.profile as { name?: string } | undefined)?.name ?? (data?.name as string | undefined) ?? '',
+    position: brand.basics.position || (data?.position as string | undefined) || '',
+    voice: voiceText,
+    expertise: brand.basics.expertise || (data?.expertise as string | undefined) || '',
+    value: composedValue,
+    languageStyle: (data?.languageStyle as string | undefined) ?? '',
+    contentPillars: pillarsText,
+    ...(v2Block && { v2: v2Block }),
   };
 }
 
@@ -181,6 +254,8 @@ export async function handleAlignContent(
 
 // ---- Generate Hook Options ----
 
+type ContentAngle = 'market' | 'personal' | 'institutional';
+
 type GenerateHooksInput = {
   idToken: string;
   content: string;
@@ -189,6 +264,9 @@ type GenerateHooksInput = {
   format: 'linkedin' | 'text-heavy' | 'hybrid';
   length: 'short' | 'medium' | 'long';
   locale?: 'pt-BR' | 'en';
+  // Selecao do PR 5 — pilar e angulo desta geracao especifica.
+  selectedPillarId?: string;
+  angle?: ContentAngle;
 };
 
 type GenerateHooksResult = {
@@ -228,8 +306,10 @@ export async function generateHooks(input: GenerateHooksInput): Promise<Generate
     const companyProfile = await getCompanyProfile(input.companyId);
     const personalBranding = await getPersonalBranding(input.userId);
 
+    const pbWithSelection = enrichPbWithSelection(personalBranding, input.selectedPillarId, input.angle);
+
     const systemPrompt = buildHooksSystemPrompt({
-      pb: personalBranding,
+      pb: pbWithSelection,
       cp: companyProfile,
       locale: input.locale,
     });
@@ -275,6 +355,9 @@ type GenerateWithHookInput = {
   format: 'linkedin' | 'text-heavy' | 'hybrid';
   length: 'short' | 'medium' | 'long';
   locale?: 'pt-BR' | 'en';
+  // Selecao do PR 5 — pilar e angulo desta geracao especifica.
+  selectedPillarId?: string;
+  angle?: ContentAngle;
 };
 
 export async function generateWithHook(input: GenerateWithHookInput): Promise<AlignContentState> {
@@ -309,8 +392,10 @@ export async function generateWithHook(input: GenerateWithHookInput): Promise<Al
     const companyProfile = await getCompanyProfile(input.companyId);
     const personalBranding = await getPersonalBranding(input.userId);
 
+    const pbWithSelection = enrichPbWithSelection(personalBranding, input.selectedPillarId, input.angle);
+
     const systemPrompt = buildSystemPrompt({
-      pb: personalBranding,
+      pb: pbWithSelection,
       cp: companyProfile,
       format: input.format,
       length: input.length,
@@ -342,6 +427,8 @@ Gere o post COMPLETO começando com o hook acima. NÃO mude o hook. A estrutura 
         format: input.format,
         length: input.length,
         promptVersion: PROMPT_VERSION,
+        ...(input.selectedPillarId && { pillarId: input.selectedPillarId }),
+        ...(input.angle && { angle: input.angle }),
         starred: false,
         createdAt: FieldValue.serverTimestamp(),
       }).catch(err => console.error('Error saving generated content:', err));
@@ -355,6 +442,28 @@ Gere o post COMPLETO começando com o hook acima. NÃO mude o hook. A estrutura 
 }
 
 // ---- Shared prompt builders ----
+
+/**
+ * Enriquece o PersonalBrandingForPrompt com a selecao especifica da geracao
+ * (pilar selecionado + angulo). Resolve o `selectedPillarId` contra os
+ * pilares do v2 pra montar `selectedPillar: { name, description }`.
+ */
+function enrichPbWithSelection(
+  pb: PersonalBrandingForPrompt,
+  selectedPillarId?: string,
+  angle?: ContentAngle,
+): PersonalBrandingForPrompt & {
+  selectedPillar?: { name: string; description?: string };
+  angle?: ContentAngle;
+} {
+  let selectedPillar: { name: string; description?: string } | undefined;
+  if (selectedPillarId && pb.v2?.strategy?.pillars?.length) {
+    const found = pb.v2.strategy.pillars.find((p) => p.id === selectedPillarId);
+    if (found) selectedPillar = { name: found.name, description: found.description };
+  }
+  return { ...pb, ...(selectedPillar && { selectedPillar }), ...(angle && { angle }) };
+}
+
 
 /**
  * Monta o system prompt completo a partir das camadas de knowledge.

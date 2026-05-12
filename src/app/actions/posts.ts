@@ -19,6 +19,13 @@ export type ScheduledPost = {
   publishedAt?: string;
   createdAt: string;
   updatedAt: string;
+  // PR 3: pilar e formato do post (alimenta as tags no calendario - PR 4).
+  // contentPillar guarda o ID do pilar definido em
+  // users/{uid}.personalBrand.strategy.pillars; formato espelha o que o
+  // colaborador escolheu no Assistente (LinkedIn estruturado / Texto Denso).
+  // Ambos opcionais — posts antigos continuam validos sem esses campos.
+  contentPillar?: string;
+  formato?: 'linkedin' | 'text-heavy' | 'hybrid';
 };
 
 export async function createScheduledPost(
@@ -29,6 +36,8 @@ export async function createScheduledPost(
     mediaUrl?: string;
     mediaType?: string;
     scheduledFor: string;
+    contentPillar?: string;
+    formato?: 'linkedin' | 'text-heavy' | 'hybrid';
   }
 ): Promise<{ success?: boolean; postId?: string; error?: string }> {
   try {
@@ -49,6 +58,8 @@ export async function createScheduledPost(
       status: 'scheduled',
       linkedinPostId: null,
       linkedinPostUrl: null,
+      ...(data.contentPillar && { contentPillar: data.contentPillar }),
+      ...(data.formato && { formato: data.formato }),
       createdAt: now,
       updatedAt: now,
     });
@@ -70,6 +81,8 @@ export async function updateScheduledPost(
     mediaType?: string;
     scheduledFor?: string;
     status?: 'draft' | 'scheduled' | 'in_progress';
+    contentPillar?: string;
+    formato?: 'linkedin' | 'text-heavy' | 'hybrid';
   }
 ): Promise<{ success?: boolean; error?: string }> {
   try {
@@ -86,6 +99,11 @@ export async function updateScheduledPost(
     if (data.mediaType !== undefined) updateData.mediaType = data.mediaType || null;
     if (data.scheduledFor !== undefined) updateData.scheduledFor = data.scheduledFor;
     if (data.status !== undefined) updateData.status = data.status;
+    // contentPillar/formato podem ser '' pra remover o campo do post.
+    if (data.contentPillar !== undefined) {
+      updateData.contentPillar = data.contentPillar || FieldValue.delete();
+    }
+    if (data.formato !== undefined) updateData.formato = data.formato;
 
     await adminDb.collection('users').doc(userId).collection('scheduledPosts').doc(postId).update(updateData);
     return { success: true };

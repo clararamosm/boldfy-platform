@@ -267,5 +267,19 @@ service cloud.firestore {
         allow write: if hasRole(request.auth.uid, 'master');
       }
     }
+
+    // Collection group `trails` — necessario para `collectionGroup('trails')`
+    // queries do client (usado em getTrailByCode em src/lib/trilhas/queries.ts).
+    // Sem essa rule, queries collectionGroup falham mesmo quando a leitura
+    // individual seria permitida pelas rules acima.
+    // Trails existem em duas subcolecoes:
+    //   - globalSessions/{sid}/trails/{tid}   (leitura ja liberada acima)
+    //   - companies/{cid}/sessions/{sid}/trails/{tid}  (leitura liberada via
+    //     a regra hierarquica de /companies/{cid}/... acima)
+    // Logo, qualquer auth pode ler — isto so reflete isso no escopo de
+    // collectionGroup.
+    match /{path=**}/trails/{trailId} {
+      allow read: if request.auth != null;
+    }
   }
 }

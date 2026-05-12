@@ -5,6 +5,7 @@ import React from 'react';
 import { Clock, User, Heart, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getPillarClasses } from '@/lib/pillar-colors';
 
 export type CalendarCardPost = {
   id: string;
@@ -16,6 +17,9 @@ export type CalendarCardPost = {
   etapa?: string;
   formato?: string;
   contentPillar?: string;
+  // PR 4: chave da cor do pilar (orange/amber/green/blue).
+  // Opcional pra retrocompat — quando ausente, render cai no cyan default.
+  contentPillarColor?: string;
   // Métricas do LinkedIn Analytics (preenchidas pelo enrichment do XLSX upload)
   analyticsReactions?: number;
   analyticsImpressions?: number;
@@ -123,14 +127,29 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
         </div>
       )}
 
-      {/* Pilar (own line, colored) */}
-      {post.contentPillar && (
-        <div className="flex items-center">
-          <span className="inline-flex items-center px-1 py-px rounded text-[7px] font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 truncate max-w-[80px]">
-            {post.contentPillar}
-          </span>
-        </div>
-      )}
+      {/* Pilar (own line, colored).
+          Usa getPillarClasses quando `contentPillarColor` esta presente
+          (PR 4) — assim a tag pega a cor real do pilar. Sem colorKey,
+          mantem o cyan default antigo (retrocompat com strategist). */}
+      {post.contentPillar && (() => {
+        const pillarClasses = post.contentPillarColor
+          ? getPillarClasses(post.contentPillarColor)
+          : null;
+        return (
+          <div className="flex items-center">
+            <span
+              className={cn(
+                'inline-flex items-center px-1 py-px rounded text-[7px] font-medium truncate max-w-[80px]',
+                pillarClasses
+                  ? `${pillarClasses.bg} ${pillarClasses.text}`
+                  : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+              )}
+            >
+              {post.contentPillar}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Métricas (reações + impressões) — linha própria abaixo de tudo */}
       {hasMetrics && (

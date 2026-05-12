@@ -38,9 +38,14 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import Image from 'next/image';
-import { HotTopicsBox } from '@/components/hot-topics-box';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { useT, useLocale } from '@/lib/i18n/context';
 import { getDateLocale } from '@/lib/i18n/date-utils';
+import { resolvePersonalBrand } from '@/lib/personal-brand';
+import { getPillarClasses } from '@/lib/pillar-colors';
+import type { PersonalBrandPillar } from '@/types/personal-brand';
 
 function EditorContent() {
   const t = useT();
@@ -62,6 +67,11 @@ function EditorContent() {
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('10:00');
   const [showTip, setShowTip] = useState(false);
+  // PR 3: pilar e formato do post (persistidos em ScheduledPost.contentPillar / .formato).
+  // Strings vazias = "nao definido"; campos opcionais no doc Firestore.
+  const [contentPillar, setContentPillar] = useState<string>('');
+  const [formato, setFormato] = useState<'' | 'linkedin' | 'text-heavy' | 'hybrid'>('');
+  const [pillars, setPillars] = useState<PersonalBrandPillar[]>([]);
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,6 +89,8 @@ function EditorContent() {
     if (editPostId) return; // Skip — edit mode loads via separate effect
     const captionParam = searchParams.get('caption');
     const dateParam = searchParams.get('date');
+    const pillarParam = searchParams.get('pillar');
+    const formatoParam = searchParams.get('formato');
 
     if (captionParam) {
       setCaption(captionParam);
@@ -91,7 +103,29 @@ function EditorContent() {
         // ignore invalid date
       }
     }
+    if (pillarParam) setContentPillar(pillarParam);
+    if (formatoParam && ['linkedin', 'text-heavy', 'hybrid'].includes(formatoParam)) {
+      setFormato(formatoParam as 'linkedin' | 'text-heavy' | 'hybrid');
+    }
   }, [searchParams, editPostId]);
+
+  // Fetch pilares do colaborador pra popular o dropdown
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'users', userId));
+        if (cancelled) return;
+        const data = snap.exists() ? snap.data() : {};
+        const { brand } = resolvePersonalBrand(data);
+        setPillars(brand.strategy?.pillars ?? []);
+      } catch (err) {
+        console.error('Failed to load pillars:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
 
   // Load existing post when in edit mode
   useEffect(() => {
@@ -113,6 +147,8 @@ function EditorContent() {
             setExistingMediaType(result.post.mediaType || null);
             setMediaPreview(result.post.mediaUrl);
           }
+          if (result.post.contentPillar) setContentPillar(result.post.contentPillar);
+          if (result.post.formato) setFormato(result.post.formato);
         } else if (result.error) {
           toast({ variant: 'destructive', title: t.common.error, description: result.error });
           router.push('/colaborador/calendario');
@@ -220,9 +256,13 @@ function EditorContent() {
           scheduledFor: string;
           mediaUrl?: string;
           mediaType?: string;
+          contentPillar?: string;
+          formato?: 'linkedin' | 'text-heavy' | 'hybrid';
         } = {
           caption,
           scheduledFor,
+          contentPillar,
+          ...(formato && { formato }),
         };
 
         if (mediaFile) {
@@ -250,6 +290,8 @@ function EditorContent() {
           mediaUrl,
           mediaType,
           scheduledFor,
+          ...(contentPillar && { contentPillar }),
+          ...(formato && { formato }),
         });
 
         if (result.success) {
@@ -414,10 +456,9 @@ function EditorContent() {
             {t.colabNewPost.backToCalendar}
           </Button>
 
-          {/* Hot Topics — inspiração rápida (only in create mode) */}
-          {!isEditMode && (
-            <HotTopicsBox onSelectTopic={(prompt) => setCaption(prev => prev ? prev + '\n\n' + prompt : prompt)} />
-          )}
+          {/* PR 3: HotTopicsBox foi removido daqui — o lugar de buscar
+              inspiracao e o Assistente de IA (/colaborador/assistente).
+              Esta tela e dedicada a "agendar / postar" o que ja esta pronto. */}
 
           <Card>
             <CardHeader>
@@ -455,6 +496,52 @@ function EditorContent() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground text-right">{caption.length} {t.colabNewPost.characters}</p>
+              </div>
+
+              {/* PR 3: classificacao do post (pilar + formato).
+                  Opcionais. Alimentam as tags no calendario (PR 4). */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Pilar</Label>
+                  <Select
+                    value={contentPillar || 'none'}
+                    onValueChange={(v) => setContentPillar(v === 'none' ? '' : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={pillars.length > 0 ? 'Selecione um pilar' : 'Sem pilares cadastrados'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem pilar</SelectItem>
+                      {pillars.map((p) => {
+                        const c = getPillarClasses(p.color);
+                        return (
+                          <SelectItem key={p.id} value={p.id}>
+                            <span className="inline-flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${c.bg}`} />
+                              {p.name}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Formato</Label>
+                  <Select
+                    value={formato || 'none'}
+                    onValueChange={(v) => setFormato(v === 'none' ? '' : (v as 'linkedin' | 'text-heavy' | 'hybrid'))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um formato" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sem formato</SelectItem>
+                      <SelectItem value="linkedin">LinkedIn estruturado</SelectItem>
+                      <SelectItem value="text-heavy">Texto Denso</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Media upload */}

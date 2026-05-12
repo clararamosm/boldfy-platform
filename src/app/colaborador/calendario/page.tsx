@@ -48,6 +48,8 @@ import { getDateLocale } from '@/lib/i18n/date-utils';
 import type { Dictionary } from '@/lib/i18n/dictionaries/pt-BR';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
+import { resolvePersonalBrand } from '@/lib/personal-brand';
+import type { PersonalBrandPillar } from '@/types/personal-brand';
 
 // ─── Types ──────
 type CalendarMission = {
@@ -130,6 +132,10 @@ export default function CalendarioPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [missions, setMissions] = useState<CalendarMission[]>([]);
+  // PR 4: pilares do colaborador (resolvidos do PersonalBrand v2) — usados pra
+  // mapear ScheduledPost.contentPillar (que guarda o ID) pro nome + cor do
+  // pilar correspondente nas tags do calendario.
+  const [pillarsMap, setPillarsMap] = useState<Map<string, PersonalBrandPillar>>(new Map());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -154,6 +160,17 @@ export default function CalendarioPage() {
         setPosts(postsResult.posts);
       } else if (postsResult.error) {
         toast({ variant: 'destructive', title: t.common.error, description: postsResult.error });
+      }
+
+      // PR 4: monta o pillarsMap pra renderizar as tags de pilar com nome+cor
+      // certos a partir do contentPillar (ID) dos posts.
+      if (userDocSnap.exists()) {
+        const { brand } = resolvePersonalBrand(userDocSnap.data());
+        if (brand.strategy?.pillars?.length) {
+          const map = new Map<string, PersonalBrandPillar>();
+          for (const p of brand.strategy.pillars) map.set(p.id, p);
+          setPillarsMap(map);
+        }
       }
 
       // Missions
@@ -640,23 +657,41 @@ export default function CalendarioPage() {
                       minHeight="min-h-[90px]"
                     >
                       {/* Post cards — draggable */}
-                      {postItems.slice(0, 2).map(item => (
-                        <CalendarPostCard
-                          key={`p-${item.data.id}`}
-                          post={{
-                            id: item.data.id,
-                            caption: item.data.caption,
-                            scheduledFor: item.data.scheduledFor,
-                            status: item.data.status,
-                          }}
-                          statusConfig={getCardConfig(item.data.status)}
-                          draggable={item.data.status !== 'published'}
-                          onDragStart={(e) => handleDragStart(item.data, e)}
-                          onDragEnd={handleDragEnd}
-                          isDragging={draggedPostId === item.data.id}
-                          onClick={() => router.push(`/colaborador/calendario/novo?edit=${item.data.id}`)}
-                        />
-                      ))}
+                      {postItems.slice(0, 2).map(item => {
+                        // PR 4: resolve pilar (ID -> {name, color}) e formato pra render
+                        const pillar = item.data.contentPillar
+                          ? pillarsMap.get(item.data.contentPillar)
+                          : undefined;
+                        const formatoLabel = item.data.formato === 'text-heavy'
+                          ? 'Texto Denso'
+                          : item.data.formato === 'linkedin'
+                            ? 'LinkedIn'
+                            : item.data.formato === 'hybrid'
+                              ? 'Híbrido'
+                              : undefined;
+                        return (
+                          <CalendarPostCard
+                            key={`p-${item.data.id}`}
+                            post={{
+                              id: item.data.id,
+                              caption: item.data.caption,
+                              scheduledFor: item.data.scheduledFor,
+                              status: item.data.status,
+                              ...(pillar && {
+                                contentPillar: pillar.name,
+                                contentPillarColor: pillar.color,
+                              }),
+                              ...(formatoLabel && { formato: formatoLabel }),
+                            }}
+                            statusConfig={getCardConfig(item.data.status)}
+                            draggable={item.data.status !== 'published'}
+                            onDragStart={(e) => handleDragStart(item.data, e)}
+                            onDragEnd={handleDragEnd}
+                            isDragging={draggedPostId === item.data.id}
+                            onClick={() => router.push(`/colaborador/calendario/novo?edit=${item.data.id}`)}
+                          />
+                        );
+                      })}
                       {/* Mission indicators (not draggable) */}
                       {missionItems.slice(0, postItems.length > 0 ? 1 : 2).map(item => (
                         <div

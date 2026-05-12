@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { CoinIcon } from '@/components/coin-icon';
 import type { Modulo, ModuloModo, QuestaoDesafio, Sessao } from '@/types/trilhas';
-import { MODO_LABELS, MODO_CONFIG } from '@/types/trilhas';
+import { MODO_LABELS, MODO_CONFIG, TRAIL_CODE_REGEX } from '@/types/trilhas';
 import { ModuloDialog, type ModuloFormData } from './modulo-dialog';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -30,6 +30,10 @@ export type TrailFormData = {
   tempoEstimadoMin: number;
   pontuacaoBonusTrilha: number;
   ordem?: number;
+  // Codigo curto da trilha (ex: 'MP01'). Editavel apenas pelo Master
+  // (controlado pela prop `showCodeField`). Validacao de unicidade entre
+  // trilhas globais e feita pelo server action `setGlobalTrailCode`.
+  code?: string;
 };
 
 export type TrailBuilderProps = {
@@ -43,6 +47,12 @@ export type TrailBuilderProps = {
   onSave: () => void;
   onBack: () => void;
   onImageUpload?: (file: File) => Promise<string>;
+  /**
+   * Quando `true`, exibe o input "Codigo da Trilha" no card de metadata.
+   * Usado pelo /master/trilhas. Admin de empresa nao ve esse campo
+   * (trilhas customizadas podem ter codigo vazio).
+   */
+  showCodeField?: boolean;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -65,8 +75,12 @@ export function calcPontuacao(mods: Modulo[]) {
 export function TrailBuilder({
   session, isEditing, trailForm, onTrailFormChange,
   modulos, onModulosChange, saving, onSave, onBack,
-  onImageUpload,
+  onImageUpload, showCodeField = false,
 }: TrailBuilderProps) {
+  // Valida o formato do codigo da trilha em tempo real (UX preview).
+  // A validacao autoritativa de unicidade vive em setGlobalTrailCode (server).
+  const codeRaw = trailForm.code ?? '';
+  const codeIsInvalid = codeRaw.length > 0 && !TRAIL_CODE_REGEX.test(codeRaw);
   // Modulo dialog state
   const [moduloDialogOpen, setModuloDialogOpen] = useState(false);
   const [editingModuloIdx, setEditingModuloIdx] = useState<number | null>(null);
@@ -169,6 +183,34 @@ export function TrailBuilder({
             <Label>Descricao</Label>
             <Textarea value={trailForm.descricao} onChange={e => onTrailFormChange({ ...trailForm, descricao: e.target.value })} placeholder="Descreva o objetivo desta trilha..." />
           </div>
+          {showCodeField && (
+            <div>
+              <Label>
+                Codigo da Trilha
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  (opcional — usado pra referenciar a trilha sem ID. Ex: MP01, EC02)
+                </span>
+              </Label>
+              <Input
+                value={codeRaw}
+                onChange={e =>
+                  onTrailFormChange({
+                    ...trailForm,
+                    code: e.target.value.toUpperCase().slice(0, 4),
+                  })
+                }
+                placeholder="MP01"
+                className={`max-w-[160px] font-mono uppercase ${codeIsInvalid ? 'border-destructive' : ''}`}
+                maxLength={4}
+                aria-invalid={codeIsInvalid || undefined}
+              />
+              {codeIsInvalid && (
+                <p className="text-xs text-destructive mt-1">
+                  Formato invalido. Use 2 letras + 2 digitos (ex: MP01).
+                </p>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Tempo Estimado (min)</Label>

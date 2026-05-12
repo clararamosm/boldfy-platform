@@ -27,8 +27,11 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Sessao, Trilha, Modulo, TrilhaAnalytics } from '@/types/trilhas';
+import { TRAIL_CODE_REGEX } from '@/types/trilhas';
 import { TrailBuilder, TrailCard, AnalyticsDialog, calcPontuacao, type TrailFormData } from '@/components/trilhas';
 import { Header } from '@/components/dashboard/header';
+import { setGlobalTrailCode } from '@/app/actions/trilhas';
+import { auth } from '@/lib/firebase';
 
 // 'sessions' = lista principal com accordion inline.
 // 'builder'  = Trail Builder fullscreen (editar/criar trilha — UI densa
@@ -185,11 +188,12 @@ export default function MasterTrilhasPage() {
         tempoEstimadoMin: trail.tempoEstimadoMin || 30,
         pontuacaoBonusTrilha: trail.pontuacaoBonusTrilha || 0,
         ordem: trail.ordem,
+        code: trail.code,
       });
       setModulos(trail.modulos || []);
     } else {
       setSelectedTrail(null);
-      setTrailForm({ titulo: '', descricao: '', tempoEstimadoMin: 30, pontuacaoBonusTrilha: 0 });
+      setTrailForm({ titulo: '', descricao: '', tempoEstimadoMin: 30, pontuacaoBonusTrilha: 0, code: undefined });
       setModulos([]);
     }
     setViewMode('builder');
@@ -208,6 +212,19 @@ export default function MasterTrilhasPage() {
       toast({ variant: 'destructive', title: 'Titulo obrigatorio', description: 'Preencha o titulo da trilha para salvar.' });
       return;
     }
+
+    // Valida formato do `code` antes de iniciar o save. Unicidade e
+    // validada server-side por setGlobalTrailCode.
+    const codeRaw = (trailForm.code ?? '').trim().toUpperCase();
+    if (codeRaw.length > 0 && !TRAIL_CODE_REGEX.test(codeRaw)) {
+      toast({
+        variant: 'destructive',
+        title: 'Codigo da trilha invalido',
+        description: 'Use 2 letras maiusculas + 2 digitos (ex: MP01). Deixe vazio para nao definir codigo.',
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const { total, bonus } = calcPontuacao(modulos);
@@ -219,11 +236,39 @@ export default function MasterTrilhasPage() {
         modulos: modulos.map((m, i) => Object.fromEntries(Object.entries({ ...m, ordem: i }).filter(([_, v]) => v !== undefined))),
         atualizadaEm: Timestamp.now(),
       };
+      let trailId: string;
       if (selectedTrail) {
-        await updateDoc(doc(db, `globalSessions/${selectedSession.id}/trails`, selectedTrail.id), trailData);
+        trailId = selectedTrail.id;
+        await updateDoc(doc(db, `globalSessions/${selectedSession.id}/trails`, trailId), trailData);
       } else {
-        await addDoc(collection(db, `globalSessions/${selectedSession.id}/trails`), { ...trailData, criadaEm: Timestamp.now() });
+        const created = await addDoc(collection(db, `globalSessions/${selectedSession.id}/trails`), { ...trailData, criadaEm: Timestamp.now() });
+        trailId = created.id;
       }
+
+      // Salva o `code` separado pelo server action (precisa de Admin SDK
+      // pra validar unicidade entre trilhas globais).
+      const previousCode = (selectedTrail?.code ?? '').trim().toUpperCase();
+      if (codeRaw !== previousCode) {
+        const idToken = await auth.currentUser?.getIdToken();
+        if (!idToken) {
+          throw new Error('Sessao expirada. Faca login novamente.');
+        }
+        const result = await setGlobalTrailCode(idToken, {
+          sessionId: selectedSession.id,
+          trailId,
+          code: codeRaw,
+        });
+        if (!result.ok) {
+          // Save dos campos principais ja foi feito — avisa que o codigo
+          // nao foi atualizado mas a trilha em si esta salva.
+          toast({
+            variant: 'destructive',
+            title: 'Codigo nao foi atualizado',
+            description: result.error,
+          });
+        }
+      }
+
       setViewMode('sessions');
       // Garante que a sessao volta expandida pra mostrar a trilha salva.
       setExpandedSessionIds(prev => new Set(prev).add(selectedSession.id));
@@ -460,6 +505,8 @@ export default function MasterTrilhasPage() {
               }
             }}
             onImageUpload={handleImageUpload}
+            // Master ve o campo "Codigo da Trilha" (admin de empresa nao).
+            showCodeField
           />
         )}
 

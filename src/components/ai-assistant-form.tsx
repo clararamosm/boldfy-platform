@@ -2,6 +2,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { getAuthToken } from '@/lib/auth-client';
 import { generateHooks, generateWithHook } from '@/app/actions';
 import { completeOnboardingItem } from '@/hooks/use-onboarding';
@@ -9,13 +12,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Sparkles, Loader2, ClipboardCopy, Check, ThumbsUp, MessageSquare, Repeat2, Send, ArrowRight, RefreshCw } from 'lucide-react';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Sparkles, Loader2, ClipboardCopy, Check, ThumbsUp, MessageSquare, Repeat2, Send, ArrowRight, RefreshCw, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useLocale } from '@/lib/i18n/context';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Skeleton } from './ui/skeleton';
 import { useRouter } from 'next/navigation';
+import { resolvePersonalBrand } from '@/lib/personal-brand';
+import { getPillarClasses } from '@/lib/pillar-colors';
+import type { PersonalBrandPillar } from '@/types/personal-brand';
 
 // ─── Loading messages ──────────────────────
 const HOOK_LOADING_MESSAGES = [
@@ -265,8 +274,39 @@ export function AiAssistantForm({
 
   // Form values (persisted across steps)
   const [content, setContent] = useState('');
+  // Formato: na UI o colaborador escolhe entre "linkedin" (estruturado) e
+  // "text-heavy" (denso). "hybrid" foi removido da UI no PR 5 mas continua
+  // valido no backend pra retrocompat com posts/configuracoes antigas.
   const [format, setFormat] = useState('linkedin');
   const [length, setLength] = useState('medium');
+
+  // PR 5: pilar e angulo do post atual. Opcionais — se vazios, a IA usa
+  // somente o brand context geral (sem foco em pilar especifico).
+  const [pillars, setPillars] = useState<PersonalBrandPillar[]>([]);
+  const [selectedPillarId, setSelectedPillarId] = useState<string>('');
+  const [angle, setAngle] = useState<'' | 'market' | 'personal' | 'institutional'>('');
+  const [brandIsIncomplete, setBrandIsIncomplete] = useState(false);
+
+  // Le pilares + status de marca pessoal uma vez quando o componente monta.
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'users', userId));
+        if (cancelled) return;
+        const data = snap.exists() ? snap.data() : {};
+        const { brand, source } = resolvePersonalBrand(data);
+        setPillars(brand.strategy?.pillars ?? []);
+        // "Incompleta" = ainda esta no shape v1-fallback ou vazio. Mostra
+        // banner discreto orientando o colaborador a preencher.
+        setBrandIsIncomplete(source !== 'v2');
+      } catch (err) {
+        console.error('Failed to load personal brand:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
 
   // Fill textarea when external content changes (e.g. hot topic selected)
   useEffect(() => {
@@ -303,6 +343,8 @@ export function AiAssistantForm({
         format: format as 'linkedin' | 'text-heavy' | 'hybrid',
         length: length as 'short' | 'medium' | 'long',
         locale,
+        ...(selectedPillarId && { selectedPillarId }),
+        ...(angle && { angle }),
       });
 
       if (result.error) {
@@ -337,6 +379,8 @@ export function AiAssistantForm({
         format: format as 'linkedin' | 'text-heavy' | 'hybrid',
         length: length as 'short' | 'medium' | 'long',
         locale,
+        ...(selectedPillarId && { selectedPillarId }),
+        ...(angle && { angle }),
       });
 
       if (result.error) {
@@ -373,6 +417,8 @@ export function AiAssistantForm({
         format: format as 'linkedin' | 'text-heavy' | 'hybrid',
         length: length as 'short' | 'medium' | 'long',
         locale,
+        ...(selectedPillarId && { selectedPillarId }),
+        ...(angle && { angle }),
       });
 
       if (result.error) {
@@ -392,7 +438,10 @@ export function AiAssistantForm({
 
   const handleUseLegenda = () => {
     if (finalContent) {
+      // PR 3+5: propaga pilar e formato pro editor pre-popular os dropdowns.
       const params = new URLSearchParams({ caption: finalContent });
+      if (selectedPillarId) params.set('pillar', selectedPillarId);
+      if (format) params.set('formato', format);
       router.push(`/colaborador/calendario/novo?${params.toString()}`);
     }
   };
@@ -427,14 +476,63 @@ export function AiAssistantForm({
               />
             </div>
 
+            {/* Pilar + angulo (PR 5) — visiveis so se o colaborador tem pilares cadastrados */}
+            {pillars.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Pilar (opcional)</Label>
+                  <Select
+                    value={selectedPillarId || 'none'}
+                    onValueChange={(v) => setSelectedPillarId(v === 'none' ? '' : v)}
+                    disabled={isEditorDisabled}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Qualquer pilar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Qualquer pilar</SelectItem>
+                      {pillars.map((p) => {
+                        const c = getPillarClasses(p.color);
+                        return (
+                          <SelectItem key={p.id} value={p.id}>
+                            <span className="inline-flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${c.bg}`} />
+                              {p.name}
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">Ângulo (opcional)</Label>
+                  <Select
+                    value={angle || 'none'}
+                    onValueChange={(v) => setAngle(v === 'none' ? '' : (v as 'market' | 'personal' | 'institutional'))}
+                    disabled={isEditorDisabled}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Deixe a IA escolher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Deixe a IA escolher</SelectItem>
+                      <SelectItem value="market">Mercado — análise/observação</SelectItem>
+                      <SelectItem value="personal">Pessoal — história vivida</SelectItem>
+                      <SelectItem value="institutional">Institucional — voz da empresa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2.5">
                 <Label className="text-xs font-medium">Formato</Label>
                 <RadioGroup value={format} onValueChange={setFormat} className="gap-1.5" disabled={isEditorDisabled}>
                   {[
-                    { value: 'linkedin', label: 'LinkedIn' },
+                    { value: 'linkedin', label: 'LinkedIn estruturado' },
                     { value: 'text-heavy', label: 'Texto Denso' },
-                    { value: 'hybrid', label: 'Híbrido' },
                   ].map(({ value, label }) => (
                     <div key={value} className="flex items-center space-x-2">
                       <RadioGroupItem value={value} id={`format-${value}`} />
@@ -460,11 +558,23 @@ export function AiAssistantForm({
               </div>
             </div>
 
+            {brandIsIncomplete && (
+              <div className="rounded-md border border-amber-300/40 bg-amber-50 dark:bg-amber-900/10 p-3 text-sm flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+                <div className="flex-1 text-amber-900 dark:text-amber-200">
+                  Sua marca pessoal está incompleta. A IA pode gerar conteúdo genérico.{' '}
+                  <Link href="/colaborador/marca-pessoal" className="underline font-medium">
+                    Completar marca pessoal →
+                  </Link>
+                </div>
+              </div>
+            )}
+
             <LoadingButton
               loading={isGeneratingHooks}
               messages={HOOK_LOADING_MESSAGES}
               onClick={handleGenerateHooks}
-              label="Gerar Legenda"
+              label="Gerar opções de hook"
               icon={Sparkles}
             />
 
