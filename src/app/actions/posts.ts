@@ -21,7 +21,9 @@ export type ScheduledPost = {
   // estes campos — sempre single em mediaUrl/mediaType.
   mediaUrls?: string[];
   mediaTypes?: string[];
-  scheduledFor: string; // ISO date string
+  // ISO date string. Null/ausente em drafts criados pelo auto-save
+  // antes de o user definir uma data.
+  scheduledFor: string | null;
   status: 'draft' | 'scheduled' | 'in_progress' | 'published' | 'failed';
   linkedinPostId?: string;
   linkedinPostUrl?: string;
@@ -50,11 +52,15 @@ export async function createScheduledPost(
     caption: string;
     mediaUrl?: string;
     mediaType?: string;
-    scheduledFor: string;
+    // null/omitido = post salvo como draft (auto-save antes da decisao final).
+    scheduledFor?: string | null;
     contentPillar?: string;
     formato?: string;
     mediaUrls?: string[];
     mediaTypes?: string[];
+    // Status inicial. Default 'scheduled' quando ha data; 'draft' quando nao.
+    // O caller pode forcar explicitamente — auto-save sempre cria como 'draft'.
+    status?: 'draft' | 'scheduled';
   }
 ): Promise<{ success?: boolean; postId?: string; error?: string }> {
   try {
@@ -63,7 +69,11 @@ export async function createScheduledPost(
     // foi removida do gate para evitar dupla checagem em fluxos diferentes.
     await requireActiveModuleByRole(user);
     if (!data.caption.trim()) return { error: 'A legenda não pode estar vazia.' };
-    if (!data.scheduledFor) return { error: 'Data de agendamento é obrigatória.' };
+
+    // Status: explicit > inferido pela presenca de data.
+    // Drafts sem data sao validos — auto-save cria um doc com scheduledFor=null
+    // pra que o user nao perca o conteudo se sair da pagina.
+    const inferredStatus = data.status ?? (data.scheduledFor ? 'scheduled' : 'draft');
 
     const now = new Date().toISOString();
     // Multi-image: quando ha array com 2+ imagens, salva mediaUrls/mediaTypes
@@ -78,8 +88,8 @@ export async function createScheduledPost(
       mediaUrl: firstUrl,
       mediaType: firstType,
       ...(hasGallery && { mediaUrls: data.mediaUrls, mediaTypes: data.mediaTypes ?? [] }),
-      scheduledFor: data.scheduledFor,
-      status: 'scheduled',
+      scheduledFor: data.scheduledFor ?? null,
+      status: inferredStatus,
       linkedinPostId: null,
       linkedinPostUrl: null,
       ...(data.contentPillar && { contentPillar: data.contentPillar }),
@@ -103,7 +113,7 @@ export async function updateScheduledPost(
     caption?: string;
     mediaUrl?: string;
     mediaType?: string;
-    scheduledFor?: string;
+    scheduledFor?: string | null;
     status?: 'draft' | 'scheduled' | 'in_progress';
     contentPillar?: string;
     formato?: string;
@@ -123,6 +133,12 @@ export async function updateScheduledPost(
     if (data.caption !== undefined) updateData.caption = data.caption;
     if (data.scheduledFor !== undefined) updateData.scheduledFor = data.scheduledFor;
     if (data.status !== undefined) updateData.status = data.status;
+    // Auto-bump de status: se user passou data sem mudar status, e o post
+    // ainda esta como draft, promovemos pra scheduled. Inverso tambem:
+    // quem limpa data num post scheduled vai pra draft.
+    if (data.scheduledFor !== undefined && data.status === undefined) {
+      updateData.status = data.scheduledFor ? 'scheduled' : 'draft';
+    }
     // contentPillar/formato podem ser '' pra remover o campo do post.
     if (data.contentPillar !== undefined) {
       updateData.contentPillar = data.contentPillar || FieldValue.delete();

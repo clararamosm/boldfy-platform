@@ -268,6 +268,9 @@ export default function CalendarioPage() {
       : posts.filter(p => p.status === statusFilter);
 
     filteredPosts.forEach(post => {
+      // Drafts sem data não vão pro grid de dias — aparecem só na seção
+      // "Rascunhos sem data" do sidebar.
+      if (!post.scheduledFor) return;
       const dayKey = format(parseISO(post.scheduledFor), 'yyyy-MM-dd');
       addItem(dayKey, { kind: 'post', data: post });
     });
@@ -298,15 +301,24 @@ export default function CalendarioPage() {
     return itemsByDay.get(key) || [];
   }, [selectedDay, itemsByDay]);
 
+  // ─── Drafts sem data ──────
+  // Rascunhos criados pelo auto-save (ainda sem data definida) aparecem
+  // numa seção dedicada no sidebar, abaixo dos posts do dia selecionado.
+  const draftsWithoutDate = useMemo(() => {
+    return posts
+      .filter(p => p.status === 'draft' && !p.scheduledFor)
+      .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  }, [posts]);
+
   // ─── Upcoming (sidebar default) ──────
   const upcomingItems = useMemo(() => {
     const now = new Date();
     const upcoming: CalendarItem[] = [];
 
-    // Upcoming posts
+    // Upcoming posts — só os com data (drafts sem data ficam fora)
     posts
-      .filter(p => p.status === 'scheduled' && parseISO(p.scheduledFor) > now)
-      .sort((a, b) => parseISO(a.scheduledFor).getTime() - parseISO(b.scheduledFor).getTime())
+      .filter(p => p.status === 'scheduled' && !!p.scheduledFor && parseISO(p.scheduledFor) > now)
+      .sort((a, b) => parseISO(a.scheduledFor!).getTime() - parseISO(b.scheduledFor!).getTime())
       .slice(0, 3)
       .forEach(p => upcoming.push({ kind: 'post', data: p }));
 
@@ -365,8 +377,10 @@ export default function CalendarioPage() {
     const post = posts.find(p => p.id === draggedPostId);
     if (!post) return;
 
-    // Keep original time, change only the date
-    const originalTime = post.scheduledFor.substring(10);
+    // Keep original time, change only the date. Posts sem data (drafts)
+    // não deveriam ser arrastáveis, mas defensivamente assume 09:00 como
+    // hora padrão caso o user consiga arrastar um draft.
+    const originalTime = post.scheduledFor ? post.scheduledFor.substring(10) : 'T09:00:00.000Z';
     const newScheduledFor = dayKey + originalTime;
 
     if (newScheduledFor === post.scheduledFor) {
@@ -409,7 +423,10 @@ export default function CalendarioPage() {
   // ─── Calendar cell indicator helpers ──────
   const getCalendarCellLabel = (item: CalendarItem): string => {
     if (item.kind === 'post') {
-      return `${format(parseISO(item.data.scheduledFor), 'HH:mm')} · ${item.data.caption.slice(0, 18)}`;
+      const timeStr = item.data.scheduledFor
+        ? format(parseISO(item.data.scheduledFor), 'HH:mm')
+        : '—';
+      return `${timeStr} · ${item.data.caption.slice(0, 18)}`;
     }
     return item.data.name.slice(0, 22);
   };
@@ -455,7 +472,7 @@ export default function CalendarioPage() {
                   {config.tag}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  {format(parseISO(post.scheduledFor), 'HH:mm')}
+                  {post.scheduledFor ? format(parseISO(post.scheduledFor), 'HH:mm') : 'Sem data'}
                 </span>
               </div>
               <div className="flex gap-1">
@@ -774,6 +791,29 @@ export default function CalendarioPage() {
                     </CardContent>
                   </Card>
                 )}
+              </div>
+            )}
+
+            {/* Rascunhos sem data — sempre visível no sidebar quando há
+                drafts pendentes. Aparece independente da seleção do dia. */}
+            {draftsWithoutDate.length > 0 && (
+              <div className="space-y-3 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-muted-foreground">
+                    Rascunhos sem data
+                  </h4>
+                  <Badge variant="secondary" className="text-xs">
+                    {draftsWithoutDate.length}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Conteúdos salvos automaticamente. Abra pra definir uma data ou postar.
+                </p>
+                <div className="space-y-3">
+                  {draftsWithoutDate.map((post) =>
+                    renderSidebarCard({ kind: 'post', data: post }, 0),
+                  )}
+                </div>
               </div>
             )}
           </div>

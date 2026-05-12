@@ -1,7 +1,7 @@
 // src/app/colaborador/calendario/novo/page.tsx
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
@@ -26,6 +26,7 @@ import {
   X,
   Upload,
   Info,
+  Check,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import Image from 'next/image';
@@ -95,14 +96,32 @@ function EditorContent() {
   const [manageOpen, setManageOpen] = useState(false);
   const [savingFormats, setSavingFormats] = useState(false);
   const [newFormatInput, setNewFormatInput] = useState('');
+  // Auto-save (igual estrategista): debounce 1.5s a cada mudanca. Primeiro
+  // save cria como draft (sem data = draft); saves seguintes atualizam.
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [currentPostId, setCurrentPostId] = useState<string | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isAutoSavingRef = useRef(false);
+  // Guarda referencia ao primeiro render — nao dispara auto-save logo
+  // ao carregar um post existente (so quando o user efetivamente muda algo).
+  const hasInitializedRef = useRef(false);
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // ─── Edit mode ──────────────────────────────────────
+  // editPostId vem do query param `?edit=<id>` na URL. Quando ausente, o
+  // editor comeca em branco — o primeiro auto-save vai criar o post e
+  // setar `currentPostId`. A partir dai os saves seguintes sao updates.
   const editPostId = searchParams.get('edit');
   const isEditMode = !!editPostId;
   const [isLoadingPost, setIsLoadingPost] = useState(!!editPostId);
+
+  // Sincroniza currentPostId quando o query param chega. Importante pra
+  // permitir o auto-save reconhecer "ja estou num post" desde o inicio.
+  useEffect(() => {
+    if (editPostId) setCurrentPostId(editPostId);
+  }, [editPostId]);
 
   // Populate from query params (only in create mode).
   // `formato` NÃO vem por query — assistente envia "estilo de escrita"
@@ -339,6 +358,106 @@ function EditorContent() {
     return { urls, types };
   };
 
+  // ─── Auto-save ──────────────────────────────────────
+  /**
+   * Salva o estado atual no Firestore. Primeiro chamada cria o post (status
+   * inferido pela presença/ausência de data); chamadas seguintes atualizam.
+   * Idempotente — pode ser chamado quantas vezes for. Bloqueia execuções
+   * concorrentes via `isAutoSavingRef`.
+   *
+   * Não dispara em estados "vazios" (sem caption e sem mídia) — evita
+   * criar docs lixo enquanto o user só clica no editor sem digitar.
+   */
+  const triggerAutoSave = useCallback(async () => {
+    if (!userId) return;
+    if (publishedUrl) return; // post já publicado, não toca
+    const captionEmpty = !caption.trim();
+    if (captionEmpty && mediaItems.length === 0) return;
+    if (isAutoSavingRef.current) return;
+
+    isAutoSavingRef.current = true;
+    setAutoSaveStatus('saving');
+    try {
+      const token = await getAuthToken();
+      const { urls, types } = await uploadPendingMedia();
+      const scheduledFor = scheduledDate
+        ? new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString()
+        : null;
+
+      if (currentPostId) {
+        const result = await updateScheduledPost(token, userId, currentPostId, {
+          caption,
+          scheduledFor,
+          mediaUrls: urls,
+          mediaTypes: types,
+          contentPillar,
+          ...(formato && { formato }),
+        });
+        if (!result.success) throw new Error(result.error || 'Update falhou');
+      } else {
+        const result = await createScheduledPost(token, userId, {
+          caption,
+          scheduledFor,
+          mediaUrl: urls[0],
+          mediaType: types[0],
+          mediaUrls: urls,
+          mediaTypes: types,
+          contentPillar,
+          ...(formato && { formato }),
+          status: 'draft', // primeiro auto-save sempre cria como draft
+        });
+        if (!result.success || !result.postId) throw new Error(result.error || 'Create falhou');
+        setCurrentPostId(result.postId);
+        // Atualiza URL pra refletir o post (sem refresh) — assim se o user
+        // der refresh, volta no mesmo doc em vez de criar duplicado.
+        router.replace(`/colaborador/calendario/novo?edit=${result.postId}`);
+      }
+      setAutoSaveStatus('saved');
+    } catch (err) {
+      console.error('Auto-save failed:', err);
+      setAutoSaveStatus('error');
+    } finally {
+      isAutoSavingRef.current = false;
+    }
+  }, [userId, currentPostId, caption, mediaItems, scheduledDate, scheduledTime, contentPillar, formato, publishedUrl, router, uploadPendingMedia]);
+
+  /**
+   * Debounce: a cada mudança relevante no editor, agenda um save em 1.5s.
+   * Pula o primeiro render (carregou post existente) pra não disparar save
+   * imediato com o conteúdo recém-lido.
+   */
+  useEffect(() => {
+    // Skip enquanto o editor ainda está carregando o post de edição
+    if (isLoadingPost) return;
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      return;
+    }
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void triggerAutoSave();
+    }, 1500);
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caption, mediaItems, scheduledDate, scheduledTime, contentPillar, formato, isLoadingPost]);
+
+  /**
+   * beforeunload protection — se há save em andamento, avisa o user
+   * antes de sair. Não bloqueia, só pede confirmação.
+   */
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (autoSaveStatus === 'saving' || isAutoSavingRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [autoSaveStatus]);
+
   // Submit (schedule for later)
   const handleSubmit = async () => {
     if (!userId) return;
@@ -552,11 +671,23 @@ function EditorContent() {
           </div>
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-            {isSaving && (
+            {/* Auto-save status — visivel quando o auto-save ja rodou ao
+                menos uma vez ou esta rodando. Estado 'idle' (antes de
+                qualquer mudanca) fica silencioso. */}
+            {autoSaveStatus === 'saving' && (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                <span>{t.colabNewPost.scheduling}</span>
+                <span>Salvando...</span>
               </>
+            )}
+            {autoSaveStatus === 'saved' && !isPublishing && (
+              <>
+                <Check className="h-3.5 w-3.5 text-green-500" />
+                <span>Salvo</span>
+              </>
+            )}
+            {autoSaveStatus === 'error' && (
+              <span className="text-destructive">Erro ao salvar</span>
             )}
             {publishedUrl && (
               <a
