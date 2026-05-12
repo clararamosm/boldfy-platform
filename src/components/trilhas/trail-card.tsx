@@ -31,12 +31,12 @@ export function TrailCard({
 
   return (
     <div className={`flex items-center justify-between p-3 rounded-lg border ${active ? 'bg-purple-50 border-purple-200' : 'bg-gray-50'}`}>
-      <div className="flex items-center gap-3 flex-1">
-        <div className={`w-2.5 h-2.5 rounded-full ${active ? 'bg-green-500' : 'bg-gray-300'}`} />
-        <div>
-          <p className="font-medium text-sm">{trail.titulo}</p>
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${active ? 'bg-green-500' : 'bg-gray-300'}`} />
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-sm truncate">{trail.titulo}</p>
           <p className="text-xs text-muted-foreground line-clamp-1">{trail.descricao}</p>
-          <div className="flex gap-2 mt-1">
+          <div className="flex gap-2 mt-1 flex-wrap">
             <Badge variant="secondary" className="text-xs">{(trail.modulos || []).length} modulos</Badge>
             <Badge variant="secondary" className="text-xs"><CoinIcon className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} pontos</Badge>
             {trail.pontuacaoBonus > 0 && (
@@ -46,7 +46,7 @@ export function TrailCard({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 shrink-0">
         {onAnalytics && (
           <Button variant="ghost" size="icon" onClick={onAnalytics}>
             <BarChart3 className="w-4 h-4 text-blue-500" />

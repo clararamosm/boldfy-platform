@@ -21,7 +21,10 @@ export function HotTopicsBox({ onSelectTopic, showRegenerate = false }: HotTopic
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [cardsPerPage, setCardsPerPage] = useState(4);
+  // Como o backend devolve 6 tópicos fixos, capamos em 3 por página pra
+  // ter 3+3 (em vez de 4+2 que ficava desbalanceado). Fallback responsivo
+  // ainda reduz pra 2 ou 1 em telas pequenas.
+  const [cardsPerPage, setCardsPerPage] = useState(3);
 
   useEffect(() => {
     const fetchTopics = async () => {
@@ -41,15 +44,14 @@ export function HotTopicsBox({ onSelectTopic, showRegenerate = false }: HotTopic
     fetchTopics();
   }, []);
 
-  // Calculate how many cards fit based on container width
+  // Calculate how many cards fit based on container width.
+  // Cap em 3 pra sempre fechar 3+3 (com os 6 tópicos que o backend devolve).
   const updateCardsPerPage = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
     const containerWidth = el.clientWidth;
     // Each card is flex-1 with min-w-[200px], gap-3 (12px)
-    // We want to show as many as fit, max 4
-    if (containerWidth >= 900) setCardsPerPage(4);
-    else if (containerWidth >= 650) setCardsPerPage(3);
+    if (containerWidth >= 650) setCardsPerPage(3);
     else if (containerWidth >= 420) setCardsPerPage(2);
     else setCardsPerPage(1);
   }, []);
