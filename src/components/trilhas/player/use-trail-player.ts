@@ -476,8 +476,13 @@ export function useTrailPlayer(trailId: string) {
   }, [resetModuleState]);
 
   // ─── Side effects ─────────────────────────────────────
+  // Re-hidrata o quizScore quando o usuário volta a um módulo de desafio que
+  // ele já tinha resolvido em sessão anterior. Guard de `quizSubmitted` evita
+  // sobrescrever o score recém-calculado pelo `handleSubmitDesafio` (que
+  // atualiza `progress`, disparando esse useEffect imediatamente após o submit).
   useEffect(() => {
     if (!currentModule || !progress) return;
+    if (quizSubmitted) return;
     if (currentModule.tipo === 'desafio' && progress.primeirasTentativasDesafio?.[currentModule.id]) {
       setAlreadyAttempted(true);
       const attempt = progress.primeirasTentativasDesafio[currentModule.id];
@@ -487,7 +492,7 @@ export function useTrailPlayer(trailId: string) {
         points: attempt.pontos || attempt.pontosGanhos || 0,
       });
     }
-  }, [currentModule, progress]);
+  }, [currentModule, progress, quizSubmitted]);
 
   const handleVideoTimeUpdate = useCallback(() => {
     if (!videoRef.current) return;

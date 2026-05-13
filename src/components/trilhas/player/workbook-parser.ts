@@ -7,13 +7,14 @@ import DOMPurify from 'dompurify';
 
 // ─── Chunk Types ────────────────────────────────────────────
 export type HtmlChunk = { type: 'html'; content: string };
-export type FieldChunk = { type: 'input-field'; id: string; placeholder?: string };
-export type AreaChunk = { type: 'input-area'; id: string; placeholder?: string; rows?: number };
-export type ListChunk = { type: 'input-list'; id: string; items: number; placeholder?: string };
+export type FieldChunk = { type: 'input-field'; id: string; placeholder?: string; label?: string };
+export type AreaChunk = { type: 'input-area'; id: string; placeholder?: string; rows?: number; label?: string };
+export type ListChunk = { type: 'input-list'; id: string; items: number; placeholder?: string; label?: string };
 export type SelectChunk = {
   type: 'input-select';
   id: string;
   options: { value: string; label: string }[];
+  label?: string;
 };
 
 export type WorkbookChunk = HtmlChunk | FieldChunk | AreaChunk | ListChunk | SelectChunk;
@@ -57,15 +58,59 @@ function parseAttributes(attrString: string): Record<string, string> {
 }
 
 // ─── Options Parser (for input-select) ──────────────────────
-// Format: "Verde: Convergencia, Amarelo: Gap, Vermelho: Surpresa"
+// Suporta dois formatos:
+//   A) Só labels:   "Ainda não enviei, Já enviei, Recebi as 3 respostas"
+//   B) value:label: "verde: Convergência, amarelo: Gap, vermelho: Surpresa"
+//
+// Bug que esse parser cobre: JSONs antigos no formato B onde a label tem
+// vírgula dentro (ex: "parcial: alguns batem, outros não"). Como o split é
+// por vírgula, "outros não" virava uma opção lixo. Solução: detectar que
+// "outros não" não tem prefixo "valor:" e fundir com a label da anterior.
+const VALUE_LABEL_PATTERN = /^[\wáéíóúãõçÁÉÍÓÚÃÕÇ\s-]{1,20}:\s/;
+
 function parseSelectOptions(optionsStr: string): { value: string; label: string }[] {
-  return optionsStr.split(',').map(opt => {
-    const parts = opt.trim().split(':');
-    if (parts.length >= 2) {
-      return { value: parts[0].trim(), label: parts.slice(1).join(':').trim() };
+  const raw = optionsStr.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  const usesValueLabelFormat = raw.some(opt => VALUE_LABEL_PATTERN.test(opt));
+
+  if (!usesValueLabelFormat) {
+    return raw.map(opt => ({ value: opt, label: opt }));
+  }
+
+  const result: { value: string; label: string }[] = [];
+  for (const opt of raw) {
+    if (VALUE_LABEL_PATTERN.test(opt)) {
+      const colonIdx = opt.indexOf(':');
+      result.push({
+        value: opt.slice(0, colonIdx).trim(),
+        label: opt.slice(colonIdx + 1).trim(),
+      });
+    } else if (result.length > 0) {
+      // Sem prefixo "valor:" → vírgula bagunçou o split; fundir com a anterior
+      result[result.length - 1].label += ', ' + opt;
+    } else {
+      // Primeira opção sem prefixo mas modo value:label detectado em outras
+      result.push({ value: opt, label: opt });
     }
-    return { value: parts[0].trim(), label: parts[0].trim() };
-  }).filter(opt => opt.value.length > 0);
+  }
+  return result;
+}
+
+// ─── Label-before-input matcher ─────────────────────────────
+// Procura por <label for="ID">texto</label> opcionalmente envolto em <p> no
+// final do HTML chunk imediatamente antes de um <input-X id="ID">. Quando
+// casa, o renderer move o label pra dentro do componente do input (próximos
+// um do outro, sem espaçamento grande do flow do prose).
+const TRAILING_LABEL_REGEX = /(?:<p[^>]*>\s*)?<label\s+for="([^"]+)"\s*>([\s\S]*?)<\/label>(?:\s*<\/p>)?\s*$/i;
+
+function extractTrailingLabel(html: string, expectedId: string): { cleanHtml: string; label?: string } {
+  const match = html.match(TRAILING_LABEL_REGEX);
+  if (!match || match.index === undefined || match[1] !== expectedId) {
+    return { cleanHtml: html };
+  }
+  return {
+    cleanHtml: html.slice(0, match.index).trim(),
+    label: match[2].trim(),
+  };
 }
 
 // ─── Main Parser ────────────────────────────────────────────
@@ -78,52 +123,63 @@ export function parseWorkbookHtml(html: string): WorkbookChunk[] {
 
   let match;
   while ((match = TAG_REGEX.exec(html)) !== null) {
-    // Add HTML chunk before this tag (if any)
+    const tagType = match[1].toLowerCase(); // field, area, list, select
+    const attrs = parseAttributes(match[2]);
+    const id = attrs.id || `${tagType}-${chunks.length}`;
+
+    // Pega o HTML antes desse input. Se terminar com <label for="ID">, move o
+    // label pra dentro do chunk do input pra ficar visualmente colado a ele.
+    let absorbedLabel: string | undefined;
     if (match.index > lastIndex) {
       const rawHtml = html.slice(lastIndex, match.index).trim();
       if (rawHtml.length > 0) {
-        chunks.push({
-          type: 'html',
-          content: DOMPurify.sanitize(rawHtml, SANITIZE_CONFIG),
-        });
+        const { cleanHtml, label } = extractTrailingLabel(rawHtml, id);
+        absorbedLabel = label;
+        if (cleanHtml.length > 0) {
+          chunks.push({
+            type: 'html',
+            content: DOMPurify.sanitize(cleanHtml, SANITIZE_CONFIG),
+          });
+        }
       }
     }
-
-    const tagType = match[1].toLowerCase(); // field, area, list, select
-    const attrs = parseAttributes(match[2]);
 
     switch (tagType) {
       case 'field':
         chunks.push({
           type: 'input-field',
-          id: attrs.id || `field-${chunks.length}`,
+          id,
           placeholder: attrs.placeholder,
+          label: absorbedLabel,
         });
         break;
 
       case 'area':
         chunks.push({
           type: 'input-area',
-          id: attrs.id || `area-${chunks.length}`,
+          id,
           placeholder: attrs.placeholder,
           rows: attrs.rows ? parseInt(attrs.rows, 10) : undefined,
+          label: absorbedLabel,
         });
         break;
 
       case 'list':
         chunks.push({
           type: 'input-list',
-          id: attrs.id || `list-${chunks.length}`,
+          id,
           items: attrs.items ? parseInt(attrs.items, 10) : 3,
           placeholder: attrs.placeholder,
+          label: absorbedLabel,
         });
         break;
 
       case 'select':
         chunks.push({
           type: 'input-select',
-          id: attrs.id || `select-${chunks.length}`,
+          id,
           options: attrs.options ? parseSelectOptions(attrs.options) : [],
+          label: absorbedLabel,
         });
         break;
     }
