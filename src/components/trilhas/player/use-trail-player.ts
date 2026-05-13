@@ -13,6 +13,7 @@ import {
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { recalculatePoints } from '@/app/actions';
 import { checkConquestsFromClient } from '@/app/actions/gamification';
+import { createTrailContentMission, createTrailTriggerMission } from '@/app/actions/missions';
 import { getAuthToken } from '@/lib/auth-client';
 import { useT } from '@/lib/i18n/context';
 import { interpolate } from '@/lib/i18n';
@@ -286,30 +287,22 @@ export function useTrailPlayer(trailId: string) {
         });
       } catch (err) { console.error('Error adding trail to pointsHistory:', err); }
 
-      // Create trigger mission if exists
+      // Create trigger mission if exists. Server action (Admin SDK) porque
+      // Firestore rules bloqueiam escrita em companies/X/missions pelo colab.
       if (trail.missaoGatilho) {
         try {
-          const triggerNow = Timestamp.now();
-          const triggerDeadlineDays = trail.missaoGatilho.prazoDias || 14;
-          const triggerEndDate = new Date();
-          triggerEndDate.setDate(triggerEndDate.getDate() + triggerDeadlineDays);
-
-          await addDoc(collection(db, 'companies', companyId!, 'missions'), {
+          const token = await getAuthToken();
+          const result = await createTrailTriggerMission(token, user!.uid, companyId!, {
             name: trail.missaoGatilho.titulo,
             description: trail.missaoGatilho.descricao,
             points: trail.missaoGatilho.pontos || 0,
-            type: 'trail_trigger',
-            status: 'active',
-            tag: 'Missao de Trilha',
             trailId,
-            assignedTo: user!.uid,
             requiresProof: trail.missaoGatilho.requerComprovante || false,
-            completionMode: trail.missaoGatilho.requerComprovante ? 'proof' : 'auto',
-            deadlineDays: triggerDeadlineDays,
-            startDate: triggerNow,
-            endDate: Timestamp.fromDate(triggerEndDate),
-            createdAt: triggerNow,
+            deadlineDays: trail.missaoGatilho.prazoDias || 14,
           });
+          if (result.error) {
+            console.error('Error creating trigger mission:', result.error);
+          }
         } catch (err) { console.error('Error creating trigger mission:', err); }
       }
     }
@@ -382,35 +375,39 @@ export function useTrailPlayer(trailId: string) {
   };
 
   // ─── Unlock mission (missao_conteudo) ─────────────────
-  const handleUnlockMission = async () => {
+  // Cria a missão via server action (Admin SDK). Antes era addDoc direto do
+  // client, mas as Firestore rules bloqueiam escrita em companies/X/missions
+  // pra colaborador — falhava silencioso e a missão nunca aparecia.
+  const handleUnlockMission = async (): Promise<{ error?: string } | void> => {
     if (!currentModule || !user || !companyId) return;
     setSaving(true);
     try {
-      const now = Timestamp.now();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 14);
-
       const missionPoints = currentModule.missaoGatilho?.pontosRecompensa
         || currentModule.conteudo?.pontuacaoBase || 0;
 
-      await addDoc(collection(db, 'companies', companyId, 'missions'), {
-        name: currentModule.titulo || 'Missao de Trilha',
+      const token = await getAuthToken();
+      const result = await createTrailContentMission(token, user.uid, companyId, {
+        name: currentModule.titulo || 'Missão de Trilha',
         description: currentModule.conteudo?.instrucao || '',
         points: missionPoints,
-        type: 'trail_content',
-        status: 'active',
-        tag: 'Missao de Trilha',
         trailId,
         moduleId: currentModule.id,
-        assignedTo: user.uid,
-        completionMode: 'proof',
-        startDate: now,
-        endDate: Timestamp.fromDate(endDate),
         deadlineDays: 14,
-        createdAt: now,
       });
+
+      if (result.error) {
+        console.error('Error creating trail content mission:', result.error);
+        setSaving(false);
+        return { error: result.error };
+      }
+
       await completeModule(currentModule.id, 0);
-    } catch (err) { console.error('Error creating mission:', err); }
+    } catch (err) {
+      console.error('Error creating mission:', err);
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido.';
+      setSaving(false);
+      return { error: msg };
+    }
     setSaving(false);
   };
 

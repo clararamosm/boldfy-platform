@@ -7,6 +7,153 @@ import { requireSelf, requireAdmin } from '@/lib/auth-guard';
 import { notifyMissionSubmitted, notifyMissionReviewed } from '@/lib/notifications';
 import { checkAndAwardConquests } from '@/app/actions/gamification';
 
+// ---- Create Mission from Trail Module (missao_conteudo) ----
+//
+// Disparado quando o colaborador clica "desbloquear missão" num módulo
+// `missao_conteudo` da trilha. Antes era addDoc direto do client, mas as
+// Firestore rules bloqueiam (colaborador só tem `allow read` em missions).
+// Server action usa Admin SDK pra criar a missão atribuída só pra esse user.
+export async function createTrailContentMission(
+  idToken: string,
+  userId: string,
+  companyId: string,
+  data: {
+    name: string;
+    description: string;
+    points: number;
+    trailId: string;
+    moduleId: string;
+    deadlineDays?: number;
+  }
+): Promise<{ success?: boolean; missionId?: string; error?: string }> {
+  try {
+    const authUser = await requireSelf(idToken, userId);
+
+    if (authUser.companyId !== companyId) {
+      return { error: 'Acesso negado: você não pertence a esta empresa.' };
+    }
+
+    // Evita duplicar a missão se o usuário já desbloqueou esse módulo antes.
+    const existingSnap = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missions')
+      .where('type', '==', 'trail_content')
+      .where('moduleId', '==', data.moduleId)
+      .where('assignedTo', '==', userId)
+      .limit(1)
+      .get();
+
+    if (!existingSnap.empty) {
+      return { success: true, missionId: existingSnap.docs[0].id };
+    }
+
+    const deadlineDays = data.deadlineDays ?? 14;
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + deadlineDays);
+
+    const missionRef = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missions')
+      .add({
+        name: data.name || 'Missão de Trilha',
+        description: data.description || '',
+        points: data.points || 0,
+        type: 'trail_content',
+        status: 'active',
+        tag: 'Missao de Trilha',
+        trailId: data.trailId,
+        moduleId: data.moduleId,
+        assignedTo: userId,
+        completionMode: 'proof',
+        startDate: FieldValue.serverTimestamp(),
+        endDate,
+        deadlineDays,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+    return { success: true, missionId: missionRef.id };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in createTrailContentMission:', msg);
+    return { error: msg };
+  }
+}
+
+// ---- Create Trigger Mission from Trail Completion ----
+//
+// Disparado dentro de `completeModule` quando a trilha inteira é concluída
+// e ela tem `missaoGatilho`. Mesma justificativa do createTrailContentMission:
+// Firestore rules bloqueiam escrita em companies/X/missions pelo colaborador.
+export async function createTrailTriggerMission(
+  idToken: string,
+  userId: string,
+  companyId: string,
+  data: {
+    name: string;
+    description: string;
+    points: number;
+    trailId: string;
+    requiresProof?: boolean;
+    deadlineDays?: number;
+  }
+): Promise<{ success?: boolean; missionId?: string; error?: string }> {
+  try {
+    const authUser = await requireSelf(idToken, userId);
+
+    if (authUser.companyId !== companyId) {
+      return { error: 'Acesso negado: você não pertence a esta empresa.' };
+    }
+
+    // Evita duplicar a missão se o usuário já completou a trilha antes.
+    const existingSnap = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missions')
+      .where('type', '==', 'trail_trigger')
+      .where('trailId', '==', data.trailId)
+      .where('assignedTo', '==', userId)
+      .limit(1)
+      .get();
+
+    if (!existingSnap.empty) {
+      return { success: true, missionId: existingSnap.docs[0].id };
+    }
+
+    const deadlineDays = data.deadlineDays ?? 14;
+    const endDate = new Date();
+    endDate.setDate(endDate.getDate() + deadlineDays);
+
+    const missionRef = await adminDb
+      .collection('companies')
+      .doc(companyId)
+      .collection('missions')
+      .add({
+        name: data.name || 'Missão de Trilha',
+        description: data.description || '',
+        points: data.points || 0,
+        type: 'trail_trigger',
+        status: 'active',
+        tag: 'Missao de Trilha',
+        trailId: data.trailId,
+        assignedTo: userId,
+        requiresProof: data.requiresProof || false,
+        completionMode: data.requiresProof ? 'proof' : 'auto',
+        startDate: FieldValue.serverTimestamp(),
+        endDate,
+        deadlineDays,
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+    return { success: true, missionId: missionRef.id };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in createTrailTriggerMission:', msg);
+    return { error: msg };
+  }
+}
+
 // ---- Mission Proof Submission ----
 
 export async function submitMissionProof(
