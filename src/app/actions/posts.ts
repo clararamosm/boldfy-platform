@@ -58,9 +58,12 @@ export async function createScheduledPost(
     formato?: string;
     mediaUrls?: string[];
     mediaTypes?: string[];
-    // Status inicial. Default 'scheduled' quando ha data; 'draft' quando nao.
-    // O caller pode forcar explicitamente — auto-save sempre cria como 'draft'.
-    status?: 'draft' | 'scheduled';
+    // Status inicial. Default 'in_progress' quando ha data, 'draft' quando nao.
+    // Caller pode forçar 'scheduled' (botão Agendar) ou outros explicitamente.
+    // Auto-save NUNCA cria como 'scheduled' — só o gesto explícito de agendar
+    // promove pra scheduled, pra não acionar o cron de publicação antes da
+    // hora se o user ainda estiver editando.
+    status?: 'draft' | 'scheduled' | 'in_progress';
   }
 ): Promise<{ success?: boolean; postId?: string; error?: string }> {
   try {
@@ -70,10 +73,12 @@ export async function createScheduledPost(
     await requireActiveModuleByRole(user);
     if (!data.caption.trim()) return { error: 'A legenda não pode estar vazia.' };
 
-    // Status: explicit > inferido pela presenca de data.
-    // Drafts sem data sao validos — auto-save cria um doc com scheduledFor=null
-    // pra que o user nao perca o conteudo se sair da pagina.
-    const inferredStatus = data.status ?? (data.scheduledFor ? 'scheduled' : 'draft');
+    // Status: explicit > inferido pela presença de data.
+    // Sem status explícito + com data = 'in_progress' (em construção com data
+    // marcada). Sem data = 'draft'. NUNCA inferir 'scheduled' aqui — só o
+    // caller passando status='scheduled' (botão Agendar) confirma o
+    // agendamento real e habilita o cron de publicação.
+    const inferredStatus = data.status ?? (data.scheduledFor ? 'in_progress' : 'draft');
 
     const now = new Date().toISOString();
     // Multi-image: quando ha array com 2+ imagens, salva mediaUrls/mediaTypes
@@ -133,12 +138,12 @@ export async function updateScheduledPost(
     if (data.caption !== undefined) updateData.caption = data.caption;
     if (data.scheduledFor !== undefined) updateData.scheduledFor = data.scheduledFor;
     if (data.status !== undefined) updateData.status = data.status;
-    // Auto-bump de status: se user passou data sem mudar status, e o post
-    // ainda esta como draft, promovemos pra scheduled. Inverso tambem:
-    // quem limpa data num post scheduled vai pra draft.
-    if (data.scheduledFor !== undefined && data.status === undefined) {
-      updateData.status = data.scheduledFor ? 'scheduled' : 'draft';
-    }
+    // NÃO fazer auto-bump silencioso de status. Antes: se caller passava
+    // scheduledFor sem status, o servidor promovia pra 'scheduled' — o que
+    // fazia o auto-save do editor virar agendamento real e o cron de
+    // publicação pegar posts ainda em construção. Agora status só muda
+    // quando o caller manda explícito (auto-save → in_progress/draft,
+    // botão "Agendar" → scheduled).
     // contentPillar/formato podem ser '' pra remover o campo do post.
     if (data.contentPillar !== undefined) {
       updateData.contentPillar = data.contentPillar || FieldValue.delete();

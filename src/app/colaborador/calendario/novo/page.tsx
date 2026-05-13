@@ -395,6 +395,12 @@ function EditorContent() {
         ? new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString()
         : null;
 
+      // Auto-save NUNCA cria agendamento real. Se tem data, marca como
+      // 'in_progress' (em construção com data); se não tem, 'draft'. Só o
+      // botão "Agendar" (handleSubmit) confirma como 'scheduled'. Isso
+      // impede o cron de publicar posts que ainda estão sendo escritos.
+      const autoSaveStatus: 'draft' | 'in_progress' = scheduledFor ? 'in_progress' : 'draft';
+
       if (currentPostId) {
         const result = await updateScheduledPost(token, userId, currentPostId, {
           caption,
@@ -402,14 +408,13 @@ function EditorContent() {
           mediaUrls: urls,
           mediaTypes: types,
           contentPillar,
+          status: autoSaveStatus,
           ...(formato && { formato }),
         });
         if (!result.success) throw new Error(result.error || 'Update falhou');
-        // Server faz auto-bump de status (draft <-> scheduled) baseado
-        // em scheduledFor. Espelha aqui pra badge ficar em sync. Não
-        // sobrescreve se ja era 'published' ou 'failed' (post imutavel).
+        // Post imutavel (published/failed) não é tocado.
         if (postStatus !== 'published' && postStatus !== 'failed') {
-          setPostStatus(scheduledFor ? 'scheduled' : 'draft');
+          setPostStatus(autoSaveStatus);
         }
       } else {
         const result = await createScheduledPost(token, userId, {
@@ -421,11 +426,11 @@ function EditorContent() {
           mediaTypes: types,
           contentPillar,
           ...(formato && { formato }),
-          status: 'draft', // primeiro auto-save sempre cria como draft
+          status: autoSaveStatus,
         });
         if (!result.success || !result.postId) throw new Error(result.error || 'Create falhou');
         setCurrentPostId(result.postId);
-        setPostStatus(scheduledFor ? 'scheduled' : 'draft');
+        setPostStatus(autoSaveStatus);
         // Atualiza URL pra refletir o post (sem refresh) — assim se o user
         // der refresh, volta no mesmo doc em vez de criar duplicado.
         router.replace(`/colaborador/calendario/novo?edit=${result.postId}`);
@@ -504,10 +509,13 @@ function EditorContent() {
         // Sempre enviamos mediaUrls (mesmo vazio) pra que o server action
         // saiba se houve remoção. O server action faz a sincronização
         // entre array e singular automaticamente.
+        // status 'scheduled' EXPLÍCITO: esse é o único ponto onde o user
+        // confirma o agendamento. Auto-save fica em in_progress até aqui.
         const result = await updateScheduledPost(token, userId, editPostId, {
           caption,
           scheduledFor,
           contentPillar,
+          status: 'scheduled',
           ...(formato && { formato }),
           mediaUrls: urls,
           mediaTypes: types,
@@ -529,6 +537,7 @@ function EditorContent() {
           mediaUrls: urls,
           mediaTypes: types,
           scheduledFor,
+          status: 'scheduled',
           ...(contentPillar && { contentPillar }),
           ...(formato && { formato }),
         });
@@ -566,9 +575,12 @@ function EditorContent() {
 
       if (isEditMode && editPostId) {
         // ─── Edit mode: update post then publish ──────
+        // status 'scheduled' explícito — se a chamada do LinkedIn falhar,
+        // o cron pega e tenta de novo. Auto-save manteria in_progress.
         const updateResult = await updateScheduledPost(token, userId, editPostId, {
           caption,
           scheduledFor: new Date().toISOString(),
+          status: 'scheduled',
           mediaUrls: urls,
           mediaTypes: types,
         });
@@ -600,6 +612,8 @@ function EditorContent() {
         }
       } else {
         // ─── Create mode: create post then publish ──────
+        // status 'scheduled' explícito — se a chamada do LinkedIn falhar,
+        // o cron pega e tenta de novo.
         const createResult = await createScheduledPost(token, userId, {
           caption,
           mediaUrl: urls[0],
@@ -607,6 +621,7 @@ function EditorContent() {
           mediaUrls: urls,
           mediaTypes: types,
           scheduledFor: new Date().toISOString(),
+          status: 'scheduled',
         });
 
         if (!createResult.success || !createResult.postId) {
