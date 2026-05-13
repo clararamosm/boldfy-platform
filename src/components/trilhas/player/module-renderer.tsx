@@ -371,7 +371,7 @@ function DesafioQuestions({
 
       <Card>
         <CardContent className="p-6">
-          <p className="text-lg font-semibold mb-4">{q.enunciado}</p>
+          <p className="text-lg font-semibold mb-4">{q.enunciado || q.pergunta}</p>
           <div className="space-y-2">
             {q.opcoes?.map((opt: string, oi: number) => {
               let style = 'border-border hover:bg-muted cursor-pointer';
