@@ -533,6 +533,7 @@ export function useTrailPlayer(trailId: string) {
     let cancelled = false;
     let intervalId: ReturnType<typeof setInterval> | null = null;
     let lastPlayingTimestamp: number | null = null;
+    let lastCurrentTime = 0;
     let accumulatedSeconds = 0;
     let knownDuration = 0;
 
@@ -561,19 +562,33 @@ export function useTrailPlayer(trailId: string) {
             if (cancelled) return;
             if (e.data === YT_PLAYER_STATE.PLAYING) {
               lastPlayingTimestamp = Date.now();
+              lastCurrentTime = e.target.getCurrentTime();
               if (intervalId) clearInterval(intervalId);
               intervalId = setInterval(() => {
-                if (lastPlayingTimestamp === null) return;
+                if (lastPlayingTimestamp === null || !playerRef.current) return;
                 const now = Date.now();
-                const delta = (now - lastPlayingTimestamp) / 1000;
+                const wallDelta = (now - lastPlayingTimestamp) / 1000;
                 lastPlayingTimestamp = now;
-                accumulatedSeconds += delta;
-                setTempoAssistido(accumulatedSeconds);
-                const pct = knownDuration > 0
-                  ? (accumulatedSeconds / knownDuration) * 100
-                  : 0;
-                setVideoProgress(Math.min(pct, 100));
-                if (pct >= 80) setVideoCompleted(true);
+
+                const currentTime = playerRef.current.getCurrentTime();
+                const videoDelta = currentTime - lastCurrentTime;
+                lastCurrentTime = currentTime;
+
+                // Conta avanço real no vídeo (getCurrentTime delta), não tempo
+                // de relógio. Isso faz playback 2x contar correto: em 1s de
+                // relógio, o cursor avança ~2s no vídeo. Limite é wallDelta * 3
+                // pra tolerar 2x + jitter, mas rejeitar seek-forward longo
+                // (arrastar pro final). Rewind (delta negativo) é ignorado.
+                const maxPlausibleDelta = Math.max(wallDelta * 3, 1);
+                if (videoDelta > 0 && videoDelta <= maxPlausibleDelta) {
+                  accumulatedSeconds += videoDelta;
+                  setTempoAssistido(accumulatedSeconds);
+                  const pct = knownDuration > 0
+                    ? (accumulatedSeconds / knownDuration) * 100
+                    : 0;
+                  setVideoProgress(Math.min(pct, 100));
+                  if (pct >= 80) setVideoCompleted(true);
+                }
               }, 1000);
             } else {
               // PAUSED, ENDED, BUFFERING — para o contador
