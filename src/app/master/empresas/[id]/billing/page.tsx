@@ -443,6 +443,22 @@ export default function MasterCompanyBillingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
 
+  // Recarrega o bloco serializado de billing (apenas o state, sem rehidratar
+  // forms). Usado depois de criar/remover/convidar TL para que o card
+  // "Status dos Modulos" reflita a nova contagem de Thought Leaders.
+  async function refreshBilling() {
+    if (!companyId) return;
+    try {
+      const idToken = await getAuthToken();
+      const res = await getCompanyBilling(idToken, companyId);
+      if (res.success && res.data) {
+        setBilling(res.data);
+      }
+    } catch (e) {
+      console.error('[refreshBilling] erro:', e);
+    }
+  }
+
   async function handleCreateTL() {
     if (!companyId || !token || !tlName.trim()) {
       toast({ variant: 'destructive', title: 'Nome do TL obrigatorio.' });
@@ -463,6 +479,7 @@ export default function MasterCompanyBillingPage() {
       toast({ title: 'Thought Leader criado.', description: 'Envie o convite quando quiser.' });
       setTlName('');
       await loadTLList();
+      await refreshBilling();
     } finally {
       setIsCreatingTL(false);
     }
@@ -481,6 +498,7 @@ export default function MasterCompanyBillingPage() {
       setInviteTLId(null);
       setInviteTLEmail('');
       await loadTLList();
+      await refreshBilling();
     } finally {
       setIsSendingTLInvite(false);
     }
@@ -513,6 +531,7 @@ export default function MasterCompanyBillingPage() {
       toast({ title: 'Thought Leader removido.' });
       setConfirmDeleteTLId(null);
       await loadTLList();
+      await refreshBilling();
     } finally {
       setIsDeletingTL(false);
     }

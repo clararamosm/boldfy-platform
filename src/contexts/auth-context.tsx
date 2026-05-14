@@ -3,8 +3,9 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { syncPlatformSeatsForCurrentUser } from '@/app/actions/billing';
 
 // Session cookie helpers — calls server API to set signed HttpOnly cookie
 async function setSessionCookie(idToken: string) {
@@ -96,11 +97,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             safeData.linkedinConnection = safeConnection;
           }
 
-          // Auto-activate collaborators and thought leaders on first login
-          if ((role === 'colaborador' || role === 'thoughtleader') && data.status === 'Pendente') {
-            updateDoc(doc(db, 'users', fbUser.uid), { status: 'Ativo' }).catch(err =>
-              console.error('Failed to activate collaborator:', err),
-            );
+          // Auto-activate users on first login. Admin entra junto pra que o painel
+          // Master pare de mostrar "Convite pendente" depois do primeiro acesso.
+          if (
+            (role === 'colaborador' || role === 'thoughtleader' || role === 'admin') &&
+            data.status === 'Pendente'
+          ) {
+            try {
+              await updateDoc(doc(db, 'users', fbUser.uid), {
+                status: 'Ativo',
+                lastLoginAt: serverTimestamp(),
+              });
+              // Colaborador ativando = novo seat pago. Dispara o resync que
+              // atualiza billing.platform.seats no Firestore e a quantity da
+              // subscription no Stripe (com proration). Admin/TL nao geram
+              // seat de Platform — resyncPlatformSeats filtra por role e
+              // ignora ambos. Falha aqui nao bloqueia o login do user.
+              if (role === 'colaborador') {
+                const idToken = await fbUser.getIdToken();
+                syncPlatformSeatsForCurrentUser(idToken).catch(err =>
+                  console.error('Failed to sync platform seats on activation:', err),
+                );
+              }
+            } catch (err) {
+              console.error('Failed to activate user:', err);
+            }
+          } else if (role === 'admin' && !data.lastLoginAt) {
+            // Admins legados ja com status='Ativo' mas sem lastLoginAt: backfill no proximo login.
+            updateDoc(doc(db, 'users', fbUser.uid), {
+              lastLoginAt: serverTimestamp(),
+            }).catch(err => console.error('Failed to backfill admin lastLoginAt:', err));
           }
 
           setUser({

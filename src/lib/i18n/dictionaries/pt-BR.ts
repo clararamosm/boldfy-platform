@@ -339,7 +339,7 @@ const ptBR = {
     title: 'Colaboradores',
     totalCollaborators: 'Total de Colaboradores',
     activeCollaborators: 'Colaboradores Ativos',
-    availableLicenses: 'Licenças Disponíveis',
+    availableLicenses: 'Assentos Cobrados',
     teamTitle: 'Equipe',
     teamDescription: 'Gerencie os colaboradores da sua empresa.',
     tableCollaborator: 'Colaborador',

@@ -130,8 +130,9 @@ export default function AdminColaboradoresPage() {
   const { user } = useAuth();
   const companyId = useResolvedCompanyId();
   const { company } = useCompanyData(companyId);
-  const totalLicenses = company?.licenses || 0;
-
+  // Nota: removido `totalLicenses` (company.licenses) pois nao limita mais
+  // o convite de colaboradores no modelo per-seat dinamico. O TL ainda usa
+  // tlLicenses pois o plano TL tem assentos contratados separadamente.
   const totalTLLicenses = company?.tlLicenses || 0;
 
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -242,14 +243,13 @@ export default function AdminColaboradoresPage() {
     }
   }, [inviteTLState, toast, companyId, fetchCollaborators]);
 
-  const isLicenseLimitReached = collaborators.length >= totalLicenses;
+  // Modelo per-seat dinamico: convite e sempre permitido. Novos colaboradores
+  // alem dos 5 seats minimos comecam a ser cobrados quando ativam a conta.
   const inviteButton = (
-    <div title={isLicenseLimitReached ? 'Limite de licenças atingido' : undefined}>
-      <Button size="sm" disabled={isLoading || !companyId || isLicenseLimitReached}>
-        <PlusCircle className="mr-2 h-4 w-4" />
-        {t.adminCollaborators.invite}
-      </Button>
-    </div>
+    <Button size="sm" disabled={isLoading || !companyId}>
+      <PlusCircle className="mr-2 h-4 w-4" />
+      {t.adminCollaborators.invite}
+    </Button>
   );
 
   const getStatusBadge = (status: Collaborator['status']) => {
@@ -528,7 +528,13 @@ export default function AdminColaboradoresPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
           <StatCard title={t.adminCollaborators.totalCollaborators} value={String(collaborators.length)} icon={Users} isLoading={isLoading} />
           <StatCard title={t.adminCollaborators.activeCollaborators} value={String(collaborators.filter(c => c.status === 'Ativo').length)} icon={UserCheck} isLoading={isLoading} />
-          <StatCard title={t.adminCollaborators.availableLicenses} value={`${collaborators.length} / ${totalLicenses}`} icon={Users} isLoading={isLoading} />
+          {/*
+            Modelo per-seat: nao ha mais limite. O numero mostrado e o de
+            assentos cobrados (minimo 5, escala com colaboradores ativos).
+            Label da chave i18n availableLicenses ja foi atualizado para
+            "Assentos Cobrados" / "Billed Seats".
+          */}
+          <StatCard title={t.adminCollaborators.availableLicenses} value={String(Math.max(collaborators.filter(c => c.status === 'Ativo').length, 5))} icon={Users} isLoading={isLoading} />
         </div>
         <Card>
           <CardHeader>

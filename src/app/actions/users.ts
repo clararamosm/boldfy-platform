@@ -713,15 +713,10 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
     const companyName = companyData?.companyName || '';
     const companyLocale = (companyData?.locale as 'pt-BR' | 'en') || 'pt-BR';
 
-    const currentLicenses = companyData?.licenses || 0;
-    const usersQuery = await adminDb.collection("users")
-      .where("companyId", "==", companyId)
-      .where("role", "==", "colaborador")
-      .get();
-
-    if (usersQuery.size >= currentLicenses) {
-      return { error: `Limite de licenças atingido (${currentLicenses}). Não é possível convidar mais colaboradores.` };
-    }
+    // Modelo per-seat dinamico estilo Notion: nao bloqueamos o convite.
+    // A empresa adiciona quantos colaboradores quiser. A cobranca de novos
+    // seats so e disparada quando o colaborador ATIVA a conta (primeiro login),
+    // via resyncPlatformSeats no auth-context. Convite em si e evento gratuito.
 
     let userRecord;
     try {
@@ -760,13 +755,9 @@ export async function inviteCollaborator(prevState: InviteCollaboratorState, for
       { idempotencyKey: userRecord.uid },
     );
 
-    // Billing: sincroniza seats do modulo Platform (Firestore + Stripe com proration).
-    // Nao bloqueia o convite caso falhe — erro ja e logado internamente.
-    try {
-      await resyncPlatformSeats(companyId);
-    } catch (seatErr) {
-      console.error('[inviteCollaborator] resyncPlatformSeats falhou:', seatErr);
-    }
+    // Billing nao e atualizado no convite. O resync de seats acontece no
+    // primeiro login do colaborador (auth-context -> syncPlatformSeatsForCurrentUser),
+    // quando o status muda de 'Pendente' para 'Ativo'.
 
     const resetLink = await generateInviteLink(email, userRecord.uid);
     sendInvitationEmail({
@@ -1429,6 +1420,15 @@ export async function toggleCollaboratorStatus(
     await adminDb.collection('users').doc(parsed.collaboratorId).update({
       status: parsed.newStatus,
     });
+
+    // Billing: sincroniza seats apos mudanca de status. Ativar conta um seat;
+    // desativar libera. resyncPlatformSeats respeita o minimo de 5 seats via
+    // Math.max(activeCollaborators, PLATFORM_MIN_SEATS).
+    try {
+      await resyncPlatformSeats(companyId);
+    } catch (seatErr) {
+      console.error('[toggleCollaboratorStatus] resyncPlatformSeats falhou:', seatErr);
+    }
 
     return { success: true };
   } catch (error) {

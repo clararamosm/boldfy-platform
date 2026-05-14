@@ -46,11 +46,15 @@ export async function resyncPlatformSeats(companyId: string): Promise<SeatSyncRe
     throw new Error(`Empresa ${companyId} nao encontrada.`);
   }
 
-  // Contar colaboradores ativos. Usamos count() da Admin SDK para eficiencia.
+  // Contar colaboradores ATIVOS (status='Ativo'). Pendentes (convite enviado
+  // mas conta ainda nao ativada) NAO contam como seat pago. O resync e
+  // disparado novamente quando o colaborador ativa o primeiro login, momento
+  // em que o seat passa a ser cobrado proporcionalmente no Stripe.
   const countSnap = await adminDb
     .collection('users')
     .where('companyId', '==', companyId)
     .where('role', '==', 'colaborador')
+    .where('status', '==', 'Ativo')
     .count()
     .get();
 

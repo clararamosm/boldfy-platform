@@ -341,7 +341,7 @@ const en: Dictionary = {
     title: 'Collaborators',
     totalCollaborators: 'Total Collaborators',
     activeCollaborators: 'Active Collaborators',
-    availableLicenses: 'Available Licenses',
+    availableLicenses: 'Billed Seats',
     teamTitle: 'Team',
     teamDescription: 'Manage your company collaborators.',
     tableCollaborator: 'Collaborator',

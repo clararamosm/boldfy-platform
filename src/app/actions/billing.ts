@@ -15,7 +15,7 @@
 
 'use server';
 
-import { requireAdmin, requireMaster } from '@/lib/auth-guard';
+import { requireAdmin, requireAuth, requireMaster } from '@/lib/auth-guard';
 import { db as adminDb } from '@/lib/firebase-admin';
 import {
   applyMasterTrialSetup,
@@ -994,6 +994,42 @@ export async function getBillingWarnings(
       success: false,
       error: e instanceof Error ? e.message : 'Erro ao carregar avisos.',
     };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// USER: Sync de seats da Platform apos ativacao (primeiro login)
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Chamada do client (auth-context) quando um colaborador faz o primeiro login
+ * e seu status passa de 'Pendente' para 'Ativo'. Dispara o resync de seats
+ * do Platform — que conta colaboradores ativos da empresa, atualiza
+ * billing.platform.seats no Firestore e ajusta a quantity da subscription
+ * no Stripe (com proration automatica) se a empresa estiver com status='active'.
+ *
+ * Empresas parceiras (freeTrialUnlimited=true) ou em trial/pending nao tem
+ * subscription ativa no Stripe, entao o resync atualiza apenas o Firestore
+ * — sem cobranca.
+ */
+export async function syncPlatformSeatsForCurrentUser(
+  idToken: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!idToken) {
+      return { success: false, error: 'Token de autenticacao ausente.' };
+    }
+    const caller = await requireAuth(idToken);
+    if (!caller.companyId) {
+      // User sem empresa (master, strategist sem empresa, etc): nada a sincronizar.
+      return { success: true };
+    }
+    await resyncPlatformSeats(caller.companyId);
+    return { success: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : 'Erro desconhecido.';
+    console.error('[syncPlatformSeatsForCurrentUser] falhou:', msg);
+    return { success: false, error: msg };
   }
 }
 
