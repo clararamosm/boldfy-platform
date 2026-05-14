@@ -13,8 +13,13 @@ export default function ColaboradorAnalyticsPage() {
     if (!user) return false;
     const status = (user as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus;
     const lastMonth = status?.lastUploadMonth;
-    const currentMonth = new Date().toISOString().substring(0, 7);
-    return !lastMonth || lastMonth < currentMonth;
+    // O extract pendente é sempre o do MÊS PASSADO (em maio, espera-se abril).
+    // Comparar com o mês atual gerava banner "pendente" durante o mês corrente,
+    // o que confundia: o extract só fecha quando o mês acaba.
+    const now = new Date();
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+    return !lastMonth || lastMonth < previousMonth;
   }, [user]);
 
   if (!user) {

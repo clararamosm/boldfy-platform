@@ -4,11 +4,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Loader2, History } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInSnapshot, getLinkedInSnapshotBatch, listLinkedInSnapshots } from '@/app/actions/linkedin-analytics';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
-import { MONTH_NAMES_PT, formatMesAno } from '@/lib/linkedin-analytics-utils';
+import { formatMesAno } from '@/lib/linkedin-analytics-utils';
 
 import { AnalyticsHeader } from './analytics-header';
 import { UploadPendingBanner } from './upload-pending-banner';
@@ -42,25 +41,6 @@ type TrendMap = Record<string, Pick<LinkedInSnapshot,
   'mesAno' | 'totalNewFollowers' | 'totalImpressions' | 'totalReach' | 'totalEngagement' | 'uploadType' | 'totalPostsPublished'
 >>;
 
-type PeriodPreset = '1M' | '3M' | '6M' | '1A' | 'custom';
-
-const PERIOD_LABELS: Record<PeriodPreset, string> = {
-  '1M': '1 mês',
-  '3M': '3 meses',
-  '6M': '6 meses',
-  '1A': '1 ano',
-  'custom': 'Personalizado',
-};
-
-/** Retorna o mês YYYY-MM resultante de subtrair `months` meses de `from` */
-function subtractMonths(from: string, months: number): string {
-  const [y, m] = from.split('-').map(Number);
-  let newM = m - months;
-  let newY = y;
-  while (newM < 1) { newM += 12; newY--; }
-  return `${newY}-${String(newM).padStart(2, '0')}`;
-}
-
 export function AnalyticsDashboard({
   userId,
   userName,
@@ -85,11 +65,6 @@ export function AnalyticsDashboard({
   const [historicalModalOpen, setHistoricalModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const isLoadingDataRef = useRef(false);
-
-  // Filtro de período — controla o range dos gráficos de tendência
-  const [periodPreset, setPeriodPreset] = useState<PeriodPreset>('6M');
-  const [customFrom, setCustomFrom] = useState('');  // YYYY-MM (inclusive)
-  const [customTo, setCustomTo] = useState('');       // YYYY-MM (inclusive)
 
   // O botão "Histórico" só aparece para o próprio usuário (role ≠ admin)
   const canManageHistory = role !== 'admin';
@@ -216,75 +191,18 @@ export function AnalyticsDashboard({
     loadData(reloadTo);
   }, [loadData, selectedMonth]);
 
-  // Todos os meses disponíveis (monthly + historical) em ordem crescente
-  const allAvailableMonths = useMemo(
-    () => Object.keys(trendSnapshots).sort(),
-    [trendSnapshots],
-  );
-
-  // Mês mais recente com dados — âncora do período
-  const latestMonth = useMemo(
-    () => allAvailableMonths[allAvailableMonths.length - 1] ?? '',
-    [allAvailableMonths],
-  );
-
-  // Range do período selecionado
-  const periodRange = useMemo((): { from: string; to: string } => {
-    if (!latestMonth) return { from: '', to: '' };
-    const to = latestMonth;
-    if (periodPreset === '1M') return { from: subtractMonths(to, 0), to };
-    if (periodPreset === '3M') return { from: subtractMonths(to, 2), to };
-    if (periodPreset === '6M') return { from: subtractMonths(to, 5), to };
-    if (periodPreset === '1A') return { from: subtractMonths(to, 11), to };
-    // custom
-    return {
-      from: customFrom || allAvailableMonths[0] || to,
-      to: customTo || to,
-    };
-  }, [periodPreset, latestMonth, customFrom, customTo, allAvailableMonths]);
-
-  // Snapshots filtrados pelo período — para os gráficos
-  const filteredTrendSnapshots = useMemo((): TrendMap => {
-    if (!periodRange.from) return trendSnapshots;
-    const result: TrendMap = {};
-    for (const [k, v] of Object.entries(trendSnapshots)) {
-      if (k >= periodRange.from && k <= periodRange.to) result[k] = v;
-    }
-    return result;
-  }, [trendSnapshots, periodRange]);
-
-  // Meses monthly dentro do período (apenas monthly alimentam KPIs)
-  const monthlyInRange = useMemo(() => {
-    if (!periodRange.from) return monthlyMonths;
-    return monthlyMonths.filter(m => m >= periodRange.from && m <= periodRange.to);
-  }, [monthlyMonths, periodRange]);
-
-  // Mês âncora dos KPIs = mês monthly mais recente dentro do período
-  // (usado para top posts, demographics, action plan, ICP-Fit)
-  const anchorMonth = useMemo(
-    () => monthlyInRange[0] ?? selectedMonth, // monthlyMonths está desc
-    [monthlyInRange, selectedMonth],
-  );
-
-  // KPIs acumulados do período = soma de todos os meses monthly no range
-  const periodKpis = useMemo(() => {
-    const snapsInRange = monthlyInRange.map(m => trendSnapshots[m]).filter(Boolean);
-    return {
-      totalImpressions: snapsInRange.reduce((s, v) => s + (v?.totalImpressions ?? 0), 0),
-      totalReach:       snapsInRange.reduce((s, v) => s + (v?.totalReach ?? 0), 0),
-      totalEngagement:  snapsInRange.reduce((s, v) => s + (v?.totalEngagement ?? 0), 0),
-      totalNewFollowers: snapsInRange.reduce((s, v) => s + (v?.totalNewFollowers ?? 0), 0),
-    };
-  }, [monthlyInRange, trendSnapshots]);
-
-  // Delta vs mês anterior ao anchor — sempre exibido quando há prevSnapshot
-
-  // Quando o período muda, atualiza o snapshot exibido para anchor
-  useEffect(() => {
-    if (!anchorMonth || anchorMonth === selectedMonth) return;
-    setSelectedMonth(anchorMonth);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anchorMonth]);
+  // Lista de meses no seletor: monthly primeiro (descendente), historical depois
+  // marcados como parciais. A Clara confirmou: default = último monthly. Se só
+  // tiver historical, cai pro mais recente de qualquer tipo.
+  const monthOptions = useMemo(() => {
+    const monthlySet = new Set(monthlyMonths);
+    const all = Object.keys(trendSnapshots).sort().reverse();
+    return all.map(m => ({
+      value: m,
+      label: formatMesAno(m),
+      isHistorical: !monthlySet.has(m),
+    }));
+  }, [monthlyMonths, trendSnapshots]);
 
   if (loading) {
     return (
@@ -327,6 +245,9 @@ export function AnalyticsDashboard({
               <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
                 Exporte os últimos 365 dias do LinkedIn Analytics. Os meses são separados automaticamente e os gráficos de evolução ficam disponíveis imediatamente.
               </p>
+              <p className="mt-2 text-xs font-semibold text-amber-700">
+                🪙 100 pontos ao concluir
+              </p>
             </div>
           </button>
 
@@ -342,9 +263,12 @@ export function AnalyticsDashboard({
               </svg>
             </div>
             <div>
-              <p className="font-semibold text-sm text-foreground">Upload do mês atual</p>
+              <p className="font-semibold text-sm text-foreground">Upload do mês passado</p>
               <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                Já tem histórico importado ou quer começar do mês corrente? Faça o export do período mensal e importe aqui.
+                Já tem histórico importado ou quer começar do mês corrente? Faça o export do período mensal fechado e importe aqui.
+              </p>
+              <p className="mt-2 text-xs font-semibold text-amber-700">
+                🪙 50 pontos por mês upado
               </p>
             </div>
           </button>
@@ -382,53 +306,27 @@ export function AnalyticsDashboard({
   // Tem dados históricos mas nenhum upload mensal ainda
   const hasOnlyHistorical = monthlyMonths.length === 0;
 
-  // Barra de controles: filtro de período + botão histórico (ícone)
-  const ControlsBar = (
+  // Seletor de mês individual — substituiu o filtro 1M/3M/6M/1A.
+  // Mostra qual mês está sendo exibido (default = último monthly cadastrado).
+  // Meses com upload historical aparecem marcados como "(parcial)".
+  const MonthSelectorBar = (
     <div className="flex items-center gap-2 flex-wrap">
-      {/* Filtro de período — pills */}
-      <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
-        {(['1M', '3M', '6M', '1A', 'custom'] as PeriodPreset[]).map(preset => (
-          <button
-            key={preset}
-            onClick={() => setPeriodPreset(preset)}
-            className={cn(
-              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-              periodPreset === preset
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {PERIOD_LABELS[preset]}
-          </button>
-        ))}
-      </div>
-
-      {/* Selects de range personalizado */}
-      {periodPreset === 'custom' && (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Select value={customFrom || allAvailableMonths[0] || ''} onValueChange={setCustomFrom}>
-            <SelectTrigger className="h-7 w-32 text-xs">
-              <SelectValue placeholder="De" />
-            </SelectTrigger>
-            <SelectContent>
-              {allAvailableMonths.map(m => (
-                <SelectItem key={m} value={m} className="text-xs">{formatMesAno(m)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span>→</span>
-          <Select value={customTo || latestMonth || ''} onValueChange={setCustomTo}>
-            <SelectTrigger className="h-7 w-32 text-xs">
-              <SelectValue placeholder="Até" />
-            </SelectTrigger>
-            <SelectContent>
-              {[...allAvailableMonths].reverse().map(m => (
-                <SelectItem key={m} value={m} className="text-xs">{formatMesAno(m)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+      <span className="text-xs text-muted-foreground">Visualizando:</span>
+      <Select
+        value={selectedMonth || monthOptions[0]?.value || ''}
+        onValueChange={setSelectedMonth}
+      >
+        <SelectTrigger className="h-8 w-44 text-sm">
+          <SelectValue placeholder="Escolha um mês" />
+        </SelectTrigger>
+        <SelectContent>
+          {monthOptions.map(opt => (
+            <SelectItem key={opt.value} value={opt.value} className="text-sm">
+              {opt.label}{opt.isHistorical ? ' (parcial)' : ''}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       {/* Botão ícone — histórico de uploads */}
       {canManageHistory && (
@@ -451,56 +349,60 @@ export function AnalyticsDashboard({
         <UploadPendingBanner onUploadClick={() => setUploadModalOpen(true)} />
       )}
 
-      {/* ── SEÇÃO DE PERÍODO ─────────────────────────────────────
-          Tudo dentro desta seção é afetado pelo filtro de período.
-          Gráficos de tendência + KPIs acumulados.
+      {/* ── SEÇÃO DO MÊS SELECIONADO ─────────────────────────────
+          Header (seguidores), seletor de mês, gráficos de tendência
+          e KPIs do mês ativo. O usuário escolhe explicitamente qual
+          mês quer ver — default é o último mês monthly cadastrado.
       ───────────────────────────────────────────────────────── */}
       <div className="rounded-xl border bg-card/50 space-y-4 p-4">
 
-        {/* Cabeçalho da seção: info de seguidores (se houver snapshot) + filtro + histórico */}
+        {/* Cabeçalho: info de seguidores (se houver snapshot) + seletor de mês + histórico */}
         {snapshot && !hasOnlyHistorical ? (
           <AnalyticsHeader
             userName={userName}
             snapshot={snapshot}
             prevSnapshot={prevSnapshot ?? undefined}
-            monthSelector={ControlsBar}
+            monthSelector={MonthSelectorBar}
           />
         ) : (
           <div className="flex items-center justify-between flex-wrap gap-2">
             {hasOnlyHistorical ? (
               <p className="text-sm font-medium text-muted-foreground">Evolução histórica</p>
             ) : (
-              <p className="text-sm text-muted-foreground">Sem dados para este período.</p>
+              <p className="text-sm text-muted-foreground">Sem dados para este mês.</p>
             )}
-            {ControlsBar}
+            {MonthSelectorBar}
           </div>
         )}
 
-        {/* Gráficos de tendência — sempre visíveis quando há qualquer dado */}
+        {/* Gráficos de tendência — recebem TODOS os snapshots; toggle 6m/12m
+            interno é responsabilidade do próprio gráfico (Frente B da spec). */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="rounded-xl border bg-background p-4">
-            <ImpressionsMonthlyChart snapshots={filteredTrendSnapshots} showMediaValue={showMediaValue} />
+            <ImpressionsMonthlyChart snapshots={trendSnapshots} showMediaValue={showMediaValue} />
           </div>
           <div className="rounded-xl border bg-background p-4">
-            <FollowersMonthlyChart snapshots={filteredTrendSnapshots} />
+            <FollowersMonthlyChart snapshots={trendSnapshots} />
           </div>
         </div>
 
-        {/* KPIs acumulados do período — só quando há snapshots monthly no range */}
-        {!hasOnlyHistorical && periodKpis.totalImpressions > 0 && (
+        {/* KPIs do mês selecionado — só quando o mês tem snapshot monthly */}
+        {!hasOnlyHistorical && snapshot && snapshot.totalImpressions > 0 && (
           <AnalyticsKpiCards
-            totalImpressions={periodKpis.totalImpressions}
-            totalReach={periodKpis.totalReach}
-            totalEngagement={periodKpis.totalEngagement}
-            totalNewFollowers={periodKpis.totalNewFollowers}
+            totalImpressions={snapshot.totalImpressions}
+            totalReach={snapshot.totalReach}
+            totalEngagement={snapshot.totalEngagement}
+            totalNewFollowers={snapshot.totalNewFollowers}
             prevImpressions={prevSnapshot?.totalImpressions}
             prevReach={prevSnapshot?.totalReach}
             prevEngagement={prevSnapshot?.totalEngagement}
             prevNewFollowers={prevSnapshot?.totalNewFollowers}
+            prevMonthLabel={prevSnapshot ? formatMesAno(prevSnapshot.mesAno) : undefined}
+            isHistoricalSnapshot={snapshot.uploadType === 'historical'}
           />
         )}
       </div>
-      {/* ── FIM SEÇÃO DE PERÍODO ─────────────────────────────── */}
+      {/* ── FIM SEÇÃO DO MÊS SELECIONADO ──────────────────────── */}
 
       {/* ── SEÇÃO DO MÊS MAIS RECENTE ────────────────────────────
           Top posts, demographics, ICP-Fit, Action Plan.

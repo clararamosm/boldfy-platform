@@ -541,6 +541,9 @@ export async function notifyMonthlyAnalyticsReminder({
       Com esses dados a gente consegue ver como foi a performance do seu conteúdo
       e manter tudo atualizado no seu painel. 📊
     </p>
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 8px;">
+      E você ainda ganha <strong>🪙 50 pontos</strong> quando faz o upload.
+    </p>
 
     <!-- CTA principal -->
     <div style="margin: 28px 0;">

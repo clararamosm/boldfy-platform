@@ -28,6 +28,8 @@ import { ConquestsProgressCard } from '@/components/gamification/dashboard/conqu
 import { ConquestsBadgesCard } from '@/components/gamification/dashboard/conquests-badges-card';
 import { PointsCard } from '@/components/gamification/dashboard/points-card';
 import { RewardsCard } from '@/components/gamification/dashboard/rewards-card';
+import { UploadPendingBanner } from '@/components/linkedin-analytics/upload-pending-banner';
+import { useRouter } from 'next/navigation';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -131,10 +133,24 @@ const DashboardSkeleton = () => (
 
 export default function ColaboradorDashboardPage() {
   const { user: authUser } = useAuth();
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const t = useT();
+
+  // Detecta se o extract do mês passado ainda não foi feito. Reflete a
+  // mesma regra usada na página de Analytics (compara com o mês anterior,
+  // não com o mês corrente — o extract só fecha quando o mês termina).
+  const uploadPending = React.useMemo(() => {
+    if (!authUser) return false;
+    const status = (authUser as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus;
+    const lastMonth = status?.lastUploadMonth;
+    const now = new Date();
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+    return !lastMonth || lastMonth < previousMonth;
+  }, [authUser]);
 
   const fetchDashboard = useCallback(async (uid: string) => {
     try {
@@ -480,6 +496,16 @@ export default function ColaboradorDashboardPage() {
             heroConquests: gamDash?.heroConquests || 'Conquistas',
           }}
         />
+
+        {/* Banner de upload do mês passado — destaque maior pra fortalecer
+            o hábito de export mensal. Clicar leva pra Analytics, onde
+            está o botão real de upload. Só aparece se está pendente. */}
+        {uploadPending && (
+          <UploadPendingBanner
+            variant="highlight"
+            onUploadClick={() => router.push('/colaborador/analytics')}
+          />
+        )}
 
         {/* Row 2: Check-in (full width) */}
         <CheckinCard

@@ -13,8 +13,11 @@ export default function ThoughtLeaderAnalyticsPage() {
     if (!user) return false;
     const status = (user as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus;
     const lastMonth = status?.lastUploadMonth;
-    const currentMonth = new Date().toISOString().substring(0, 7); // "YYYY-MM"
-    return !lastMonth || lastMonth < currentMonth;
+    // O extract pendente é o do MÊS PASSADO (em maio, espera-se abril).
+    const now = new Date();
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+    return !lastMonth || lastMonth < previousMonth;
   }, [user]);
 
   if (!user) {

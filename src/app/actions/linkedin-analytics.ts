@@ -1,6 +1,7 @@
 'use server';
 
 import { db as adminDb } from '@/lib/firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { requireAuth, requireStrategistForTL } from '@/lib/auth-guard';
 import { ai } from '@/ai/genkit';
 import { normalizeLinkedInUrl, linkedInIdPrefix } from '@/lib/linkedin-xlsx-parser';
@@ -12,6 +13,83 @@ import type {
   IcpFitScore,
   IcpDefinition,
 } from '@/lib/linkedin-analytics-types';
+import { formatMesAno } from '@/lib/linkedin-analytics-utils';
+
+// ---------------------------------------------------------------------------
+// Pontos por upload de Analytics
+// ---------------------------------------------------------------------------
+//
+// Spec: /Developer/source-of-truth/specs/analytics-dashboard-revamp.md (Frente E)
+// - Upload mensal (uploadType='monthly'): 50 pontos, 1x por mês (idempotente).
+// - Upload histórico (uploadType='historical'): 100 pontos, 1x na vida do user.
+//
+// Idempotência via query em pointsHistory: monthly checa por analyticsMonth,
+// historical checa por uploadType='historical'. Se já existe, não credita
+// de novo. Permite reupar sem dar dupla pontuação.
+
+const ANALYTICS_POINTS = {
+  monthly: 50,
+  historical: 100,
+} as const;
+
+async function awardAnalyticsPoints(
+  userId: string,
+  mesAno: string,
+  uploadType: 'monthly' | 'historical',
+): Promise<{ awarded: boolean; points: number }> {
+  const points = ANALYTICS_POINTS[uploadType];
+  const historyRef = adminDb
+    .collection('users')
+    .doc(userId)
+    .collection('pointsHistory');
+
+  // Idempotência: monthly = 1x por mês; historical = 1x na vida.
+  const query = uploadType === 'monthly'
+    ? historyRef
+        .where('source', '==', 'analytics')
+        .where('analyticsMonth', '==', mesAno)
+        .limit(1)
+    : historyRef
+        .where('source', '==', 'analytics')
+        .where('uploadType', '==', 'historical')
+        .limit(1);
+
+  const existing = await query.get();
+  if (!existing.empty) {
+    return { awarded: false, points: 0 };
+  }
+
+  const description = uploadType === 'monthly'
+    ? `Upload Analytics: ${formatMesAno(mesAno)}`
+    : 'Upload Analytics: histórico de 12 meses';
+
+  const batch = adminDb.batch();
+  const userRef = adminDb.collection('users').doc(userId);
+
+  batch.set(historyRef.doc(), {
+    description,
+    date: FieldValue.serverTimestamp(),
+    points,
+    type: 'gain',
+    source: 'analytics',
+    analyticsMonth: mesAno,
+    uploadType,
+  });
+
+  batch.update(userRef, {
+    points: FieldValue.increment(points),
+    pendingNotifications: FieldValue.arrayUnion({
+      type: 'points',
+      source: 'analytics',
+      points,
+      description,
+      createdAt: Date.now(),
+    }),
+  });
+
+  await batch.commit();
+  return { awarded: true, points };
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -307,6 +385,13 @@ export async function uploadLinkedInSnapshot(
       'linkedinSnapshotStatus.lastUploadAt': new Date().toISOString(),
     });
 
+    // Atribui pontos pelo upload mensal (50 pts, 1x por mês). Falha silenciosa
+    // não bloqueia o upload em si — o snapshot já está salvo.
+    if (snapshot.uploadType !== 'historical') {
+      awardAnalyticsPoints(userId, mesAno, 'monthly')
+        .catch((err) => console.error('[awardAnalyticsPoints monthly] error:', err));
+    }
+
     // Enriquecimento assíncrono — não bloqueia o retorno
     enrichSnapshotWithPostData(userId, mesAno).catch(() => {});
 
@@ -376,6 +461,11 @@ export async function uploadLinkedInSnapshotBatch(
       'linkedinSnapshotStatus.lastUploadMonth': latestMonth,
       'linkedinSnapshotStatus.lastUploadAt': now,
     });
+
+    // Atribui pontos pelo upload histórico (100 pts, 1x na vida do user).
+    // Usa o mês mais recente como label do registro.
+    awardAnalyticsPoints(userId, latestMonth, 'historical')
+      .catch((err) => console.error('[awardAnalyticsPoints historical] error:', err));
 
     // Enriquecimento de todos os meses salvos (top posts)
     for (const month of savedMonths) {

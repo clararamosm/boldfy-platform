@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from "@/components/dashboard/header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
   ChevronDown, ChevronUp, Clock, TrendingUp,
 } from "lucide-react";
 import { useAuth } from '@/contexts/auth-context';
+import { UploadPendingBanner } from '@/components/linkedin-analytics/upload-pending-banner';
 import { useT } from '@/lib/i18n/context';
 import { interpolate } from '@/lib/i18n/interpolate';
 import { useToast } from '@/hooks/use-toast';
@@ -61,6 +62,18 @@ export default function ThoughtLeaderDashboardPage() {
   const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Banner de upload do mês passado (Analytics). Mesma regra das pages de
+  // Analytics: pendente se o último upload é de ANTES do mês passado.
+  const uploadPending = useMemo(() => {
+    if (!user) return false;
+    const status = (user as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus;
+    const lastMonth = status?.lastUploadMonth;
+    const now = new Date();
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+    return !lastMonth || lastMonth < previousMonth;
+  }, [user]);
   const { toast } = useToast();
 
   const [posts, setPosts] = useState<PipelinePost[]>([]);
@@ -306,6 +319,15 @@ export default function ThoughtLeaderDashboardPage() {
             </Button>
           )}
         </div>
+
+        {/* Banner de upload do mês passado de Analytics — destaque pra reforçar
+            o hábito de export mensal. Click leva pra /thoughtleader/analytics. */}
+        {uploadPending && (
+          <UploadPendingBanner
+            variant="highlight"
+            onUploadClick={() => router.push('/thoughtleader/analytics')}
+          />
+        )}
 
         {/* ─── Inline add idea input ────────────────────── */}
         {showIdeaInput && (
