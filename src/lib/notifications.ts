@@ -620,3 +620,82 @@ export async function notifyMonthlyAnalyticsReminder({
     </p>`,
   );
 }
+
+/**
+ * Email de reativacao "Voce esta perdendo pontos" — disparado pelo admin via
+ * botao "Avisar" no card Precisam de Empurrao do dashboard. Tom FOMO,
+ * mostra pontos perdidos da equipe e ranking pra trazer o colaborador de volta.
+ *
+ * IMPORTANTE: ignora notificationPrefs porque eh acao manual do admin (nao opt-in
+ * automatico). Diferente do convite inicial — esse aqui eh urgencia, nao onboarding.
+ */
+export async function notifyReactivation({
+  userId,
+  daysSinceLastPost,
+  teamPointsRecent,
+  topCollaboratorName,
+  topCollaboratorPoints,
+}: {
+  userId: string;
+  daysSinceLastPost: number;        // -1 se nunca postou
+  teamPointsRecent: number;          // pontos distribuidos pro time no periodo recente
+  topCollaboratorName: string;
+  topCollaboratorPoints: number;
+}): Promise<{ success: boolean; reason?: string }> {
+  const userDoc = await adminDb.collection('users').doc(userId).get();
+  const data = userDoc.data();
+  const email = data?.profile?.email || data?.email;
+  if (!email) return { success: false, reason: 'sem email' };
+
+  const fullName = data?.profile?.name || data?.name || 'Colaborador';
+  const firstName = fullName.split(' ')[0];
+  const baseUrl = getBaseUrl();
+
+  const daysLine = daysSinceLastPost > 0
+    ? `Faz <strong>${daysSinceLastPost} dias</strong> que voce nao posta nada por aqui.`
+    : `Voce ainda nao publicou seu primeiro post.`;
+
+  const teamLine = teamPointsRecent > 0
+    ? `Enquanto isso, sua equipe ganhou <strong>${teamPointsRecent.toLocaleString('pt-BR')} pontos</strong> no programa`
+    : `Sua equipe esta acumulando pontos`;
+
+  const topLine = topCollaboratorName
+    ? ` e <strong>${topCollaboratorName.split(' ')[0]}</strong> assumiu o topo do ranking com <strong>${topCollaboratorPoints.toLocaleString('pt-BR')} pts</strong>.`
+    : '.';
+
+  const subject = `Voce esta perdendo pontos, ${firstName} 👀`;
+
+  await sendNotificationEmail(
+    email,
+    subject,
+    `
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+      Oi, ${firstName}!
+    </p>
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+      ${daysLine}
+    </p>
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+      ${teamLine}${topLine}
+    </p>
+    <p style="font-size: 15px; line-height: 1.7; margin: 0 0 24px;">
+      Bora voltar? Um post ja te coloca de novo na corrida — e os pontos voltam a contar.
+    </p>
+
+    <!-- CTA principal -->
+    <div style="margin: 28px 0;">
+      <a href="${baseUrl}/colaborador/dashboard"
+         style="display: inline-block; background-color: #9333ea; color: #ffffff;
+                font-size: 15px; font-weight: 600; text-decoration: none;
+                padding: 12px 24px; border-radius: 8px;">
+        → Voltar pra plataforma
+      </a>
+    </div>
+
+    <p style="font-size: 13px; color: #6B7280; line-height: 1.6; margin: 16px 0 0;">
+      Sua equipe sente sua falta. 💜
+    </p>`,
+  );
+
+  return { success: true };
+}

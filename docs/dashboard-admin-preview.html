@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Admin — Preview Boldfy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Nunito+Sans:wght@700;900&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --primary: #CD50F1;
+      --primary-mid: #9840AD;
+      --primary-dark: #5E2A67;
+      --primary-darker: #2D1445;
+      --bg: #FAF7FF;
+      --card: #FFFFFF;
+      --secondary: #F7EEFC;
+      --border: #E4D8ED;
+      --fg: #45336B;
+      --muted: #9D85B3;
+      --secondary-fg: #7E3FA6;
+      --gold: #F59E0B;
+      --green: #10B981;
+      --blue: #3B82F6;
+      --orange: #F97316;
+      --pink: #EC4899;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+      padding: 40px 32px;
+      line-height: 1.5;
+    }
+    .container { max-width: 1280px; margin: 0 auto; }
+
+    /* ── Header ────────────────────────────────────────── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .header h1 {
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 900;
+      font-size: 32px;
+      color: var(--primary-dark);
+      letter-spacing: -0.02em;
+    }
+    .header .sub {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .last-update {
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .last-update svg { width: 14px; height: 14px; }
+    /* Period tabs (segmented control) */
+    .period-tabs {
+      display: inline-flex;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px;
+      gap: 2px;
+      box-shadow: 0 4px 16px rgba(93, 42, 103, .04);
+    }
+    .period-tabs button {
+      padding: 8px 16px;
+      background: transparent;
+      border: none;
+      border-radius: 9px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .period-tabs button:hover:not(.active) {
+      color: var(--primary);
+      background: var(--secondary);
+    }
+    .period-tabs button.active {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 12px rgba(205, 80, 241, .25);
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 18px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(205, 80, 241, .28);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.25s ease;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(205, 80, 241, .38);
+    }
+    .btn-primary svg { width: 16px; height: 16px; }
+
+    /* ── KPI Banner geral ───────────────────────────────── */
+    .kpi-banner {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px 24px;
+      box-shadow: 0 8px 32px rgba(93, 42, 103, .06);
+      transition: all 0.25s ease;
+    }
+    .kpi-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 40px rgba(205, 80, 241, .12);
+      border-color: rgba(205, 80, 241, .35);
+    }
+    .kpi-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+    }
+    .kpi-icon svg { width: 20px; height: 20px; color: var(--primary); }
+    .kpi-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 900;
+      font-size: 28px;
+      color: var(--primary-dark);
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    .kpi-delta {
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .kpi-delta.up { color: var(--green); }
+    .kpi-delta.down { color: #6B5B8A; }
+    .kpi-delta svg { width: 12px; height: 12px; }
+
+    /* ── Section title ──────────────────────────────────── */
+    .section-title {
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 900;
+      font-size: 18px;
+      color: var(--primary-dark);
+      letter-spacing: -0.01em;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title svg { width: 18px; height: 18px; color: var(--primary); }
+
+    /* ── Boxes Platform / TL ────────────────────────────── */
+    .two-cols {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 18px;
+      margin-bottom: 28px;
+      align-items: start;
+    }
+    .module-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(93, 42, 103, .06);
+    }
+    .module-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .module-title {
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 900;
+      font-size: 16px;
+      color: var(--primary-dark);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .module-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: var(--secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .module-icon svg { width: 16px; height: 16px; color: var(--primary); }
+    .module-icon.gold { background: rgba(245, 158, 11, .12); }
+    .module-icon.gold svg { color: var(--gold); }
+    .tag {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(16, 185, 129, .12);
+      color: var(--green);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stats-grid.three-cols {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .stat-mini {
+      background: var(--bg);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .stat-mini .label {
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+      line-height: 1.3;
+    }
+    .stat-mini .value {
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 900;
+      font-size: 22px;
+      color: var(--primary-dark);
+      letter-spacing: -0.02em;
+    }
+    .stat-mini .delta {
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    /* Gráficos lado a lado */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+    .stat-mini .delta.up { color: var(--green); }
+
+    /* Pipeline TL */
+    .pipeline {
+      background: var(--bg);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .pipeline .label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+    .pipeline-bar {
+      display: flex;
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: var(--secondary);
+      margin-bottom: 8px;
+    }
+    .pipeline-bar .seg { height: 100%; }
+    .seg-1 { background: #BC9EE0; }
+    .seg-2 { background: #A471D1; }
+    .seg-3 { background: var(--primary); }
+    .seg-4 { background: var(--primary-mid); }
+    .seg-5 { background: var(--green); }
+    .pipeline-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .pipeline-legend .dot {
+      width: 8px; height: 8px; border-radius: 999px;
+      display: inline-block; margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    /* Ranking */
+    .ranking-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+    .ranking-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .ranking-item:last-child { border-bottom: none; }
+    .rank-badge {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: var(--secondary);
+      color: var(--secondary-fg);
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .rank-badge.gold { background: rgba(245, 158, 11, .18); color: var(--gold); }
+    .rank-badge.silver { background: #E8E1F0; color: #8A7A9C; }
+    .rank-badge.bronze { background: rgba(180, 120, 60, .18); color: #B47A3C; }
+    .rank-name {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg);
+    }
+    .rank-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--primary-dark);
+    }
+
+    /* ── Funil de engajamento (pipeline style) ───────────── */
+    .funnel-pipeline {
+      background: var(--bg);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .funnel-pipeline .label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .funnel-pipeline .label svg { width: 13px; height: 13px; }
+    .funnel-bar {
+      display: flex;
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: var(--secondary);
+      margin-bottom: 10px;
+    }
+    .funnel-bar .seg { height: 100%; }
+    .funnel-seg-1 { background: #BC9EE0; }
+    .funnel-seg-2 { background: #A471D1; }
+    .funnel-seg-3 { background: var(--primary); }
+    .funnel-seg-4 { background: var(--primary-mid); }
+    .funnel-seg-5 { background: var(--primary-dark); }
+    .funnel-seg-6 { background: var(--green); }
+    .funnel-seg-7 { background: var(--gold); }
+    .funnel-legend {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px 10px;
+      font-size: 10.5px;
+      color: var(--muted);
+    }
+    .funnel-legend .item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .funnel-legend .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .funnel-legend .count {
+      font-weight: 700;
+      color: var(--fg);
+    }
+
+    /* ── Dentro do Platform: Top 5 + Empurrão (bento) ───── */
+    .platform-bottom {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 4px;
+    }
+    .bento-block {
+      background: var(--bg);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      min-height: 280px;
+    }
+    .bento-list {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 4px;
+      /* Custom scrollbar */
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .bento-list::-webkit-scrollbar { width: 5px; }
+    .bento-list::-webkit-scrollbar-track { background: transparent; }
+    .bento-list::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 999px;
+    }
+    .bento-list::-webkit-scrollbar-thumb:hover {
+      background: rgba(205, 80, 241, .4);
+    }
+    .platform-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .platform-section-title svg { width: 12px; height: 12px; }
+    .platform-section-title .count-badge {
+      font-size: 10px;
+      color: var(--primary);
+      background: rgba(205, 80, 241, .1);
+      padding: 2px 7px;
+      border-radius: 999px;
+      letter-spacing: 0;
+    }
+    .push-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .push-item:last-child { border-bottom: none; }
+    .ranking-item {
+      padding: 8px 0;
+    }
+    .bento-list .ranking-item:last-child {
+      border-bottom: none;
+    }
+    .push-info { display: flex; align-items: center; gap: 12px; }
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: var(--secondary);
+      color: var(--secondary-fg);
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .push-name { font-size: 13px; font-weight: 600; color: var(--fg); }
+    .push-detail { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .push-action {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(205, 80, 241, .1);
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+      transition: all 0.2s ease;
+    }
+    .push-action:hover {
+      background: rgba(205, 80, 241, .18);
+    }
+
+    /* ── Gráfico Earned Media ───────────────────────────── */
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(93, 42, 103, .06);
+      margin-bottom: 28px;
+    }
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    .chart-current {
+      text-align: right;
+    }
+    .chart-current .big {
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 900;
+      font-size: 26px;
+      color: var(--primary-dark);
+      letter-spacing: -0.02em;
+    }
+    .chart-current .small {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+    .chart-svg {
+      width: 100%;
+      height: 220px;
+    }
+
+    /* ── Audiência ─────────────────────────────────────── */
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+    .audience-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 22px 24px;
+      box-shadow: 0 8px 32px rgba(93, 42, 103, .06);
+    }
+    .audience-card h3 {
+      font-family: 'Nunito Sans', sans-serif;
+      font-weight: 900;
+      font-size: 14px;
+      color: var(--primary-dark);
+      letter-spacing: -0.01em;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .audience-card h3 svg { width: 16px; height: 16px; color: var(--primary); }
+    .audience-item {
+      margin-bottom: 12px;
+    }
+    .audience-item:last-child { margin-bottom: 0; }
+    .audience-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .audience-label-row .name { color: var(--fg); font-weight: 600; }
+    .audience-label-row .pct { color: var(--primary); font-weight: 700; }
+    .audience-bar {
+      height: 6px;
+      background: var(--secondary);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .audience-bar .fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), #E875FF);
+      border-radius: 999px;
+    }
+
+    /* ── Info tooltip nas seções ────────────────────────── */
+    .info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      background: rgba(205, 80, 241, .1);
+      color: var(--primary);
+      cursor: help;
+      position: relative;
+      margin-left: 2px;
+      flex-shrink: 0;
+    }
+    .info-icon svg { width: 11px; height: 11px; stroke-width: 2.5; }
+    .info-icon:hover { background: rgba(205, 80, 241, .2); }
+    .info-icon[data-tooltip]::before,
+    .info-icon[data-tooltip]::after {
+      position: absolute;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 100;
+    }
+    .info-icon[data-tooltip]::before {
+      content: attr(data-tooltip);
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: var(--primary-darker);
+      color: white;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 11.5px;
+      font-weight: 500;
+      letter-spacing: 0;
+      text-transform: none;
+      line-height: 1.45;
+      width: 260px;
+      white-space: normal;
+      text-align: left;
+      box-shadow: 0 12px 28px rgba(45, 20, 69, .25);
+    }
+    .info-icon[data-tooltip]::after {
+      content: '';
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      border: 5px solid transparent;
+      border-top-color: var(--primary-darker);
+      margin-bottom: 0;
+    }
+    .info-icon[data-tooltip]:hover::before,
+    .info-icon[data-tooltip]:hover::after {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Paginação nos bento blocks ─────────────────────── */
+    .bento-block { position: relative; }
+    .bento-pagination {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .bento-page-indicator {
+      font-size: 10.5px;
+      color: var(--muted);
+      font-weight: 600;
+      min-width: 28px;
+      text-align: center;
+    }
+    .bento-page-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: white;
+      color: var(--primary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      transition: all 0.2s ease;
+    }
+    .bento-page-btn:hover:not(:disabled) {
+      background: var(--secondary);
+      border-color: rgba(205, 80, 241, .35);
+    }
+    .bento-page-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .bento-page-btn svg { width: 12px; height: 12px; }
+    .bento-pages {
+      flex: 1;
+      position: relative;
+    }
+    .bento-page {
+      display: none;
+    }
+    .bento-page.active {
+      display: block;
+    }
+
+    /* Note sobre preview */
+    .preview-note {
+      background: rgba(205, 80, 241, .06);
+      border: 1px dashed rgba(205, 80, 241, .3);
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-size: 12px;
+      color: var(--primary-mid);
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .preview-note svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    @media (max-width: 920px) {
+      .kpi-banner, .audience-grid { grid-template-columns: repeat(2, 1fr); }
+      .two-cols, .bottom-grid { grid-template-columns: 1fr; }
+      .funnel-steps { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Aviso de preview -->
+    <div class="preview-note">
+      <i data-lucide="info"></i>
+      <span><strong>Preview estático</strong> — dados são fictícios pra visualizar layout. Período fictício: últimos 30 dias.</span>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+      <div>
+        <h1>Dashboard</h1>
+        <div class="sub">Visão geral do programa de employee advocacy</div>
+      </div>
+      <div class="header-controls">
+        <div class="last-update">
+          <i data-lucide="clock"></i>
+          <span>Última atualização: há 23 min</span>
+        </div>
+        <div class="period-tabs" role="tablist">
+          <button type="button" data-period="7">7 dias</button>
+          <button type="button" class="active" data-period="30">30 dias</button>
+          <button type="button" data-period="90">90 dias</button>
+        </div>
+        <button class="btn-primary">
+          <i data-lucide="refresh-cw"></i>
+          Atualizar dados
+        </button>
+      </div>
+    </div>
+
+    <!-- KPI Banner geral -->
+    <div class="kpi-banner">
+      <div class="kpi-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div class="kpi-icon"><i data-lucide="users"></i></div>
+          <span class="info-icon" data-tooltip="Colaboradores e thought leaders que já ativaram a conta (excluindo convites pendentes). O denominador é o total cadastrado, somando Platform e TL."><i data-lucide="info"></i></span>
+        </div>
+        <div class="kpi-label">Equipe Ativa</div>
+        <div class="kpi-value">27 <span style="color: var(--muted); font-size: 18px;">/ 35</span></div>
+        <div class="kpi-delta up"><i data-lucide="arrow-up"></i> +3 vs período anterior</div>
+      </div>
+      <div class="kpi-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div class="kpi-icon"><i data-lucide="send"></i></div>
+          <span class="info-icon" data-tooltip="Total de posts efetivamente publicados no LinkedIn no período, somando Platform e TL. Inclui posts via pipeline da estrategista e posts diretos."><i data-lucide="info"></i></span>
+        </div>
+        <div class="kpi-label">Posts Publicados</div>
+        <div class="kpi-value">87</div>
+        <div class="kpi-delta up"><i data-lucide="arrow-up"></i> +12% vs período anterior</div>
+      </div>
+      <div class="kpi-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div class="kpi-icon"><i data-lucide="eye"></i></div>
+          <span class="info-icon" data-tooltip="Quantas vezes os posts da sua equipe apareceram no feed de outras pessoas no LinkedIn. Coletado dos extracts mensais — atualize quando puxar novo arquivo."><i data-lucide="info"></i></span>
+        </div>
+        <div class="kpi-label">Impressões</div>
+        <div class="kpi-value">45,2k</div>
+        <div class="kpi-delta up"><i data-lucide="arrow-up"></i> +18% vs período anterior</div>
+      </div>
+      <div class="kpi-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div class="kpi-icon"><i data-lucide="dollar-sign"></i></div>
+          <span class="info-icon" data-tooltip="Valor estimado de mídia ganha — quanto você gastaria em LinkedIn Ads pra atingir as mesmas impressões. Calculado com CPM de R$ 300 a cada mil impressões."><i data-lucide="info"></i></span>
+        </div>
+        <div class="kpi-label">Earned Media</div>
+        <div class="kpi-value">R$ 13,5k</div>
+        <div class="kpi-delta up"><i data-lucide="arrow-up"></i> +15% vs período anterior</div>
+      </div>
+    </div>
+
+    <!-- Boxes Platform e TL -->
+    <div class="two-cols">
+
+      <!-- Box Platform -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-title">
+            <div class="module-icon"><i data-lucide="layers"></i></div>
+            Programa Platform
+            <span class="info-icon" data-tooltip="Visão consolidada do programa de employee advocacy: engajamento da equipe, jornada de ativação, ranking e quem precisa de atenção. Cobre apenas colaboradores comuns — TLs aparecem no box ao lado."><i data-lucide="info"></i></span>
+          </div>
+          <span class="tag">Ativo</span>
+        </div>
+
+        <div class="stats-grid three-cols">
+          <div class="stat-mini">
+            <div class="label">Colaboradores Ativos</div>
+            <div class="value">23 <span style="color: var(--muted); font-size: 14px;">/ 30</span></div>
+            <div class="delta up">+2 vs período anterior</div>
+          </div>
+          <div class="stat-mini">
+            <div class="label">Posts Publicados</div>
+            <div class="value">62</div>
+            <div class="delta up">+8% vs período anterior</div>
+          </div>
+          <div class="stat-mini">
+            <div class="label">Impressões Geradas</div>
+            <div class="value">28,4k</div>
+            <div class="delta up">+12% vs período anterior</div>
+          </div>
+          <div class="stat-mini">
+            <div class="label">Trilhas Concluídas</div>
+            <div class="value">14</div>
+            <div class="delta up">+4 vs período anterior</div>
+          </div>
+          <div class="stat-mini">
+            <div class="label">Pontos Distribuídos</div>
+            <div class="value">8.420</div>
+            <div class="delta up">+22% vs período anterior</div>
+          </div>
+          <div class="stat-mini">
+            <div class="label">Recompensas Resgatadas</div>
+            <div class="value">7</div>
+            <div class="delta up">+2 vs período anterior</div>
+          </div>
+        </div>
+
+        <!-- Funil de Engajamento (estilo pipeline, dentro do Platform) -->
+        <div class="funnel-pipeline">
+          <div class="label">
+            <i data-lucide="git-branch"></i>
+            Funil de Engajamento da Equipe · 30 colaboradores
+            <span class="info-icon" data-tooltip="Onde cada colaborador está agora na jornada — NÃO é cumulativo. Concentração nos primeiros steps indica onboarding travado. Pouca gente em 'Postando Consistente' sinaliza perda de engajamento a longo prazo."><i data-lucide="info"></i></span>
+          </div>
+          <div class="funnel-bar">
+            <div class="seg funnel-seg-1" style="width: 10%"></div>
+            <div class="seg funnel-seg-2" style="width: 7%"></div>
+            <div class="seg funnel-seg-3" style="width: 13%"></div>
+            <div class="seg funnel-seg-4" style="width: 17%"></div>
+            <div class="seg funnel-seg-5" style="width: 20%"></div>
+            <div class="seg funnel-seg-6" style="width: 13%"></div>
+            <div class="seg funnel-seg-7" style="width: 20%"></div>
+          </div>
+          <div class="funnel-legend">
+            <span class="item"><span class="dot" style="background:#BC9EE0"></span>Convidado <span class="count">3</span></span>
+            <span class="item"><span class="dot" style="background:#A471D1"></span>Ativado <span class="count">2</span></span>
+            <span class="item"><span class="dot" style="background:var(--primary)"></span>LinkedIn <span class="count">4</span></span>
+            <span class="item"><span class="dot" style="background:var(--primary-mid)"></span>Brand Context <span class="count">5</span></span>
+            <span class="item"><span class="dot" style="background:var(--primary-dark)"></span>1ª Trilha <span class="count">6</span></span>
+            <span class="item"><span class="dot" style="background:var(--green)"></span>1º Post <span class="count">4</span></span>
+            <span class="item"><span class="dot" style="background:var(--gold)"></span>Consistente <span class="count">6</span></span>
+          </div>
+        </div>
+
+        <!-- Bottom do Platform: Top 5 + Empurrão (bento blocks) -->
+        <div class="platform-bottom">
+          <div class="bento-block">
+            <div class="platform-section-title">
+              <i data-lucide="trophy"></i>
+              Top 5 do período
+              <span class="info-icon" data-tooltip="Colaboradores com mais pontos ganhos no período selecionado. Use pra reconhecer publicamente — gera competição saudável e modela comportamento desejado pro resto da equipe."><i data-lucide="info"></i></span>
+            </div>
+            <div class="bento-list">
+              <div class="ranking-item">
+                <div class="rank-badge gold">1</div>
+                <div class="rank-name">Lucas Mendes <span style="color: var(--muted); font-size: 11px;">· 8 missões</span></div>
+                <div class="rank-value">1.240 pts</div>
+              </div>
+              <div class="ranking-item">
+                <div class="rank-badge silver">2</div>
+                <div class="rank-name">Sofia Castro <span style="color: var(--muted); font-size: 11px;">· 6 missões</span></div>
+                <div class="rank-value">980 pts</div>
+              </div>
+              <div class="ranking-item">
+                <div class="rank-badge bronze">3</div>
+                <div class="rank-name">André Cardoso <span style="color: var(--muted); font-size: 11px;">· 5 missões</span></div>
+                <div class="rank-value">850 pts</div>
+              </div>
+              <div class="ranking-item">
+                <div class="rank-badge">4</div>
+                <div class="rank-name">Mariana Lopes <span style="color: var(--muted); font-size: 11px;">· 4 missões</span></div>
+                <div class="rank-value">720 pts</div>
+              </div>
+              <div class="ranking-item">
+                <div class="rank-badge">5</div>
+                <div class="rank-name">João Vieira <span style="color: var(--muted); font-size: 11px;">· 4 missões</span></div>
+                <div class="rank-value">640 pts</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bento-block" id="empurraoBlock">
+            <div class="platform-section-title">
+              <i data-lucide="bell-ring"></i>
+              Precisam de Empurrão
+              <span class="count-badge">7</span>
+              <span class="info-icon" data-tooltip="Colaboradores ativos há mais de 14 dias sem postar nada. Botão Avisar envia email lembrete urgente — diferente do convite inicial, com tom de FOMO ('Você está perdendo pontos enquanto sua equipe avança')."><i data-lucide="info"></i></span>
+              <div class="bento-pagination">
+                <button class="bento-page-btn" data-target="empurraoBlock" data-dir="-1" aria-label="Anterior"><i data-lucide="chevron-left"></i></button>
+                <span class="bento-page-indicator">1 / 2</span>
+                <button class="bento-page-btn" data-target="empurraoBlock" data-dir="1" aria-label="Próximo"><i data-lucide="chevron-right"></i></button>
+              </div>
+            </div>
+            <div class="bento-pages">
+              <div class="bento-page active" data-page="1">
+                <div class="push-item">
+                  <div class="push-info">
+                    <div class="avatar">PA</div>
+                    <div>
+                      <div class="push-name">Pedro Alves</div>
+                      <div class="push-detail">22 dias sem postar</div>
+                    </div>
+                  </div>
+                  <button class="push-action" title="Envia email: 'Você está perdendo pontos'">Avisar</button>
+                </div>
+                <div class="push-item">
+                  <div class="push-info">
+                    <div class="avatar">BM</div>
+                    <div>
+                      <div class="push-name">Bianca Maia</div>
+                      <div class="push-detail">18 dias sem postar</div>
+                    </div>
+                  </div>
+                  <button class="push-action" title="Envia email: 'Você está perdendo pontos'">Avisar</button>
+                </div>
+                <div class="push-item">
+                  <div class="push-info">
+                    <div class="avatar">LB</div>
+                    <div>
+                      <div class="push-name">Luísa Bahia</div>
+                      <div class="push-detail">16 dias sem postar</div>
+                    </div>
+                  </div>
+                  <button class="push-action" title="Envia email: 'Você está perdendo pontos'">Avisar</button>
+                </div>
+                <div class="push-item">
+                  <div class="push-info">
+                    <div class="avatar">FM</div>
+                    <div>
+                      <div class="push-name">Felipe Mendes</div>
+                      <div class="push-detail">15 dias sem postar</div>
+                    </div>
+                  </div>
+                  <button class="push-action" title="Envia email: 'Você está perdendo pontos'">Avisar</button>
+                </div>
+              </div>
+              <div class="bento-page" data-page="2">
+                <div class="push-item">
+                  <div class="push-info">
+                    <div class="avatar">CS</div>
+                    <div>
+                      <div class="push-name">Carolina Silva</div>
+                      <div class="push-detail">15 dias sem postar</div>
+                    </div>
+                  </div>
+                  <button class="push-action" title="Envia email: 'Você está perdendo pontos'">Avisar</button>
+                </div>
+                <div class="push-item">
+                  <div class="push-info">
+                    <div class="avatar">RT</div>
+                    <div>
+                      <div class="push-name">Rafael Torres</div>
+                      <div class="push-detail">14 dias sem postar</div>
+                    </div>
+                  </div>
+                  <button class="push-action" title="Envia email: 'Você está perdendo pontos'">Avisar</button>
+                </div>
+                <div class="push-item">
+                  <div class="push-info">
+                    <div class="avatar">JN</div>
+                    <div>
+                      <div class="push-name">Juliana Nascimento</div>
+                      <div class="push-detail">14 dias sem postar</div>
+                    </div>
+                  </div>
+                  <button class="push-action" title="Envia email: 'Você está perdendo pontos'">Avisar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Box Thought Leader -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-title">
+            <div class="module-icon gold"><i data-lucide="mic"></i></div>
+            Thought Leader
+            <span class="info-icon" data-tooltip="Métricas do plano TL — executivos com produção de conteúdo via pipeline da estrategista. Cada TL tem investimento maior em produção, então as métricas individuais valem mais que as do Platform."><i data-lucide="info"></i></span>
+          </div>
+          <span class="tag">Ativo</span>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-mini">
+            <div class="label">TLs Ativos</div>
+            <div class="value">4 <span style="color: var(--muted); font-size: 14px;">/ 5</span></div>
+            <div class="delta up">+1 vs período anterior</div>
+          </div>
+          <div class="stat-mini">
+            <div class="label">Posts Publicados</div>
+            <div class="value">25</div>
+            <div class="delta up">+20% vs período anterior</div>
+          </div>
+          <div class="stat-mini">
+            <div class="label">Impressões Geradas</div>
+            <div class="value">16,8k</div>
+            <div class="delta up">+24% vs período anterior</div>
+          </div>
+          <div class="stat-mini">
+            <div class="label">Engajamento Total</div>
+            <div class="value">1.124</div>
+            <div class="delta up">+18% vs período anterior</div>
+          </div>
+        </div>
+
+        <div class="pipeline">
+          <div class="label">
+            Pipeline de Conteúdo
+            <span class="info-icon" style="margin-left: 6px;" data-tooltip="Posts dos TLs em cada etapa de produção. Concentração em 'Aprovar' indica gargalo na revisão (TL não aprovou os ideias/posts). Backlog grande significa que a estrategista produz mais rápido do que o TL consome."><i data-lucide="info"></i></span>
+          </div>
+          <div class="pipeline-bar">
+            <div class="seg seg-1" style="width: 18%"></div>
+            <div class="seg seg-2" style="width: 28%"></div>
+            <div class="seg seg-3" style="width: 12%"></div>
+            <div class="seg seg-4" style="width: 10%"></div>
+            <div class="seg seg-5" style="width: 32%"></div>
+          </div>
+          <div class="pipeline-legend">
+            <span><span class="dot" style="background:#BC9EE0"></span>Backlog (8)</span>
+            <span><span class="dot" style="background:#A471D1"></span>Produção (12)</span>
+            <span><span class="dot" style="background:var(--primary)"></span>Aprovar (5)</span>
+            <span><span class="dot" style="background:var(--primary-mid)"></span>Agendado (4)</span>
+            <span><span class="dot" style="background:var(--green)"></span>Postado (25)</span>
+          </div>
+        </div>
+
+        <div class="ranking-title">
+          Top 3 TLs no período
+          <span class="info-icon" style="margin-left: 6px; vertical-align: middle;" data-tooltip="Thought Leaders ordenados por impressões geradas no período. Como TL tem investimento alto por pessoa, vale acompanhar quem está dando retorno proporcional."><i data-lucide="info"></i></span>
+        </div>
+        <div class="ranking-item">
+          <div class="rank-badge gold">1</div>
+          <div class="rank-name">Camila Souza</div>
+          <div class="rank-value">5.2k impr.</div>
+        </div>
+        <div class="ranking-item">
+          <div class="rank-badge silver">2</div>
+          <div class="rank-name">Roberto Lima</div>
+          <div class="rank-value">3.8k impr.</div>
+        </div>
+        <div class="ranking-item">
+          <div class="rank-badge bronze">3</div>
+          <div class="rank-name">Marina Costa</div>
+          <div class="rank-value">2.4k impr.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Gráficos lado a lado: Earned Media + Impressões do Programa -->
+    <div class="charts-row">
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="section-title" style="margin-bottom: 4px;">
+              <i data-lucide="trending-up"></i>
+              Evolução de Earned Media
+              <span class="info-icon" data-tooltip="Acompanhe se o investimento no programa está se traduzindo em mais valor de mídia ao longo do tempo. Tendência ascendente é o que você quer ver. Quedas indicam queda no volume ou alcance dos posts."><i data-lucide="info"></i></span>
+            </div>
+            <div style="font-size: 12px; color: var(--muted);">Últimos 6 meses · valor mensal</div>
+          </div>
+          <div class="chart-current">
+            <div class="big">R$ 13,5k</div>
+            <div class="small">Mai · este mês</div>
+          </div>
+        </div>
+        <svg class="chart-svg" viewBox="0 0 600 220" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="lineGrad1" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#CD50F1" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#CD50F1" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="50" x2="600" y2="50" stroke="#E4D8ED" stroke-dasharray="3,4"/>
+          <line x1="0" y1="105" x2="600" y2="105" stroke="#E4D8ED" stroke-dasharray="3,4"/>
+          <line x1="0" y1="160" x2="600" y2="160" stroke="#E4D8ED" stroke-dasharray="3,4"/>
+          <text x="8" y="46" font-size="10" fill="#9D85B3" font-family="Inter">R$ 15k</text>
+          <text x="8" y="101" font-size="10" fill="#9D85B3" font-family="Inter">R$ 10k</text>
+          <text x="8" y="156" font-size="10" fill="#9D85B3" font-family="Inter">R$ 5k</text>
+          <path d="M 60,165 L 150,140 L 240,123 L 330,108 L 420,93 L 540,55 L 540,200 L 60,200 Z"
+                fill="url(#lineGrad1)"/>
+          <path d="M 60,165 L 150,140 L 240,123 L 330,108 L 420,93 L 540,55"
+                fill="none" stroke="#CD50F1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="60" cy="165" r="4" fill="#fff" stroke="#CD50F1" stroke-width="2.5"/>
+          <circle cx="150" cy="140" r="4" fill="#fff" stroke="#CD50F1" stroke-width="2.5"/>
+          <circle cx="240" cy="123" r="4" fill="#fff" stroke="#CD50F1" stroke-width="2.5"/>
+          <circle cx="330" cy="108" r="4" fill="#fff" stroke="#CD50F1" stroke-width="2.5"/>
+          <circle cx="420" cy="93" r="4" fill="#fff" stroke="#CD50F1" stroke-width="2.5"/>
+          <circle cx="540" cy="55" r="5" fill="#CD50F1"/>
+          <text x="60" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Dez</text>
+          <text x="150" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Jan</text>
+          <text x="240" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Fev</text>
+          <text x="330" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Mar</text>
+          <text x="420" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Abr</text>
+          <text x="540" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle" font-weight="700">Mai</text>
+        </svg>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <div>
+            <div class="section-title" style="margin-bottom: 4px;">
+              <i data-lucide="eye"></i>
+              Impressões do Programa
+              <span class="info-icon" data-tooltip="Crescimento do alcance da sua equipe no LinkedIn. Cresce quando você tem mais posts E mais consistência. Tendência forte mês após mês indica que o efeito composto do programa está funcionando."><i data-lucide="info"></i></span>
+            </div>
+            <div style="font-size: 12px; color: var(--muted);">Últimos 6 meses · total mensal</div>
+          </div>
+          <div class="chart-current">
+            <div class="big">45,2k</div>
+            <div class="small">Mai · este mês</div>
+          </div>
+        </div>
+        <svg class="chart-svg" viewBox="0 0 600 220" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="lineGrad2" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="#10B981" stop-opacity="0.22"/>
+              <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="50" x2="600" y2="50" stroke="#E4D8ED" stroke-dasharray="3,4"/>
+          <line x1="0" y1="105" x2="600" y2="105" stroke="#E4D8ED" stroke-dasharray="3,4"/>
+          <line x1="0" y1="160" x2="600" y2="160" stroke="#E4D8ED" stroke-dasharray="3,4"/>
+          <text x="8" y="46" font-size="10" fill="#9D85B3" font-family="Inter">50k</text>
+          <text x="8" y="101" font-size="10" fill="#9D85B3" font-family="Inter">30k</text>
+          <text x="8" y="156" font-size="10" fill="#9D85B3" font-family="Inter">10k</text>
+          <!-- Pontos: Dez 18k, Jan 22k, Fev 28k, Mar 32k, Abr 38k, Mai 45.2k (escala 0..50k) -->
+          <path d="M 60,148 L 150,135 L 240,114 L 330,100 L 420,80 L 540,55 L 540,200 L 60,200 Z"
+                fill="url(#lineGrad2)"/>
+          <path d="M 60,148 L 150,135 L 240,114 L 330,100 L 420,80 L 540,55"
+                fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="60" cy="148" r="4" fill="#fff" stroke="#10B981" stroke-width="2.5"/>
+          <circle cx="150" cy="135" r="4" fill="#fff" stroke="#10B981" stroke-width="2.5"/>
+          <circle cx="240" cy="114" r="4" fill="#fff" stroke="#10B981" stroke-width="2.5"/>
+          <circle cx="330" cy="100" r="4" fill="#fff" stroke="#10B981" stroke-width="2.5"/>
+          <circle cx="420" cy="80" r="4" fill="#fff" stroke="#10B981" stroke-width="2.5"/>
+          <circle cx="540" cy="55" r="5" fill="#10B981"/>
+          <text x="60" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Dez</text>
+          <text x="150" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Jan</text>
+          <text x="240" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Fev</text>
+          <text x="330" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Mar</text>
+          <text x="420" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle">Abr</text>
+          <text x="540" y="215" font-size="11" fill="#9D85B3" font-family="Inter" text-anchor="middle" font-weight="700">Mai</text>
+        </svg>
+      </div>
+
+    </div>
+
+    <!-- Audiência -->
+    <div class="audience-grid">
+
+      <div class="audience-card">
+        <h3>
+          <i data-lucide="briefcase"></i> Cargos
+          <span class="info-icon" style="margin-left: auto;" data-tooltip="Distribuição dos cargos que estão consumindo o conteúdo da equipe. Compare com seu ICP — se Diretor/VP é maioria mas seu produto vende pra Especialista, repensa a estratégia de conteúdo."><i data-lucide="info"></i></span>
+        </h3>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Diretor / VP</span><span class="pct">28%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 28%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Gerente</span><span class="pct">26%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 26%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Especialista</span><span class="pct">22%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 22%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">C-Level</span><span class="pct">14%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 14%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Outros</span><span class="pct">10%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 10%"></div></div>
+        </div>
+      </div>
+
+      <div class="audience-card">
+        <h3>
+          <i data-lucide="building"></i> Indústrias
+          <span class="info-icon" style="margin-left: auto;" data-tooltip="Setores que mais consomem o conteúdo. Forte concentração num setor pode indicar nicho dominado — bom pra estratégia de account-based marketing."><i data-lucide="info"></i></span>
+        </h3>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Tech / SaaS</span><span class="pct">32%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 32%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Marketing / Agências</span><span class="pct">18%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 18%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Finanças</span><span class="pct">14%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 14%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Consultoria</span><span class="pct">12%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 12%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Outros</span><span class="pct">24%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 24%"></div></div>
+        </div>
+      </div>
+
+      <div class="audience-card">
+        <h3>
+          <i data-lucide="map-pin"></i> Localização
+          <span class="info-icon" style="margin-left: auto;" data-tooltip="Geografia da audiência alcançada. Útil pra empresas com foco regional, planos de expansão internacional ou pra validar se o alcance reflete o mercado-alvo."><i data-lucide="info"></i></span>
+        </h3>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">São Paulo, BR</span><span class="pct">38%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 38%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Rio de Janeiro, BR</span><span class="pct">14%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 14%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Outras (BR)</span><span class="pct">22%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 22%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Estados Unidos</span><span class="pct">14%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 14%"></div></div>
+        </div>
+        <div class="audience-item">
+          <div class="audience-label-row"><span class="name">Outros</span><span class="pct">12%</span></div>
+          <div class="audience-bar"><div class="fill" style="width: 12%"></div></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // Paginação nos bento blocks
+    function updateBentoPagination(block) {
+      const pages = block.querySelectorAll('.bento-page');
+      const indicator = block.querySelector('.bento-page-indicator');
+      const activeIdx = Array.from(pages).findIndex(p => p.classList.contains('active'));
+      if (indicator) indicator.textContent = `${activeIdx + 1} / ${pages.length}`;
+      block.querySelectorAll('.bento-page-btn').forEach(b => {
+        const dir = parseInt(b.dataset.dir, 10);
+        const wouldBe = activeIdx + dir;
+        b.disabled = wouldBe < 0 || wouldBe >= pages.length;
+      });
+    }
+    document.querySelectorAll('.bento-page-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const block = document.getElementById(btn.dataset.target);
+        if (!block) return;
+        const pages = block.querySelectorAll('.bento-page');
+        const dir = parseInt(btn.dataset.dir, 10);
+        const activeIdx = Array.from(pages).findIndex(p => p.classList.contains('active'));
+        const newIdx = activeIdx + dir;
+        if (newIdx < 0 || newIdx >= pages.length) return;
+        pages.forEach(p => p.classList.remove('active'));
+        pages[newIdx].classList.add('active');
+        updateBentoPagination(block);
+      });
+    });
+    // Inicializa estado dos botões (disabled na primeira/última página)
+    document.querySelectorAll('.bento-block').forEach(updateBentoPagination);
+
+    // Period tabs (visual toggle, sem fetch real no preview)
+    document.querySelectorAll('.period-tabs button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
