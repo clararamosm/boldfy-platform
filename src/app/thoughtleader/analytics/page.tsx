@@ -40,7 +40,9 @@ export default function ThoughtLeaderAnalyticsPage() {
           showActionPlan={true}
           readOnlyActionPlan={true}
           showMediaValue={false}
-          showIcpScore={true}
+          // ICP fit score oculto da UI ate calibrar melhor.
+          // Componente e logica preservados (icp-fit-score-card.tsx + getIcpFitScore).
+          showIcpScore={false}
           uploadPending={uploadPending}
         />
       </div>

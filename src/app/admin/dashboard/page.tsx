@@ -600,7 +600,13 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Top por ICP-Fit */}
+          {/*
+            Top por ICP-Fit oculto da UI ate calibrar melhor.
+            Componente preservado abaixo (comentado) e action que computa
+            topCollaboratorsByIcp em dashboard.ts mantida intacta — voltam
+            quando o calculo do score estiver afinado.
+          */}
+          {/*
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -654,6 +660,7 @@ export default function AdminDashboardPage() {
               )}
             </CardContent>
           </Card>
+          */}
         </div>
 
         {/* ─── BLOCO 6: Saúde do programa ─────────────────────────────── */}

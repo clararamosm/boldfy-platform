@@ -123,7 +123,8 @@ export default function AdminTLAnalyticsPage() {
             role="admin"
             showActionPlan={true}
             readOnlyActionPlan={true}
-            showIcpScore={true}
+            // ICP fit score oculto da UI ate calibrar melhor.
+            showIcpScore={false}
             showMediaValue={true}
             uploadPending={false}
           />

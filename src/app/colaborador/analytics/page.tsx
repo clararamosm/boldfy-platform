@@ -41,7 +41,8 @@ export default function ColaboradorAnalyticsPage() {
           role="colaborador"
           showActionPlan={false}
           showMediaValue={false}
-          showIcpScore={true}
+          // ICP fit score oculto da UI ate calibrar melhor.
+          showIcpScore={false}
           uploadPending={uploadPending}
         />
       </div>

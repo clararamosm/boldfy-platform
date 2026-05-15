@@ -108,7 +108,8 @@ export default function StrategistAnalyticsPage() {
           showActionPlan={true}
           readOnlyActionPlan={false}
           showMediaValue={false}
-          showIcpScore={true}
+          // ICP fit score oculto da UI ate calibrar melhor.
+          showIcpScore={false}
           uploadPending={false}
         />
       </main>
