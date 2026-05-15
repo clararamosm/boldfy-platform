@@ -188,16 +188,26 @@ function lastNMonths(n: number): { mesAno: string; label: string }[] {
   return out;
 }
 
-/** Detecta se um user tem brand context preenchido. */
+/**
+ * Detecta se um user preencheu o Manual de Marca Pessoal.
+ * Criterio alinhado com o onboarding: precisa ter `basics.position` E
+ * `basics.expertise` preenchidos (os 2 campos obrigatorios do formulario).
+ * Esse mesmo criterio marca o item `personal-brand` como completo na
+ * checklist do colaborador, garantindo coerencia entre o funil do
+ * dashboard do admin e o que o colaborador ve no proprio checklist.
+ *
+ * Suporta tanto a estrutura v2 (basics.{...}) quanto campos antigos no
+ * topo do personalBrand pra compat com dados legados.
+ */
 function hasBrandContext(data: Record<string, unknown>): boolean {
   const pb = data.personalBrand as Record<string, unknown> | undefined;
   if (!pb) return false;
-  // Pelo menos um campo principal preenchido
+  const basics = pb.basics as Record<string, unknown> | undefined;
+  const position = (basics?.position as string | undefined) || (pb.position as string | undefined);
+  const expertise = (basics?.expertise as string | undefined) || (pb.expertise as string | undefined);
   return Boolean(
-    (pb.voice && String(pb.voice).trim()) ||
-    (pb.expertise && String(pb.expertise).trim()) ||
-    (pb.value && String(pb.value).trim()) ||
-    (pb.position && String(pb.position).trim()),
+    position && String(position).trim() &&
+    expertise && String(expertise).trim(),
   );
 }
 

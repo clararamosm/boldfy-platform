@@ -95,7 +95,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
                     menuItems={[
                         { href: buildAdminHref('/admin/configuracoes'), label: t.nav.settings, icon: UserIcon },
                         { href: buildAdminHref('/admin/billing'), label: 'Planos e cobrança', icon: CreditCard },
-                        { href: buildAdminHref('/admin/brand-context'), label: 'Brand Context', icon: Palette },
+                        // Manual de Marca migrou pro menu principal do sidebar (item de topo).
                         { href: buildAdminHref('/admin/suporte'), label: t.nav.support, icon: HelpCircle },
                     ]}
                     onLogout={handleLogout}

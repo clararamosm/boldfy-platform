@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   BookOpen, Gift, LayoutDashboard, Library, Sparkles, Zap, Newspaper,
   CalendarDays, UserSearch, BarChart2, Trophy, ChevronRight, PenTool, Gamepad2,
+  Palette,
 } from 'lucide-react';
 import {
   SidebarGroup,
@@ -172,6 +173,9 @@ export function ColaboradorSidebarNav({ uploadPending = false }: ColaboradorSide
 
           {/* Dashboard — standalone */}
           <SimpleItem href="/colaborador/dashboard" icon={LayoutDashboard} title={t.nav.dashboard} />
+
+          {/* Manual de Marca Pessoal — label curto pra evitar overflow no sidebar */}
+          <SimpleItem href="/colaborador/marca-pessoal" icon={Palette} title="Marca Pessoal" />
 
           {/* Conteúdo — collapsible group */}
           <CollapsibleGroup

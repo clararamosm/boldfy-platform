@@ -49,6 +49,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, BookOpen, Plus, Trash2 } from 'lucide-react';
 import { savePersonalBrand, previewWorkbookImport } from '@/app/actions/personal-brand';
+import { completeOnboardingItem } from '@/hooks/use-onboarding';
 import { resolvePersonalBrand } from '@/lib/personal-brand';
 import {
   defaultPersonalBrandVoiceSliders,
@@ -425,7 +426,11 @@ export default function MarcaPessoalPage() {
         toast({ variant: 'destructive', title: 'Erro ao salvar', description: result.error });
         return;
       }
-      toast({ title: 'Marca pessoal salva', description: 'Suas preferencias foram atualizadas.' });
+      // Marca item da checklist como completo. Idempotente (re-saves nao
+      // duplicam). isBasicsFilled ja garante position + expertise preenchidos
+      // (validado no inicio da funcao), entao chega aqui = criterio atendido.
+      completeOnboardingItem(userId, 'personal-brand');
+      toast({ title: 'Manual de Marca Pessoal salvo', description: 'Suas preferências foram atualizadas.' });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido.';
       toast({ variant: 'destructive', title: 'Erro ao salvar', description: errorMessage });
@@ -483,11 +488,11 @@ export default function MarcaPessoalPage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Header title="Marca Pessoal" />
+      <Header title="Manual de Marca Pessoal" />
       <main className="flex-1 p-6 md:p-10">
         <div className="mx-auto max-w-4xl space-y-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Marca Pessoal</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Manual de Marca Pessoal</h1>
             <p className="text-muted-foreground">
               Configure sua identidade em 4 blocos. A IA usa essas informacoes pra gerar conteudo que soa como voce.
             </p>

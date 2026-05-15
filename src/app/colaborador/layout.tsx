@@ -83,7 +83,7 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
                     avatarOverride={companyLogoUrl}
                     feedbackPage="Sidebar"
                     menuItems={[
-                        { href: '/colaborador/marca-pessoal', label: 'Marca Pessoal', icon: Sparkles },
+                        // Manual de Marca Pessoal migrou pro menu principal do sidebar (item de topo).
                         { href: '/colaborador/configuracoes', label: t.nav.settings, icon: UserIcon },
                         { href: '/colaborador/suporte', label: t.nav.support, icon: HelpCircle },
                     ]}

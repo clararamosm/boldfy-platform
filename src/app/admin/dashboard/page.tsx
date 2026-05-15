@@ -201,7 +201,7 @@ function StatMini({ label, value, delta }: {
 // ─── Funnel Pipeline ────────────────────────────────────────────────
 
 const FUNNEL_COLORS = ['#BC9EE0', '#A471D1', '#CD50F1', '#9840AD', '#5E2A67', '#10B981', '#F59E0B'];
-const FUNNEL_LABELS = ['Convidado', 'Ativado', 'LinkedIn', 'Brand Context', '1ª Trilha', '1º Post', 'Consistente'];
+const FUNNEL_LABELS = ['Convidado', 'Ativado', 'LinkedIn', 'Manual de Marca', '1ª Trilha', '1º Post', 'Consistente'];
 
 function FunnelPipeline({ steps, total }: { steps: FunnelSteps; total: number }) {
   const counts = [
@@ -217,7 +217,7 @@ function FunnelPipeline({ steps, total }: { steps: FunnelSteps; total: number })
         <span className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">
           Funil de Engajamento da Equipe · {total} colaborador{total === 1 ? '' : 'es'}
         </span>
-        <InfoTooltip text="Onde cada colaborador está agora na jornada — NÃO é cumulativo. Concentração nos primeiros steps indica onboarding travado. Pouca gente em Consistente sinaliza perda de engajamento a longo prazo." />
+        <InfoTooltip text="Onde cada colaborador está agora na jornada — NÃO é cumulativo. Concentração nos primeiros steps indica onboarding travado (especialmente em Manual de Marca, que destrava a qualidade do conteúdo gerado). Pouca gente em Consistente sinaliza perda de engajamento a longo prazo." />
       </div>
       <div className="flex h-2.5 rounded-full overflow-hidden bg-muted">
         {counts.map((count, i) => (

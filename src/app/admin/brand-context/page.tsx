@@ -13,7 +13,7 @@ export default function AdminBrandContextPage() {
   if (loading || !user) {
     return (
       <>
-        <Header title="Brand Context" />
+        <Header title="Manual de Marca" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

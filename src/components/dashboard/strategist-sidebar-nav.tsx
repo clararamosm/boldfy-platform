@@ -163,7 +163,7 @@ export function StrategistSidebarNav() {
                                             >
                                                 <Link href={`/strategist/brand-context?c=${company.slug}`}>
                                                     <Building2 />
-                                                    <span>Brand Context</span>
+                                                    <span>Manual de Marca</span>
                                                 </Link>
                                             </SidebarMenuButton>
                                         </SidebarMenuItem>

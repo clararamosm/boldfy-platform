@@ -197,7 +197,7 @@ export function BrandContextShell({ companyId }: Props) {
       };
       const result = await saveCompanyBrandContext(token, companyId, data);
       if (result.success) {
-        toast({ title: 'Brand Context salvo com sucesso!' });
+        toast({ title: 'Manual de Marca salvo com sucesso!' });
         completeOnboardingItem(auth.currentUser?.uid, 'brand-context');
       } else {
         toast({ variant: 'destructive', title: 'Erro', description: result.error });
@@ -222,7 +222,7 @@ export function BrandContextShell({ companyId }: Props) {
   if (isLoading) {
     return (
       <>
-        <Header title="Brand Context" />
+        <Header title="Manual de Marca" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <div className="max-w-3xl mx-auto space-y-4">
             <Skeleton className="h-8 w-64" />
@@ -237,7 +237,7 @@ export function BrandContextShell({ companyId }: Props) {
 
   return (
     <>
-      <Header title={`Brand Context${companyName ? ` — ${companyName}` : ''}`} />
+      <Header title={`Manual de Marca${companyName ? ` — ${companyName}` : ''}`} />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="max-w-3xl mx-auto space-y-6">
 
@@ -435,7 +435,7 @@ export function BrandContextShell({ companyId }: Props) {
           <div className="sticky bottom-4 flex justify-end">
             <Button size="lg" onClick={handleSave} disabled={isSaving} className="shadow-lg">
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Salvar Brand Context
+              Salvar Manual de Marca
             </Button>
           </div>
         </div>

@@ -180,8 +180,8 @@ export function getTourStepsForRole(role: OnboardingRole): TourStep[] {
 const ADMIN_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
   {
     id: 'brand-context',
-    label: 'Preencher Brand Context',
-    description: 'Configure a identidade da marca',
+    label: 'Preencher Manual de Marca',
+    description: 'Configure a identidade da marca da empresa',
     href: '/admin/brand-context',
   },
   {
@@ -216,6 +216,12 @@ const COLABORADOR_CHECKLIST: Omit<OnboardingChecklistItem, 'completed'>[] = [
     label: 'Começar uma trilha',
     description: 'Acesse e inicie sua primeira trilha de aprendizado',
     href: '/colaborador/trilhas',
+  },
+  {
+    id: 'personal-brand',
+    label: 'Preencher Manual de Marca Pessoal',
+    description: 'Defina voz, expertise e pilares pra criar conteúdo alinhado',
+    href: '/colaborador/marca-pessoal',
   },
   {
     id: 'use-content-idea',

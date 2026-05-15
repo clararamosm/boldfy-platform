@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   BookOpen, Gift, LayoutDashboard, Library, Trophy, Users,
   Newspaper, UserSearch, BarChart2, Layers, ChevronRight,
+  Palette,
 } from 'lucide-react';
 import {
   SidebarGroup,
@@ -151,6 +152,7 @@ export function AdminSidebarNav() {
 
           {/* Itens simples do topo */}
           <SimpleItem href="/admin/dashboard" icon={LayoutDashboard} title={t.nav.dashboard} />
+          <SimpleItem href="/admin/brand-context" icon={Palette} title="Manual de Marca" />
           <SimpleItem href="/admin/colaboradores" icon={Users} title={t.nav.collaborators} />
 
           {/* Módulo Plataforma */}
