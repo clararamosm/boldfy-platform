@@ -9,11 +9,12 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import Link from 'next/link';
 import {
   Users, Send, Eye, DollarSign,
   Layers, Mic, Trophy, BellRing, GitBranch,
   TrendingUp, Briefcase, Building, Maximize2,
-  RefreshCw, Clock, Info,
+  RefreshCw, Clock, Info, UserPlus, ArrowRight,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Minus,
   Loader2,
 } from 'lucide-react';
@@ -817,7 +818,7 @@ export default function AdminDashboardPage() {
                 </Card>
 
                 {/* Box Thought Leader */}
-                <Card>
+                <Card className="relative overflow-hidden">
                   <CardHeader className="pb-3 border-b border-border">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base flex items-center gap-2">
@@ -827,10 +828,38 @@ export default function AdminDashboardPage() {
                         Thought Leader
                         <InfoTooltip text="Métricas do plano TL — executivos com produção de conteúdo via pipeline da estrategista. Cada TL tem investimento maior em produção, então as métricas individuais valem mais que as do Platform." />
                       </CardTitle>
-                      <Badge variant="secondary" className="bg-green-500/10 text-green-700 hover:bg-green-500/10">Ativo</Badge>
+                      {data.tlTotalUsers > 0 ? (
+                        <Badge variant="secondary" className="bg-green-500/10 text-green-700 hover:bg-green-500/10">Ativo</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">Sem TLs</Badge>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-4">
+                    {/* Empty state overlay: aparece blur quando nenhum TL cadastrado */}
+                    {data.tlTotalUsers === 0 && (
+                      <div className="absolute inset-0 top-[60px] z-10 flex items-center justify-center bg-card/60 backdrop-blur-sm rounded-b-xl">
+                        <div className="text-center px-6 py-8 max-w-[260px]">
+                          <div className="w-12 h-12 mx-auto mb-3 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+                            <UserPlus className="h-6 w-6 text-amber-500" />
+                          </div>
+                          <h3 className="text-sm font-bold text-foreground mb-1">
+                            Cadastre seu primeiro Thought Leader
+                          </h3>
+                          <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+                            Convide um executivo da sua empresa pra ter um TL produzindo conteúdo com apoio da estrategista.
+                          </p>
+                          <Link
+                            href="/admin/colaboradores"
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+                          >
+                            Gerenciar assentos
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </Link>
+                        </div>
+                      </div>
+                    )}
+
 
                     {/* Stats 2x2 */}
                     <div className="grid gap-3 grid-cols-2">
