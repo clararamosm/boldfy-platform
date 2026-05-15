@@ -34,9 +34,10 @@ export type TopThoughtLeader = {
 export type PushItem = {
   id: string;
   name: string;
-  email: string;
   avatarUrl?: string;
   daysSinceLastPost: number;
+  // Nota: email NAO eh exposto ao client. A action sendReactivationEmail
+  // recebe apenas userId e busca o email server-side via Firestore.
 };
 
 export type AudienceItem = {
@@ -266,9 +267,10 @@ export async function getAdminDashboardData(
     // Mapa de colaboradores pra acumular pontos/missões e funil
     let collaboratorsWithActivity = 0;
     let funnelLinkedIn = 0;
+    // Mapa intermediario com TODOS os campos (uso interno, server-side).
+    // Pra retorno ao client, apenas campos seguros sao serializados.
     const collabMap = new Map<string, {
       name: string;
-      email: string;
       avatarUrl?: string;
       status: string;
       points: number;
@@ -291,7 +293,6 @@ export async function getAdminDashboardData(
       const streak = data.streak as Record<string, unknown> | undefined;
       collabMap.set(d.id, {
         name: data.name || data.profile?.name || 'Sem nome',
-        email: data.profile?.email || data.email || '',
         avatarUrl: data.profile?.avatarUrl || data.avatarUrl,
         status: data.status || 'Pendente',
         points,
@@ -470,7 +471,6 @@ export async function getAdminDashboardData(
       pushNeeded.push({
         id,
         name: c.name,
-        email: c.email,
         avatarUrl: c.avatarUrl,
         daysSinceLastPost: days,
       });
