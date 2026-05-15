@@ -23,6 +23,8 @@ import { useT } from '@/lib/i18n/context';
 import { useFormat } from '@/hooks/use-format-date';
 import { useAuth } from '@/contexts/auth-context';
 import { completeOnboardingItem } from '@/hooks/use-onboarding';
+import { RichText } from '@/components/ui/rich-text';
+import { stripHtml } from '@/lib/text-utils';
 
 // ─── Types ──────────────────────────────────────
 type MissionStatus = 'completa' | 'pendente' | 'aguardando' | 'rejeitada' | 'agendada' | 'expirada';
@@ -149,7 +151,7 @@ const WeeklyMissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
                         <CoinIcon size="sm" className="mr-1" /> {mission.points} pts
                     </Badge>
                 </div>
-                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{mission.description}</p>
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{stripHtml(mission.description)}</p>
                 <div className="flex items-center justify-between gap-2 pt-0.5">
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
                         {badge && (
@@ -260,7 +262,7 @@ const CompactMissionRow = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
             {/* Expanded content */}
             {expanded && (
                 <div className="px-3 pb-3 pt-0 pl-9 space-y-2">
-                    <p className="text-xs text-muted-foreground leading-relaxed">{mission.description}</p>
+                    <RichText html={mission.description} className="text-xs text-muted-foreground" />
                     {mission.status === 'rejeitada' && mission.submissionFeedback && (
                         <div className="bg-red-50 border border-red-200 rounded-md px-2.5 py-1.5">
                             <p className="text-[11px] text-red-700 flex items-center gap-1">
