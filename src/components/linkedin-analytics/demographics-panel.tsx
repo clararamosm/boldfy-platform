@@ -309,11 +309,25 @@ function LocationMap({ items }: LocationMapProps) {
   const brazilDots: Array<{ label: string; pct: number; cx: number; cy: number; r: number }> = [];
   const otherItems: Array<{ label: string; pct: number }> = [];
 
+  // Escala dos centroides → coordenadas do SVG.
+  // BR_LOCATIONS foi criado quando o SVG do Brasil usava um viewBox menor
+  // (~500x500). O SVG atual usa viewBox 1000x912, entao multiplicamos as
+  // coordenadas por 2 na hora de plotar pra alinhar os pinos com os paths
+  // dos estados. Validado via cross-check: path do Acre comeca em
+  // M49.7 291.4 e BR_LOCATIONS['Acre'] = [25.9, 144.3] → ratio ~2.0x.
+  const MAP_SCALE = 2;
+
   for (const item of top) {
     const centroid = findCentroid(item.label);
     if (centroid) {
       const r = 4 + (item.percentage / maxPct) * 10; // radius 4–14
-      brazilDots.push({ label: item.label, pct: item.percentage, cx: centroid[0], cy: centroid[1], r });
+      brazilDots.push({
+        label: item.label,
+        pct: item.percentage,
+        cx: centroid[0] * MAP_SCALE,
+        cy: centroid[1] * MAP_SCALE,
+        r,
+      });
     } else {
       otherItems.push({ label: item.label, pct: item.percentage });
     }
