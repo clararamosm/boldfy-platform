@@ -332,7 +332,7 @@ export default function StrategistCalendarioPage() {
   if (isLoading) {
     return (
       <>
-        <Header title="Calendario" />
+        <Header title="Calendário" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <CalendarSkeleton cellHeight="h-36" />
         </main>
@@ -352,7 +352,7 @@ export default function StrategistCalendarioPage() {
 
   return (
     <>
-      <Header title="Calendario" />
+      <Header title="Calendário" />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="space-y-4">
           {/* Month navigation + filters */}

@@ -27,15 +27,15 @@ export function ReviewSubmissionsSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-lg w-full overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Comprovacoes Pendentes</SheetTitle>
+          <SheetTitle>Comprovações Pendentes</SheetTitle>
           <SheetDescription>
-            Revise as comprovacoes enviadas pelos colaboradores.
+            Revise as comprovações enviadas pelos colaboradores.
           </SheetDescription>
         </SheetHeader>
         <div className="space-y-4 mt-6">
           {submissions.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Nenhuma comprovacao pendente.
+              Nenhuma comprovação pendente.
             </p>
           ) : (
             submissions.map((sub) => (
@@ -47,9 +47,9 @@ export function ReviewSubmissionsSheet({
                 <CardContent className="space-y-3">
                   {sub.proofUrl && (
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Comprovacao:</Label>
+                      <Label className="text-xs text-muted-foreground">Comprovação:</Label>
                       {sub.proofFileName?.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                        <img src={sub.proofUrl} alt="Comprovacao" className="rounded-md border max-h-48 w-full object-contain" />
+                        <img src={sub.proofUrl} alt="Comprovação" className="rounded-md border max-h-48 w-full object-contain" />
                       ) : (
                         <a href={sub.proofUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline flex items-center gap-1">
                           <Eye className="h-3 w-3" />

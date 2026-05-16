@@ -417,7 +417,7 @@ export default function AdminBillingPage() {
   if (loadingBilling) {
     return (
       <>
-        <Header title="Planos e Cobranca" />
+        <Header title="Planos e Cobrança" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <div className="grid gap-6 max-w-5xl mx-auto">
             <Skeleton className="h-20 w-full" />
@@ -433,7 +433,7 @@ export default function AdminBillingPage() {
   if (!billing) {
     return (
       <>
-        <Header title="Planos e Cobranca" />
+        <Header title="Planos e Cobrança" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <div className="max-w-xl mx-auto">
             <Card>

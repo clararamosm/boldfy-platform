@@ -34,7 +34,7 @@ export function AISuggestionsDialog({
 
   return (
     <ActionDialog
-      title="Gerar Missoes com IA"
+      title="Gerar Missões com IA"
       description="A IA analisa o contexto da sua empresa e sugere missoes. Selecione, configure o tipo e modo, e defina datas se necessario."
       open={open}
       onOpenChange={(o) => { onOpenChange(o); }}
@@ -78,7 +78,7 @@ export function AISuggestionsDialog({
                         <Switch checked={suggestion.type === 'timed'} onCheckedChange={(v) => onUpdateField(index, 'type', v ? 'timed' : 'fixed')} />
                       </div>
                       <div className="flex items-center gap-2">
-                        <Label className="text-xs whitespace-nowrap">Comprovacao</Label>
+                        <Label className="text-xs whitespace-nowrap">Comprovação</Label>
                         <Switch checked={suggestion.completionMode === 'proof'} onCheckedChange={(v) => onUpdateField(index, 'completionMode', v ? 'proof' : 'auto')} />
                       </div>
                     </div>

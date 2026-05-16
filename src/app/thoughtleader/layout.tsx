@@ -62,7 +62,7 @@ function ThoughtLeaderLayoutInner({ children }: { children: React.ReactNode }) {
     const sidebarContent = (
         <>
             <SidebarHeader>
-                <div className="flex items-center gap-2 has-[[data-state=collapsed]]:-ml-1 has-[[data-state=collapsed]]:justify-center">
+                <div className="flex items-center gap-2 group-data-[state=collapsed]:justify-center">
                     <Logo />
                     <span className="font-headline text-xl font-bold text-foreground group-data-[state=collapsed]:hidden">Boldfy</span>
                 </div>

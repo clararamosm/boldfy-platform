@@ -52,11 +52,14 @@ export function SidebarUserFooter({
 }: SidebarUserFooterProps) {
   const avatarSrc = avatarOverride || user.profile?.avatarUrl;
   return (
-    <div className="flex items-center w-full gap-1 px-1">
+    <div className="flex items-center w-full gap-1 p-2 group-data-[collapsible=icon]:justify-center">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="flex-1 justify-start gap-2 px-2 py-3 h-auto min-w-0">
-            <Avatar className="h-9 w-9 shrink-0">
+          <Button
+            variant="ghost"
+            className="flex-1 justify-start gap-2 px-0 py-2 h-auto min-w-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
+          >
+            <Avatar className="h-8 w-8 shrink-0">
               {avatarSrc && (
                 <AvatarImage src={avatarSrc} alt={user.name || ''} />
               )}

@@ -385,7 +385,7 @@ export default function AdminTrilhasPage() {
       trailsSnap.docs.forEach(d => batch.delete(d.ref));
       batch.delete(doc(db, `companies/${companyId}/sessions`, session.id));
       await batch.commit();
-      toast({ title: 'Sessao excluida com sucesso' });
+      toast({ title: 'Sessão excluída com sucesso' });
       setDeleteSessionTarget(null);
       loadCompanyData();
     } catch (err) {

@@ -740,7 +740,7 @@ export default function MasterCompanyBillingPage() {
       }
       setBilling(res.data);
       toast({
-        title: 'Configuracoes salvas',
+        title: 'Configurações salvas',
         description: 'Todas as alteracoes de billing foram aplicadas.',
       });
     });
@@ -1478,7 +1478,7 @@ export default function MasterCompanyBillingPage() {
                 <CardContent className="pt-6">
                   <p className="text-sm text-muted-foreground">
                     Pack selector dedicado para o modulo Design. Por enquanto, o status do
-                    Design aparece no card &quot;Status dos Modulos&quot; acima. Configuracao de
+                    Design aparece no card &quot;Status dos Módulos&quot; acima. Configuração de
                     pack via Stripe direto.
                   </p>
                 </CardContent>

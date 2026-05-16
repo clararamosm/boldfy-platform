@@ -146,9 +146,9 @@ export function AdminSidebarNav() {
   const { count } = useUnreadFeed();
 
   return (
-    <SidebarGroup>
+    <SidebarGroup className="p-0">
       <SidebarGroupContent>
-        <SidebarMenu>
+        <SidebarMenu className="p-2 group-data-[collapsible=icon]:items-center">
 
           {/* Itens simples do topo */}
           <SimpleItem href="/admin/dashboard" icon={LayoutDashboard} title={t.nav.dashboard} />

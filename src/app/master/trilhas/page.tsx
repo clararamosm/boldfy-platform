@@ -133,30 +133,30 @@ export default function MasterTrilhasPage() {
           ativa: true, criadaEm: Timestamp.now(),
         });
       }
-      toast({ title: 'Sessao salva com sucesso!' });
+      toast({ title: 'Sessão salva com sucesso!' });
       setSessionDialogOpen(false);
       loadSessions();
     } catch (err) {
       console.error('Erro ao salvar sessao:', err);
-      toast({ variant: 'destructive', title: 'Erro ao salvar sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: 'Erro ao salvar sessão', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     } finally {
       setSaving(false);
     }
   };
 
   const deleteSession = async (sessionId: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta sessao e todas as suas trilhas?')) return;
+    if (!confirm('Tem certeza que deseja excluir esta sessão e todas as suas trilhas?')) return;
     try {
       const trailsSnap = await getDocs(collection(db, `globalSessions/${sessionId}/trails`));
       const batch = writeBatch(db);
       trailsSnap.docs.forEach(d => batch.delete(d.ref));
       batch.delete(doc(db, 'globalSessions', sessionId));
       await batch.commit();
-      toast({ title: 'Sessao excluida com sucesso!' });
+      toast({ title: 'Sessão excluída com sucesso!' });
       loadSessions();
     } catch (err) {
       console.error('Erro ao excluir sessao:', err);
-      toast({ variant: 'destructive', title: 'Erro ao excluir sessao', description: err instanceof Error ? err.message : 'Erro desconhecido' });
+      toast({ variant: 'destructive', title: 'Erro ao excluir sessão', description: err instanceof Error ? err.message : 'Erro desconhecido' });
     }
   };
 
@@ -329,8 +329,8 @@ export default function MasterTrilhasPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Sessoes de Aprendizagem</h2>
-          <p className="text-muted-foreground">Gerencie sessoes globais e suas trilhas</p>
+          <h2 className="text-2xl font-bold">Sessões de Aprendizagem</h2>
+          <p className="text-muted-foreground">Gerencie sessões globais e suas trilhas</p>
         </div>
         <Button onClick={() => openSessionDialog()} className="bg-purple-600 hover:bg-purple-700">
           <Plus className="w-4 h-4 mr-2" /> Nova Sessao
@@ -343,8 +343,8 @@ export default function MasterTrilhasPage() {
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FolderOpen className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">Nenhuma sessao criada</p>
-            <p className="text-muted-foreground mb-4">Crie sua primeira sessao de aprendizagem</p>
+            <p className="text-lg font-medium">Nenhuma sessão criada</p>
+            <p className="text-muted-foreground mb-4">Crie sua primeira sessão de aprendizagem</p>
             <Button onClick={() => openSessionDialog()} variant="outline">
               <Plus className="w-4 h-4 mr-2" /> Criar Sessao
             </Button>
@@ -469,7 +469,7 @@ export default function MasterTrilhasPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{editingSession ? 'Editar Sessao' : 'Nova Sessao'}</DialogTitle>
-              <DialogDescription>Preencha os dados da sessao de aprendizagem</DialogDescription>
+              <DialogDescription>Preencha os dados da sessão de aprendizagem</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>

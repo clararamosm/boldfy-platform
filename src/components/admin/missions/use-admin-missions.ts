@@ -380,7 +380,7 @@ export function useAdminMissions() {
       setFeedbackMap(prev => { const next = { ...prev }; delete next[submissionId]; return next; });
       fetchMissions(companyId);
     } catch {
-      toast({ variant: 'destructive', title: 'Erro ao avaliar comprovacao.' });
+      toast({ variant: 'destructive', title: 'Erro ao avaliar comprovação.' });
     } finally {
       setIsReviewing(false);
     }

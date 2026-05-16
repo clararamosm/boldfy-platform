@@ -37,7 +37,7 @@ export default function StrategistBrandContextPage() {
   if (!companySlug) {
     return (
       <>
-        <Header title="Brand Context" />
+        <Header title="Manual de Marca" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <Card>
             <CardContent className="py-12 text-center">
@@ -53,7 +53,7 @@ export default function StrategistBrandContextPage() {
   if (isResolving || !companyId) {
     return (
       <>
-        <Header title="Brand Context" />
+        <Header title="Manual de Marca" />
         <main className="flex-1 overflow-auto p-4 md:p-6">
           <div className="max-w-3xl mx-auto space-y-4">
             <Skeleton className="h-8 w-64" />

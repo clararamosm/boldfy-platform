@@ -167,9 +167,9 @@ export function ColaboradorSidebarNav({ uploadPending = false }: ColaboradorSide
   const { count } = useUnreadFeed();
 
   return (
-    <SidebarGroup>
+    <SidebarGroup className="p-0">
       <SidebarGroupContent>
-        <SidebarMenu>
+        <SidebarMenu className="p-2 group-data-[collapsible=icon]:items-center">
 
           {/* Dashboard — standalone */}
           <SimpleItem href="/colaborador/dashboard" icon={LayoutDashboard} title={t.nav.dashboard} />

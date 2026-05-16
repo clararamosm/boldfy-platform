@@ -22,7 +22,7 @@ export default function AdminMissoesPage() {
 
   return (
     <>
-      <Header title="Missoes" />
+      <Header title="Missões" />
       <main className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
         {/* Actions bar */}
         <div className="flex items-center justify-between">
@@ -30,7 +30,7 @@ export default function AdminMissoesPage() {
             {m.totalPending > 0 && (
               <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200 cursor-pointer hover:bg-yellow-200 transition-colors" onClick={() => m.setReviewSheetOpen(true)}>
                 <FileCheck className="h-3 w-3 mr-1" />
-                {m.totalPending} comprovacao(oes) pendente(s)
+                {m.totalPending} comprovação(ões) pendente(s)
               </Badge>
             )}
           </div>

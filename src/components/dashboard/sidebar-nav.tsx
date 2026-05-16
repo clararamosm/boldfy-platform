@@ -53,7 +53,7 @@ export function SidebarNav({ items }: SidebarNavProps) {
           animation: badgeBounce 0.6s ease-in-out, badgeGlow 0.6s ease-in-out;
         }
       `}</style>
-      <SidebarMenu>
+      <SidebarMenu className="group-data-[collapsible=icon]:items-center">
         {items.map((item) => (
           <SidebarMenuItem key={item.href}>
             {item.disabled ? (
