@@ -67,7 +67,7 @@ export function SidebarUserFooter({
                 {user.name?.substring(0, 2).toUpperCase() || fallbackInitials}
               </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col items-start group-data-[state=collapsed]:hidden overflow-hidden">
+            <div className="flex flex-col items-start overflow-hidden transition-[max-width,opacity] duration-150 group-data-[state=collapsed]:opacity-0 group-data-[state=collapsed]:max-w-0">
               <span className="text-sm font-medium truncate max-w-[130px]">
                 {(user.name || '').split(' ')[0]}
               </span>
@@ -78,7 +78,7 @@ export function SidebarUserFooter({
           </Button>
         </DropdownMenuTrigger>
         {feedbackPage && (
-          <div className="shrink-0 group-data-[state=collapsed]:hidden">
+          <div className="shrink-0 overflow-hidden transition-[max-width,opacity] duration-150 group-data-[state=collapsed]:opacity-0 group-data-[state=collapsed]:max-w-0 group-data-[state=collapsed]:pointer-events-none">
             <FeedbackDialog pagina={feedbackPage} />
           </div>
         )}

@@ -68,7 +68,7 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
             <SidebarHeader>
                 <div className="flex items-center gap-2 group-data-[state=collapsed]:justify-center">
                     <Logo />
-                    <span className="font-headline text-xl font-bold text-foreground group-data-[state=collapsed]:hidden">Boldfy</span>
+                    <span className="font-headline text-xl font-bold text-foreground overflow-hidden transition-[max-width,opacity] duration-150 group-data-[state=collapsed]:opacity-0 group-data-[state=collapsed]:max-w-0">Boldfy</span>
                 </div>
             </SidebarHeader>
             <SidebarContent>
