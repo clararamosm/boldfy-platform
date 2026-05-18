@@ -896,7 +896,7 @@ function EditorContent() {
               <Upload className="h-8 w-8 text-muted-foreground mb-2" />
               <span className="text-sm text-muted-foreground">{t.colabNewPost.clickToAdd}</span>
               <span className="text-xs text-muted-foreground mt-0.5">
-                Imagens (JPG/PNG/WEBP, até 5MB cada, até {MAX_GALLERY_IMAGES} numa galeria) · GIF/PDF (até 5MB) · Vídeo MP4/MOV (até 200MB)
+                Imagens (JPG/PNG/WEBP, até 5MB cada, até {MAX_GALLERY_IMAGES} numa galeria) · GIF (até 10MB, 1 por post) · PDF (até 5MB) · Vídeo MP4/MOV (até 200MB)
               </span>
               <input
                 type="file"

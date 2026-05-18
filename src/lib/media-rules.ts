@@ -5,14 +5,15 @@
 // política, sem duplicação:
 //
 //   - Imagens (JPG/PNG/WEBP): até 10 por post, 5MB cada. Galeria multi-image.
-//   - GIF: 1 só, 5MB.
+//   - GIF: 1 só, 10MB. (GIF tende a ter peso maior que imagem estática por
+//     conta dos frames — limite mais generoso que imagem comum.)
 //   - PDF: 1 só, 5MB.
 //   - Vídeo: 1 só, 200MB.
 //   - Mistura proibida: galeria de imagens não convive com vídeo/PDF/GIF.
 
 export const MAX_GALLERY_IMAGES = 10;
 export const MAX_IMAGE_SIZE_MB = 5;
-export const MAX_GIF_SIZE_MB = 5;
+export const MAX_GIF_SIZE_MB = 10;
 export const MAX_PDF_SIZE_MB = 5;
 export const MAX_VIDEO_SIZE_MB = 200;
 
