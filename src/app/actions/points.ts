@@ -244,7 +244,7 @@ export async function getRankingPageData(
     const [allUsersSnap, companyDoc] = await Promise.all([
       adminDb.collection('users')
         .where('companyId', '==', companyId)
-        .where('role', '==', 'collaborator')
+        .where('role', '==', 'colaborador')
         .orderBy('points', 'desc')
         .get(),
       adminDb.collection('companies').doc(companyId).get(),

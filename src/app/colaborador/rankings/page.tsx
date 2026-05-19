@@ -3,22 +3,24 @@
 // Top 10, Monthly Posts, Monthly Conquests, My Conquests.
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { getAuthToken } from '@/lib/auth-client';
 import { getRankingPageData, sendCongratulation } from '@/app/actions';
 import type { RankingPageData, MonthlyPublisher, MonthlyConquest, ConquestProgress } from '@/app/actions';
 import { useT } from '@/lib/i18n/context';
 import { cn } from '@/lib/utils';
+import { getConquestGoalName } from '@/lib/gamification-constants';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { GemBadge } from '@/components/gamification/gem-badge';
 import { CoinIcon } from '@/components/coin-icon';
-import { Trophy, Heart, Check, FileText, BookOpen, Zap, Diamond, Gift, Flame } from 'lucide-react';
+import { Trophy, Heart, Check, FileText, BookOpen, Zap, Diamond, Gift, Flame, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 // ─── Category config (mirrors conquest-modal) ─────────────────────
@@ -38,6 +40,77 @@ function getInitials(name: string): string {
 
 function formatDate(epoch: number): string {
   return new Date(epoch).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+}
+
+// Parse a conquest id like "pub_20" → { category: 'pub', target: 20 }
+function parseConquestId(id: string): { category: string; target: number } | null {
+  const m = /^([a-z]+)_(\d+)$/.exec(id);
+  if (!m) return null;
+  const target = Number(m[2]);
+  if (Number.isNaN(target)) return null;
+  return { category: m[1], target };
+}
+
+// Resolve a conquest label preferring i18n overrides, then the dynamic
+// goal-name function, then any provided fallback. This is what fixes the
+// "pub_20", "trail_70", etc. raw-id labels that appeared once a user
+// progressed past the static dictionary entries.
+function resolveConquestLabel(
+  conquestId: string,
+  category: string | undefined,
+  target: number | undefined,
+  dictionary: Record<string, string> | undefined,
+  fallback?: string,
+): string {
+  const fromDict = dictionary?.[conquestId];
+  if (fromDict) return fromDict;
+  const parsed = (category && target != null)
+    ? { category, target }
+    : parseConquestId(conquestId);
+  if (parsed) return getConquestGoalName(parsed.category, parsed.target);
+  return fallback || conquestId;
+}
+
+// Explainers shown in the info popover next to each category title.
+const CATEGORY_INFO: Record<string, { title: string; body: string }> = {
+  pub: {
+    title: 'Publicações',
+    body: 'Conta cada publicação sua no LinkedIn validada pela plataforma. Os marcos aumentam conforme você publica mais — depois de 1.000, novos marcos são adicionados de 250 em 250.',
+  },
+  trail: {
+    title: 'Trilhas',
+    body: 'Conta cada trilha de aprendizado da Boldfy concluída por completo. Cada marco corresponde a uma quantidade de trilhas finalizadas.',
+  },
+  mission: {
+    title: 'Missões',
+    body: 'Conta cada missão da empresa que foi aprovada pelo seu admin. Missões pendentes ou recusadas não contam.',
+  },
+  seq: {
+    title: 'Sequência',
+    body: 'Conta semanas seguidas em que você fechou a meta de 3 publicações. Se uma semana terminar sem 3 posts, a sequência zera. Os marcos (7, 14, 28, 49, 70, 98, 140) acompanham os níveis da sua jornada.',
+  },
+};
+
+function CategoryInfo({ category }: { category: string }) {
+  const info = CATEGORY_INFO[category];
+  if (!info) return null;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Sobre ${info.title}`}
+          className="text-muted-foreground hover:text-foreground transition-colors rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="top" className="w-64 text-xs leading-relaxed">
+        <p className="font-semibold text-sm mb-1">{info.title}</p>
+        <p className="text-muted-foreground">{info.body}</p>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 // ─── Skeleton ─────────────────────────────────────────────────────
@@ -305,7 +378,7 @@ function MonthlyConquestsSection({
               const isCongratulated = congratulatedMap[key] || false;
               const isLoading = loadingMap[key] || false;
               const isMe = c.userId === userId;
-              const label = conquestLabels?.[c.conquestId] || c.conquestLabel;
+              const label = resolveConquestLabel(c.conquestId, undefined, undefined, conquestLabels, c.conquestLabel);
 
               return (
                 <div key={`${c.userId}-${c.conquestId}-${c.conquestDate}`} className="flex items-center gap-3">
@@ -372,6 +445,22 @@ function MyConquestsSection({
     seq: dashboardT?.seqCategory || 'Sequência',
   };
 
+  // Show all completed conquests + only the *next* pending one per category.
+  // For seq (finite ladder) that may be none once everything is done.
+  const visibleByCategory = useMemo(() => {
+    const map: Record<string, ConquestProgress[]> = {};
+    for (const cat of categories) {
+      const sorted = conquests
+        .filter(c => c.category === cat)
+        .slice()
+        .sort((a, b) => a.target - b.target);
+      const completed = sorted.filter(c => c.completed);
+      const nextPending = sorted.find(c => !c.completed);
+      map[cat] = nextPending ? [...completed, nextPending] : completed;
+    }
+    return map;
+  }, [conquests]);
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -383,7 +472,7 @@ function MyConquestsSection({
       <CardContent>
         <div className="space-y-6">
           {categories.map(cat => {
-            const catConquests = conquests.filter(c => c.category === cat);
+            const catConquests = visibleByCategory[cat] || [];
             if (catConquests.length === 0) return null;
             const config = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG.pub;
             const CatIcon = config.icon;
@@ -395,10 +484,11 @@ function MyConquestsSection({
                     <CatIcon className={cn('h-4 w-4', config.color)} />
                   </div>
                   <span className="text-sm font-semibold">{categoryNames[cat]}</span>
+                  <CategoryInfo category={cat} />
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                   {catConquests.map(cq => {
-                    const label = conquestLabels?.[cq.conquestId] || cq.conquestId;
+                    const label = resolveConquestLabel(cq.conquestId, cq.category, cq.target, conquestLabels);
                     return (
                       <div
                         key={cq.conquestId}
