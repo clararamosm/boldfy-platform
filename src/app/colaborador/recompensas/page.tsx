@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ActionDialog } from '@/components/dashboard/action-dialog';
 import { useT } from '@/lib/i18n/context';
+import { getConquestGoalName } from '@/lib/gamification-constants';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -274,20 +275,60 @@ const getHistoryIcon = (source: HistoryItem['source'], type: HistoryItem['type']
   }
 };
 
-const PointHistoryItem = ({ icon, description, date, points, type }: HistoryItem) => (
-  <div className="flex justify-between items-center p-3 rounded-lg hover:bg-muted/50">
-    <div className="flex items-center gap-3">
-      {icon}
-      <div>
-        <p className="font-medium">{description}</p>
-        <p className="text-sm text-muted-foreground">{date && typeof date === 'object' && date !== null && 'toDate' in date && typeof date.toDate === 'function' ? date.toDate().toLocaleDateString() : date ? new Date(date as string).toLocaleDateString() : 'N/A'}</p>
+// Format raw pointsHistory descriptions for display.
+// - "Publicação no LinkedIn | <postId>" → "Publicação no LinkedIn" (the post id
+//   is noise for the user; the date is the useful disambiguator)
+// - "Conquista: pub_1" / "trail_10" / "mission_5" / "seq_7" → human label via
+//   getConquestGoalName (e.g. "1ª publicação", "10 trilhas concluídas")
+function formatHistoryDescription(description: string, source?: HistoryItem['source']): string {
+  if (!description) return description;
+
+  if (source === 'publicacao') {
+    // Drop the trailing "| <id>" segment (any separator after the readable label)
+    const pipeIdx = description.indexOf('|');
+    if (pipeIdx > 0) return description.slice(0, pipeIdx).trim();
+    return description;
+  }
+
+  if (source === 'conquest') {
+    // "Conquista: <category>_<target>"
+    const match = /^Conquista:\s*([a-z]+)_(\d+)\s*$/i.exec(description);
+    if (match) {
+      const category = match[1].toLowerCase();
+      const target = Number(match[2]);
+      if (!Number.isNaN(target)) {
+        return getConquestGoalName(category, target);
+      }
+    }
+  }
+
+  return description;
+}
+
+const PointHistoryItem = ({ icon, description, date, points, type, source }: HistoryItem) => {
+  const isSpend = type === 'spend';
+  const displayDescription = formatHistoryDescription(description, source);
+  return (
+    <div className="flex justify-between items-center p-3 rounded-lg hover:bg-muted/50">
+      <div className="flex items-center gap-3">
+        {icon}
+        <div>
+          <p className="font-medium">{displayDescription}</p>
+          <p className="text-sm text-muted-foreground">{date && typeof date === 'object' && date !== null && 'toDate' in date && typeof date.toDate === 'function' ? date.toDate().toLocaleDateString() : date ? new Date(date as string).toLocaleDateString() : 'N/A'}</p>
+        </div>
       </div>
+      <Badge
+        variant="secondary"
+        className={`${isSpend
+          ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'
+          : 'bg-primary/10 text-primary'
+        } whitespace-nowrap shrink-0`}
+      >
+        <CoinIcon size="xs" variant={isSpend ? 'red' : 'default'} className="mr-1" /> {isSpend ? '-' : '+'}{points.toLocaleString()}
+      </Badge>
     </div>
-    <Badge variant="secondary" className={`${type === 'gain' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'} whitespace-nowrap shrink-0`}>
-      <CoinIcon size="xs" className="mr-1" /> {type === 'gain' ? '+' : '-'}{points.toLocaleString()}
-    </Badge>
-  </div>
-);
+  );
+};
 
 // ─── Rescue Item with Code Reveal ─────────────────────────────────
 

@@ -21,8 +21,8 @@ type CoinSize = keyof typeof sizes;
 type CoinIconProps = {
   className?: string;
   size?: CoinSize;
-  /** gray = pending, green = completed, default = gold (points) */
-  variant?: 'default' | 'gray' | 'green';
+  /** gray = pending, green = completed, red = spent, default = gold (points) */
+  variant?: 'default' | 'gray' | 'green' | 'red';
 };
 
 export function CoinIcon({ className, size = 'md', variant = 'default' }: CoinIconProps) {
@@ -30,24 +30,28 @@ export function CoinIcon({ className, size = 'md', variant = 'default' }: CoinIc
     default: 'from-yellow-300 via-yellow-400 to-yellow-500',
     gray: 'from-gray-200 via-gray-300 to-gray-400',
     green: 'from-green-300 via-green-500 to-green-600',
+    red: 'from-red-300 via-red-500 to-red-600',
   }[variant];
 
   const shadow = {
     default: 'shadow-[0_2px_0_#B8960B,0_3px_6px_rgba(0,0,0,0.12)]',
     gray: 'shadow-[0_2px_0_#9ca3af,0_2px_4px_rgba(0,0,0,0.08)]',
     green: 'shadow-[0_2px_0_#16a34a,0_2px_4px_rgba(22,163,74,0.2)]',
+    red: 'shadow-[0_2px_0_#b91c1c,0_2px_4px_rgba(185,28,28,0.2)]',
   }[variant];
 
   const starFill = {
     default: '#7B5800',
     gray: '#6b7280',
     green: '#ffffff',
+    red: '#ffffff',
   }[variant];
 
   const ringBorder = {
     default: 'border-yellow-700/15',
     gray: 'border-gray-500/15',
     green: 'border-white/20',
+    red: 'border-white/20',
   }[variant];
 
   return (
