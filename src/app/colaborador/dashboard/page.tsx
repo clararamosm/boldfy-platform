@@ -20,6 +20,7 @@ import { useT } from '@/lib/i18n/context';
 import { getWeekMonday } from '@/lib/iso-week';
 import { getNextConquestTarget, getConquestGoalName, getLevelFromCycles, catchUpConquests } from '@/app/actions';
 import { getAuthToken } from '@/lib/auth-client';
+import { useExtractPending } from '@/hooks/use-extract-pending';
 
 // Dashboard sub-components
 import { HeroCard } from '@/components/gamification/dashboard/hero-card';
@@ -139,18 +140,12 @@ export default function ColaboradorDashboardPage() {
   const { toast } = useToast();
   const t = useT();
 
-  // Detecta se o extract do mês passado ainda não foi feito. Reflete a
-  // mesma regra usada na página de Analytics (compara com o mês anterior,
-  // não com o mês corrente — o extract só fecha quando o mês termina).
-  const uploadPending = React.useMemo(() => {
-    if (!authUser) return false;
-    const status = (authUser as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus;
-    const lastMonth = status?.lastUploadMonth;
-    const now = new Date();
-    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
-    return !lastMonth || lastMonth < previousMonth;
-  }, [authUser]);
+  // Source-of-truth check: read the actual snapshot doc for the previous
+  // month instead of trusting `linkedinSnapshotStatus.lastUploadMonth`,
+  // which can dessincronize with reality (e.g. a snapshot uploaded
+  // successfully but the flag write lost the race, or a seed script
+  // created a snapshot without touching the flag).
+  const { pending: uploadPending } = useExtractPending(authUser?.uid);
 
   const fetchDashboard = useCallback(async (uid: string) => {
     try {

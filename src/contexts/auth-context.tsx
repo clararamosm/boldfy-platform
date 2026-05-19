@@ -48,12 +48,19 @@ type AuthContextValue = {
   user: AuthUser | null;
   firebaseUser: FirebaseUser | null;
   loading: boolean;
+  /**
+   * Re-fetch the user doc from Firestore and update the in-memory AuthUser.
+   * Use after server-side mutations that update fields the client cares about
+   * (e.g. linkedinSnapshotStatus.lastUploadMonth after an extract upload).
+   */
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   firebaseUser: null,
   loading: true,
+  refreshUser: async () => {},
 });
 
 // ─── Hook ───────────────────────────────────────────────────
@@ -68,10 +75,49 @@ export function useAuth() {
 
 // ─── Provider ───────────────────────────────────────────────
 
+/**
+ * Read the user doc from Firestore and shape it into an AuthUser.
+ * Used both at login (inside onAuthStateChanged) and at runtime
+ * by refreshUser() so we don't duplicate the shaping logic.
+ */
+async function buildAuthUserFromDoc(
+  uid: string,
+  fallbackEmail: string | null,
+): Promise<AuthUser | null> {
+  const userDoc = await getDoc(doc(db, 'users', uid));
+  if (!userDoc.exists()) return null;
+  const data = userDoc.data();
+  const safeData = { ...data };
+  if (safeData.linkedinConnection) {
+    const { accessToken: _at, refreshToken: _rt, ...safeConnection } = safeData.linkedinConnection as Record<string, unknown>;
+    void _at; void _rt;
+    safeData.linkedinConnection = safeConnection;
+  }
+  return {
+    uid,
+    name: data.profile?.name || data.name || '',
+    email: data.profile?.email || data.email || fallbackEmail || '',
+    role: data.role || '',
+    companyId: data.companyId,
+    profile: data.profile,
+    rawData: safeData,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshUser = useCallback(async () => {
+    if (!firebaseUser) return;
+    try {
+      const refreshed = await buildAuthUserFromDoc(firebaseUser.uid, firebaseUser.email);
+      if (refreshed) setUser(refreshed);
+    } catch (err) {
+      console.error('AuthProvider: refreshUser failed:', err);
+    }
+  }, [firebaseUser]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
@@ -158,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading }}>
+    <AuthContext.Provider value={{ user, firebaseUser, loading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

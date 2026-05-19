@@ -4,23 +4,13 @@ import { useAuth } from '@/contexts/auth-context';
 import { Header } from '@/components/dashboard/header';
 import { AnalyticsDashboard } from '@/components/linkedin-analytics/analytics-dashboard';
 import { Loader2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useExtractPending } from '@/hooks/use-extract-pending';
 
 export default function ColaboradorAnalyticsPage() {
   const { user } = useAuth();
-
-  const uploadPending = useMemo(() => {
-    if (!user) return false;
-    const status = (user as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus;
-    const lastMonth = status?.lastUploadMonth;
-    // O extract pendente é sempre o do MÊS PASSADO (em maio, espera-se abril).
-    // Comparar com o mês atual gerava banner "pendente" durante o mês corrente,
-    // o que confundia: o extract só fecha quando o mês acaba.
-    const now = new Date();
-    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
-    return !lastMonth || lastMonth < previousMonth;
-  }, [user]);
+  // Source-of-truth: existence of the previous month's snapshot doc.
+  // See use-extract-pending for why we don't read the user-doc flag here.
+  const { pending: uploadPending } = useExtractPending(user?.uid);
 
   if (!user) {
     return (

@@ -17,6 +17,7 @@ import { SidebarUserFooter } from "@/components/dashboard/sidebar-user-footer";
 import { LinkedInSidebarBox } from "@/components/dashboard/linkedin-sidebar-box";
 import { LocaleProvider, useT } from "@/lib/i18n/context";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
+import { useExtractPending } from "@/hooks/use-extract-pending";
 import { OnboardingShell } from "@/components/onboarding";
 import { BillingWarningBanner } from "@/components/billing/billing-warning-banner";
 import { GamificationToastProvider } from "@/components/gamification/points-toast";
@@ -46,6 +47,13 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
         }).catch(() => {});
     }, [companyId]);
 
+    // Sidebar dot indicator: same source-of-truth as Dashboard/Analytics
+    // (existence of previous-month snapshot doc). The old code compared
+    // lastUploadMonth with the *current* month, which kept the dot lit all
+    // month even after the user uploaded — confusing once the extract was
+    // already done. Hook must come before the early return below.
+    const { pending: uploadPending } = useExtractPending(user?.uid);
+
     const handleLogout = async () => {
         await signOut(auth);
         router.push('/login');
@@ -58,10 +66,6 @@ function ColaboradorLayoutInner({ children }: { children: React.ReactNode }) {
             </div>
         );
     }
-
-    const currentMonth = new Date().toISOString().substring(0, 7);
-    const lastUploadMonth = (user as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus?.lastUploadMonth;
-    const uploadPending = !lastUploadMonth || lastUploadMonth < currentMonth;
 
     const sidebarContent = (
         <>

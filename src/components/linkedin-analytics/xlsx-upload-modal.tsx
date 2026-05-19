@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { parseLinkedInXlsxMulti } from '@/lib/linkedin-xlsx-parser';
 import { uploadLinkedInSnapshot, uploadLinkedInSnapshotBatch } from '@/app/actions/linkedin-analytics';
 import { getAuthToken } from '@/lib/auth-client';
+import { useAuth } from '@/contexts/auth-context';
 import type { ParsedLinkedInData } from '@/lib/linkedin-analytics-types';
 import { formatMesAno, formatMesAnoShort, formatNumber, formatDate } from '@/lib/linkedin-analytics-utils';
 
@@ -44,6 +45,7 @@ export function XlsxUploadModal({
   const [state, setState] = useState<UploadState>({ status: 'idle' });
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { refreshUser } = useAuth();
 
   const reset = useCallback(() => {
     setState({ status: 'idle' });
@@ -119,11 +121,15 @@ export function XlsxUploadModal({
       }
 
       setState({ status: 'success', mesAno: result.mesAno! });
+      // Re-fetch the auth user so `linkedinSnapshotStatus.lastUploadMonth` is
+      // up to date and the "extract pendente" banner disappears without a
+      // page reload. Failure here is non-blocking.
+      refreshUser().catch(() => {});
       onSuccess?.(result.mesAno!);
     } catch {
       setState({ status: 'error', message: 'Erro inesperado. Tente novamente.' });
     }
-  }, [userId, onSuccess, uploadType]);
+  }, [userId, onSuccess, uploadType, refreshUser]);
 
   // Upload em lote (histórico multi-mês) — sempre sobrescreve
   const handleConfirmBatchUpload = useCallback(async (snapshots: ParsedLinkedInData[]) => {
@@ -140,11 +146,12 @@ export function XlsxUploadModal({
 
       const latestMonth = [...(result.savedMonths ?? [])].sort().reverse()[0] ?? '';
       setState({ status: 'success', mesAno: latestMonth, monthCount: result.savedMonths?.length });
+      refreshUser().catch(() => {});
       onSuccess?.(latestMonth);
     } catch {
       setState({ status: 'error', message: 'Erro inesperado. Tente novamente.' });
     }
-  }, [userId, onSuccess]);
+  }, [userId, onSuccess, refreshUser]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
