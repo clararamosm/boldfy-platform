@@ -262,7 +262,7 @@ export default function ColaboradorDashboardPage() {
       type TrailDoc = { id: string; titulo: string; modulos: unknown[]; ativa?: boolean; ordem?: number };
       const allTrailDocs: TrailDoc[] = [];
 
-      // Source 1: Activated global trails
+      // Source 1: Activated global trails — fetch all in parallel
       const activatedBySession: Record<string, string[]> = {};
       activatedGlobalSnap.docs.forEach(d => {
         const sessId = d.data().sessionId;
@@ -270,53 +270,62 @@ export default function ColaboradorDashboardPage() {
         if (!activatedBySession[sessId]) activatedBySession[sessId] = [];
         activatedBySession[sessId].push(d.id);
       });
+      const globalTrailReqs: Array<Promise<TrailDoc | null>> = [];
       for (const [sessId, trailIds] of Object.entries(activatedBySession)) {
         for (const tid of trailIds) {
-          try {
-            const tDoc = await getDoc(doc(db, `globalSessions/${sessId}/trails`, tid));
-            if (tDoc.exists()) {
-              const data = tDoc.data();
-              if (data.ativa !== false) {
-                allTrailDocs.push({
+          globalTrailReqs.push(
+            getDoc(doc(db, `globalSessions/${sessId}/trails`, tid))
+              .then(tDoc => {
+                if (!tDoc.exists()) return null;
+                const data = tDoc.data();
+                if (data.ativa === false) return null;
+                return {
                   id: tDoc.id,
                   titulo: data.titulo || 'Sem titulo',
                   modulos: data.modulos || [],
                   ativa: data.ativa,
                   ordem: data.ordem,
-                });
-              }
-            }
-          } catch { /* skip inaccessible global trail */ }
+                };
+              })
+              .catch(() => null)
+          );
         }
       }
 
-      // Source 2: Company custom sessions → trails
+      // Source 2: Company custom sessions → trails — fan out in parallel
+      let customTrailDocs: TrailDoc[] = [];
       try {
         const compSessSnap = await getDocs(
           query(collection(db, `companies/${companyId}/sessions`), orderBy('ordem', 'asc'))
         );
-        for (const sessDoc of compSessSnap.docs) {
-          const sessData = sessDoc.data();
-          if (sessData.ativa === false) continue;
-          try {
-            const trailSnap = await getDocs(
+        const activeSessions = compSessSnap.docs.filter(d => d.data().ativa !== false);
+        const sessionTrailSnaps = await Promise.all(
+          activeSessions.map(sessDoc =>
+            getDocs(
               query(collection(db, `companies/${companyId}/sessions/${sessDoc.id}/trails`), orderBy('ordem', 'asc'))
-            );
-            trailSnap.docs.forEach(td => {
+            ).catch(() => null)
+          )
+        );
+        customTrailDocs = sessionTrailSnaps.flatMap(snap => {
+          if (!snap) return [];
+          return snap.docs
+            .map(td => {
               const data = td.data();
-              if (data.ativa !== false) {
-                allTrailDocs.push({
-                  id: td.id,
-                  titulo: data.titulo || 'Sem titulo',
-                  modulos: data.modulos || [],
-                  ativa: data.ativa,
-                  ordem: data.ordem,
-                });
-              }
-            });
-          } catch { /* skip inaccessible custom session */ }
-        }
+              if (data.ativa === false) return null;
+              return {
+                id: td.id,
+                titulo: data.titulo || 'Sem titulo',
+                modulos: data.modulos || [],
+                ativa: data.ativa,
+                ordem: data.ordem,
+              } as TrailDoc;
+            })
+            .filter((t): t is TrailDoc => t !== null);
+        });
       } catch { /* skip if no sessions collection */ }
+
+      const globalTrailDocs = (await Promise.all(globalTrailReqs)).filter((t): t is TrailDoc => t !== null);
+      allTrailDocs.push(...globalTrailDocs, ...customTrailDocs);
 
       // Build Trail[] with progress
       const trails: Trail[] = allTrailDocs.map(t => {
@@ -349,20 +358,26 @@ export default function ColaboradorDashboardPage() {
       const rawStreak = userData.streak || {};
       const cyclesCompleted = (rawStreak.cyclesCompleted as number) || 0;
       const level = (userData.level?.current as number) || getLevelFromCycles(cyclesCompleted);
-      let completedConquests: string[] = userData.conquests?.completed || [];
+      const completedConquests: string[] = userData.conquests?.completed || [];
 
-      // ── Retroactive catch-up: award any pending conquests ──
-      // Fire-and-forget but await to update completedConquests before rendering
-      try {
-        const token = await getAuthToken();
-        const catchUpResult = await catchUpConquests(token, uid);
-        if (catchUpResult.awarded.length > 0) {
-          // Merge newly awarded conquests into the list
-          completedConquests = [...completedConquests, ...catchUpResult.awarded];
+      // ── Retroactive catch-up runs in background ──
+      // Used to block render with `await`, which added a server-action
+      // round-trip to the critical path. Now we kick it off and merge any
+      // newly-awarded conquests into state once it resolves.
+      void (async () => {
+        try {
+          const token = await getAuthToken();
+          const catchUpResult = await catchUpConquests(token, uid);
+          if (catchUpResult.awarded.length > 0) {
+            setData(prev => prev ? {
+              ...prev,
+              completedConquests: [...prev.completedConquests, ...catchUpResult.awarded],
+            } : prev);
+          }
+        } catch (err) {
+          console.error('Conquest catch-up failed:', err);
         }
-      } catch (err) {
-        console.error('Conquest catch-up failed:', err);
-      }
+      })();
 
       setData({
         userName: userData.profile?.name || userData.name || 'Colaborador',
@@ -466,6 +481,13 @@ export default function ColaboradorDashboardPage() {
     const displayLabel = num === 1 ? '1a' : String(num);
     return { id, category: cat, label: conquestsI18n?.[id] || displayLabel };
   });
+
+  // Trails shown in the dashboard card: prefer ones already started but
+  // unfinished. If the user has none in progress, show the next ones they
+  // haven't started yet. Finished trails (100%) are never listed here.
+  const inProgressTrails = data.trails.filter(tr => tr.progress > 0 && tr.progress < 100);
+  const notStartedTrails = data.trails.filter(tr => tr.progress === 0);
+  const trailsToShow = inProgressTrails.length > 0 ? inProgressTrails : notStartedTrails;
 
   // Hero subtitle based on streak
   const heroSubtitle = data.streakCurrentWeeks >= 4
@@ -572,13 +594,13 @@ export default function ColaboradorDashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {data.trails.length === 0 ? (
+              {trailsToShow.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   {t.colabDashboard.noTrails}
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {data.trails.slice(0, 4).map(tr => (
+                  {trailsToShow.slice(0, 4).map(tr => (
                     <TrailItem key={tr.id} title={tr.title} progress={tr.progress} />
                   ))}
                 </div>

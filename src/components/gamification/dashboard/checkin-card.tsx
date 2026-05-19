@@ -50,7 +50,14 @@ export function CheckinCard({
   const postsDisplay = Math.min(postsThisWeek, 3);
   const streakWeekLabel = currentWeeks > 0 ? currentWeeks : (isWeekCompleted ? 1 : 0);
 
-  // Bonus for current completed week
+  // `currentWeeks` reflects the streak position the user is *in*, not the
+  // number of weeks already completed: a new ISO week with a continuing streak
+  // bumps `currentWeeks` on the very first publication. We derive
+  // `completedWeeks` so the cycle stepper and summary never claim a week is
+  // done before the 3-post threshold has been hit.
+  const completedWeeks = isWeekCompleted ? currentWeeks : Math.max(0, currentWeeks - 1);
+
+  // Bonus for the week the user just completed (0 if current week isn't done yet)
   const currentWeekIdx = Math.max(0, Math.min(currentWeeks - 1, 6));
   const currentBonus = isWeekCompleted ? WEEK_BONUSES[currentWeekIdx] : 0;
 
@@ -138,13 +145,13 @@ export function CheckinCard({
           <div className="flex gap-1.5">
             {Array.from({ length: 7 }, (_, i) => {
               const weekNum = i + 1;
-              const done = weekNum <= currentWeeks;
-              const isCurrent = weekNum === currentWeeks + 1 && !isWeekCompleted && currentWeeks > 0;
+              const done = weekNum <= completedWeeks;
+              const isCurrent = !done && weekNum === completedWeeks + 1 && currentWeeks > 0 && weekNum <= 7;
               return (
                 <div
                   key={i}
                   className={cn(
-                    'flex-1 flex flex-col items-center gap-1 py-2 rounded-xl border-[1.5px]',
+                    'flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-xl border-[1.5px]',
                     done
                       ? 'border-green-500 bg-green-50 dark:bg-green-900/10'
                       : isCurrent
@@ -153,10 +160,10 @@ export function CheckinCard({
                   )}
                 >
                   <span className={cn(
-                    'text-[9px] font-extrabold',
+                    'text-[9px] font-extrabold whitespace-nowrap',
                     done ? 'text-green-600 dark:text-green-400' : isCurrent ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
                   )}>
-                    S{weekNum}
+                    {t.week} {weekNum}
                   </span>
                   {/* Circle indicator */}
                   <div className={cn(
@@ -183,8 +190,8 @@ export function CheckinCard({
           {/* Cycle summary */}
           <div className="flex items-center justify-between mt-2">
             <span className="text-xs font-bold text-foreground">
-              {currentWeeks > 0
-                ? <>{currentWeeks} {t.weeksStreak.replace('{count}', String(currentWeeks))}</>
+              {completedWeeks > 0
+                ? t.weeksStreak.replace('{count}', String(completedWeeks))
                 : t.noPosts}
             </span>
             {!isWeekCompleted && currentWeeks > 0 && (
