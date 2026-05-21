@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Check, Heart, MessageCircle, Bookmark, Sparkles, Eye, Send, Linkedin, Loader2 } from 'lucide-react';
@@ -14,10 +14,35 @@ import './onboarding-animations.css';
 
 // ─── Types ───────────────────────────────────────────────────
 
+/**
+ * Reading time bucket for each message — used to calibrate the
+ * delay (and typing indicator) shown BEFORE the message appears.
+ *
+ *  short  — saudação/frase curta (~ até 60 chars)
+ *  medium — uma frase (~60–140 chars)
+ *  long   — parágrafo (~140–250 chars) ou frase + animação inline
+ *  xl     — parágrafo + card/lista/botão/tutorial
+ *  anim   — animação dedicada (sem texto)
+ */
+type ReadingTime = 'short' | 'medium' | 'long' | 'xl' | 'anim';
+
+const READING_DELAYS: Record<ReadingTime, number> = {
+  short: 5000,
+  medium: 6500,
+  long: 8000,
+  xl: 10000,
+  anim: 4000,
+};
+
+/** Pausa curta entre a mensagem anterior e o typing indicator (ms). */
+const POST_MESSAGE_PAUSE = 250;
+
 type ChatMessage = {
   type: 'fai' | 'anim';
   content?: React.ReactNode;
   animation?: React.ReactNode;
+  /** Quanto tempo a Fai "leva digitando" antes desta mensagem aparecer. */
+  readingTime?: ReadingTime;
 };
 
 type WelcomePopupProps = {
@@ -140,7 +165,17 @@ function WorkflowAnimation() {
 
 // ─── LinkedIn Analytics Tutorial Animation ───────────────────
 
-function LinkedInExportTutorial({ onUploadClick }: { onUploadClick: () => void }) {
+function LinkedInExportTutorial({ onUploadClick, onSkip }: { onUploadClick: () => void; onSkip?: () => void }) {
+  const [skipped, setSkipped] = useState(false);
+
+  if (skipped) {
+    return (
+      <div className="mt-3 rounded-[10px] border border-border/60 bg-muted/30 px-3 py-2.5 text-[11px] text-muted-foreground text-center">
+        Sem problema. Você pode subir o histórico depois nas configurações.
+      </div>
+    );
+  }
+
   return (
     <div className="mt-3 space-y-3">
       {/* Tutorial steps */}
@@ -169,14 +204,27 @@ function LinkedInExportTutorial({ onUploadClick }: { onUploadClick: () => void }
         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Fazer upload do histórico
       </button>
+      {/* Pular discreto — propositalmente pequeno pra não competir com o CTA */}
+      {onSkip && (
+        <button
+          type="button"
+          onClick={() => { setSkipped(true); onSkip(); }}
+          className="block mx-auto text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground/80 hover:underline underline-offset-2 transition-colors"
+        >
+          pular por enquanto
+        </button>
+      )}
     </div>
   );
 }
 
 // ─── Checklist items per role (for display in chat) ──────────
+// Mantidos em sincronia com os checklists definidos em
+// src/hooks/use-onboarding.ts. Se algum item for adicionado/renomeado
+// lá, atualize aqui também.
 
 const ADMIN_ITEMS = [
-  'Preencher Brand Context',
+  'Preencher Manual de Marca',
   'Convidar um colaborador',
   'Criar uma missão',
   'Adicionar uma recompensa',
@@ -185,8 +233,10 @@ const ADMIN_ITEMS = [
 
 const COLAB_ITEMS = [
   'Começar uma trilha',
+  'Preencher Manual de Marca Pessoal',
   'Usar uma ideia de conteúdo',
   'Agendar um conteúdo',
+  'Fazer sua primeira publicação',
   'Fazer uma compra na loja',
   'Completar uma missão',
 ];
@@ -203,18 +253,22 @@ function getAdminMessages(name: string, licenses: number): ChatMessage[] {
   return [
     {
       type: 'fai',
+      readingTime: 'short',
       content: <>Oi, <strong>{name}</strong>! Sou a <strong>Fai</strong>, sua assistente aqui na Boldfy.</>,
     },
     {
       type: 'fai',
+      readingTime: 'medium',
       content: <>Seu programa de Employee Advocacy vai <strong>transformar seu time em vozes ativas</strong> no LinkedIn.</>,
     },
     {
       type: 'anim',
+      readingTime: 'anim',
       animation: <RocketAnimation />,
     },
     {
       type: 'fai',
+      readingTime: 'long',
       content: (
         <>
           Posts são criados, aprovados e <strong>publicados direto da plataforma</strong>:
@@ -224,10 +278,12 @@ function getAdminMessages(name: string, licenses: number): ChatMessage[] {
     },
     {
       type: 'fai',
+      readingTime: 'medium',
       content: <>Na plataforma, você pode adicionar <strong>dois tipos de usuário</strong>. Te explico:</>,
     },
     {
       type: 'fai',
+      readingTime: 'xl',
       content: (
         <>
           Os primeiros são os <strong>Colaboradores</strong>:
@@ -241,6 +297,7 @@ function getAdminMessages(name: string, licenses: number): ChatMessage[] {
     },
     {
       type: 'fai',
+      readingTime: 'long',
       content: (
         <>
           Os outros são os <strong>Thought Leaders</strong>:
@@ -253,10 +310,21 @@ function getAdminMessages(name: string, licenses: number): ChatMessage[] {
     },
     {
       type: 'fai',
+      readingTime: 'medium',
       content: <>Você tem <span className="text-primary font-bold">{licenses} licenças de colaborador</span>. Pra adicionar Thought Leaders, fale com o time Boldfy.</>,
     },
     {
       type: 'fai',
+      readingTime: 'long',
+      content: (
+        <>
+          Antes de tudo, você precisa preencher o <strong>Manual de Marca da empresa</strong>. É dele que <strong>toda IA da plataforma se alimenta</strong> pra escrever no tom de voz certo — sem isso, o conteúdo do time sai genérico.
+        </>
+      ),
+    },
+    {
+      type: 'fai',
+      readingTime: 'xl',
       content: (
         <>
           Preparei um checklist rápido pra configurar tudo:
@@ -274,32 +342,63 @@ function getAdminMessages(name: string, licenses: number): ChatMessage[] {
   ];
 }
 
-function LinkedInConnectButton({ onConnect }: { onConnect: () => void }) {
+function LinkedInConnectButton({ onConnect, onSkip }: { onConnect: () => void; onSkip?: () => void }) {
   const [connecting, setConnecting] = useState(false);
+  const [skipped, setSkipped] = useState(false);
+
+  if (skipped) {
+    return (
+      <div className="mt-3 rounded-[10px] border border-border/60 bg-muted/30 px-3 py-2.5 text-[11px] text-muted-foreground text-center">
+        Sem problema. Você pode conectar depois nas configurações.
+      </div>
+    );
+  }
+
   return (
-    <button
-      onClick={() => { setConnecting(true); onConnect(); }}
-      disabled={connecting}
-      className="mt-3 w-full flex items-center justify-center gap-2 rounded-[10px] border border-[#0A66C2]/40 bg-[#0A66C2]/5 hover:bg-[#0A66C2]/10 text-[#0A66C2] font-bold text-xs px-3 py-2.5 transition-colors"
-    >
-      {connecting ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-      ) : (
-        <Linkedin className="h-3.5 w-3.5" />
+    <div className="mt-3 space-y-2">
+      <button
+        onClick={() => { setConnecting(true); onConnect(); }}
+        disabled={connecting}
+        className="w-full flex items-center justify-center gap-2 rounded-[10px] border border-[#0A66C2]/40 bg-[#0A66C2]/5 hover:bg-[#0A66C2]/10 text-[#0A66C2] font-bold text-xs px-3 py-2.5 transition-colors"
+      >
+        {connecting ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Linkedin className="h-3.5 w-3.5" />
+        )}
+        {connecting ? 'Conectando...' : 'Conectar LinkedIn'}
+      </button>
+      {/* Pular discreto — propositalmente pequeno pra não competir com o CTA */}
+      {onSkip && !connecting && (
+        <button
+          type="button"
+          onClick={() => { setSkipped(true); onSkip(); }}
+          className="block mx-auto text-[10px] leading-none text-muted-foreground/50 hover:text-muted-foreground/80 hover:underline underline-offset-2 transition-colors"
+        >
+          pular por enquanto
+        </button>
       )}
-      {connecting ? 'Conectando...' : 'Conectar LinkedIn'}
-    </button>
+    </div>
   );
 }
 
-function getColaboradorMessages(name: string, company: string, onUploadClick: () => void, onLinkedInConnect: () => void): ChatMessage[] {
+function getColaboradorMessages(
+  name: string,
+  company: string,
+  onUploadClick: () => void,
+  onLinkedInConnect: () => void,
+  onSkipLinkedIn: () => void,
+  onSkipUpload: () => void,
+): ChatMessage[] {
   return [
     {
       type: 'fai',
+      readingTime: 'short',
       content: <>Oi, <strong>{name}</strong>! Bem-vindo(a) à <strong>{company}</strong>!</>,
     },
     {
       type: 'fai',
+      readingTime: 'long',
       content: (
         <>
           Aqui você tem uma <strong>IA que escreve com a sua voz</strong>. Não é template genérico, é conteúdo que parece você:
@@ -309,35 +408,49 @@ function getColaboradorMessages(name: string, company: string, onUploadClick: ()
     },
     {
       type: 'fai',
+      readingTime: 'medium',
       content: <>Você completa missões, ganha pontos e troca por <strong>recompensas reais</strong>!</>,
     },
     {
       type: 'anim',
+      readingTime: 'anim',
       animation: <GiftAnimation />,
     },
     {
       type: 'fai',
+      readingTime: 'long',
       content: (
         <>
-          Antes de tudo, você precisa <strong>conectar seu perfil do LinkedIn</strong>. É por lá que a IA vai publicar os posts no seu nome — sem isso, nada rola!
-          <LinkedInConnectButton onConnect={onLinkedInConnect} />
+          Antes de tudo, você precisa preencher seu <strong>Manual de Marca Pessoal</strong>. Isso define sua voz, seus pilares e o que você quer comunicar. É <strong>daí que a IA aprende a escrever do seu jeito</strong> — sem isso, ela escreve genérico.
         </>
       ),
     },
     {
       type: 'fai',
+      readingTime: 'xl',
+      content: (
+        <>
+          Agora você precisa <strong>conectar seu perfil do LinkedIn</strong>. É por lá que a IA vai publicar os posts no seu nome — sem isso, nada rola!
+          <LinkedInConnectButton onConnect={onLinkedInConnect} onSkip={onSkipLinkedIn} />
+        </>
+      ),
+    },
+    {
+      type: 'fai',
+      readingTime: 'xl',
       content: (
         <>
           Agora preciso do seu <strong>histórico do LinkedIn Analytics</strong>. Isso ativa os gráficos de evolução do seu perfil — e você verá sua evolução desde o início.
-          <LinkedInExportTutorial onUploadClick={onUploadClick} />
+          <LinkedInExportTutorial onUploadClick={onUploadClick} onSkip={onSkipUpload} />
         </>
       ),
     },
     {
       type: 'fai',
+      readingTime: 'xl',
       content: (
         <>
-          Vou te mostrar a plataforma agora! Depois, preparei <strong>5 ações</strong> pra você completar. Quando terminar, você ganha:
+          Vou te mostrar a plataforma agora! Depois, preparei <strong>{COLAB_ITEMS.length} ações</strong> pra você completar. Quando terminar, você ganha:
           <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-50/50 border border-amber-200/30 text-amber-500 font-extrabold text-xs px-3 py-1.5 rounded-full mt-1">
             <Sparkles className="h-3.5 w-3.5" />+150 pontos!
           </div>
@@ -355,14 +468,22 @@ function getColaboradorMessages(name: string, company: string, onUploadClick: ()
   ];
 }
 
-function getThoughtLeaderMessages(name: string, onUploadClick: () => void, onLinkedInConnect: () => void): ChatMessage[] {
+function getThoughtLeaderMessages(
+  name: string,
+  onUploadClick: () => void,
+  onLinkedInConnect: () => void,
+  onSkipLinkedIn: () => void,
+  onSkipUpload: () => void,
+): ChatMessage[] {
   return [
     {
       type: 'fai',
+      readingTime: 'short',
       content: <>Oi, <strong>{name}</strong>! Sou a <strong>Fai</strong>, sua assistente aqui na Boldfy.</>,
     },
     {
       type: 'fai',
+      readingTime: 'long',
       content: (
         <>
           A equipe de estratégia vai preparar seus posts e você <strong>publica direto da plataforma</strong>, sem sair do app:
@@ -372,6 +493,7 @@ function getThoughtLeaderMessages(name: string, onUploadClick: () => void, onLin
     },
     {
       type: 'fai',
+      readingTime: 'long',
       content: (
         <>
           Seu fluxo é simples. Tudo num <strong>pipeline automatizado</strong>:
@@ -381,27 +503,30 @@ function getThoughtLeaderMessages(name: string, onUploadClick: () => void, onLin
     },
     {
       type: 'fai',
+      readingTime: 'xl',
       content: (
         <>
           Antes de tudo, você precisa <strong>conectar seu perfil do LinkedIn</strong>. É por lá que a equipe vai publicar os posts no seu nome — sem isso, nada rola!
-          <LinkedInConnectButton onConnect={onLinkedInConnect} />
+          <LinkedInConnectButton onConnect={onLinkedInConnect} onSkip={onSkipLinkedIn} />
         </>
       ),
     },
     {
       type: 'fai',
+      readingTime: 'xl',
       content: (
         <>
           Pra ativar seu <strong>dashboard de Analytics</strong>, vou precisar do seu histórico do LinkedIn. Com ele, você já estreia com os gráficos de evolução do seu perfil desde o início.
-          <LinkedInExportTutorial onUploadClick={onUploadClick} />
+          <LinkedInExportTutorial onUploadClick={onUploadClick} onSkip={onSkipUpload} />
         </>
       ),
     },
     {
       type: 'fai',
+      readingTime: 'long',
       content: (
         <>
-          Vou te mostrar a plataforma agora! Depois, preparei <strong>3 ações</strong> pra você começar de verdade:
+          Vou te mostrar a plataforma agora! Depois, preparei <strong>{TL_ITEMS.length} ações</strong> pra você começar de verdade:
           <div className="mt-2 flex flex-col gap-1.5">
             {TL_ITEMS.map((item) => (
               <div key={item} className="flex items-center gap-2 text-xs font-medium text-foreground/80 bg-white/70 border border-primary/10 rounded-[10px] px-2.5 py-1.5">
@@ -430,51 +555,125 @@ export function WelcomePopup({
   onComplete,
 }: WelcomePopupProps) {
   const [visibleCount, setVisibleCount] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
+  // Quando o usuário clica "pular por enquanto" no upload histórico,
+  // destravamos o botão "Vamos lá!" sem marcar o item do checklist como
+  // completo (o item continua pendente no FaiWidget).
+  const [historySkipped, setHistorySkipped] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
 
   // Apenas Colaborador precisa do upload histórico no welcome para liberar "Vamos lá!"
   // TL não é bloqueado pelo upload — ele vai conectar o LinkedIn depois
   const needsHistoricalUpload = role === 'colaborador';
 
-  const handleUploadClick = () => {
+  const handleUploadClick = useCallback(() => {
     onRequestUpload?.();
-  };
+  }, [onRequestUpload]);
 
-  const handleLinkedInConnect = () => {
+  const handleLinkedInConnect = useCallback(() => {
     onRequestLinkedInConnect?.();
-  };
+  }, [onRequestLinkedInConnect]);
 
-  const messages = role === 'admin'
-    ? getAdminMessages(userName, licensesCount)
-    : role === 'colaborador'
-    ? getColaboradorMessages(userName, companyName, handleUploadClick, handleLinkedInConnect)
-    : getThoughtLeaderMessages(userName, handleUploadClick, handleLinkedInConnect);
+  // LinkedIn skip não precisa de estado externo: o próprio LinkedInConnectButton
+  // lida com a UI internamente. Passamos um no-op só pra ativar o botão "pular".
+  const handleSkipLinkedIn = useCallback(() => {
+    // intencionalmente vazio — o LinkedInConnectButton trata o estado visual
+  }, []);
 
-  // Progressive message reveal
+  const handleSkipUpload = useCallback(() => {
+    setHistorySkipped(true);
+  }, []);
+
+  const messages = useMemo(() => {
+    if (role === 'admin') {
+      return getAdminMessages(userName, licensesCount);
+    }
+    if (role === 'colaborador') {
+      return getColaboradorMessages(
+        userName,
+        companyName,
+        handleUploadClick,
+        handleLinkedInConnect,
+        handleSkipLinkedIn,
+        handleSkipUpload,
+      );
+    }
+    return getThoughtLeaderMessages(
+      userName,
+      handleUploadClick,
+      handleLinkedInConnect,
+      handleSkipLinkedIn,
+      handleSkipUpload,
+    );
+  }, [role, userName, companyName, licensesCount, handleUploadClick, handleLinkedInConnect, handleSkipLinkedIn, handleSkipUpload]);
+
+  // Mantemos a lista de readingTimes em ref pra evitar reagendar quando o
+  // conteúdo das mensagens mudar (ex: estados internos dos CTAs do LinkedIn).
+  const readingTimesRef = useRef<ReadingTime[]>([]);
+  readingTimesRef.current = messages.map((m) => m.readingTime ?? 'medium');
+
+  // Progressive message reveal — chain of setTimeouts with typing indicator
+  // shown BEFORE each message arrives (mensagem N exibida → respiro curto →
+  // typing indicator → delay calibrado pelo tamanho da próxima → mensagem N+1).
   useEffect(() => {
     if (!open) {
       setVisibleCount(0);
+      setIsTyping(false);
       return;
     }
 
-    // Show first message immediately
+    const total = readingTimesRef.current.length;
+    if (total === 0) return;
+
+    // Respeita preferência do usuário por menos animação
+    const reduced = typeof window !== 'undefined'
+      && typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reductionFactor = reduced ? 0.15 : 1;
+
+    // Primeira mensagem aparece imediatamente
     setVisibleCount(1);
+    setIsTyping(false);
 
+    let cancelled = false;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
     let i = 1;
-    const delay = role === 'thoughtleader' ? 2000 : 1200; // TL gets more reading time
-    const interval = setInterval(() => {
-      i++;
-      if (i > messages.length) {
-        clearInterval(interval);
-        return;
-      }
-      setVisibleCount(i);
-    }, delay);
 
-    return () => clearInterval(interval);
+    const scheduleNext = () => {
+      if (cancelled || i >= total) return;
+
+      const nextReadingTime = readingTimesRef.current[i] ?? 'medium';
+      const baseDelay = READING_DELAYS[nextReadingTime];
+      // Garantimos um mínimo de 800ms mesmo em reduced-motion pra não atropelar
+      const typingDelay = Math.max(800, baseDelay * reductionFactor);
+
+      // Fase 1: pequena pausa pra "respiro" depois da mensagem anterior
+      const t1 = setTimeout(() => {
+        if (cancelled) return;
+        setIsTyping(true);
+
+        // Fase 2: typing indicator visível durante o delay calibrado
+        const t2 = setTimeout(() => {
+          if (cancelled) return;
+          setIsTyping(false);
+          i += 1;
+          setVisibleCount(i);
+          scheduleNext();
+        }, typingDelay);
+        timeouts.push(t2);
+      }, POST_MESSAGE_PAUSE);
+      timeouts.push(t1);
+    };
+
+    scheduleNext();
+
+    return () => {
+      cancelled = true;
+      timeouts.forEach(clearTimeout);
+    };
   }, [open, messages.length]);
 
-  // Auto-scroll as messages appear
+  // Auto-scroll as messages appear (ou o typing indicator)
   useEffect(() => {
     if (messagesRef.current) {
       messagesRef.current.scrollTo({
@@ -482,14 +681,14 @@ export function WelcomePopup({
         behavior: 'smooth',
       });
     }
-  }, [visibleCount]);
+  }, [visibleCount, isTyping]);
 
   const allVisible = visibleCount >= messages.length;
 
   // Botão "Vamos lá!" só fica habilitado quando:
   // - Todas as mensagens foram reveladas (allVisible)
-  // - Para TL e Colaborador: também precisa ter feito o upload histórico
-  const canProceed = allVisible && (!needsHistoricalUpload || historyUploaded);
+  // - Para Colaborador: precisa ter feito o upload histórico OU explicitamente pulado
+  const canProceed = allVisible && (!needsHistoricalUpload || historyUploaded || historySkipped);
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
@@ -546,9 +745,10 @@ export function WelcomePopup({
             </div>
           ))}
 
-          {/* Typing indicator while messages are loading */}
-          {!allVisible && (
-            <div className="flex gap-2.5 items-start ob-msg-in">
+          {/* Typing indicator — só visível entre uma mensagem e outra,
+              durante o "tempo de digitação" da Fai. */}
+          {isTyping && (
+            <div className="flex gap-2.5 items-start ob-msg-in" aria-live="polite" aria-label="Fai está digitando">
               <Image
                 src="/images/email/fai-avatar.png"
                 alt="Fai"
@@ -569,8 +769,8 @@ export function WelcomePopup({
 
         {/* CTA Button */}
         <div className="px-6 py-4 border-t bg-background/50 space-y-2">
-          {/* Hint quando o upload ainda não foi feito */}
-          {allVisible && needsHistoricalUpload && !historyUploaded && (
+          {/* Hint quando o upload ainda não foi feito nem pulado */}
+          {allVisible && needsHistoricalUpload && !historyUploaded && !historySkipped && (
             <p className="text-center text-xs text-muted-foreground">
               Faça o upload do histórico para continuar ↑
             </p>
