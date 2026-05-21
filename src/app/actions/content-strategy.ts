@@ -110,7 +110,7 @@ export async function saveContentStrategy(
 
     // Get TL's companyId
     const tlDoc = await adminDb.collection('users').doc(tlUserId).get();
-    if (!tlDoc.exists) return { error: 'Thought Leader nao encontrado.' };
+    if (!tlDoc.exists) return { error: 'Thought Leader não encontrado.' };
     const companyId = tlDoc.data()?.companyId;
     if (!companyId) return { error: 'Thought Leader sem empresa vinculada.' };
 
@@ -156,7 +156,7 @@ export async function getContentStrategy(
 
     // Get TL's companyId
     const tlDoc = await adminDb.collection('users').doc(tlUserId).get();
-    if (!tlDoc.exists) return { error: 'Thought Leader nao encontrado.' };
+    if (!tlDoc.exists) return { error: 'Thought Leader não encontrado.' };
     const companyId = tlDoc.data()?.companyId;
     if (!companyId) return { data: null };
 
@@ -187,7 +187,7 @@ export async function saveBrandManual(
 
     // Get TL's companyId
     const tlDoc = await adminDb.collection('users').doc(tlUserId).get();
-    if (!tlDoc.exists) return { error: 'Thought Leader nao encontrado.' };
+    if (!tlDoc.exists) return { error: 'Thought Leader não encontrado.' };
     const companyId = tlDoc.data()?.companyId;
     if (!companyId) return { error: 'Thought Leader sem empresa vinculada.' };
 
@@ -233,7 +233,7 @@ export async function getBrandManual(
 
     // Get TL's companyId
     const tlDoc = await adminDb.collection('users').doc(tlUserId).get();
-    if (!tlDoc.exists) return { error: 'Thought Leader nao encontrado.' };
+    if (!tlDoc.exists) return { error: 'Thought Leader não encontrado.' };
     const companyId = tlDoc.data()?.companyId;
     if (!companyId) return { data: null };
 
@@ -278,7 +278,7 @@ export async function getCompanyBrandContext(
     }
 
     const compDoc = await adminDb.collection('companies').doc(companyId).get();
-    if (!compDoc.exists) return { error: 'Empresa nao encontrada.' };
+    if (!compDoc.exists) return { error: 'Empresa não encontrada.' };
 
     const brandContext = compDoc.data()?.brandContext || compDoc.data()?.branding || null;
     return { data: brandContext as BrandContextData | null };

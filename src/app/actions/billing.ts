@@ -412,7 +412,7 @@ export async function getCompanyBilling(
   try {
     await requireMaster(idToken);
     if (!companyId || typeof companyId !== 'string') {
-      return { success: false, error: 'companyId invalido.' };
+      return { success: false, error: 'companyId inválido.' };
     }
     const block = await getCompanyBillingBlock(companyId);
     const data = await serializeWithCounts(companyId, block);
@@ -434,7 +434,7 @@ export async function getMyCompanyBilling(
 ): Promise<BillingActionResult<SerializableBillingBlock>> {
   try {
     if (!idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const admin = await requireAdmin(idToken);
     if (!admin.companyId) {
@@ -460,7 +460,7 @@ export async function triggerAdminFirstLogin(
 ): Promise<BillingActionResult> {
   try {
     if (!idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const admin = await requireAdmin(idToken);
     if (!admin.companyId) {
@@ -525,7 +525,7 @@ export async function saveMasterBilling(
 ): Promise<BillingActionResult<SerializableBillingBlock>> {
   try {
     if (!input?.idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const master = await requireMaster(input.idToken);
 
@@ -549,14 +549,14 @@ export async function saveMasterBilling(
       kind: 'billing.config_changed',
       actorRole: 'master',
       actorUid: master.uid,
-      summary: 'Configuracoes de billing atualizadas pelo master',
+      summary: 'Configurações de billing atualizadas pelo master',
     });
     return { success: true, data };
   } catch (e: unknown) {
     console.error('[saveMasterBilling] falhou:', e);
     return {
       success: false,
-      error: e instanceof Error ? e.message : 'Erro ao salvar configuracoes de billing.',
+      error: e instanceof Error ? e.message : 'Erro ao salvar configurações de billing.',
     };
   }
 }
@@ -586,7 +586,7 @@ export async function setTLBilledOutsidePlatform(
 ): Promise<BillingActionResult<SerializableBillingBlock>> {
   try {
     if (!input?.idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const master = await requireMaster(input.idToken);
     const validated = validateTLBilledOutsidePlatformInput({
@@ -631,7 +631,7 @@ export async function setMasterTrialDuration(
 ): Promise<BillingActionResult<SerializableBillingBlock>> {
   try {
     if (!input?.idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const master = await requireMaster(input.idToken);
     const validated = validateMasterTrialSetupInput({
@@ -674,7 +674,7 @@ export async function toggleFreeTrialUnlimited(
 ): Promise<BillingActionResult<SerializableBillingBlock>> {
   try {
     if (!input?.idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const master = await requireMaster(input.idToken);
     const validated = validateToggleFreeUnlimitedInput({
@@ -727,7 +727,7 @@ export async function activateBillingModule(
 ): Promise<BillingActionResult<ActivateModuleResult>> {
   try {
     if (!input?.idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const admin = await requireAdmin(input.idToken);
     if (!admin.companyId) {
@@ -739,7 +739,7 @@ export async function activateBillingModule(
     // Validar modulo
     const moduleKey = input.module;
     if (moduleKey !== 'platform' && moduleKey !== 'tl' && moduleKey !== 'design') {
-      return { success: false, error: 'Modulo invalido.' };
+      return { success: false, error: 'Módulo inválido.' };
     }
     // Ler estado do billing
     const billing = await getCompanyBillingBlock(admin.companyId);
@@ -858,7 +858,7 @@ export async function simulatePricing(
 ): Promise<BillingActionResult<SimulatePricingResult>> {
   try {
     if (!input?.idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const admin = await requireAdmin(input.idToken);
     if (!admin.companyId) {
@@ -921,7 +921,7 @@ export async function simulatePricing(
     if (input.design) {
       const pack = getDesignPack(input.design.pack);
       if (!pack) {
-        designResult = { valid: false, totalCents: 0, error: 'Pack invalido.' };
+        designResult = { valid: false, totalCents: 0, error: 'Pack inválido.' };
       } else {
         designResult = { valid: true, totalCents: pack.priceCents, packName: pack.label };
         grandTotal += pack.priceCents;
@@ -973,7 +973,7 @@ export async function getBillingWarnings(
 ): Promise<BillingActionResult<GetBillingWarningsResult>> {
   try {
     if (!idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const admin = await requireAdmin(idToken);
     if (!admin.companyId) {
@@ -1017,7 +1017,7 @@ export async function syncPlatformSeatsForCurrentUser(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     const caller = await requireAuth(idToken);
     if (!caller.companyId) {
@@ -1070,11 +1070,11 @@ export async function getCompanyActivityLog(
 ): Promise<BillingActionResult<GetCompanyActivityLogResult>> {
   try {
     if (!idToken) {
-      return { success: false, error: 'Token de autenticacao ausente.' };
+      return { success: false, error: 'Token de autenticação ausente.' };
     }
     await requireMaster(idToken);
     if (!companyId || typeof companyId !== 'string') {
-      return { success: false, error: 'companyId invalido.' };
+      return { success: false, error: 'companyId inválido.' };
     }
 
     const requested = Math.floor(opts?.limit ?? ACTIVITY_LOG_DEFAULT_LIMIT);

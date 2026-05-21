@@ -48,7 +48,7 @@ export async function requireSelf(idToken: string, targetUserId: string): Promis
   const user = await requireAuth(idToken);
 
   if (user.uid !== targetUserId) {
-    throw new Error('Acesso negado: voce so pode acessar seus proprios dados.');
+    throw new Error('Acesso negado: você só pode acessar seus próprios dados.');
   }
 
   return user;
@@ -62,11 +62,11 @@ export async function requireAdmin(idToken: string, companyId?: string): Promise
   const user = await requireAuth(idToken);
 
   if (user.role !== 'admin' && user.role !== 'master') {
-    throw new Error('Acesso negado: permissao de administrador necessaria.');
+    throw new Error('Acesso negado: permissão de administrador necessária.');
   }
 
   if (companyId && user.role === 'admin' && user.companyId !== companyId) {
-    throw new Error('Acesso negado: voce nao tem permissao nesta empresa.');
+    throw new Error('Acesso negado: você não tem permissão nesta empresa.');
   }
 
   return user;
@@ -79,7 +79,7 @@ export async function requireMaster(idToken: string): Promise<AuthUser> {
   const user = await requireAuth(idToken);
 
   if (user.role !== 'master') {
-    throw new Error('Acesso negado: permissao de master necessaria.');
+    throw new Error('Acesso negado: permissão de master necessária.');
   }
 
   return user;
@@ -92,7 +92,7 @@ export async function requireStrategist(idToken: string): Promise<AuthUser> {
   const user = await requireAuth(idToken);
 
   if (user.role !== 'strategist') {
-    throw new Error('Acesso negado: permissao de estrategista necessaria.');
+    throw new Error('Acesso negado: permissão de estrategista necessária.');
   }
 
   return user;
@@ -113,7 +113,7 @@ export async function requireAdminOrStrategist(idToken: string, companyId: strin
 
   if (user.role === 'admin') {
     if (user.companyId !== companyId) {
-      throw new Error('Acesso negado: voce nao tem permissao nesta empresa.');
+      throw new Error('Acesso negado: você não tem permissão nesta empresa.');
     }
     return user;
   }
@@ -123,12 +123,12 @@ export async function requireAdminOrStrategist(idToken: string, companyId: strin
     const userDoc = await adminDb.collection('users').doc(user.uid).get();
     const assignedCompanies = userDoc.data()?.assignedCompanies as string[] | undefined;
     if (!assignedCompanies?.includes(companyId)) {
-      throw new Error('Acesso negado: voce nao esta atribuido a esta empresa.');
+      throw new Error('Acesso negado: você não está atribuído a esta empresa.');
     }
     return user;
   }
 
-  throw new Error('Acesso negado: permissao de admin ou estrategista necessaria.');
+  throw new Error('Acesso negado: permissão de admin ou estrategista necessária.');
 }
 
 /**
@@ -139,7 +139,7 @@ export async function requireTLOrMaster(idToken: string): Promise<AuthUser> {
   const user = await requireAuth(idToken);
 
   if (user.role !== 'thoughtleader' && user.role !== 'master') {
-    throw new Error('Acesso negado: permissao de Thought Leader ou Master necessaria.');
+    throw new Error('Acesso negado: permissão de Thought Leader ou Master necessária.');
   }
 
   return user;
@@ -153,7 +153,7 @@ export async function requireStrategistOrMaster(idToken: string): Promise<AuthUs
   const user = await requireAuth(idToken);
 
   if (user.role !== 'strategist' && user.role !== 'master') {
-    throw new Error('Acesso negado: permissao de estrategista ou master necessaria.');
+    throw new Error('Acesso negado: permissão de estrategista ou master necessária.');
   }
 
   return user;
@@ -171,13 +171,13 @@ export async function requireStrategistForTL(idToken: string, tlUserId: string):
   }
 
   if (user.role !== 'strategist') {
-    throw new Error('Acesso negado: permissao de estrategista necessaria.');
+    throw new Error('Acesso negado: permissão de estrategista necessária.');
   }
 
   // Buscar o TL para saber a empresa
   const tlDoc = await adminDb.collection('users').doc(tlUserId).get();
   if (!tlDoc.exists) {
-    throw new Error('Thought Leader nao encontrado.');
+    throw new Error('Thought Leader não encontrado.');
   }
 
   const tlCompanyId = tlDoc.data()?.companyId;
@@ -189,7 +189,7 @@ export async function requireStrategistForTL(idToken: string, tlUserId: string):
   const strategistDoc = await adminDb.collection('users').doc(user.uid).get();
   const assignedCompanies = strategistDoc.data()?.assignedCompanies as string[] | undefined;
   if (!assignedCompanies?.includes(tlCompanyId)) {
-    throw new Error('Acesso negado: voce nao esta atribuido a empresa deste Thought Leader.');
+    throw new Error('Acesso negado: você não está atribuído à empresa deste Thought Leader.');
   }
 
   return user;

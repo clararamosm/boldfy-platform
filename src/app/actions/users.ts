@@ -364,7 +364,7 @@ export async function requestPasswordReset(
 
   const normalizedEmail = (email || '').trim().toLowerCase();
   if (!normalizedEmail || !normalizedEmail.includes('@')) {
-    return { error: 'E-mail invalido.' };
+    return { error: 'E-mail inválido.' };
   }
 
   try {
@@ -788,7 +788,7 @@ export async function deleteCollaborator(idToken: string, userId: string): Promi
   try {
     // Verificar que quem chama e admin da mesma empresa do colaborador
     const targetDoc = await adminDb.collection('users').doc(userId).get();
-    if (!targetDoc.exists) return { error: 'Colaborador nao encontrado.' };
+    if (!targetDoc.exists) return { error: 'Colaborador não encontrado.' };
     const targetData = targetDoc.data();
     if (!targetData?.companyId) return { error: 'Colaborador sem empresa associada.' };
     await requireAdmin(idToken, targetData.companyId);
@@ -1470,7 +1470,7 @@ export async function resendInvite(
   userId: string,
 ): Promise<{ success?: boolean; error?: string }> {
   if (!adminAuth) {
-    return { error: 'O servico de autenticacao nao esta disponivel.' };
+    return { error: 'O serviço de autenticação não está disponível.' };
   }
   try {
     const caller = await requireAuth(idToken);
@@ -1482,7 +1482,7 @@ export async function resendInvite(
 
     // Get user data
     const userDoc = await adminDb.collection('users').doc(userId).get();
-    if (!userDoc.exists) return { error: 'Usuario nao encontrado.' };
+    if (!userDoc.exists) return { error: 'Usuário não encontrado.' };
 
     const userData = userDoc.data()!;
     const email = userData.profile?.email || userData.email;

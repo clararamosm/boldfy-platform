@@ -219,7 +219,7 @@ export async function updatePipelinePost(
     const docRef = adminDb.collection(getPipelinePath(tlUserId)).doc(postId);
     const docSnap = await docRef.get();
     if (!docSnap.exists) {
-      return { error: 'Post nao encontrado.' };
+      return { error: 'Post não encontrado.' };
     }
 
     // Multi-image: quando mediaUrls vem no payload, sincroniza mediaUrl/
@@ -291,7 +291,7 @@ export async function deletePipelinePost(
     const docRef = adminDb.collection(getPipelinePath(tlUserId)).doc(postId);
     const docSnap = await docRef.get();
     if (!docSnap.exists) {
-      return { error: 'Post nao encontrado.' };
+      return { error: 'Post não encontrado.' };
     }
 
     await docRef.delete();
@@ -365,12 +365,12 @@ export async function approvePipelineIdea(
     const docSnap = await docRef.get();
 
     if (!docSnap.exists) {
-      return { error: 'Post nao encontrado.' };
+      return { error: 'Post não encontrado.' };
     }
 
     const currentStatus = docSnap.data()?.status;
     if (currentStatus !== 'aprovar_ideia') {
-      return { error: 'Este post nao esta aguardando aprovacao de ideia.' };
+      return { error: 'Este post não está aguardando aprovação de ideia.' };
     }
 
     await docRef.update({
@@ -402,12 +402,12 @@ export async function approvePipelinePost(
     const docSnap = await docRef.get();
 
     if (!docSnap.exists) {
-      return { error: 'Post nao encontrado.' };
+      return { error: 'Post não encontrado.' };
     }
 
     const currentStatus = docSnap.data()?.status;
     if (currentStatus !== 'aprovar_post') {
-      return { error: 'Este post nao esta aguardando aprovacao.' };
+      return { error: 'Este post não está aguardando aprovação.' };
     }
 
     // Approve post → auto-advance to pronto_pra_postar
@@ -448,12 +448,12 @@ export async function requestPipelineAdjustment(
     const docSnap = await docRef.get();
 
     if (!docSnap.exists) {
-      return { error: 'Post nao encontrado.' };
+      return { error: 'Post não encontrado.' };
     }
 
     const currentStatus = docSnap.data()?.status;
     if (currentStatus !== 'aprovar_ideia' && currentStatus !== 'aprovar_post') {
-      return { error: 'Este post nao esta em etapa de aprovacao.' };
+      return { error: 'Este post não está em etapa de aprovação.' };
     }
 
     await docRef.update({
@@ -494,12 +494,12 @@ export async function resolvePipelineAdjustment(
     const docSnap = await docRef.get();
 
     if (!docSnap.exists) {
-      return { error: 'Post nao encontrado.' };
+      return { error: 'Post não encontrado.' };
     }
 
     const currentStatus = docSnap.data()?.status;
     if (currentStatus !== 'ajuste') {
-      return { error: 'Este post nao esta com status de ajuste.' };
+      return { error: 'Este post não está com status de ajuste.' };
     }
 
     await docRef.update({
@@ -536,7 +536,7 @@ export async function markPipelinePostPublished(
     const docSnap = await docRef.get();
 
     if (!docSnap.exists) {
-      return { error: 'Post nao encontrado.' };
+      return { error: 'Post não encontrado.' };
     }
 
     await docRef.update({

@@ -652,8 +652,8 @@ export async function notifyReactivation({
   const baseUrl = getBaseUrl();
 
   const daysLine = daysSinceLastPost > 0
-    ? `Faz <strong>${daysSinceLastPost} dias</strong> que voce nao posta nada por aqui.`
-    : `Voce ainda nao publicou seu primeiro post.`;
+    ? `Faz <strong>${daysSinceLastPost} dias</strong> que você não posta nada por aqui.`
+    : `Você ainda não publicou seu primeiro post.`;
 
   const teamLine = teamPointsRecent > 0
     ? `Enquanto isso, sua equipe ganhou <strong>${teamPointsRecent.toLocaleString('pt-BR')} pontos</strong> no programa`

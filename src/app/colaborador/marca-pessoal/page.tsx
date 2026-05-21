@@ -146,7 +146,7 @@ function BlockStatusBadge({ status }: { status: BlockStatus }) {
       Preenchido
     </Badge>
   ) : (
-    <Badge variant="secondary">Em construcao</Badge>
+    <Badge variant="secondary">Em construção</Badge>
   );
 }
 
@@ -236,7 +236,7 @@ function PillarEditor({ pillar, onChange, onRemove }: PillarEditorProps) {
                 id: pillar.id || slugify(e.target.value) || `pilar-${Date.now()}`,
               })
             }
-            placeholder="Nome do pilar (ex: Previsao de Receita)"
+            placeholder="Nome do pilar (ex: Previsão de Receita)"
             maxLength={80}
             className="flex-1"
           />
@@ -325,7 +325,7 @@ export default function MarcaPessoalPage() {
         toast({
           variant: 'destructive',
           title: 'Erro ao carregar',
-          description: 'Tente recarregar a pagina.',
+          description: 'Tente recarregar a página.',
         });
       } finally {
         setIsLoading(false);
@@ -359,8 +359,8 @@ export default function MarcaPessoalPage() {
             title: 'Nada a importar',
             description:
               preview.trailsMissing.length > 0
-                ? `Trilhas nao cadastradas: ${preview.trailsMissing.join(', ')}.`
-                : 'Voce ainda nao respondeu as trilhas relevantes.',
+                ? `Trilhas não cadastradas: ${preview.trailsMissing.join(', ')}.`
+                : 'Você ainda não respondeu às trilhas relevantes.',
           });
           return;
         }
@@ -402,7 +402,7 @@ export default function MarcaPessoalPage() {
     if (!isBasicsFilled(form.basics)) {
       toast({
         variant: 'destructive',
-        title: 'Identidade basica obrigatoria',
+        title: 'Identidade básica obrigatória',
         description: 'Preencha pelo menos cargo e expertise antes de salvar.',
       });
       return;
@@ -410,7 +410,7 @@ export default function MarcaPessoalPage() {
     setIsSaving(true);
     try {
       const idToken = await auth.currentUser?.getIdToken();
-      if (!idToken) throw new Error('Sessao expirada. Faca login novamente.');
+      if (!idToken) throw new Error('Sessão expirada. Faça login novamente.');
 
       // Monta o payload removendo blocos vazios.
       const payload = {
@@ -494,7 +494,7 @@ export default function MarcaPessoalPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Manual de Marca Pessoal</h1>
             <p className="text-muted-foreground">
-              Configure sua identidade em 4 blocos. A IA usa essas informacoes pra gerar conteudo que soa como voce.
+              Configure sua identidade em 4 blocos. A IA usa essas informações pra gerar conteúdo que soa como você.
             </p>
           </div>
 
@@ -507,8 +507,8 @@ export default function MarcaPessoalPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>1. Identidade basica</CardTitle>
-                      <CardDescription>O minimo pra IA saber quem esta escrevendo.</CardDescription>
+                      <CardTitle>1. Identidade básica</CardTitle>
+                      <CardDescription>O mínimo pra IA saber quem está escrevendo.</CardDescription>
                     </div>
                     <BlockStatusBadge status={isBasicsFilled(form.basics) ? 'filled' : 'in-progress'} />
                   </div>
@@ -530,7 +530,7 @@ export default function MarcaPessoalPage() {
                     <Label htmlFor="expertise">Expertise</Label>
                     <Textarea
                       id="expertise"
-                      placeholder="O que voce domina (1-2 frases). Ex: 'Vendas complexas pra fintechs B2B com ciclo longo'."
+                      placeholder="O que você domina (1-2 frases). Ex: 'Vendas complexas pra fintechs B2B com ciclo longo'."
                       value={form.basics.expertise}
                       onChange={(e) =>
                         setForm({ ...form, basics: { ...form.basics, expertise: e.target.value } })
@@ -540,10 +540,10 @@ export default function MarcaPessoalPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="experience">Experiencias previas</Label>
+                    <Label htmlFor="experience">Experiências prévias</Label>
                     <Textarea
                       id="experience"
-                      placeholder="Resumo das experiencias que dao autoridade ao que voce fala. Ex: '10 anos liderando vendas em fintechs B2B; fundou e vendeu a empresa X; mentor de 30+ founders'."
+                      placeholder="Resumo das experiências que dão autoridade ao que você fala. Ex: '10 anos liderando vendas em fintechs B2B; fundou e vendeu a empresa X; mentor de 30+ founders'."
                       value={form.basics.experience ?? ''}
                       onChange={(e) =>
                         setForm({ ...form, basics: { ...form.basics, experience: e.target.value } })
@@ -552,7 +552,7 @@ export default function MarcaPessoalPage() {
                       rows={3}
                     />
                     <p className="text-xs text-muted-foreground">
-                      A IA usa isso pra justificar afirmacoes do tipo &ldquo;ja vi X empresas cometerem...&rdquo;.
+                      A IA usa isso pra justificar afirmações do tipo &ldquo;já vi X empresas cometerem...&rdquo;.
                     </p>
                   </div>
                 </CardContent>
@@ -564,7 +564,7 @@ export default function MarcaPessoalPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle>2. Posicionamento e Proposta de Valor</CardTitle>
-                      <CardDescription>O que voce projeta + como gera valor pro seu publico.</CardDescription>
+                      <CardDescription>O que você projeta + como gera valor pro seu público.</CardDescription>
                     </div>
                     <BlockStatusBadge status={isDiscoveryFilled(form.discovery) ? 'filled' : 'in-progress'} />
                   </div>
@@ -577,10 +577,10 @@ export default function MarcaPessoalPage() {
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold">Posicionamento</h3>
                     <div className="space-y-2">
-                      <Label htmlFor="aspiration">Como voce quer ser visto</Label>
+                      <Label htmlFor="aspiration">Como você quer ser visto</Label>
                       <Textarea
                         id="aspiration"
-                        placeholder="A imagem que voce quer projetar no LinkedIn — o lugar profissional que voce quer ocupar na cabeca de quem te le."
+                        placeholder="A imagem que você quer projetar no LinkedIn — o lugar profissional que você quer ocupar na cabeça de quem te lê."
                         value={form.discovery.aspiration}
                         onChange={(e) =>
                           setForm({ ...form, discovery: { ...form.discovery, aspiration: e.target.value } })
@@ -643,7 +643,7 @@ export default function MarcaPessoalPage() {
                         <Label htmlFor="vp-how">Como resolve</Label>
                         <Input
                           id="vp-how"
-                          placeholder="Ex: documentacao narrativa"
+                          placeholder="Ex: documentação narrativa"
                           value={form.discovery.valueProposition.how}
                           onChange={(e) =>
                             setForm({
@@ -660,7 +660,7 @@ export default function MarcaPessoalPage() {
                         <Label htmlFor="vp-result">Resultado/transformacao</Label>
                         <Input
                           id="vp-result"
-                          placeholder="Ex: aprovacoes mais rapidas"
+                          placeholder="Ex: aprovações mais rápidas"
                           value={form.discovery.valueProposition.result}
                           onChange={(e) =>
                             setForm({
@@ -677,7 +677,7 @@ export default function MarcaPessoalPage() {
                         <Label htmlFor="vp-differential">Diferencial</Label>
                         <Input
                           id="vp-differential"
-                          placeholder="O que voce faz/tem que mais ninguem faz/tem. Ex: 'metodo aplicado em +30 scale-ups pos-Series B'."
+                          placeholder="O que você faz/tem que mais ninguém faz/tem. Ex: 'método aplicado em +30 scale-ups pós-Series B'."
                           value={form.discovery.valueProposition.differential ?? ''}
                           onChange={(e) =>
                             setForm({
@@ -695,7 +695,7 @@ export default function MarcaPessoalPage() {
                       <p className="text-xs text-muted-foreground italic pt-2">
                         Preview: &ldquo;Eu ajudo {form.discovery.valueProposition.who} a resolver{' '}
                         {form.discovery.valueProposition.problem}
-                        {form.discovery.valueProposition.how && ` atraves de ${form.discovery.valueProposition.how}`}
+                        {form.discovery.valueProposition.how && ` através de ${form.discovery.valueProposition.how}`}
                         {form.discovery.valueProposition.result && `, gerando ${form.discovery.valueProposition.result}`}
                         {form.discovery.valueProposition.differential && `. Diferencial: ${form.discovery.valueProposition.differential}`}
                         .&rdquo;
@@ -728,7 +728,7 @@ export default function MarcaPessoalPage() {
                   />
                   <SliderRow
                     label="Tom"
-                    leftLabel="Serio"
+                    leftLabel="Sério"
                     rightLabel="Divertido"
                     value={form.voice.sliders.tone}
                     onChange={(v) =>
@@ -737,8 +737,8 @@ export default function MarcaPessoalPage() {
                   />
                   <SliderRow
                     label="Complexidade"
-                    leftLabel="Tecnico"
-                    rightLabel="Acessivel"
+                    leftLabel="Técnico"
+                    rightLabel="Acessível"
                     value={form.voice.sliders.complexity}
                     onChange={(v) =>
                       setForm({ ...form, voice: { ...form.voice, sliders: { ...form.voice.sliders, complexity: v } } })
@@ -769,7 +769,7 @@ export default function MarcaPessoalPage() {
                         />
                         <SliderRow
                           label="Registro"
-                          leftLabel="Analitico"
+                          leftLabel="Analítico"
                           rightLabel="Emocional"
                           value={form.voice.sliders.register ?? 50}
                           onChange={(v) =>
@@ -778,7 +778,7 @@ export default function MarcaPessoalPage() {
                         />
                         <SliderRow
                           label="Perspectiva"
-                          leftLabel="Cetico"
+                          leftLabel="Cético"
                           rightLabel="Otimista"
                           value={form.voice.sliders.outlook ?? 50}
                           onChange={(v) =>
@@ -790,7 +790,7 @@ export default function MarcaPessoalPage() {
                           <Label htmlFor="keywords">Palavras-assinatura (opcional)</Label>
                           <Input
                             id="keywords"
-                            placeholder="Separe por virgula. Ex: trade-off, sinal, jogada"
+                            placeholder="Separe por vírgula. Ex: trade-off, sinal, jogada"
                             value={form.voice.keywords?.join(', ') ?? ''}
                             onChange={(e) =>
                               setForm({
@@ -807,7 +807,7 @@ export default function MarcaPessoalPage() {
                           <Label htmlFor="avoidWords">Palavras a evitar (opcional)</Label>
                           <Input
                             id="avoidWords"
-                            placeholder="Separe por virgula. Ex: jornada, crucial, paradigma"
+                            placeholder="Separe por vírgula. Ex: jornada, crucial, paradigma"
                             value={form.voice.avoidWords?.join(', ') ?? ''}
                             onChange={(e) =>
                               setForm({
@@ -821,7 +821,7 @@ export default function MarcaPessoalPage() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="voice-desc">Descricao livre (opcional)</Label>
+                          <Label htmlFor="voice-desc">Descrição livre (opcional)</Label>
                           <Textarea
                             id="voice-desc"
                             placeholder="1-2 frases pra calibrar a IA mais finamente."
@@ -843,19 +843,19 @@ export default function MarcaPessoalPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>4. Estrategia de Conteudo</CardTitle>
-                      <CardDescription>Objetivo e Pilares do seu conteudo.</CardDescription>
+                      <CardTitle>4. Estratégia de Conteúdo</CardTitle>
+                      <CardDescription>Objetivo e Pilares do seu conteúdo.</CardDescription>
                     </div>
                     <BlockStatusBadge status={isStrategyFilled(form.strategy) ? 'filled' : 'in-progress'} />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <TrilhaHint>
-                    Pilares ficam mais claros depois da trilha <strong>Estrategia de Conteudo</strong>.
+                    Pilares ficam mais claros depois da trilha <strong>Estratégia de Conteúdo</strong>.
                   </TrilhaHint>
 
                   <div className="space-y-2">
-                    <Label htmlFor="primary-obj">Objetivo primario</Label>
+                    <Label htmlFor="primary-obj">Objetivo primário</Label>
                     <Select
                       value={form.strategy.primaryObjective}
                       onValueChange={(v) =>
@@ -879,7 +879,7 @@ export default function MarcaPessoalPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Objetivos secundarios (ate 2)</Label>
+                    <Label>Objetivos secundários (até 2)</Label>
                     <div className="flex flex-wrap gap-2">
                       {PERSONAL_BRAND_OBJECTIVES.filter((o) => o !== form.strategy.primaryObjective).map((obj) => {
                         const selected = form.strategy.secondaryObjectives?.includes(obj) ?? false;
@@ -907,9 +907,9 @@ export default function MarcaPessoalPage() {
                   <div className="space-y-3 border-t pt-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <Label>Pilares de conteudo</Label>
+                        <Label>Pilares de conteúdo</Label>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          De 3 a 5 pilares. Cada um com nome curto, descricao em 1 frase e cor.
+                          De 3 a 5 pilares. Cada um com nome curto, descrição em 1 frase e cor.
                         </p>
                       </div>
                       <Button
@@ -924,7 +924,7 @@ export default function MarcaPessoalPage() {
 
                     {form.strategy.pillars.length === 0 ? (
                       <p className="text-sm text-muted-foreground italic">
-                        Nenhum pilar definido. Adicione pelo menos 3 pra dar foco ao seu conteudo.
+                        Nenhum pilar definido. Adicione pelo menos 3 pra dar foco ao seu conteúdo.
                       </p>
                     ) : (
                       <div className="space-y-3">
@@ -970,7 +970,7 @@ export default function MarcaPessoalPage() {
               <div className="space-y-3 text-left">
                 <p>
                   Vamos puxar suas respostas do workbook pros campos correspondentes da Marca Pessoal.
-                  Voce pode revisar e editar antes de salvar.
+                  Você pode revisar e editar antes de salvar.
                 </p>
                 {importPreview && (
                   <>
@@ -986,7 +986,7 @@ export default function MarcaPessoalPage() {
                     )}
                     {importPreview.missingTitles.length > 0 && (
                       <p className="text-xs text-amber-700 dark:text-amber-400">
-                        Trilhas nao cadastradas: {importPreview.missingTitles.join(', ')}
+                        Trilhas não cadastradas: {importPreview.missingTitles.join(', ')}
                       </p>
                     )}
                   </>

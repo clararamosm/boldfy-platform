@@ -53,7 +53,7 @@ export async function getSlackConfig(
 
     return { config: configDoc.data() as SlackNotificationConfig };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Erro ao buscar configuracao.';
+    const msg = error instanceof Error ? error.message : 'Erro ao buscar configuração.';
     console.error('Error in getSlackConfig:', msg);
     return { error: msg };
   }
@@ -124,7 +124,7 @@ export async function saveSlackConfig(
 
     return { success: true };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Erro ao salvar configuracao.';
+    const msg = error instanceof Error ? error.message : 'Erro ao salvar configuração.';
     console.error('Error in saveSlackConfig:', msg);
     return { error: msg };
   }

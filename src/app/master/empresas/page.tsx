@@ -359,7 +359,7 @@ export default function MasterEmpresasPage() {
       if (result.error) {
         throw new Error(result.error);
       }
-      toast({ title: "Empresa e todos os dados excluidos com sucesso!" });
+      toast({ title: "Empresa e todos os dados excluídos com sucesso!" });
       setConfirmDeleteId(null);
       setConfirmDeleteName("");
       fetchCompanies();

@@ -100,7 +100,7 @@ async function getPersonalBranding(userId: string): Promise<PersonalBrandingForP
   // String composta com a proposta de valor (campo `value` legado).
   const vp = brand.discovery?.valueProposition;
   const composedValue = vp && (vp.who || vp.problem)
-    ? `Ajuda ${vp.who || 'profissionais'} a resolver ${vp.problem}${vp.how ? ` atraves de ${vp.how}` : ''}${vp.result ? `, gerando ${vp.result}` : ''}${vp.differential ? `. Diferencial: ${vp.differential}` : ''}.`
+    ? `Ajuda ${vp.who || 'profissionais'} a resolver ${vp.problem}${vp.how ? ` através de ${vp.how}` : ''}${vp.result ? `, gerando ${vp.result}` : ''}${vp.differential ? `. Diferencial: ${vp.differential}` : ''}.`
     : (data.value as string | undefined) ?? '';
 
   // describeVoiceSliders ja retorna bloco multilinha com instrucoes

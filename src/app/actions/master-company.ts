@@ -68,7 +68,7 @@ export async function saveCompanyIdentity(
 
     if (input.locale !== undefined) {
       if (input.locale !== 'pt-BR' && input.locale !== 'en') {
-        return { success: false, error: 'Idioma invalido. Use pt-BR ou en.' };
+        return { success: false, error: 'Idioma inválido. Use pt-BR ou en.' };
       }
       updates.locale = input.locale;
       identityChanged.push('idioma');
@@ -105,7 +105,7 @@ export async function saveCompanyIdentity(
     const docRef = adminDb.collection('companies').doc(input.companyId);
     const snap = await docRef.get();
     if (!snap.exists) {
-      return { success: false, error: 'Empresa nao encontrada.' };
+      return { success: false, error: 'Empresa não encontrada.' };
     }
 
     await docRef.update(updates);
@@ -186,11 +186,11 @@ export async function deleteCompanyAdmin(
     // Verifica que o uid e admin desta empresa.
     const userDoc = await adminDb.collection('users').doc(input.adminUid).get();
     if (!userDoc.exists) {
-      return { success: false, error: 'Admin nao encontrado.' };
+      return { success: false, error: 'Admin não encontrado.' };
     }
     const userData = userDoc.data() ?? {};
     if (userData.role !== 'admin' || userData.companyId !== input.companyId) {
-      return { success: false, error: 'Usuario nao e admin desta empresa.' };
+      return { success: false, error: 'Usuário não é admin desta empresa.' };
     }
 
     const adminEmail = (userData.profile?.email as string | undefined)

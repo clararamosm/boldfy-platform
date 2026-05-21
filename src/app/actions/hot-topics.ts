@@ -18,10 +18,10 @@ export async function getHotTopics(
 ): Promise<{ data?: HotTopicsData; error?: string }> {
   try {
     const authUser = await requireAuth(idToken);
-    if (!authUser.companyId) return { error: 'Empresa nao encontrada.' };
+    if (!authUser.companyId) return { error: 'Empresa não encontrada.' };
 
     const companyDoc = await adminDb.collection('companies').doc(authUser.companyId).get();
-    if (!companyDoc.exists) return { error: 'Empresa nao encontrada.' };
+    if (!companyDoc.exists) return { error: 'Empresa não encontrada.' };
 
     const data = companyDoc.data();
     const hotTopics = data?.hotTopics as HotTopicsData | undefined;
@@ -44,9 +44,9 @@ export async function regenerateHotTopics(
 ): Promise<{ topics?: HotTopic[]; error?: string }> {
   try {
     const authUser = await requireAuth(idToken);
-    if (!authUser.companyId) return { error: 'Empresa nao encontrada.' };
+    if (!authUser.companyId) return { error: 'Empresa não encontrada.' };
     if (authUser.role !== 'admin' && authUser.role !== 'master') {
-      return { error: 'Apenas admins podem regenerar topicos.' };
+      return { error: 'Apenas admins podem regenerar tópicos.' };
     }
 
     const result = await generateHotTopicsForCompany(authUser.companyId);

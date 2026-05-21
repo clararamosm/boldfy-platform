@@ -91,7 +91,7 @@ export type PersonalBrandObjective = (typeof PERSONAL_BRAND_OBJECTIVES)[number];
 
 export const OBJECTIVE_LABELS: Record<PersonalBrandObjective, string> = {
   autoridade: 'Construir autoridade',
-  conexoes_qualificadas: 'Conexoes qualificadas',
+  conexoes_qualificadas: 'Conexões qualificadas',
   demanda: 'Gerar demanda',
   talentos: 'Atrair talentos',
   mercado: 'Conhecer o mercado',

@@ -283,9 +283,9 @@ export async function getCompanyFeed(
 ): Promise<{ posts?: FeedPost[]; error?: string }> {
   try {
     const authUser = await requireAuth(idToken);
-    if (!authUser.companyId) return { error: 'Empresa nao encontrada.' };
+    if (!authUser.companyId) return { error: 'Empresa não encontrada.' };
     if (authUser.role !== 'colaborador' && authUser.role !== 'admin' && authUser.role !== 'thoughtleader') {
-      return { error: 'Acesso nao autorizado.' };
+      return { error: 'Acesso não autorizado.' };
     }
 
     // 1. Get collaborators AND thought leaders in the company

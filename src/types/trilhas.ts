@@ -181,11 +181,11 @@ export function isWorkbookModule(instrucaoCard?: string): boolean {
 
 // --- Helper: labels para modos ---
 export const MODO_LABELS: Record<ModuloModo, string> = {
-  aula: 'Aula (Video)',
+  aula: 'Aula (Vídeo)',
   leitura: 'Leitura',
   desafio: 'Desafio (Quiz)',
-  faca_voce_mesmo: 'Faca Voce Mesmo',
-  missao_conteudo: 'Missao de Conteudo',
+  faca_voce_mesmo: 'Faça Você Mesmo',
+  missao_conteudo: 'Missão de Conteúdo',
 };
 
 // --- Helper: icones para modos ---

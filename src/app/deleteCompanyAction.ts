@@ -19,11 +19,11 @@ export async function deleteCompany(
     await requireMaster(idToken);
 
     if (!adminDb) {
-      return { error: "O servico de banco de dados nao esta disponivel." };
+      return { error: "O serviço de banco de dados não está disponível." };
     }
 
     if (!companyId) {
-      return { error: "ID da empresa e obrigatorio." };
+      return { error: "ID da empresa é obrigatório." };
     }
 
     const companyRef = adminDb.collection("companies").doc(companyId);
@@ -31,7 +31,7 @@ export async function deleteCompany(
     // Check if company exists
     const companyDoc = await companyRef.get();
     if (!companyDoc.exists) {
-      return { error: "Empresa nao encontrada." };
+      return { error: "Empresa não encontrada." };
     }
 
     // Delete all subcollections first

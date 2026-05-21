@@ -241,7 +241,7 @@ export default function MasterCompanyBillingPage() {
         if (!res.success || !res.data) {
           toast({
             title: 'Erro ao carregar',
-            description: res.error || 'Nao foi possivel ler o billing.',
+            description: res.error || 'Não foi possível ler o billing.',
             variant: 'destructive',
           });
           return;
@@ -699,8 +699,8 @@ export default function MasterCompanyBillingPage() {
         betaDurationMonths > 24
       ) {
         toast({
-          title: 'Duracao do beta invalida',
-          description: 'Informe um numero inteiro entre 1 e 24 meses.',
+          title: 'Duração do beta inválida',
+          description: 'Informe um número inteiro entre 1 e 24 meses.',
           variant: 'destructive',
         });
         return;
@@ -710,8 +710,8 @@ export default function MasterCompanyBillingPage() {
     if (tlOutsideEnabled) {
       if (!Number.isInteger(tlOutsideExecutives) || tlOutsideExecutives < 1) {
         toast({
-          title: 'Numero de executivos invalido',
-          description: 'Informe um numero inteiro maior ou igual a 1.',
+          title: 'Número de executivos inválido',
+          description: 'Informe um número inteiro maior ou igual a 1.',
           variant: 'destructive',
         });
         return;
@@ -754,7 +754,7 @@ export default function MasterCompanyBillingPage() {
     { id: 'thoughtleader', label: 'Thought Leader' },
     { id: 'design', label: 'Design' },
     { id: 'admin', label: 'Admin' },
-    { id: 'historico', label: 'Historico' },
+    { id: 'historico', label: 'Histórico' },
   ];
   const activeSectionId = useScrollSpy(sections.map((s) => s.id));
 
@@ -1220,7 +1220,7 @@ export default function MasterCompanyBillingPage() {
             {tlOutsideEnabled && (
               <div className="grid gap-4 md:grid-cols-2 rounded-lg border p-4">
                 <div className="space-y-2">
-                  <Label htmlFor="tlOutsideExecutives">Numero de executivos</Label>
+                  <Label htmlFor="tlOutsideExecutives">Número de executivos</Label>
                   <Input
                     id="tlOutsideExecutives"
                     type="number"
@@ -1470,7 +1470,7 @@ export default function MasterCompanyBillingPage() {
                 <h2 className="text-lg font-semibold">Design</h2>
                 <Badge variant="outline" className="gap-1 text-[11px] font-normal">
                   <Construction className="h-3 w-3" />
-                  Em construcao
+                  Em construção
                 </Badge>
               </div>
 
@@ -1540,7 +1540,7 @@ export default function MasterCompanyBillingPage() {
                         </div>
                         <div>
                           <Label className="text-xs text-muted-foreground">
-                            {adminInfo.isPending ? 'Status' : 'Ultimo login'}
+                            {adminInfo.isPending ? 'Status' : 'Último login'}
                           </Label>
                           <p className="text-sm mt-1">
                             {adminInfo.isPending
@@ -1673,10 +1673,10 @@ export default function MasterCompanyBillingPage() {
             <section id="historico" className="scroll-mt-20">
               <Card>
                 <CardHeader>
-                  <CardTitle>Historico</CardTitle>
+                  <CardTitle>Histórico</CardTitle>
                   <CardDescription>
                     Linha do tempo de eventos relevantes (billing, admin, pagamentos).
-                    Sem aviso pra empresa: visivel apenas para o master.
+                    Sem aviso pra empresa: visível apenas para o master.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1772,7 +1772,7 @@ function chargeTag(type: BillingChargeType): {
     case 'inactive':
     default:
       // Modulo nao ativado — falar de cobranca aqui nao faz sentido.
-      return { label: 'Nao aplicavel', variant: 'outline' };
+      return { label: 'Não aplicável', variant: 'outline' };
   }
 }
 
@@ -1841,19 +1841,19 @@ function PlatformStatusCard({
     breakdown = {
       text:
         chargeType === 'free'
-          ? 'Parceiro Boldfy — sem cobranca.'
+          ? 'Parceiro Boldfy — sem cobrança.'
           : chargeType === 'trial'
-            ? 'Em teste gratuito — sem cobranca ate o fim do trial.'
-            : 'Modulo nao ativado — sem cobranca.',
+            ? 'Em teste gratuito — sem cobrança até o fim do trial.'
+            : 'Módulo não ativado — sem cobrança.',
       total: null,
     };
   } else if (perSeatCents != null && totalCents != null) {
     const perSeat = formatBRL(perSeatCents);
     const total = formatBRL(totalCents);
-    const minNote = atMinimum ? ' (minimo 5)' : '';
+    const minNote = atMinimum ? ' (mínimo 5)' : '';
     breakdown = {
       text: `${billedSeats} seats${minNote} × ${perSeat}/seat`,
-      total: `${total}/mes`,
+      total: `${total}/mês`,
     };
   } else {
     breakdown = {
@@ -1908,7 +1908,7 @@ function TLStatusCard({
     };
   } else {
     breakdown = {
-      text: 'Modulo nao ativado — sem cobranca.',
+      text: 'Módulo não ativado — sem cobrança.',
       total: null,
     };
   }
@@ -1954,7 +1954,7 @@ function DesignStatusCard({
     };
   } else {
     breakdown = {
-      text: 'Modulo nao ativado — sem cobranca.',
+      text: 'Módulo não ativado — sem cobrança.',
       total: null,
     };
   }

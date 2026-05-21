@@ -801,7 +801,7 @@ export async function sendReactivationEmail(
     await requireAdmin(idToken, companyId);
 
     const targetDoc = await adminDb.collection('users').doc(targetUserId).get();
-    if (!targetDoc.exists) return { error: 'Colaborador nao encontrado.' };
+    if (!targetDoc.exists) return { error: 'Colaborador não encontrado.' };
     const targetData = targetDoc.data();
     if (targetData?.companyId !== companyId) return { error: 'Colaborador de outra empresa.' };
     if (targetData?.role !== 'colaborador') return { error: 'Acao disponivel apenas para colaboradores.' };

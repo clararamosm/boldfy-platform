@@ -96,8 +96,8 @@ function evaluateModule(input: ModuleCheckInput, now: Date): BillingWarning | nu
       id: `module-${input.module}-blocked`,
       severity: 'critical',
       title: `${moduleLabel} bloqueado`,
-      message: `O prazo de 7 dias para primeiro pagamento expirou. Finalize a cobranca para restabelecer o acesso.`,
-      cta: { label: 'Ir para cobranca', href: '/admin/billing' },
+      message: `O prazo de 7 dias para primeiro pagamento expirou. Finalize a cobrança para restabelecer o acesso.`,
+      cta: { label: 'Ir para cobrança', href: '/admin/billing' },
       module: input.module,
       triggerISO: deadline ? deadline.toISOString() : undefined,
     };
@@ -110,7 +110,7 @@ function evaluateModule(input: ModuleCheckInput, now: Date): BillingWarning | nu
         id: `module-${input.module}-deadline-today`,
         severity: 'critical',
         title: `${moduleLabel}: prazo de pagamento expira hoje`,
-        message: `Conclua o pagamento agora para evitar bloqueio automatico.`,
+        message: `Conclua o pagamento agora para evitar bloqueio automático.`,
         cta: { label: 'Pagar agora', href: '/admin/billing' },
         module: input.module,
         triggerISO: deadline.toISOString(),
@@ -121,7 +121,7 @@ function evaluateModule(input: ModuleCheckInput, now: Date): BillingWarning | nu
         id: `module-${input.module}-deadline-soon`,
         severity: 'warning',
         title: `${moduleLabel}: ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'} para o pagamento`,
-        message: `Apos o prazo o modulo e bloqueado automaticamente. Finalize a cobranca.`,
+        message: `Após o prazo o módulo é bloqueado automaticamente. Finalize a cobrança.`,
         cta: { label: 'Pagar agora', href: '/admin/billing' },
         module: input.module,
         triggerISO: deadline.toISOString(),
@@ -131,8 +131,8 @@ function evaluateModule(input: ModuleCheckInput, now: Date): BillingWarning | nu
       id: `module-${input.module}-deadline-info`,
       severity: 'info',
       title: `${moduleLabel}: pagamento pendente`,
-      message: `Voce tem ${daysLeft} dias para concluir a cobranca antes do bloqueio.`,
-      cta: { label: 'Ver cobranca', href: '/admin/billing' },
+      message: `Você tem ${daysLeft} dias para concluir a cobrança antes do bloqueio.`,
+      cta: { label: 'Ver cobrança', href: '/admin/billing' },
       module: input.module,
       triggerISO: deadline.toISOString(),
     };
@@ -166,8 +166,8 @@ export function computeBillingWarnings(
       out.push({
         id: 'beta-active-permanent',
         severity: 'info',
-        title: 'Voce esta no programa beta',
-        message: 'Sua empresa tem acesso cortesia. Aproveite e nos de feedback quando puder.',
+        title: 'Você está no programa beta',
+        message: 'Sua empresa tem acesso cortesia. Aproveite e nos dê feedback quando puder.',
       });
     } else {
       const daysLeft = daysUntil(betaEnd, now);
@@ -176,9 +176,9 @@ export function computeBillingWarnings(
         out.push({
           id: 'beta-expired',
           severity: 'critical',
-          title: 'Periodo beta encerrado',
+          title: 'Período beta encerrado',
           message:
-            'Seu acesso cortesia terminou. Configure um modulo ativo para continuar usando a plataforma.',
+            'Seu acesso cortesia terminou. Configure um módulo ativo para continuar usando a plataforma.',
           cta: { label: 'Ver planos', href: '/admin/billing' },
           triggerISO: betaEnd.toISOString(),
         });
@@ -188,7 +188,7 @@ export function computeBillingWarnings(
           severity: 'warning',
           title: `Beta termina em ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'}`,
           message:
-            'Finalize sua ativacao de Plataforma antes do fim do beta para nao interromper o acesso.',
+            'Finalize sua ativação de Plataforma antes do fim do beta para não interromper o acesso.',
           cta: { label: 'Ativar plano', href: '/admin/billing' },
           triggerISO: betaEnd.toISOString(),
         });
@@ -197,7 +197,7 @@ export function computeBillingWarnings(
           id: 'beta-expiring',
           severity: 'info',
           title: `Beta termina em ${daysLeft} dias`,
-          message: 'Aproveite o periodo restante. Quando terminar, ative um plano para continuar.',
+          message: 'Aproveite o período restante. Quando terminar, ative um plano para continuar.',
           cta: { label: 'Ver planos', href: '/admin/billing' },
           triggerISO: betaEnd.toISOString(),
         });
@@ -230,8 +230,8 @@ export function computeBillingWarnings(
             id: 'platform-trial-expired',
             severity: 'critical',
             title: 'Teste gratuito expirou',
-            message: 'Cadastre seu cartao em ate 7 dias para nao perder acesso a Plataforma.',
-            cta: { label: 'Cadastrar cartao', href: '/admin/billing' },
+            message: 'Cadastre seu cartão em até 7 dias para não perder acesso à Plataforma.',
+            cta: { label: 'Cadastrar cartão', href: '/admin/billing' },
             module: 'platform',
             triggerISO: trialEnd.toISOString(),
           });
@@ -240,8 +240,8 @@ export function computeBillingWarnings(
             id: 'platform-trial-ending',
             severity: 'warning',
             title: `Teste gratuito termina em ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'}`,
-            message: 'Cadastre seu cartao para continuar usando a Plataforma sem interrupcao.',
-            cta: { label: 'Cadastrar cartao', href: '/admin/billing' },
+            message: 'Cadastre seu cartão para continuar usando a Plataforma sem interrupção.',
+            cta: { label: 'Cadastrar cartão', href: '/admin/billing' },
             module: 'platform',
             triggerISO: trialEnd.toISOString(),
           });
@@ -250,8 +250,8 @@ export function computeBillingWarnings(
             id: 'platform-trial-soon',
             severity: 'info',
             title: `Teste gratuito: ${daysLeft} dias restantes`,
-            message: 'Quando o teste acabar, voce tem 7 dias para cadastrar o cartao.',
-            cta: { label: 'Cadastrar cartao', href: '/admin/billing' },
+            message: 'Quando o teste acabar, você tem 7 dias para cadastrar o cartão.',
+            cta: { label: 'Cadastrar cartão', href: '/admin/billing' },
             module: 'platform',
             triggerISO: trialEnd.toISOString(),
           });

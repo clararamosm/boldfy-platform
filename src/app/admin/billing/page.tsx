@@ -92,7 +92,7 @@ function daysFromNow(iso: string | null): number | null {
 
 async function getIdToken(): Promise<string> {
   const currentUser = firebaseAuth.currentUser;
-  if (!currentUser) throw new Error('Nao autenticado.');
+  if (!currentUser) throw new Error('Não autenticado.');
   return currentUser.getIdToken();
 }
 
@@ -251,7 +251,7 @@ export default function AdminBillingPage() {
       toast({
         variant: 'destructive',
         title: 'Erro',
-        description: err instanceof Error ? err.message : 'Nao foi possivel carregar o billing.',
+        description: err instanceof Error ? err.message : 'Não foi possível carregar o billing.',
       });
     } finally {
       setLoadingBilling(false);
@@ -356,9 +356,9 @@ export default function AdminBillingPage() {
             variant: 'warning',
             icon: Clock,
             title: `Teste termina em ${days} ${days === 1 ? 'dia' : 'dias'}`,
-            message: 'Cadastre seu cartao para nao perder o acesso quando o teste acabar.',
+            message: 'Cadastre seu cartão para não perder o acesso quando o teste acabar.',
             cta: {
-              label: 'Cadastrar cartao',
+              label: 'Cadastrar cartão',
               onClick: () => handleActivate('platform'),
               loading: activatingModule === 'platform',
             },
@@ -403,8 +403,8 @@ export default function AdminBillingPage() {
         return {
           variant: 'info',
           icon: Sparkles,
-          title: 'Voce esta pagando preco beta',
-          message: `Desconto de 30% no Platform por mais ${days} ${days === 1 ? 'dia' : 'dias'}. Depois disso, preco cheio.`,
+          title: 'Você está pagando preço beta',
+          message: `Desconto de 30% no Platform por mais ${days} ${days === 1 ? 'dia' : 'dias'}. Depois disso, preço cheio.`,
         };
       }
     }
@@ -438,7 +438,7 @@ export default function AdminBillingPage() {
           <div className="max-w-xl mx-auto">
             <Card>
               <CardHeader>
-                <CardTitle>Nao foi possivel carregar</CardTitle>
+                <CardTitle>Não foi possível carregar</CardTitle>
               </CardHeader>
               <CardContent>
                 <Button onClick={loadBilling}>Tentar novamente</Button>

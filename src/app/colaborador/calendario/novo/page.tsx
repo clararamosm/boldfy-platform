@@ -1078,7 +1078,7 @@ function EditorContent() {
           <div className="space-y-4">
             {/* Defaults — read-only */}
             <div>
-              <Label className="text-xs text-muted-foreground">Padrao (nao removiveis)</Label>
+              <Label className="text-xs text-muted-foreground">Padrão (não removíveis)</Label>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {DEFAULT_POST_FORMATS.map((d) => (
                   <span

@@ -473,12 +473,12 @@ export default function MasterTrilhasPage() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Titulo</Label>
-                <Input value={sessionForm.titulo} onChange={e => setSessionForm({ ...sessionForm, titulo: e.target.value })} placeholder="Ex: Modulo Basico" />
+                <Label>Título</Label>
+                <Input value={sessionForm.titulo} onChange={e => setSessionForm({ ...sessionForm, titulo: e.target.value })} placeholder="Ex: Módulo Básico" />
               </div>
               <div>
-                <Label>Descricao</Label>
-                <Textarea value={sessionForm.descricao} onChange={e => setSessionForm({ ...sessionForm, descricao: e.target.value })} placeholder="Descreva esta sessao..." />
+                <Label>Descrição</Label>
+                <Textarea value={sessionForm.descricao} onChange={e => setSessionForm({ ...sessionForm, descricao: e.target.value })} placeholder="Descreva esta sessão..." />
               </div>
               <div>
                 <Label>Ordem</Label>

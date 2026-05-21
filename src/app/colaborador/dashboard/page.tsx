@@ -507,7 +507,7 @@ export default function ColaboradorDashboardPage() {
           subtitle={heroSubtitle}
           t={{
             greeting: t.colabDashboard.greeting,
-            levelPill: (gamLevelUp?.levelPill as string) || 'Nivel {level}',
+            levelPill: (gamLevelUp?.levelPill as string) || 'Nível {level}',
             heroPoints: gamDash?.heroPoints || 'Pontos',
             heroRewards: gamDash?.heroRewards || 'Resgatados',
             heroConquests: gamDash?.heroConquests || 'Conquistas',
@@ -536,10 +536,10 @@ export default function ColaboradorDashboardPage() {
             week: (gamCheckin?.week as string) || 'Semana',
             postsCount: (gamCheckin?.postsCount as string) || '{count}/3',
             completed: (gamCheckin?.completed as string) || 'Semana completa!',
-            streakBonus: (gamCheckin?.streakBonus as string) || 'Bonus streak: +{points} pts',
-            nextBonus: (gamCheckin?.nextBonus as string) || 'Proximo bonus: +{points} pts',
+            streakBonus: (gamCheckin?.streakBonus as string) || 'Bônus streak: +{points} pts',
+            nextBonus: (gamCheckin?.nextBonus as string) || 'Próximo bônus: +{points} pts',
             cycleComplete: (gamCheckin?.cycleComplete as string) || 'Ciclo completo!',
-            noPosts: (gamCheckin?.noPosts as string) || 'Nenhuma publicacao',
+            noPosts: (gamCheckin?.noPosts as string) || 'Nenhuma publicação',
             cycle: (gamCheckin?.cycle as string) || 'Ciclo',
             weeksStreak: (gamCheckin?.weeksStreak as string) || 'semanas seguidas',
             weekSummary: (gamCheckin?.weekSummary as string) || 'posts esta semana',
@@ -617,10 +617,10 @@ export default function ColaboradorDashboardPage() {
             t={{
               conquestsBadges: gamDash?.conquestsBadges || 'Conquistas',
               badgesCollected: gamDash?.badgesCollected || '{count} conquistados',
-              pubCategory: gamDash?.pubCategory || 'Publicacoes',
+              pubCategory: gamDash?.pubCategory || 'Publicações',
               trailCategory: gamDash?.trailCategory || 'Trilhas',
-              missionCategory: gamDash?.missionCategory || 'Missoes',
-              seqCategory: gamDash?.seqCategory || 'Constancia (jornada de niveis)',
+              missionCategory: gamDash?.missionCategory || 'Missões',
+              seqCategory: gamDash?.seqCategory || 'Constância (jornada de níveis)',
             }}
           />
         </div>
@@ -633,10 +633,10 @@ export default function ColaboradorDashboardPage() {
             totalSpent={data.totalSpent}
             t={{
               myPoints: gamDash?.myPoints || 'Meus Pontos',
-              available: gamDash?.available || 'Disponiveis',
+              available: gamDash?.available || 'Disponíveis',
               totalEarned: gamDash?.totalEarned || 'Total ganhos',
               totalSpent: gamDash?.totalSpent || 'Total gastos',
-              history: gamDash?.history || 'Historico',
+              history: gamDash?.history || 'Histórico',
             }}
           />
           <RewardsCard
@@ -646,10 +646,10 @@ export default function ColaboradorDashboardPage() {
               rewardsCard: gamDash?.rewardsCard || 'Recompensas',
               redeemed: gamDash?.redeemed || 'Resgatadas',
               redeemedLabel: gamDash?.redeemedLabel || 'recompensas resgatadas',
-              availableLabel: gamDash?.availableLabel || 'recompensas disponiveis',
-              availableInShop: gamDash?.availableInShop || 'Disponiveis na loja',
+              availableLabel: gamDash?.availableLabel || 'recompensas disponíveis',
+              availableInShop: gamDash?.availableInShop || 'Disponíveis na loja',
               viewShop: gamDash?.viewShop || 'Ver loja',
-              history: gamDash?.history || 'Historico',
+              history: gamDash?.history || 'Histórico',
             }}
           />
         </div>
