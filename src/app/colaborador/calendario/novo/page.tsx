@@ -1045,19 +1045,26 @@ function EditorContent() {
             </div>
           ) : (
             // Single image / video / GIF / PDF
-            <div className="relative rounded-lg overflow-hidden border">
+            // Preview da mídia: object-contain + bg neutro pro user ver a
+            // mídia inteira no formato original (antes era object-cover, que
+            // recortava em retângulo horizontal — feedback Clara, maio/2026).
+            // max-h-[600px] evita que fotos verticais gigantes (retrato
+            // 1080×1920+) dominem a tela; abaixo disso o tamanho é livre.
+            // mx-auto centraliza horizontalmente quando a foto é mais
+            // estreita que o container.
+            <div className="relative rounded-lg overflow-hidden border bg-muted/30 flex justify-center">
               {primaryKind === 'video' ? (
-                <video src={mediaItems[0].previewUrl} controls className="w-full max-h-[400px] object-cover" />
+                <video src={mediaItems[0].previewUrl} controls className="max-h-[600px] max-w-full" />
               ) : primaryKind === 'pdf' ? (
-                <div className="flex flex-col items-center justify-center h-40 bg-muted/30 gap-2 text-muted-foreground">
+                <div className="flex flex-col items-center justify-center h-40 w-full gap-2 text-muted-foreground">
                   <Upload className="h-8 w-8" />
                   <span className="text-sm">PDF carregado</span>
                 </div>
               ) : mediaItems[0].previewUrl.startsWith('http') ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={mediaItems[0].previewUrl} alt="Preview" className="w-full max-h-[400px] object-cover" />
+                <img src={mediaItems[0].previewUrl} alt="Preview" className="max-h-[600px] max-w-full object-contain" />
               ) : (
-                <Image src={mediaItems[0].previewUrl} alt="Preview" width={1200} height={800} className="w-full max-h-[400px] object-cover" />
+                <Image src={mediaItems[0].previewUrl} alt="Preview" width={1200} height={800} className="max-h-[600px] w-auto h-auto max-w-full object-contain" />
               )}
               <Button
                 type="button"
