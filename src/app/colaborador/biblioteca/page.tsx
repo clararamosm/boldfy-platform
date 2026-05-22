@@ -1,7 +1,7 @@
 // src/app/colaborador/biblioteca/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { collection, getDocs, query, doc, getDoc, orderBy, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
@@ -104,6 +104,38 @@ const GeneratedContentCard = ({
     const locale = useLocale();
     const [isCopied, setIsCopied] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
+    // Toggle do prompt (item.input). Por padrão fica truncado em 3 linhas com
+    // line-clamp; clicando em "Ver prompt completo" expande pra mostrar tudo.
+    // canExpand é medido em runtime — só mostramos o botão quando o texto
+    // realmente passa do limite (senão fica feio em prompts curtos).
+    const [isPromptExpanded, setIsPromptExpanded] = useState(false);
+    const [canExpandPrompt, setCanExpandPrompt] = useState(false);
+    const promptRef = useRef<HTMLParagraphElement | null>(null);
+
+    // Mede scrollHeight vs clientHeight pra detectar overflow. useLayoutEffect
+    // (e não useEffect) pra rodar antes do paint e evitar flicker do botão.
+    // Re-roda quando o texto muda (item.input) ou quando o card pai pode ter
+    // mudado de largura (resize da janela).
+    useLayoutEffect(() => {
+        const el = promptRef.current;
+        if (!el) return;
+        // Só vale medir quando está no estado truncado — se já estiver expandido,
+        // scrollHeight === clientHeight e perderíamos a sinalização.
+        if (isPromptExpanded) return;
+        setCanExpandPrompt(el.scrollHeight > el.clientHeight + 1); // +1 pra evitar falso positivo por subpixel rounding
+    }, [item.input, isPromptExpanded]);
+
+    // Recalcula em resize da janela (a largura do card muda → quantidade de
+    // linhas truncadas muda → texto que cabia pode passar a transbordar).
+    useEffect(() => {
+        const handleResize = () => {
+            const el = promptRef.current;
+            if (!el || isPromptExpanded) return;
+            setCanExpandPrompt(el.scrollHeight > el.clientHeight + 1);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [isPromptExpanded]);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(item.output);
@@ -125,7 +157,24 @@ const GeneratedContentCard = ({
             <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm text-muted-foreground line-clamp-2">{item.input}</p>
+                        <p
+                            ref={promptRef}
+                            className={`text-sm text-muted-foreground whitespace-pre-line break-words ${isPromptExpanded ? '' : 'line-clamp-3'}`}
+                        >
+                            {item.input}
+                        </p>
+                        {/* Botão de toggle — só aparece quando o prompt
+                            realmente passa de 3 linhas. Em prompts curtos
+                            (a maioria), nada é renderizado aqui. */}
+                        {canExpandPrompt && (
+                            <button
+                                type="button"
+                                onClick={() => setIsPromptExpanded((v) => !v)}
+                                className="text-xs text-primary hover:underline mt-1 font-medium"
+                            >
+                                {isPromptExpanded ? t.colabLibrary.promptSeeLess : t.colabLibrary.promptSeeMore}
+                            </button>
+                        )}
                     </div>
                     <Button
                         variant="ghost"

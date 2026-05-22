@@ -1441,6 +1441,11 @@ const ptBR = {
     next: 'Próximo',
     userError: 'Erro de usuário',
     fetchError: 'Erro ao buscar ativos.',
+    // Toggle do prompt no card de conteúdo gerado pelo Assistente IA. O
+    // prompt aparece truncado em 3 linhas por padrão; o botão só é exibido
+    // quando o texto realmente passa do limite (medido em runtime via ref).
+    promptSeeMore: 'Ver prompt completo',
+    promptSeeLess: 'Recolher',
   },
 
   // ══════════════════════════════════════════════

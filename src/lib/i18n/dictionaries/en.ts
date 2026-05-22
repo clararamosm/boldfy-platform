@@ -1439,6 +1439,8 @@ const en: Dictionary = {
     next: 'Next',
     userError: 'User error',
     fetchError: 'Error fetching assets.',
+    promptSeeMore: 'See full prompt',
+    promptSeeLess: 'Collapse',
   },
 
   // ══════════════════════════════════════════════
