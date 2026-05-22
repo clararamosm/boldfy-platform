@@ -76,7 +76,7 @@ function SettingsSkeleton() {
 function UserSettingsContent({ notificationOptions }: UserSettingsPageProps) {
   const t = useT();
   const { toast } = useToast();
-  const { user: authUser } = useAuth();
+  const { user: authUser, refreshUser } = useAuth();
   const currentUserId = authUser?.uid || null;
 
   const [isLoading, setIsLoading] = useState(true);
@@ -171,6 +171,11 @@ function UserSettingsContent({ notificationOptions }: UserSettingsPageProps) {
       } else {
         setLinkedinConnection(null);
         toast({ title: 'LinkedIn desconectado', description: 'Sua conta do LinkedIn foi desvinculada.' });
+        // Propaga pro AuthContext pra que o LinkedInSidebarBox (que lê de
+        // useAuthGuard → user.rawData.linkedinConnection) também atualize
+        // imediatamente. Sem isso, o sidebar continuava mostrando "Conectado"
+        // até dar refresh.
+        await refreshUser();
       }
     } catch {
       toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível desconectar.' });

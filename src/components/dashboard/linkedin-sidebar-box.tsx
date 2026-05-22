@@ -22,7 +22,7 @@ type Props = {
 };
 
 export function LinkedInSidebarBox({ tokenStatus }: Props) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const t = useT();
   const router = useRouter();
   const { toast } = useToast();
@@ -67,6 +67,15 @@ export function LinkedInSidebarBox({ tokenStatus }: Props) {
         toast({ variant: 'destructive', title: 'Erro', description: result.error });
       } else {
         toast({ title: 'LinkedIn desconectado' });
+        // refreshUser() re-fetcha o doc do user no Firestore (sem
+        // linkedinConnection) e atualiza o AuthContext. useAuthGuard reage
+        // à mudança e recalcula tokenStatus, fazendo o box voltar pro
+        // estado "Conecte seu LinkedIn" sem precisar de refresh manual.
+        // Antes só chamávamos router.refresh(), que invalida server
+        // components mas não toca o estado em memória do client context.
+        await refreshUser();
+        // Mantém router.refresh() pra invalidar caches de server components
+        // que possam estar lendo linkedinConnection (calendário, feed, etc).
         router.refresh();
       }
     } catch {
