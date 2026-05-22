@@ -28,6 +28,11 @@ export type ScheduledPost = {
   linkedinPostId?: string;
   linkedinPostUrl?: string;
   publishedAt?: string;
+  // Mensagem amigável de erro quando status === 'failed'. Setada pelo cron
+  // de publicação (`/api/cron/publish-posts`) e pelo action publishToLinkedIn
+  // — fonte única do motivo da falha mostrado no card do calendário e no
+  // banner do editor. Limpada quando o post é republicado com sucesso.
+  error?: string | null;
   createdAt: string;
   updatedAt: string;
   // PR 3 + rodada 4 do feedback: pilar e tipo de midia do post.
@@ -137,7 +142,16 @@ export async function updateScheduledPost(
 
     if (data.caption !== undefined) updateData.caption = data.caption;
     if (data.scheduledFor !== undefined) updateData.scheduledFor = data.scheduledFor;
-    if (data.status !== undefined) updateData.status = data.status;
+    if (data.status !== undefined) {
+      updateData.status = data.status;
+      // Reagendar (status='scheduled') ou voltar a editar (in_progress/draft)
+      // sempre limpa qualquer mensagem de falha anterior — senão o banner
+      // vermelho continuaria aparecendo no editor mesmo após a user clicar
+      // Reagendar com sucesso.
+      if (data.status === 'scheduled' || data.status === 'in_progress' || data.status === 'draft') {
+        updateData.error = FieldValue.delete();
+      }
+    }
     // NÃO fazer auto-bump silencioso de status. Antes: se caller passava
     // scheduledFor sem status, o servidor promovia pra 'scheduled' — o que
     // fazia o auto-save do editor virar agendamento real e o cron de

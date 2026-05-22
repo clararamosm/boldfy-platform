@@ -24,6 +24,7 @@ import {
   Linkedin,
   ImageIcon,
   Zap,
+  AlertCircle,
 } from 'lucide-react';
 import {
   format,
@@ -464,8 +465,13 @@ export default function CalendarioPage() {
               </div>
             )}
 
-            {/* LinkedIn link */}
-            {post.linkedinPostUrl && (
+            {/* LinkedIn link — só renderiza quando o status confirma published
+                E temos URL não-vazia. Antes a checagem era só pela existência
+                da URL, mas posts antigos podem ter linkedinPostUrl com formato
+                quebrado (`feed/update//`) que abre aba em branco. O backfill
+                em scripts/fix-failed-posts.mjs limpa esses casos, mas a guard
+                aqui evita regressões futuras. */}
+            {post.status === 'published' && post.linkedinPostUrl && post.linkedinPostId && (
               <a
                 href={post.linkedinPostUrl}
                 target="_blank"
@@ -475,6 +481,24 @@ export default function CalendarioPage() {
                 <Linkedin className="h-3.5 w-3.5" />
                 {t.colabCalendar.viewOnLinkedin}
               </a>
+            )}
+
+            {/* Failure reason — mostra o motivo da falha no card pra que o
+                user entenda o que aconteceu sem precisar abrir o editor.
+                Status 'failed' significa que o cron tentou publicar e o
+                LinkedIn rejeitou ou não confirmou. */}
+            {post.status === 'failed' && (
+              <div className="rounded-md border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-900/20 p-2 space-y-1">
+                <div className="flex items-start gap-1.5 text-xs text-red-700 dark:text-red-300">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="font-medium">{t.colabCalendar.failureReasonLabel}</p>
+                    <p className="leading-snug break-words">
+                      {post.error || t.colabCalendar.failureReasonFallback}
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Published date */}

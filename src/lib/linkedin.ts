@@ -547,7 +547,29 @@ export async function publishLinkedInPost(
     throw new Error(`Falha ao publicar (${response.status}): ${errorData.message || errorData.error || response.statusText}`);
   }
 
+  // Validação anti "falso sucesso": o LinkedIn pode responder 2xx mas sem o
+  // header `x-restli-id` (raro, mas já aconteceu — ex: post da Clara Ramos
+  // em maio/2026 ficou marcado como published com linkedinPostId vazio e
+  // linkedinPostUrl quebrada → aba em branco quando o user clicava "Ver no
+  // LinkedIn"). Sem o postId não dá pra confirmar a publicação nem buscar
+  // métricas depois, então tratamos como falha explícita pro caller marcar
+  // o post como `failed` em vez de gravar URL inútil. Logamos toda a resposta
+  // (headers + body) pra investigação futura — o LinkedIn às vezes manda
+  // info útil aqui mesmo quando o status é 2xx.
   const postId = response.headers.get('x-restli-id') || '';
+
+  if (!postId) {
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => { responseHeaders[key] = value; });
+    const responseBody = await response.text().catch(() => '');
+    console.error('LinkedIn post publish: 2xx response without x-restli-id header', JSON.stringify({
+      status: response.status,
+      headers: responseHeaders,
+      body: responseBody.slice(0, 500),
+    }));
+    throw new Error('LINKEDIN_NO_POST_ID');
+  }
+
   const postUrl = `https://www.linkedin.com/feed/update/${encodeURIComponent(postId)}/`;
 
   return { postId, postUrl };

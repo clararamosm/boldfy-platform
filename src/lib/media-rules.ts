@@ -5,15 +5,20 @@
 // política, sem duplicação:
 //
 //   - Imagens (JPG/PNG/WEBP): até 10 por post, 5MB cada. Galeria multi-image.
-//   - GIF: 1 só, 10MB. (GIF tende a ter peso maior que imagem estática por
-//     conta dos frames — limite mais generoso que imagem comum.)
+//   - GIF: 1 só, 5MB. (Limite oficial do LinkedIn — antes estava 10MB chutado,
+//     o que aceitava GIFs que o LinkedIn depois rejeitava silenciosamente,
+//     causando o bug "falso sucesso" do caso Clara Ramos em maio/2026.)
 //   - PDF: 1 só, 5MB.
 //   - Vídeo: 1 só, 200MB.
 //   - Mistura proibida: galeria de imagens não convive com vídeo/PDF/GIF.
 
 export const MAX_GALLERY_IMAGES = 10;
 export const MAX_IMAGE_SIZE_MB = 5;
-export const MAX_GIF_SIZE_MB = 10;
+// 5MB é o teto duro do LinkedIn pra GIF (vale tanto pra UI quanto pra Images API).
+// Acima disso o upload via initializeUpload+PUT funciona, mas a criação do post
+// falha downstream — o LinkedIn responde 2xx sem x-restli-id e o post nunca aparece.
+// Ref: https://www.linkedin.com/help/linkedin/answer/a564109
+export const MAX_GIF_SIZE_MB = 5;
 export const MAX_PDF_SIZE_MB = 5;
 export const MAX_VIDEO_SIZE_MB = 200;
 

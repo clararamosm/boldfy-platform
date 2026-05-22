@@ -951,6 +951,10 @@ const ptBR = {
     tagPostIdea: 'Post ideia',
     tagPostInProgress: 'Post em andamento',
     tagPostFailed: 'Post falhou',
+    // Failure surface — prefixo e fallback usados no card do calendário e
+    // no banner do editor quando status === 'failed'.
+    failureReasonLabel: 'Motivo:',
+    failureReasonFallback: 'A publicação no LinkedIn não foi confirmada. Tente reagendar.',
     // Mission in calendar
     missionUntil: 'até {date}',
     missionFrom: 'de {date}',
@@ -1520,6 +1524,11 @@ const ptBR = {
     publishedDescription: 'Seu post está no ar.',
     publishError: 'Erro ao publicar',
     scheduleError: 'Não foi possível agendar o post.',
+    // Banner de falha — exibido no topo do editor quando o post está com
+    // status 'failed'. Inclui a mensagem específica do erro vindo do cron.
+    failureBannerTitle: 'Não foi possível publicar este post',
+    failureBannerHelp: 'Ajuste o conteúdo se necessário e clique em Reagendar para tentar de novo.',
+    failureBannerReschedule: 'Reagendar',
     previewTitle: 'Preview do Post',
     yourName: 'Seu Nome',
     yourHeadline: 'Sua headline profissional',

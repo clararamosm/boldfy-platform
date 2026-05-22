@@ -27,6 +27,8 @@ import {
   Upload,
   Info,
   Check,
+  AlertCircle,
+  RotateCw,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import Image from 'next/image';
@@ -107,6 +109,10 @@ function EditorContent() {
   // (a) ao carregar post em edit mode, (b) inferido após cada auto-save,
   // (c) trocado quando publica/agenda manualmente.
   const [postStatus, setPostStatus] = useState<PostStatus | null>(null);
+  // Mensagem de erro quando o post falhou. Vem do campo `error` do doc
+  // Firestore (escrito pelo cron de publicação ou pelo publishToLinkedIn).
+  // Exibido em banner vermelho no topo do editor quando postStatus === 'failed'.
+  const [postError, setPostError] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAutoSavingRef = useRef(false);
   // Guarda referencia ao primeiro render — nao dispara auto-save logo
@@ -265,7 +271,15 @@ function EditorContent() {
           // Hidrata status pra badge — quando o post existente ja foi
           // postado, o user sabe que esta vendo um post imutavel.
           setPostStatus(result.post.status as PostStatus);
-          if (result.post.linkedinPostUrl) setPublishedUrl(result.post.linkedinPostUrl);
+          // Hidrata mensagem de erro pra mostrar no banner quando status==='failed'.
+          // Posts em outros status podem ter `error` residual de tentativas
+          // anteriores — só exibe o banner quando o status atual confirma falha.
+          if (result.post.error) setPostError(result.post.error);
+          // linkedinPostUrl só vale a pena se vier com postId real. Posts
+          // antigos do bug "falso sucesso" podem ter url='feed/update//'.
+          if (result.post.linkedinPostUrl && result.post.linkedinPostId) {
+            setPublishedUrl(result.post.linkedinPostUrl);
+          }
         } else if (result.error) {
           toast({ variant: 'destructive', title: t.common.error, description: result.error });
           router.push('/colaborador/calendario');
@@ -754,6 +768,47 @@ function EditorContent() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 md:px-6 py-8 space-y-6">
+        {/* Banner de falha de publicação — primeira coisa visível quando
+            o cron tentou publicar e o LinkedIn não confirmou. Antes desse
+            banner a única pista que o user tinha era a badge "Post falhou"
+            no header (facilmente despercebida) e nenhuma informação sobre o
+            motivo. Botão "Reagendar" reabre o agendamento mantendo data/hora
+            atuais — o user ajusta se precisar e o cron tenta de novo. */}
+        {postStatus === 'failed' && (
+          <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-900/20 p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-red-900 dark:text-red-100">
+                    {t.colabNewPost.failureBannerTitle}
+                  </p>
+                  <p className="text-sm text-red-800 dark:text-red-200 leading-relaxed break-words">
+                    {postError || t.colabCalendar.failureReasonFallback}
+                  </p>
+                  <p className="text-xs text-red-700/80 dark:text-red-300/80">
+                    {t.colabNewPost.failureBannerHelp}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-300 dark:border-red-800 text-red-700 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900/40"
+                  onClick={handleSubmit}
+                  disabled={isSaving || !scheduledDate}
+                >
+                  {isSaving ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <RotateCw className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  {t.colabNewPost.failureBannerReschedule}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Properties grid — mesmo padrao visual do PostProperties do
             estrategista: grid-cols-2 sm:grid-cols-4, labels text-xs
             muted-foreground, inputs h-8 text-xs.
@@ -896,7 +951,7 @@ function EditorContent() {
               <Upload className="h-8 w-8 text-muted-foreground mb-2" />
               <span className="text-sm text-muted-foreground">{t.colabNewPost.clickToAdd}</span>
               <span className="text-xs text-muted-foreground mt-0.5">
-                Imagens (JPG/PNG/WEBP, até 5MB cada, até {MAX_GALLERY_IMAGES} numa galeria) · GIF (até 10MB, 1 por post) · PDF (até 5MB) · Vídeo MP4/MOV (até 200MB)
+                Imagens (JPG/PNG/WEBP, até 5MB cada, até {MAX_GALLERY_IMAGES} numa galeria) · GIF (até 5MB, 1 por post) · PDF (até 5MB) · Vídeo MP4/MOV (até 200MB)
               </span>
               <input
                 type="file"

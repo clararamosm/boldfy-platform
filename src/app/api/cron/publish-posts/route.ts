@@ -12,6 +12,24 @@ import { db as adminDb } from '@/lib/firebase-admin';
 import { publishLinkedInPost, isTokenExpired, refreshAccessToken, buildConnectionData, type LinkedInConnection } from '@/lib/linkedin';
 import { awardPublicationPoints } from '@/app/actions/gamification';
 
+/**
+ * Converte uma exceção do `publishLinkedInPost` numa mensagem amigável pro
+ * usuário ver no editor/calendário. As mensagens já em PT que vêm de dentro
+ * da função são preservadas — só intercepta tokens internos como
+ * 'TOKEN_EXPIRED' e 'LINKEDIN_NO_POST_ID' que não fazem sentido pro usuário.
+ */
+function formatPublishError(error: unknown): string {
+  if (!(error instanceof Error)) return 'Erro desconhecido ao publicar.';
+  const msg = error.message;
+  if (msg === 'TOKEN_EXPIRED') {
+    return 'Token do LinkedIn expirado. Reconecte sua conta nas Configurações.';
+  }
+  if (msg === 'LINKEDIN_NO_POST_ID') {
+    return 'O LinkedIn aceitou a requisição mas não confirmou a publicação (não retornou ID do post). Por favor, reagende para tentar novamente.';
+  }
+  return msg;
+}
+
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // 60 second timeout
 
@@ -109,11 +127,20 @@ async function processScheduledPosts(
         mediaTypesArr,
       );
 
+      // Defesa em profundidade: publishLinkedInPost já lança LINKEDIN_NO_POST_ID
+      // quando o postId vem vazio. Se passar reto, marcamos como falha em vez
+      // de gravar linkedinPostUrl quebrada.
+      if (!result.postId) {
+        throw new Error('LINKEDIN_NO_POST_ID');
+      }
+
       await postDoc.ref.update({
         status: 'published',
         linkedinPostId: result.postId,
         linkedinPostUrl: result.postUrl,
         publishedAt: now,
+        // Limpa erros de tentativas anteriores que possam ter sido gravados.
+        error: null,
         updatedAt: now,
       });
 
@@ -124,7 +151,7 @@ async function processScheduledPosts(
       counters.published++;
     } catch (error) {
       console.error(`Failed to publish scheduledPost ${postDoc.id}:`, error);
-      const errMsg = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errMsg = formatPublishError(error);
       await postDoc.ref.update({ status: 'failed', error: errMsg, updatedAt: now });
       counters.failed++;
     }
@@ -193,18 +220,25 @@ async function processPipelinePosts(
         mediaTypesArr,
       );
 
+      // Mesma defesa do scheduledPosts — evita gravar URL quebrada em
+      // contentPipeline.
+      if (!result.postId) {
+        throw new Error('LINKEDIN_NO_POST_ID');
+      }
+
       await postDoc.ref.update({
         status: 'postado',
         linkedinPostId: result.postId,
         linkedinPostUrl: result.postUrl,
         publishedAt: now,
+        error: null,
         updatedAt: now,
       });
 
       counters.published++;
     } catch (error) {
       console.error(`Failed to publish pipeline post ${postDoc.id}:`, error);
-      const errMsg = error instanceof Error ? error.message : 'Erro desconhecido';
+      const errMsg = formatPublishError(error);
       // Revert to agendado with error info
       await postDoc.ref.update({ status: 'agendado', error: errMsg, updatedAt: now });
       counters.failed++;

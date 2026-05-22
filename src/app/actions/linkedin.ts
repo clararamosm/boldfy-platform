@@ -207,6 +207,13 @@ export async function publishToLinkedIn(
       : mediaType ? [mediaType] : [];
     const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim(), urls, types);
 
+    // Defesa em profundidade: publishLinkedInPost já lança LINKEDIN_NO_POST_ID
+    // quando o postId vem vazio, mas se por algum motivo passar reto, evitamos
+    // gravar URL quebrada (`/feed/update//`) marcando como falha aqui também.
+    if (!result.postId) {
+      throw new Error('LINKEDIN_NO_POST_ID');
+    }
+
     // 4. Update the post document in Firestore with published status
     const now = new Date().toISOString();
     if (postId) {
@@ -220,6 +227,8 @@ export async function publishToLinkedIn(
           linkedinPostId: result.postId,
           linkedinPostUrl: result.postUrl,
           publishedAt: now,
+          // Limpa qualquer error de tentativas anteriores que falharam.
+          error: FieldValue.delete(),
           updatedAt: now,
         });
 
@@ -236,14 +245,42 @@ export async function publishToLinkedIn(
   } catch (error) {
     console.error('Error publishing to LinkedIn:', error);
 
+    // Mensagens internas (tokens) viram texto amigável.
+    let userMessage: string;
+    let needsReconnect = false;
     if (error instanceof Error && error.message === 'TOKEN_EXPIRED') {
-      return {
-        error: 'Token do LinkedIn expirado. Reconecte sua conta nas Configurações.',
-        needsReconnect: true,
-      };
+      userMessage = 'Token do LinkedIn expirado. Reconecte sua conta nas Configurações.';
+      needsReconnect = true;
+    } else if (error instanceof Error && error.message === 'LINKEDIN_NO_POST_ID') {
+      // Caso "falso sucesso": LinkedIn respondeu 2xx mas sem x-restli-id.
+      // Antes desta correção isso virava status:'published' com URL quebrada.
+      userMessage = 'O LinkedIn aceitou a requisição mas não confirmou a publicação. Por favor, reagende para tentar novamente.';
+    } else {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido.';
+      userMessage = `Erro ao publicar: ${message}`;
     }
 
-    const message = error instanceof Error ? error.message : 'Erro desconhecido.';
-    return { error: `Erro ao publicar: ${message}` };
+    // Marca o doc como `failed` com o motivo — assim o user vê no card do
+    // calendário e no banner do editor mesmo se fechar o toast e voltar
+    // depois. Antes, em erro o doc ficava como `scheduled` (esperando o
+    // cron pegar de novo), o que silenciava a falha pro user.
+    if (postId) {
+      try {
+        await adminDb
+          .collection('users')
+          .doc(userId)
+          .collection('scheduledPosts')
+          .doc(postId)
+          .update({
+            status: 'failed',
+            error: userMessage,
+            updatedAt: new Date().toISOString(),
+          });
+      } catch (updateErr) {
+        console.error('Error marking post as failed after publish error:', updateErr);
+      }
+    }
+
+    return { error: userMessage, needsReconnect };
   }
 }

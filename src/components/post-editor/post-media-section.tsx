@@ -225,7 +225,7 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
             )}
           </Button>
           <p className="text-xs text-muted-foreground">
-            Imagens (JPG/PNG/WEBP, até 5MB cada, até {MAX_GALLERY_IMAGES} numa galeria) · GIF (até 10MB, 1 por post) · PDF (até 5MB) · Vídeo MP4/MOV (até 200MB)
+            Imagens (JPG/PNG/WEBP, até 5MB cada, até {MAX_GALLERY_IMAGES} numa galeria) · GIF (até 5MB, 1 por post) · PDF (até 5MB) · Vídeo MP4/MOV (até 200MB)
           </p>
           <input
             ref={fileRef}

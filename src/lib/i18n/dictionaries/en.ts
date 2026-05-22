@@ -953,6 +953,8 @@ const en: Dictionary = {
     tagPostIdea: 'Idea post',
     tagPostInProgress: 'In progress post',
     tagPostFailed: 'Failed post',
+    failureReasonLabel: 'Reason:',
+    failureReasonFallback: 'The LinkedIn publication was not confirmed. Try rescheduling.',
     // Mission in calendar
     missionUntil: 'until {date}',
     missionFrom: 'from {date}',
@@ -1520,6 +1522,9 @@ const en: Dictionary = {
     publishedDescription: 'Your post is live.',
     publishError: 'Error publishing',
     scheduleError: 'Could not schedule the post.',
+    failureBannerTitle: 'We could not publish this post',
+    failureBannerHelp: 'Adjust the content if needed and click Reschedule to try again.',
+    failureBannerReschedule: 'Reschedule',
     previewTitle: 'Post Preview',
     yourName: 'Your Name',
     yourHeadline: 'Your professional headline',
