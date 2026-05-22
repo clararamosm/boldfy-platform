@@ -115,11 +115,15 @@ export function TrailIntroScreen({ trail, sortedModules, isModuleCompleted, comp
               </div>
             </div>
 
-            {trail.pontuacaoBonus > 0 && (
+            {/* Bug fix maio/2026: mostra o REAL bônus de completar a trilha
+                (`pontuacaoBonusTrilha`) em vez de `pontuacaoBonus` (que é a
+                soma dos bônus dos quizzes). Antes a tela prometia o número
+                errado. */}
+            {(trail.pontuacaoBonusTrilha || 0) > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
                 <p className="text-sm text-amber-800">
                   <Trophy className="inline h-4 w-4 mr-1" />
-                  {interpolate(tp.completionBonus, { points: trail.pontuacaoBonus })}
+                  {interpolate(tp.completionBonus, { points: trail.pontuacaoBonusTrilha })}
                 </p>
               </div>
             )}

@@ -262,7 +262,13 @@ export function useTrailPlayer(trailId: string) {
     if (allModulesDone && !progress.concluida) {
       updatedProgress.concluida = true;
       updatedProgress.concluidaEm = Timestamp.now();
-      updatedProgress.pontosGanhos = totalPoints + (trail.pontuacaoBonus || 0);
+      // Bug fix maio/2026: usava `trail.pontuacaoBonus` aqui, mas esse campo é
+      // a soma dos `pontuacaoBonus` dos módulos de quiz (bônus de acerto >80%)
+      // — e esses pontos JÁ entraram em `totalPoints` via pontuacaoFixadaPorModulo
+      // quando o user acertou cada quiz. Estava sendo creditado em dobro.
+      // O REAL bônus por completar a trilha inteira é `pontuacaoBonusTrilha`,
+      // configurado pelo Master no form da trilha. Antes era ignorado.
+      updatedProgress.pontosGanhos = totalPoints + (trail.pontuacaoBonusTrilha || 0);
 
       // Register in pointsHistory + toast notification
       try {

@@ -18,7 +18,12 @@ type Props = {
 
 export function TrailConclusionScreen({ trail, progress, onBack, onReview, onGoToMissions }: Props) {
   const tp = useT().trailPlayer;
-  const modulePoints = progress?.pontosGanhos ? progress.pontosGanhos - (trail.pontuacaoBonus || 0) : 0;
+  // Bug fix maio/2026: o "bônus de conclusão" exibido aqui agora vem de
+  // `pontuacaoBonusTrilha` (que é o REAL bônus configurado pelo Master por
+  // completar a trilha inteira). Antes vinha de `pontuacaoBonus`, que na
+  // verdade é a soma dos bônus dos módulos de quiz — label confundia o user.
+  const completionBonus = trail.pontuacaoBonusTrilha || 0;
+  const modulePoints = progress?.pontosGanhos ? progress.pontosGanhos - completionBonus : 0;
 
   return (
     <div className="fixed inset-0 bg-background z-50 overflow-auto">
@@ -39,10 +44,10 @@ export function TrailConclusionScreen({ trail, progress, onBack, onReview, onGoT
                 <span className="text-muted-foreground">{tp.modulePoints}</span>
                 <span className="font-semibold">{modulePoints > 0 ? modulePoints : 0}</span>
               </div>
-              {trail.pontuacaoBonus > 0 && (
+              {completionBonus > 0 && (
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">{tp.completionBonusLabel}</span>
-                  <span className="font-semibold text-amber-600">+{trail.pontuacaoBonus}</span>
+                  <span className="font-semibold text-amber-600">+{completionBonus}</span>
                 </div>
               )}
               <hr />

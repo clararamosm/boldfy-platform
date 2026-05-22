@@ -198,10 +198,16 @@ export const MODO_ICONS: Record<ModuloModo, string> = {
 };
 
 // --- Helper: pontuacao por modo ---
+// Defaults usados pelo trail-builder quando um módulo é criado sem pontuação
+// explícita. Reduzidos em maio/2026 (feedback Clara): trilhas estavam mais
+// fáceis de concluir do que o esperado — derrubar leitura (20→5) e quiz
+// (40+30 → 20+10) pra dificultar mais. Aula segue 80 (conteúdo mais denso,
+// merece âncora alta). pontuacaoBonusTrilha default permanece 30
+// (configurado no form da trilha em trail-builder.tsx).
 export const MODO_CONFIG: Record<ModuloModo, { temPontuacao: boolean; pontosPadrao: number; pontosBonus: number }> = {
   aula: { temPontuacao: true, pontosPadrao: 80, pontosBonus: 0 },
-  leitura: { temPontuacao: true, pontosPadrao: 20, pontosBonus: 0 },
-  desafio: { temPontuacao: true, pontosPadrao: 40, pontosBonus: 30 },
+  leitura: { temPontuacao: true, pontosPadrao: 5, pontosBonus: 0 },
+  desafio: { temPontuacao: true, pontosPadrao: 20, pontosBonus: 10 },
   faca_voce_mesmo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
   missao_conteudo: { temPontuacao: false, pontosPadrao: 0, pontosBonus: 0 },
 };

@@ -39,8 +39,12 @@ export function TrailCard({
           <div className="flex gap-2 mt-1 flex-wrap">
             <Badge variant="secondary" className="text-xs">{(trail.modulos || []).length} modulos</Badge>
             <Badge variant="secondary" className="text-xs"><CoinIcon className="w-3 h-3 mr-1 text-yellow-500" />{trail.pontuacaoTotal || 0} pontos</Badge>
-            {trail.pontuacaoBonus > 0 && (
-              <Badge variant="outline" className="text-xs text-yellow-600">+{trail.pontuacaoBonus} bonus</Badge>
+            {/* Badge "+N bonus" mostra o bônus real por completar a trilha
+                (`pontuacaoBonusTrilha`), configurado pelo Master no form da
+                trilha. Antes mostrava `pontuacaoBonus` (soma dos bônus dos
+                quizzes) que confundia o admin. */}
+            {(trail.pontuacaoBonusTrilha || 0) > 0 && (
+              <Badge variant="outline" className="text-xs text-yellow-600">+{trail.pontuacaoBonusTrilha} bonus</Badge>
             )}
             <Badge variant="outline" className="text-xs">{trail.tempoEstimadoMin || 0} min</Badge>
           </div>
