@@ -115,6 +115,13 @@ function EditorContent() {
   const [postError, setPostError] = useState<string | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAutoSavingRef = useRef(false);
+  // Ref do textarea do caption — usada pelo botão "Inserir seta" pra colocar
+  // o caractere → (U+2192) na posição exata do cursor. Necessário porque o
+  // que parece uma seta quando você digita "->" no editor é só ligadura da
+  // fonte Inter — no LinkedIn o caractere real continua sendo dois ASCII e
+  // aparece como texto puro. O botão garante que o caractere real fique no
+  // banco e suba pro LinkedIn como seta de verdade.
+  const captionRef = useRef<HTMLTextAreaElement | null>(null);
   // Guarda referencia ao primeiro render — nao dispara auto-save logo
   // ao carregar um post existente (so quando o user efetivamente muda algo).
   const hasInitializedRef = useRef(false);
@@ -494,6 +501,32 @@ function EditorContent() {
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [autoSaveStatus]);
+
+  /**
+   * Insere texto na posição atual do cursor do caption (ou substitui a
+   * seleção, se houver). Foca de volta no textarea e posiciona o cursor
+   * logo após o texto inserido. Se o ref não estiver disponível (caso de
+   * border), apenda no final.
+   */
+  const insertAtCaptionCursor = useCallback((text: string) => {
+    const el = captionRef.current;
+    if (!el) {
+      setCaption((prev) => prev + text);
+      return;
+    }
+    const start = el.selectionStart ?? caption.length;
+    const end = el.selectionEnd ?? caption.length;
+    const next = caption.slice(0, start) + text + caption.slice(end);
+    setCaption(next);
+    // requestAnimationFrame pra esperar o React re-renderizar com o novo
+    // valor antes de mover o cursor — senão setSelectionRange acaba ficando
+    // na posição antiga.
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + text.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }, [caption]);
 
   // Submit (schedule for later)
   const handleSubmit = async () => {
@@ -909,23 +942,39 @@ function EditorContent() {
             de atalhos em cima + textarea min-h-[300px] sem borda interna. */}
         <div className="py-2">
           <div className="border rounded-md overflow-hidden">
-            <div className="flex items-center gap-1.5 px-2 py-1.5 border-b bg-gray-50">
+            <div className="flex items-center gap-2 px-2 py-1.5 border-b bg-gray-50">
+              {/* Botão "Inserir seta" — coloca o caractere → (U+2192) real
+                  na posição do cursor. É a forma certa de pôr seta no caption
+                  porque o LinkedIn não renderiza ligaduras da fonte (digitar
+                  "->" aparece como seta aqui via Inter, mas vira texto puro
+                  no LinkedIn). Caso Clara Ramos, maio/2026. */}
+              <button
+                type="button"
+                onClick={() => insertAtCaptionCursor('→ ')}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:bg-gray-200 transition-colors px-1.5 py-0.5 rounded"
+                title="Insere o caractere → na posição do cursor. Funciona no LinkedIn (digitar -> não funciona — vira texto puro lá)."
+              >
+                <span className="font-mono text-sm leading-none">→</span>
+                <span>Inserir seta</span>
+              </button>
+              <span className="w-px h-3.5 bg-gray-300" aria-hidden="true" />
               <button
                 type="button"
                 onClick={() => setShowTip(!showTip)}
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Info className="w-3.5 h-3.5" />
-                <span>Atalhos</span>
+                <span>Dica</span>
               </button>
               {showTip && (
                 <span className="text-xs text-muted-foreground">
-                  Use o caractere <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">→</kbd> (seta) para destacar tópicos.
+                  No LinkedIn, <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">-&gt;</kbd> aparece como texto. Use o botão acima para inserir <kbd className="px-1 py-0.5 bg-gray-200 rounded text-[11px] font-mono">→</kbd> de verdade.
                 </span>
               )}
             </div>
             <Textarea
               id="caption"
+              ref={captionRef}
               placeholder={t.colabNewPost.captionPlaceholder}
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
