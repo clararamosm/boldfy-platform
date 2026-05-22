@@ -33,20 +33,27 @@ export type PostStatusConfig = {
  */
 export function getPostStatusConfig(t: Dictionary): Record<PostStatus, PostStatusConfig> {
   return {
+    // Publicado: verde (sucesso). Antes usava o mesmo azul do LinkedIn que
+    // o `scheduled`, só com opacidades diferentes — visualmente confundia.
+    // Verde sinaliza claramente o estado terminal de sucesso.
     published: {
       tag: t.colabCalendar.tagPostPublished,
+      color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+      cardBorder: 'border-l-4 border-l-green-500',
+      badge: 'bg-green-100 text-green-700',
+      dot: 'bg-green-500',
+      icon: CheckCircle2,
+    },
+    // Agendado: azul LinkedIn cheio (sem opacidade). A opacidade /60 da dot
+    // anterior fazia a bolinha sumir visualmente no card do calendário (1.5px
+    // + 60% alpha + fundo branco = imperceptível). Agora bolinha e borda
+    // ficam sólidas, igual aos outros status.
+    scheduled: {
+      tag: t.colabCalendar.tagPostScheduled,
       color: 'bg-[#0A66C2]/10 text-[#0A66C2] dark:bg-[#0A66C2]/20',
       cardBorder: 'border-l-4 border-l-[#0A66C2]',
       badge: 'bg-[#0A66C2]/10 text-[#0A66C2]',
       dot: 'bg-[#0A66C2]',
-      icon: CheckCircle2,
-    },
-    scheduled: {
-      tag: t.colabCalendar.tagPostScheduled,
-      color: 'bg-[#0A66C2]/10 text-[#0A66C2] dark:bg-[#0A66C2]/20',
-      cardBorder: 'border-l-4 border-l-[#0A66C2]/60',
-      badge: 'bg-[#0A66C2]/10 text-[#0A66C2]',
-      dot: 'bg-[#0A66C2]/60',
       icon: Clock,
     },
     in_progress: {

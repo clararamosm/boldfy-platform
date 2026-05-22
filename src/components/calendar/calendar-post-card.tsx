@@ -5,7 +5,6 @@ import React from 'react';
 import { Clock, User, Heart, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { getPillarClasses } from '@/lib/pillar-colors';
 
 export type CalendarCardPost = {
   id: string;
@@ -127,29 +126,18 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
         </div>
       )}
 
-      {/* Pilar (own line, colored).
-          Usa getPillarClasses quando `contentPillarColor` esta presente
-          (PR 4) — assim a tag pega a cor real do pilar. Sem colorKey,
-          mantem o cyan default antigo (retrocompat com strategist). */}
-      {post.contentPillar && (() => {
-        const pillarClasses = post.contentPillarColor
-          ? getPillarClasses(post.contentPillarColor)
-          : null;
-        return (
-          <div className="flex items-center">
-            <span
-              className={cn(
-                'inline-flex items-center px-1 py-px rounded text-[7px] font-medium truncate max-w-[80px]',
-                pillarClasses
-                  ? `${pillarClasses.bg} ${pillarClasses.text}`
-                  : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-              )}
-            >
-              {post.contentPillar}
-            </span>
-          </div>
-        );
-      })()}
+      {/* Pilar (own line). Neutralizado pra cinza intencionalmente — antes
+          a tag herdava a cor do pilar (via getPillarClasses), o que competia
+          visualmente com a tag de status (que é o sinal mais importante do
+          card). Cinza pareia com etapa/formato e deixa o status (verde/azul/
+          amarelo/cinza/vermelho) ser a única cor que carrega significado. */}
+      {post.contentPillar && (
+        <div className="flex items-center">
+          <span className="inline-flex items-center px-1 py-px rounded text-[7px] font-medium truncate max-w-[80px] bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+            {post.contentPillar}
+          </span>
+        </div>
+      )}
 
       {/* Métricas (reações + impressões) — linha própria abaixo de tudo */}
       {hasMetrics && (

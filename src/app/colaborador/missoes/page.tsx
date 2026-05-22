@@ -11,7 +11,8 @@ import { ActionDialog } from "@/components/dashboard/action-dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { db, auth, storage } from '@/lib/firebase';
 import { collection, query, getDocs, doc, getDoc } from 'firebase/firestore';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -54,17 +55,45 @@ const toDate = (d: FirestoreDate | undefined): Date | null => {
     return null;
 };
 
+/**
+ * Hook compartilhado pelos cards de missão: quando o `highlightId` bate com
+ * a missão atual, scrolla suavemente até o elemento e pisca um ring de
+ * destaque por 2s. Usado pelo deep-link vindo do calendário
+ * (`/colaborador/missoes?highlight=<missionId>`).
+ */
+function useMissionHighlight(missionId: string, highlightId: string | null) {
+    const ref = useRef<HTMLDivElement | null>(null);
+    const [isHighlighted, setIsHighlighted] = useState(false);
+
+    useEffect(() => {
+        if (highlightId !== missionId) return;
+        const el = ref.current;
+        if (!el) return;
+        // Espera 1 frame pro layout estabilizar (cards renderizam, depois scrolla)
+        const scrollTimer = setTimeout(() => {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 50);
+        setIsHighlighted(true);
+        const ringTimer = setTimeout(() => setIsHighlighted(false), 2000);
+        return () => { clearTimeout(scrollTimer); clearTimeout(ringTimer); };
+    }, [highlightId, missionId]);
+
+    return { ref, isHighlighted };
+}
+
 // ─── Weekly Mission Card (full card with border) ──────
-const WeeklyMissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: {
+const WeeklyMissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmitting, highlightId }: {
     mission: Mission;
     onSubmitProof: (missionId: string, file: File) => Promise<void>;
     onAutoComplete: (missionId: string) => Promise<void>;
     isSubmitting: boolean;
+    highlightId?: string | null;
 }) => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const t = useT();
     const { fmtDate } = useFormat();
+    const { ref, isHighlighted } = useMissionHighlight(mission.id, highlightId ?? null);
 
     const formatDate = (d: FirestoreDate | undefined) => {
         const date = toDate(d);
@@ -143,7 +172,10 @@ const WeeklyMissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
     };
 
     return (
-        <Card className={`${borderClass} ${isHistory ? 'opacity-50' : ''} transition-all hover:shadow-sm`}>
+        <Card
+            ref={ref as React.Ref<HTMLDivElement>}
+            className={`${borderClass} ${isHistory ? 'opacity-50' : ''} transition-all hover:shadow-sm ${isHighlighted ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+        >
             <div className="p-4 space-y-2.5">
                 <div className="flex items-start justify-between gap-3">
                     <h3 className="font-headline text-sm font-semibold leading-tight line-clamp-1">{mission.name}</h3>
@@ -182,16 +214,21 @@ const WeeklyMissionCard = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
 };
 
 // ─── Compact Toggle Mission (for fixed / trail) ──────
-const CompactMissionRow = ({ mission, onSubmitProof, onAutoComplete, isSubmitting }: {
+const CompactMissionRow = ({ mission, onSubmitProof, onAutoComplete, isSubmitting, highlightId }: {
     mission: Mission;
     onSubmitProof: (missionId: string, file: File) => Promise<void>;
     onAutoComplete: (missionId: string) => Promise<void>;
     isSubmitting: boolean;
+    highlightId?: string | null;
 }) => {
-    const [expanded, setExpanded] = useState(false);
+    const isTargeted = highlightId === mission.id;
+    // Auto-expande quando vem do deep-link (?highlight=) — sem isso, o user
+    // chegaria na linha colapsada e teria que clicar de novo pra ver detalhes.
+    const [expanded, setExpanded] = useState(isTargeted);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const t = useT();
+    const { ref, isHighlighted } = useMissionHighlight(mission.id, highlightId ?? null);
 
     const handleSubmit = async () => {
         if (!selectedFile) return;
@@ -239,7 +276,10 @@ const CompactMissionRow = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
     };
 
     return (
-        <div className={`border rounded-lg transition-all ${isCompleted ? 'opacity-50 bg-muted/30' : 'hover:bg-muted/20'}`}>
+        <div
+            ref={ref}
+            className={`border rounded-lg transition-all ${isCompleted ? 'opacity-50 bg-muted/30' : 'hover:bg-muted/20'} ${isHighlighted ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+        >
             {/* Collapsed row */}
             <button
                 type="button"
@@ -278,7 +318,7 @@ const CompactMissionRow = ({ mission, onSubmitProof, onAutoComplete, isSubmittin
 };
 
 // ─── Section with toggle list ──────
-const ToggleSection = ({ title, icon, missions, emptyText, onSubmitProof, onAutoComplete, isSubmitting }: {
+const ToggleSection = ({ title, icon, missions, emptyText, onSubmitProof, onAutoComplete, isSubmitting, highlightId }: {
     title: string;
     icon: React.ReactNode;
     missions: Mission[];
@@ -286,6 +326,7 @@ const ToggleSection = ({ title, icon, missions, emptyText, onSubmitProof, onAuto
     onSubmitProof: (missionId: string, file: File) => Promise<void>;
     onAutoComplete: (missionId: string) => Promise<void>;
     isSubmitting: boolean;
+    highlightId?: string | null;
 }) => (
     <Card>
         <div className="px-4 pt-4 pb-2">
@@ -302,7 +343,7 @@ const ToggleSection = ({ title, icon, missions, emptyText, onSubmitProof, onAuto
             ) : (
                 <div className="space-y-1.5">
                     {missions.map(m => (
-                        <CompactMissionRow key={m.id} mission={m} onSubmitProof={onSubmitProof} onAutoComplete={onAutoComplete} isSubmitting={isSubmitting} />
+                        <CompactMissionRow key={m.id} mission={m} onSubmitProof={onSubmitProof} onAutoComplete={onAutoComplete} isSubmitting={isSubmitting} highlightId={highlightId} />
                     ))}
                 </div>
             )}
@@ -330,7 +371,23 @@ const PageSkeleton = () => (
 );
 
 // ─── Main Component ──────
+// Suspense wrapper: useSearchParams precisa de Suspense boundary no Next 15
+// pra não dar bailout durante build. Mantém todo o conteúdo dentro de um
+// inner component pra que apenas a leitura do searchParam fique suspendível.
 export default function ColaboradorMissoesPage() {
+    return (
+        <Suspense fallback={null}>
+            <MissoesPageContent />
+        </Suspense>
+    );
+}
+
+function MissoesPageContent() {
+    const searchParams = useSearchParams();
+    // ?highlight=<missionId> vem do clique em uma missão no calendário.
+    // Quando presente, os cards usam useMissionHighlight pra scrollar até a
+    // missão e aplicar um ring temporário; CompactMissionRow também já abre.
+    const highlightId = searchParams.get('highlight');
     const { user: authUser } = useAuth();
     const [missions, setMissions] = useState<Mission[]>([]);
     const [historyMissions, setHistoryMissions] = useState<Mission[]>([]);
@@ -530,7 +587,7 @@ export default function ColaboradorMissoesPage() {
                                 {activeWeekly.length > 0 && (
                                     <div className="space-y-3">
                                         {activeWeekly.map(m => (
-                                            <WeeklyMissionCard key={m.id} mission={m} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} />
+                                            <WeeklyMissionCard key={m.id} mission={m} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} highlightId={highlightId} />
                                         ))}
                                     </div>
                                 )}
@@ -540,7 +597,7 @@ export default function ColaboradorMissoesPage() {
                                     <div className="space-y-3">
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-2">{t.colabMissions.scheduled}</p>
                                         {scheduledWeekly.map(m => (
-                                            <WeeklyMissionCard key={m.id} mission={m} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} />
+                                            <WeeklyMissionCard key={m.id} mission={m} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} highlightId={highlightId} />
                                         ))}
                                     </div>
                                 )}
@@ -565,6 +622,7 @@ export default function ColaboradorMissoesPage() {
                                     onSubmitProof={handleSubmitProof}
                                     onAutoComplete={handleAutoComplete}
                                     isSubmitting={isSubmitting}
+                                    highlightId={highlightId}
                                 />
 
                                 <ToggleSection
@@ -575,6 +633,7 @@ export default function ColaboradorMissoesPage() {
                                     onSubmitProof={handleSubmitProof}
                                     onAutoComplete={handleAutoComplete}
                                     isSubmitting={isSubmitting}
+                                    highlightId={highlightId}
                                 />
                             </div>
                         </div>
@@ -595,7 +654,7 @@ export default function ColaboradorMissoesPage() {
                                 {showHistory && (
                                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                         {timedHistory.map(m => (
-                                            <WeeklyMissionCard key={m.id} mission={m} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} />
+                                            <WeeklyMissionCard key={m.id} mission={m} onSubmitProof={handleSubmitProof} onAutoComplete={handleAutoComplete} isSubmitting={isSubmitting} highlightId={highlightId} />
                                         ))}
                                     </div>
                                 )}

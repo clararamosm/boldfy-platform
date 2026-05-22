@@ -524,7 +524,11 @@ export default function CalendarioPage() {
     const tagLabel = isActive ? t.colabCalendar.tagMissionActive : t.colabCalendar.tagMissionScheduled;
 
     return (
-      <Card key={`mission-${mission.id}`} className={`overflow-hidden ${borderClass}`}>
+      <Card
+        key={`mission-${mission.id}`}
+        className={`overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${borderClass}`}
+        onClick={() => router.push(`/colaborador/missoes?highlight=${mission.id}`)}
+      >
         <CardContent className="p-4 space-y-2">
           <div className="flex items-center justify-between">
             <Badge variant="secondary" className={`${tagColor} text-[10px] gap-1 h-5`}>
@@ -634,9 +638,19 @@ export default function CalendarioPage() {
                   });
                   const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
 
-                  // Separate posts and missions for rendering
+                  // Separate posts and missions for rendering.
+                  // Ordem de prioridade na célula: missões aparecem PRIMEIRO,
+                  // depois conteúdos. Razão: missões são deadlines/objetivos
+                  // de pontos da semana — o user precisa ver elas antes do que
+                  // já agendou pra decidir o que postar. Cap visual de 2 items
+                  // por célula no total; missões consomem as vagas primeiro.
                   const postItems = uniqueItems.filter((i): i is { kind: 'post'; data: ScheduledPost } => i.kind === 'post');
                   const missionItems = uniqueItems.filter((i): i is { kind: 'mission'; data: CalendarMission } => i.kind === 'mission');
+                  const VISIBLE_LIMIT = 2;
+                  const visibleMissions = missionItems.slice(0, VISIBLE_LIMIT);
+                  const remainingSlots = Math.max(0, VISIBLE_LIMIT - visibleMissions.length);
+                  const visiblePosts = postItems.slice(0, remainingSlots);
+                  const hiddenCount = uniqueItems.length - visibleMissions.length - visiblePosts.length;
 
                   return (
                     <CalendarDayCell
@@ -653,8 +667,25 @@ export default function CalendarioPage() {
                       onDrop={() => handleDrop(dayKey)}
                       minHeight="min-h-[90px]"
                     >
-                      {/* Post cards — draggable */}
-                      {postItems.slice(0, 2).map(item => {
+                      {/* Mission indicators FIRST (não draggable). Clicar leva
+                          pra aba de missões com a missão específica destacada
+                          e expandida via query param ?highlight=<id>. */}
+                      {visibleMissions.map(item => (
+                        <button
+                          key={`m-${item.data.id}`}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/colaborador/missoes?highlight=${item.data.id}`);
+                          }}
+                          className={`w-full text-left text-[10px] px-1 py-0.5 rounded truncate transition-opacity hover:opacity-80 cursor-pointer ${getCalendarCellColor(item)}`}
+                        >
+                          <Zap className="h-2.5 w-2.5 inline mr-0.5 -mt-px" />
+                          {getCalendarCellLabel(item)}
+                        </button>
+                      ))}
+                      {/* Post cards — draggable, ocupam slots restantes */}
+                      {visiblePosts.map(item => {
                         // PR 4: resolve pilar (ID -> {name, color}) e formato pra render.
                         // Pos-rodada-4: formato e texto livre (tipo de midia tipo "Foto",
                         // "Carrossel"). Posts antigos com 'linkedin'/'text-heavy'/'hybrid'
@@ -686,19 +717,9 @@ export default function CalendarioPage() {
                           />
                         );
                       })}
-                      {/* Mission indicators (not draggable) */}
-                      {missionItems.slice(0, postItems.length > 0 ? 1 : 2).map(item => (
-                        <div
-                          key={`m-${item.data.id}`}
-                          className={`text-[10px] px-1 py-0.5 rounded truncate ${getCalendarCellColor(item)}`}
-                        >
-                          <Zap className="h-2.5 w-2.5 inline mr-0.5 -mt-px" />
-                          {getCalendarCellLabel(item)}
-                        </div>
-                      ))}
-                      {uniqueItems.length > 2 && (
+                      {hiddenCount > 0 && (
                         <div className="text-[10px] text-muted-foreground px-1">
-                          +{uniqueItems.length - 2}
+                          +{hiddenCount}
                         </div>
                       )}
                     </CalendarDayCell>
