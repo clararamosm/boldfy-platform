@@ -48,6 +48,7 @@ import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 import { resolvePersonalBrand } from '@/lib/personal-brand';
 import { getPostStatusConfig } from '@/lib/post-status-config';
+import { stripHtml } from '@/lib/text-utils';
 import type { PersonalBrandPillar } from '@/types/personal-brand';
 
 // ─── Types ──────
@@ -267,26 +268,17 @@ export default function CalendarioPage() {
       .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   }, [posts]);
 
-  // ─── Upcoming (sidebar default) ──────
-  const upcomingItems = useMemo(() => {
-    const now = new Date();
-    const upcoming: CalendarItem[] = [];
-
-    // Upcoming posts — só os com data (drafts sem data ficam fora)
-    posts
-      .filter(p => p.status === 'scheduled' && !!p.scheduledFor && parseISO(p.scheduledFor) > now)
-      .sort((a, b) => parseISO(a.scheduledFor!).getTime() - parseISO(b.scheduledFor!).getTime())
-      .slice(0, 3)
-      .forEach(p => upcoming.push({ kind: 'post', data: p }));
-
-    // Active missions
-    missions
+  // ─── Sidebar default (sem dia selecionado) ──────
+  // Antes mostrava "Próximos agendamentos" misturando posts agendados e
+  // missões ativas. Removemos os posts agendados daqui (feedback maio/2026:
+  // eles já aparecem na grade do calendário, ficavam redundantes no sidebar).
+  // O sidebar agora foca em missões ativas + rascunhos sem data (estes ficam
+  // em seção própria abaixo).
+  const activeMissionItems = useMemo<CalendarItem[]>(() => {
+    return missions
       .filter(m => m.calendarStatus === 'active')
-      .slice(0, 3)
-      .forEach(m => upcoming.push({ kind: 'mission', data: m }));
-
-    return upcoming;
-  }, [posts, missions]);
+      .map(m => ({ kind: 'mission' as const, data: m }));
+  }, [missions]);
 
   // ─── Calendar days ──────
   const calendarDays = useMemo(() => {
@@ -541,7 +533,11 @@ export default function CalendarioPage() {
           </div>
           <h4 className="text-sm font-medium">{mission.name}</h4>
           {mission.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2">{mission.description}</p>
+            // stripHtml: o description da missão vem como HTML rico (<h2>,
+            // <p>, <ul>...) salvo pelo editor do estrategista. No preview do
+            // sidebar a gente quer só texto limpo — senão aparece literal
+            // "<h2>Sua marca em voz alta</h2><p>Você fez três exercícios..."
+            <p className="text-xs text-muted-foreground line-clamp-2">{stripHtml(mission.description)}</p>
           )}
           {(mission.startDate || mission.endDate) && (
             <p className="text-[11px] text-muted-foreground">
@@ -778,16 +774,18 @@ export default function CalendarioPage() {
               )
             ) : (
               <div className="space-y-3">
-                {upcomingItems.length > 0 ? (
+                {activeMissionItems.length > 0 ? (
                   <>
-                    <p className="text-xs text-muted-foreground">{t.colabCalendar.nextScheduled}</p>
-                    {upcomingItems.map((item, idx) => renderSidebarCard(item, idx))}
+                    <h4 className="text-sm font-semibold text-muted-foreground">
+                      {t.colabCalendar.activeMissions}
+                    </h4>
+                    {activeMissionItems.map((item, idx) => renderSidebarCard(item, idx))}
                   </>
                 ) : (
                   <Card className="border-dashed">
                     <CardContent className="flex flex-col items-center justify-center py-10 text-center">
                       <p className="text-sm text-muted-foreground">
-                        {t.colabCalendar.emptyState}
+                        {t.colabCalendar.noActiveMissions}
                       </p>
                     </CardContent>
                   </Card>
