@@ -64,7 +64,10 @@ const VoiceSchema = z.object({
   description: z.string().trim().max(1000).optional(),
 });
 
-const PillarColorSchema = z.enum(['orange', 'amber', 'green', 'blue']);
+// Mantém em sincronia com PillarColorKey em src/lib/pillar-colors.ts.
+// Adicionar nova cor exige atualizar ambos OU vai dar "Invalid enum value"
+// no save de pilares (rota de save do marca-pessoal).
+const PillarColorSchema = z.enum(['orange', 'amber', 'green', 'blue', 'purple', 'wine']);
 
 const PillarSchema = z.object({
   id: z.string().trim().min(1).max(60),

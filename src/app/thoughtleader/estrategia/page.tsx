@@ -6,7 +6,7 @@ import { Loader2, FileText, Eye, Shield, Target, Layers, Zap, LayoutGrid, Crossh
 import { useAuth } from '@/contexts/auth-context';
 import { useT } from '@/lib/i18n/context';
 import { getAuthToken } from '@/lib/auth-client';
-import { getPillarClasses } from '@/lib/pillar-colors';
+import { getPillarClasses, getPillarSwatch } from '@/lib/pillar-colors';
 import type { ContentStrategyData } from '@/app/actions/content-strategy';
 import type { LucideIcon } from 'lucide-react';
 
@@ -237,7 +237,7 @@ export default function ThoughtLeaderEstrategiaPage() {
                     >
                       {/* Header with name */}
                       <div className="flex items-center gap-2.5 mb-3">
-                        <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${colorClasses.text.includes('orange') ? 'bg-orange-500' : colorClasses.text.includes('amber') ? 'bg-amber-400' : colorClasses.text.includes('green') ? 'bg-green-500' : colorClasses.text.includes('blue') ? 'bg-blue-500' : 'bg-primary'}`} />
+                        <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${getPillarSwatch(pillar.color)}`} />
                         <h3 className={`font-extrabold text-base ${colorClasses.text}`}>{pillar.name || 'Sem nome'}</h3>
                       </div>
 
