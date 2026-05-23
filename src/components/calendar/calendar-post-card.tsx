@@ -5,6 +5,7 @@ import React from 'react';
 import { Clock, User, Heart, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getPillarClasses } from '@/lib/pillar-colors';
 
 export type CalendarCardPost = {
   id: string;
@@ -126,18 +127,31 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
         </div>
       )}
 
-      {/* Pilar (own line). Neutralizado pra cinza intencionalmente — antes
-          a tag herdava a cor do pilar (via getPillarClasses), o que competia
-          visualmente com a tag de status (que é o sinal mais importante do
-          card). Cinza pareia com etapa/formato e deixa o status (verde/azul/
-          amarelo/cinza/vermelho) ser a única cor que carrega significado. */}
-      {post.contentPillar && (
-        <div className="flex items-center">
-          <span className="inline-flex items-center px-1 py-px rounded text-[7px] font-medium truncate max-w-[80px] bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-            {post.contentPillar}
-          </span>
-        </div>
-      )}
+      {/* Pilar (own line, colorida). A cor vem de `contentPillarColor` via
+          getPillarClasses — herda a paleta configurada no pilar. Reativada
+          em maio/2026 (antes estava cinza neutro): agora que tags de status
+          ficaram distinguíveis (verde published, azul scheduled, etc), a cor
+          do pilar volta a ajudar a bater o olho e identificar o tema. Sem
+          colorKey, mantém o cyan default antigo (retrocompat com strategist). */}
+      {post.contentPillar && (() => {
+        const pillarClasses = post.contentPillarColor
+          ? getPillarClasses(post.contentPillarColor)
+          : null;
+        return (
+          <div className="flex items-center">
+            <span
+              className={cn(
+                'inline-flex items-center px-1 py-px rounded text-[7px] font-medium truncate max-w-[80px]',
+                pillarClasses
+                  ? `${pillarClasses.bg} ${pillarClasses.text}`
+                  : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+              )}
+            >
+              {post.contentPillar}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Métricas (reações + impressões) — linha própria abaixo de tudo */}
       {hasMetrics && (

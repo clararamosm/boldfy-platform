@@ -108,7 +108,7 @@ export function resolvePersonalBrand(userData: Record<string, unknown> | undefin
   return { brand, source: hasV1Data ? 'v1-fallback' : 'empty' };
 }
 
-const FALLBACK_COLORS: PillarColorKey[] = ['orange', 'amber', 'green', 'blue'];
+const FALLBACK_COLORS: PillarColorKey[] = ['orange', 'amber', 'green', 'blue', 'purple'];
 
 /**
  * Pega o array ou CSV de pilares do v1 e monta a estrutura v2 minima.

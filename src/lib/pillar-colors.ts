@@ -1,6 +1,6 @@
 // Centralized pillar color palette for content strategy pillars
 
-export type PillarColorKey = 'orange' | 'amber' | 'green' | 'blue';
+export type PillarColorKey = 'orange' | 'amber' | 'green' | 'blue' | 'purple';
 
 export type PillarColor = {
   key: PillarColorKey;
@@ -15,6 +15,9 @@ export const PILLAR_COLORS: PillarColor[] = [
   { key: 'amber', label: 'Amarelo', swatch: 'bg-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300' },
   { key: 'green', label: 'Verde', swatch: 'bg-green-500', bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300' },
   { key: 'blue', label: 'Azul', swatch: 'bg-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300' },
+  // 5ª cor adicionada em maio/2026 (feedback Clara) — colaborador pode criar
+  // até 5 pilares e antes só tinham 4 cores, forçando reuso.
+  { key: 'purple', label: 'Roxo', swatch: 'bg-purple-500', bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300' },
 ];
 
 const DEFAULT_COLOR = PILLAR_COLORS[0]; // orange
