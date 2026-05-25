@@ -6,6 +6,10 @@ export default {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    // src/lib contém classes Tailwind definidas em fontes de verdade
+    // (ex: pillar-colors.ts, post-status-config.ts) — sem incluir aqui,
+    // classes usadas só nesses arquivos viram CSS órfão.
+    './src/lib/**/*.{js,ts}',
   ],
   theme: {
     extend: {

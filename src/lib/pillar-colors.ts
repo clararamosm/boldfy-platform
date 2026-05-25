@@ -6,12 +6,19 @@
 // amarelo=in_progress, vermelho=failed). Agora a paleta inteira é variação
 // de roxo — assim status e pilar nunca competem pela mesma cor.
 //
-// As KEYS antigas (orange/amber/green/blue/purple) foram mantidas pra que
-// dados já salvos no Firestore continuem válidos sem migration. Só o que
-// elas MAPEIAM visualmente mudou. Os labels foram atualizados pra refletir
-// o tom real.
+// As KEYS antigas (orange/amber/green/blue/purple/wine) foram mantidas no
+// type pra que dados já salvos no Firestore continuem válidos sem migration.
+// Só o que elas MAPEIAM visualmente mudou. Os labels foram atualizados pra
+// refletir o tom real.
 //
-// Adicionada 6ª key `wine` pra dar mais variedade na ponta escura do gradient.
+// Rev 2 (maio/2026 — feedback Clara): a paleta visível tinha 6 opções, mas
+// os 3 primeiros tons (violet-200/purple-300/violet-500 claros) sumiam no
+// fundo branco do picker — pareciam swatches vazios. Agora são exatamente
+// 5 opções, todas claramente visíveis em fundo claro, com gradiente do
+// roxo pastel até um roxo bem escuro (purple-950, mais escuro que o
+// anterior). A 6ª key `wine` segue válida no type/schema pra retro-
+// compatibilidade, mas não aparece mais no picker — se algum pilar tinha
+// 'wine' salvo, ele cai no fallback de getPillarClasses (lavanda).
 
 export type PillarColorKey = 'orange' | 'amber' | 'green' | 'blue' | 'purple' | 'wine';
 
@@ -24,15 +31,14 @@ export type PillarColor = {
 };
 
 export const PILLAR_COLORS: PillarColor[] = [
-  // Gradient de roxo do mais claro (lavanda) ao mais escuro (uva).
-  // Variando entre violet e purple do Tailwind pra dar mais distinção visual
-  // entre os tons médios — pures `purple-200/300/400` ficam muito próximos.
-  { key: 'orange', label: 'Lavanda',      swatch: 'bg-violet-200', bg: 'bg-violet-50 dark:bg-violet-950/40',  text: 'text-violet-700 dark:text-violet-300' },
-  { key: 'amber',  label: 'Lilás',        swatch: 'bg-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300' },
-  { key: 'green',  label: 'Violeta',      swatch: 'bg-violet-500', bg: 'bg-violet-100 dark:bg-violet-900/40', text: 'text-violet-800 dark:text-violet-200' },
-  { key: 'blue',   label: 'Roxo',         swatch: 'bg-purple-500', bg: 'bg-purple-200 dark:bg-purple-900/40', text: 'text-purple-800 dark:text-purple-200' },
-  { key: 'purple', label: 'Roxo escuro',  swatch: 'bg-purple-700', bg: 'bg-purple-200 dark:bg-purple-900/50', text: 'text-purple-900 dark:text-purple-100' },
-  { key: 'wine',   label: 'Uva',          swatch: 'bg-purple-900', bg: 'bg-purple-300 dark:bg-purple-900/60', text: 'text-purple-950 dark:text-purple-100' },
+  // Gradient de roxo do mais claro (visível) ao mais escuro (uva profunda).
+  // Cinco opções escolhidas pra que cada uma seja imediatamente distinguível
+  // das outras em swatches de 28px no picker, sem nenhuma sumir no fundo.
+  { key: 'orange', label: 'Lavanda',      swatch: 'bg-purple-300', bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300' },
+  { key: 'amber',  label: 'Lilás',        swatch: 'bg-purple-400', bg: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-800 dark:text-purple-200' },
+  { key: 'green',  label: 'Violeta',      swatch: 'bg-purple-500', bg: 'bg-purple-200 dark:bg-purple-900/40', text: 'text-purple-800 dark:text-purple-200' },
+  { key: 'blue',   label: 'Roxo',         swatch: 'bg-purple-700', bg: 'bg-purple-200 dark:bg-purple-900/50', text: 'text-purple-900 dark:text-purple-100' },
+  { key: 'purple', label: 'Roxo profundo', swatch: 'bg-purple-950', bg: 'bg-purple-300 dark:bg-purple-900/60', text: 'text-purple-950 dark:text-purple-100' },
 ];
 
 const DEFAULT_COLOR = PILLAR_COLORS[0]; // orange

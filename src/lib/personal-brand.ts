@@ -108,7 +108,9 @@ export function resolvePersonalBrand(userData: Record<string, unknown> | undefin
   return { brand, source: hasV1Data ? 'v1-fallback' : 'empty' };
 }
 
-const FALLBACK_COLORS: PillarColorKey[] = ['orange', 'amber', 'green', 'blue', 'purple', 'wine'];
+// Paleta reduzida pra 5 entradas (rev 2 maio/2026) — 'wine' segue válido
+// no type por retro-compatibilidade mas não é distribuído em fallbacks novos.
+const FALLBACK_COLORS: PillarColorKey[] = ['orange', 'amber', 'green', 'blue', 'purple'];
 
 /**
  * Pega o array ou CSV de pilares do v1 e monta a estrutura v2 minima.

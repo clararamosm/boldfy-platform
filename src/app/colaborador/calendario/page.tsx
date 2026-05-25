@@ -638,15 +638,16 @@ export default function CalendarioPage() {
                   // Ordem de prioridade na célula: missões aparecem PRIMEIRO,
                   // depois conteúdos. Razão: missões são deadlines/objetivos
                   // de pontos da semana — o user precisa ver elas antes do que
-                  // já agendou pra decidir o que postar. Cap visual de 2 items
-                  // por célula no total; missões consomem as vagas primeiro.
+                  // já agendou pra decidir o que postar.
+                  // Feedback maio/2026 (Clara): removido cap visual de 2 items
+                  // + indicador "+N". Agora todos os items do dia aparecem
+                  // completos — a célula cresce verticalmente conforme a
+                  // quantidade de conteúdo. O grid mantém o alinhamento da
+                  // linha esticando todas as células da semana junto.
                   const postItems = uniqueItems.filter((i): i is { kind: 'post'; data: ScheduledPost } => i.kind === 'post');
                   const missionItems = uniqueItems.filter((i): i is { kind: 'mission'; data: CalendarMission } => i.kind === 'mission');
-                  const VISIBLE_LIMIT = 2;
-                  const visibleMissions = missionItems.slice(0, VISIBLE_LIMIT);
-                  const remainingSlots = Math.max(0, VISIBLE_LIMIT - visibleMissions.length);
-                  const visiblePosts = postItems.slice(0, remainingSlots);
-                  const hiddenCount = uniqueItems.length - visibleMissions.length - visiblePosts.length;
+                  const visibleMissions = missionItems;
+                  const visiblePosts = postItems;
 
                   return (
                     <CalendarDayCell
@@ -713,11 +714,6 @@ export default function CalendarioPage() {
                           />
                         );
                       })}
-                      {hiddenCount > 0 && (
-                        <div className="text-[10px] text-muted-foreground px-1">
-                          +{hiddenCount}
-                        </div>
-                      )}
                     </CalendarDayCell>
                   );
                 })}
