@@ -427,6 +427,67 @@ export async function uploadVideoToLinkedIn(
 }
 
 /**
+ * Upload a PDF (document/carousel) to LinkedIn and return its document URN.
+ * O "carrossel" do LinkedIn é, na prática, um PDF renderizado como deck na
+ * timeline — vai pela Documents API (`/rest/documents`), não pela Images.
+ * Fluxo: initializeUpload → PUT binary → return URN.
+ *
+ * Importante: o LinkedIn aceita PDFs de até ~100MB e até 300 páginas, mas a
+ * nossa regra interna (media-rules.ts) limita em 5MB pra evitar o mesmo tipo
+ * de "falso sucesso" que aconteceu com GIF — uploads que passam no PUT mas
+ * a criação do post depois falha silenciosamente.
+ */
+export async function uploadDocumentToLinkedIn(
+  accessToken: string,
+  linkedinId: string,
+  documentUrl: string
+): Promise<string> {
+  const ownerUrn = `urn:li:person:${linkedinId}`;
+
+  // Step 1: Initialize upload
+  const initRes = await fetch('https://api.linkedin.com/rest/documents?action=initializeUpload', {
+    method: 'POST',
+    headers: linkedInApiHeaders(accessToken),
+    body: JSON.stringify({ initializeUploadRequest: { owner: ownerUrn } }),
+  });
+
+  if (!initRes.ok) {
+    const err = await initRes.json().catch(() => ({}));
+    console.error('LinkedIn document init failed:', err);
+    throw new Error(`Falha ao iniciar upload do PDF: ${err.message || initRes.statusText}`);
+  }
+
+  const initData = await initRes.json();
+  const uploadUrl = initData.value?.uploadUrl;
+  const documentUrn = initData.value?.document;
+
+  if (!uploadUrl || !documentUrn) {
+    throw new Error('LinkedIn não retornou URL de upload para o PDF.');
+  }
+
+  // Step 2: Download PDF from Firebase Storage and upload to LinkedIn
+  const docRes = await fetch(documentUrl);
+  if (!docRes.ok) throw new Error('Não foi possível baixar o PDF para upload.');
+  const docBuffer = await docRes.arrayBuffer();
+
+  const uploadRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/octet-stream',
+    },
+    body: docBuffer,
+  });
+
+  if (!uploadRes.ok) {
+    console.error('LinkedIn document upload failed:', uploadRes.statusText);
+    throw new Error(`Falha no upload do PDF: ${uploadRes.statusText}`);
+  }
+
+  return documentUrn;
+}
+
+/**
  * Determine media category from MIME type or explicit mediaType label.
  * Returns: 'image' | 'gif' | 'video' | 'pdf' | undefined
  */
@@ -483,17 +544,21 @@ export async function publishLinkedInPost(
       if (urn) mediaUrns.push(urn);
     }
   } else if (urls.length > 0) {
-    // Single media (image, video, gif, or unknown fallback).
+    // Single media (image, video, gif, pdf, or unknown fallback).
     const url = urls[0];
     const cat = classifyMediaType(types[0]);
     let urn: string | undefined;
     if (cat === 'video') {
       urn = await uploadVideoToLinkedIn(accessToken, linkedinId, url);
+    } else if (cat === 'pdf') {
+      // PDF/carrossel vai pela Documents API (não pela Images).
+      // Sem isso, o post ia pro LinkedIn como texto puro e o "carrossel"
+      // simplesmente desaparecia — bug reportado em maio/2026.
+      urn = await uploadDocumentToLinkedIn(accessToken, linkedinId, url);
     } else if (cat === 'image' || cat === 'gif' || !cat) {
       // GIF e fallback usam a mesma Images API
       urn = await uploadImageToLinkedIn(accessToken, linkedinId, url);
     }
-    // PDF: skip upload (LinkedIn nÃ£o suporta via API)
     if (urn) mediaUrns = [urn];
   }
 
@@ -521,9 +586,18 @@ export async function publishLinkedInPost(
       },
     };
   } else if (mediaUrns.length === 1) {
+    // Para PDF/documento, o `title` é o título visível do carrossel na timeline
+    // do LinkedIn — então cai pra um nome neutro só se não houver texto. Pra
+    // imagem/vídeo o título é ignorado pelo cliente, mas mantemos por consistência.
+    const mediaTitle =
+      primaryCategory === 'pdf'
+        ? 'Documento'
+        : primaryCategory === 'video'
+          ? 'Post video'
+          : 'Post image';
     body.content = {
       media: {
-        title: primaryCategory === 'video' ? 'Post video' : 'Post image',
+        title: mediaTitle,
         id: mediaUrns[0],
       },
     };
