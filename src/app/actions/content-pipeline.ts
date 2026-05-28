@@ -51,6 +51,11 @@ export type PipelinePost = {
   // na hora de publicar. PDF/video/GIF sempre singular em mediaUrl/mediaType.
   mediaUrls?: string[];
   mediaTypes?: string[];
+  // Título customizado do PDF/carrossel — só faz sentido quando mediaType ===
+  // 'application/pdf'. Vai como content.media.title no payload do LinkedIn e
+  // aparece como nome visível do carrossel na timeline. Ausente/vazio cai no
+  // fallback 'Documento'.
+  documentTitle?: string;
   tlFeedback?: string;
   tlApprovedAt?: string;
   linkedinPostId?: string;
@@ -205,6 +210,7 @@ export async function updatePipelinePost(
     mediaType: string | null;
     mediaUrls: string[] | null;
     mediaTypes: string[] | null;
+    documentTitle: string | null;
   }>
 ): Promise<ActionResult> {
   try {
@@ -227,6 +233,9 @@ export async function updatePipelinePost(
     // Quando array tem so 1 item, prefere singular e apaga o array — mantem
     // shape consistente.
     const updatePayload: Record<string, unknown> = { ...data };
+    // Primeira mídia depois desse update — usado pra decidir se o documentTitle
+    // continua fazendo sentido (só vale pra PDF).
+    let firstTypeAfterUpdate: string | null | undefined;
     if (Array.isArray(data.mediaUrls)) {
       const urls = data.mediaUrls;
       const types = Array.isArray(data.mediaTypes) ? data.mediaTypes : [];
@@ -235,17 +244,38 @@ export async function updatePipelinePost(
         updatePayload.mediaType = null;
         updatePayload.mediaUrls = FieldValue.delete();
         updatePayload.mediaTypes = FieldValue.delete();
+        firstTypeAfterUpdate = null;
       } else if (urls.length === 1) {
         updatePayload.mediaUrl = urls[0];
         updatePayload.mediaType = types[0] ?? null;
         updatePayload.mediaUrls = FieldValue.delete();
         updatePayload.mediaTypes = FieldValue.delete();
+        firstTypeAfterUpdate = types[0] ?? null;
       } else {
         updatePayload.mediaUrl = urls[0];
         updatePayload.mediaType = types[0] ?? null;
         updatePayload.mediaUrls = urls;
         updatePayload.mediaTypes = types;
+        firstTypeAfterUpdate = types[0] ?? null;
       }
+    } else if (data.mediaType !== undefined) {
+      firstTypeAfterUpdate = data.mediaType;
+    }
+
+    // documentTitle: só faz sentido com PDF.
+    //  - Caller mandou string vazia → apaga (FieldValue.delete).
+    //  - Caller mandou com conteúdo → trim + grava.
+    //  - Caller passou null explícito → apaga.
+    //  - Caller não passou + mídia atual não é PDF → apaga título residual.
+    if (data.documentTitle !== undefined) {
+      if (data.documentTitle === null) {
+        updatePayload.documentTitle = FieldValue.delete();
+      } else {
+        const trimmed = data.documentTitle.trim();
+        updatePayload.documentTitle = trimmed ? trimmed : FieldValue.delete();
+      }
+    } else if (firstTypeAfterUpdate !== undefined && firstTypeAfterUpdate !== 'application/pdf') {
+      updatePayload.documentTitle = FieldValue.delete();
     }
     updatePayload.updatedAt = new Date().toISOString();
 

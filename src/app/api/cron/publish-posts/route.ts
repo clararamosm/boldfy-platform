@@ -125,6 +125,7 @@ async function processScheduledPosts(
         post.caption,
         mediaUrlsArr,
         mediaTypesArr,
+        typeof post.documentTitle === 'string' ? post.documentTitle : undefined,
       );
 
       // Defesa em profundidade: publishLinkedInPost já lança LINKEDIN_NO_POST_ID
@@ -218,6 +219,7 @@ async function processPipelinePosts(
         post.caption,
         mediaUrlsArr,
         mediaTypesArr,
+        typeof post.documentTitle === 'string' ? post.documentTitle : undefined,
       );
 
       // Mesma defesa do scheduledPosts — evita gravar URL quebrada em

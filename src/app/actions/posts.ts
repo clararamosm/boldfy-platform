@@ -21,6 +21,12 @@ export type ScheduledPost = {
   // estes campos — sempre single em mediaUrl/mediaType.
   mediaUrls?: string[];
   mediaTypes?: string[];
+  // Título customizado do PDF/carrossel. Só faz sentido quando mediaType ===
+  // 'application/pdf'. Vai como `content.media.title` no payload da Posts API
+  // e aparece como nome visível do carrossel na timeline do LinkedIn (ex:
+  // "5 perguntas que toda PME precisa responder · 7 pages"). Ausente/vazio
+  // cai no fallback 'Documento'.
+  documentTitle?: string;
   // ISO date string. Null/ausente em drafts criados pelo auto-save
   // antes de o user definir uma data.
   scheduledFor: string | null;
@@ -63,6 +69,7 @@ export async function createScheduledPost(
     formato?: string;
     mediaUrls?: string[];
     mediaTypes?: string[];
+    documentTitle?: string;
     // Status inicial. Default 'in_progress' quando ha data, 'draft' quando nao.
     // Caller pode forçar 'scheduled' (botão Agendar) ou outros explicitamente.
     // Auto-save NUNCA cria como 'scheduled' — só o gesto explícito de agendar
@@ -98,6 +105,9 @@ export async function createScheduledPost(
       mediaUrl: firstUrl,
       mediaType: firstType,
       ...(hasGallery && { mediaUrls: data.mediaUrls, mediaTypes: data.mediaTypes ?? [] }),
+      // documentTitle só é gravado quando vier com conteúdo — Firestore rejeita
+      // undefined e gravar string vazia poluiria o doc sem necessidade.
+      ...(data.documentTitle && data.documentTitle.trim() && { documentTitle: data.documentTitle.trim() }),
       scheduledFor: data.scheduledFor ?? null,
       status: inferredStatus,
       linkedinPostId: null,
@@ -129,6 +139,7 @@ export async function updateScheduledPost(
     formato?: string;
     mediaUrls?: string[];
     mediaTypes?: string[];
+    documentTitle?: string;
   }
 ): Promise<{ success?: boolean; error?: string }> {
   try {
@@ -168,6 +179,9 @@ export async function updateScheduledPost(
     // Importante manter mediaUrl/mediaType como primeira midia pra retrocompat
     // com leitores antigos (calendario, feed) que ainda consultam o singular.
     const hasGalleryUpdate = Array.isArray(data.mediaUrls);
+    // Flag: a primeira mídia do payload é PDF? Usada pra decidir se mantemos
+    // ou apagamos o documentTitle. Removeu PDF? Title perde sentido.
+    let firstTypeAfterUpdate: string | null | undefined;
     if (hasGalleryUpdate) {
       const urls = data.mediaUrls ?? [];
       const types = data.mediaTypes ?? [];
@@ -177,23 +191,43 @@ export async function updateScheduledPost(
         updateData.mediaType = null;
         updateData.mediaUrls = FieldValue.delete();
         updateData.mediaTypes = FieldValue.delete();
+        firstTypeAfterUpdate = null;
       } else if (urls.length === 1) {
         // Single — guarda no campo legado e apaga o array (mantem consistencia)
         updateData.mediaUrl = urls[0];
         updateData.mediaType = types[0] ?? null;
         updateData.mediaUrls = FieldValue.delete();
         updateData.mediaTypes = FieldValue.delete();
+        firstTypeAfterUpdate = types[0] ?? null;
       } else {
         // Galeria
         updateData.mediaUrl = urls[0];
         updateData.mediaType = types[0] ?? null;
         updateData.mediaUrls = urls;
         updateData.mediaTypes = types;
+        firstTypeAfterUpdate = types[0] ?? null;
       }
     } else {
       // Sem novo array — caller usou a forma singular antiga.
       if (data.mediaUrl !== undefined) updateData.mediaUrl = data.mediaUrl || null;
-      if (data.mediaType !== undefined) updateData.mediaType = data.mediaType || null;
+      if (data.mediaType !== undefined) {
+        updateData.mediaType = data.mediaType || null;
+        firstTypeAfterUpdate = data.mediaType || null;
+      }
+    }
+
+    // documentTitle: só faz sentido com PDF. Aplica a regra em cascata:
+    //  - Caller mandou string vazia → apaga o campo.
+    //  - Caller mandou string com conteúdo → grava normalmente.
+    //  - Caller não mandou nada mas a mídia atual (depois desse update) não é
+    //    PDF → apaga o campo (era PDF antes, virou imagem agora, título perde
+    //    sentido).
+    if (data.documentTitle !== undefined) {
+      const trimmed = data.documentTitle.trim();
+      updateData.documentTitle = trimmed ? trimmed : FieldValue.delete();
+    } else if (firstTypeAfterUpdate !== undefined && firstTypeAfterUpdate !== 'application/pdf') {
+      // Mídia trocada pra não-PDF (ou removida) — limpa título residual.
+      updateData.documentTitle = FieldValue.delete();
     }
 
     await adminDb.collection('users').doc(userId).collection('scheduledPosts').doc(postId).update(updateData);

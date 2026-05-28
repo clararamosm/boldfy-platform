@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
 import { getAuthToken } from '@/lib/auth-client';
 import { updatePipelinePost } from '@/app/actions/content-pipeline';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, X, FileText, Loader2, Image as ImageIcon } from 'lucide-react';
 import type { PipelinePost } from '@/app/actions/content-pipeline';
@@ -35,6 +37,14 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Título do PDF — controlado localmente pra UX responsiva, persistido em
+  // blur. Sincroniza com o post sempre que ele recarrega (auto-save, troca
+  // de post, etc).
+  const [documentTitle, setDocumentTitle] = useState<string>(post.documentTitle ?? '');
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  useEffect(() => {
+    setDocumentTitle(post.documentTitle ?? '');
+  }, [post.documentTitle]);
 
   // Coleta mediaItems do post atual. Galeria (mediaUrls/mediaTypes) tem
   // prioridade; cai pro singular legado se ausente.
@@ -130,10 +140,38 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
     const newTypes = currentTypes.filter((_, i) => i !== idx);
     try {
       await persistMedia(newUrls, newTypes);
+      // Se removeu o PDF, limpa também o título residual no state — o
+      // server-side já apaga via cascade, mas o state local não saberia.
+      const stillHasPdf = newTypes.some((t) => classifyMimeType(t) === 'pdf');
+      if (!stillHasPdf) setDocumentTitle('');
     } catch {
       toast({ variant: 'destructive', title: 'Erro ao remover mídia' });
     }
   }, [currentUrls, currentTypes, persistMedia, toast]);
+
+  /**
+   * Persiste o título do PDF no Firestore. Chamado no blur do input pra
+   * evitar 1 write por keystroke. Se o valor for o mesmo do post salvo,
+   * skip — economiza writes desnecessários.
+   */
+  const persistDocumentTitle = useCallback(async () => {
+    const trimmed = documentTitle.trim();
+    const current = (post.documentTitle ?? '').trim();
+    if (trimmed === current) return;
+    setIsSavingTitle(true);
+    try {
+      const token = await getAuthToken();
+      // Server-side aceita string ou null. String vazia => null pra remover.
+      await updatePipelinePost(token, tlId, postId, {
+        documentTitle: trimmed === '' ? null : trimmed,
+      });
+    } catch (err) {
+      console.error('Failed to save documentTitle:', err);
+      toast({ variant: 'destructive', title: 'Erro ao salvar título do PDF' });
+    } finally {
+      setIsSavingTitle(false);
+    }
+  }, [documentTitle, post.documentTitle, tlId, postId, toast]);
 
   // Sem mídia e sem permissão de edição — esconde a seção
   if (currentUrls.length === 0 && !canEdit) return null;
@@ -203,6 +241,30 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
               <X className="h-3.5 w-3.5" />
             </Button>
           )}
+        </div>
+      )}
+
+      {/* Título do PDF — só renderiza quando a mídia é PDF.
+          Salvo em onBlur pra evitar 1 write por keystroke. Server-side aceita
+          string vazia/null pra remover; o cascade do updatePipelinePost já
+          apaga o título quando a mídia deixa de ser PDF. */}
+      {primaryKind === 'pdf' && (
+        <div className="space-y-1.5">
+          <Label htmlFor={`pdf-title-${postId}`} className="text-sm font-medium">
+            Título do PDF
+          </Label>
+          <Input
+            id={`pdf-title-${postId}`}
+            value={documentTitle}
+            onChange={(e) => setDocumentTitle(e.target.value.slice(0, 100))}
+            onBlur={() => { void persistDocumentTitle(); }}
+            placeholder="Ex: 5 perguntas que toda PME precisa responder"
+            maxLength={100}
+            disabled={!canEdit || isSavingTitle}
+          />
+          <p className="text-xs text-muted-foreground">
+            Aparece como nome do carrossel no LinkedIn. {documentTitle.length}/100
+          </p>
         </div>
       )}
 

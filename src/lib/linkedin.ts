@@ -518,7 +518,14 @@ export async function publishLinkedInPost(
   linkedinId: string,
   text: string,
   mediaUrls?: string[],
-  mediaTypes?: string[]
+  mediaTypes?: string[],
+  /**
+   * Título do documento — usado APENAS quando a mídia é PDF/carrossel.
+   * O LinkedIn renderiza esse texto como o nome visível do carrossel na
+   * timeline (aparece junto com "· N pages"). Se vier vazio, cai pro
+   * fallback genérico 'Documento'.
+   */
+  documentTitle?: string,
 ): Promise<LinkedInPostResult> {
   const authorUrn = `urn:li:person:${linkedinId}`;
 
@@ -587,11 +594,13 @@ export async function publishLinkedInPost(
     };
   } else if (mediaUrns.length === 1) {
     // Para PDF/documento, o `title` é o título visível do carrossel na timeline
-    // do LinkedIn — então cai pra um nome neutro só se não houver texto. Pra
-    // imagem/vídeo o título é ignorado pelo cliente, mas mantemos por consistência.
+    // do LinkedIn — então usamos o documentTitle do user quando vier. Sem ele,
+    // cai no fallback 'Documento'. Pra imagem/vídeo o título é ignorado pelo
+    // cliente, mas mantemos por consistência.
+    const customDocTitle = documentTitle?.trim();
     const mediaTitle =
       primaryCategory === 'pdf'
-        ? 'Documento'
+        ? (customDocTitle || 'Documento')
         : primaryCategory === 'video'
           ? 'Post video'
           : 'Post image';

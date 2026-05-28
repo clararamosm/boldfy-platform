@@ -137,7 +137,9 @@ export async function publishToLinkedIn(
   // vazios e mediaUrls/mediaTypes carregam o array. Pra retrocompat com
   // chamadas single, ambas as formas sao aceitas.
   mediaUrls?: string[],
-  mediaTypes?: string[]
+  mediaTypes?: string[],
+  // Título customizado pro carrossel/PDF. Ignorado quando a mídia não é PDF.
+  documentTitle?: string,
 ): Promise<PublishResult> {
   try {
     const user = await requireSelf(idToken, userId);
@@ -205,7 +207,7 @@ export async function publishToLinkedIn(
     const types: string[] = mediaTypes && mediaTypes.length > 0
       ? mediaTypes
       : mediaType ? [mediaType] : [];
-    const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim(), urls, types);
+    const result = await publishLinkedInPost(accessToken, connection.linkedinId, content.trim(), urls, types, documentTitle);
 
     // Defesa em profundidade: publishLinkedInPost já lança LINKEDIN_NO_POST_ID
     // quando o postId vem vazio, mas se por algum motivo passar reto, evitamos

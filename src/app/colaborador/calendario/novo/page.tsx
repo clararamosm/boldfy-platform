@@ -84,6 +84,10 @@ function EditorContent() {
   // singulares do schema antigo. Sempre array — mesmo single image vira
   // [{ ... }] de 1 item. Persistencia decide single vs galeria ao salvar.
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  // Título customizado do PDF/carrossel. Só é mostrado/persistido quando há PDF
+  // entre os mediaItems. LinkedIn usa esse texto como nome visível do carrossel
+  // na timeline (substituindo o fallback "Documento").
+  const [documentTitle, setDocumentTitle] = useState<string>('');
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('10:00');
   const [showTip, setShowTip] = useState(false);
@@ -273,6 +277,8 @@ function EditorContent() {
               uploadedUrl: result.post.mediaUrl,
             }]);
           }
+          // Hidrata título customizado do PDF — só aparece se existir.
+          if (result.post.documentTitle) setDocumentTitle(result.post.documentTitle);
           if (result.post.contentPillar) setContentPillar(result.post.contentPillar);
           if (result.post.formato) setFormato(result.post.formato);
           // Hidrata status pra badge — quando o post existente ja foi
@@ -360,7 +366,11 @@ function EditorContent() {
       if (item?.previewUrl?.startsWith('blob:')) {
         URL.revokeObjectURL(item.previewUrl);
       }
-      return prev.filter((_, i) => i !== idx);
+      const next = prev.filter((_, i) => i !== idx);
+      // Se removeu o PDF (ou virou lista sem PDF), limpa título — perde sentido.
+      const stillHasPdf = next.some((m) => classifyMimeType(m.mimeType) === 'pdf');
+      if (!stillHasPdf) setDocumentTitle('');
+      return next;
     });
   };
 
@@ -428,6 +438,10 @@ function EditorContent() {
           scheduledFor,
           mediaUrls: urls,
           mediaTypes: types,
+          // Só envia documentTitle quando a primeira mídia é PDF — assim o
+          // server-side cascade não apaga o título acidentalmente em saves de
+          // posts com outras mídias.
+          ...(types[0] === 'application/pdf' && { documentTitle }),
           contentPillar,
           status: autoSaveStatus,
           ...(formato && { formato }),
@@ -445,6 +459,7 @@ function EditorContent() {
           mediaType: types[0],
           mediaUrls: urls,
           mediaTypes: types,
+          ...(types[0] === 'application/pdf' && { documentTitle }),
           contentPillar,
           ...(formato && { formato }),
           status: autoSaveStatus,
@@ -463,7 +478,7 @@ function EditorContent() {
     } finally {
       isAutoSavingRef.current = false;
     }
-  }, [userId, currentPostId, caption, mediaItems, scheduledDate, scheduledTime, contentPillar, formato, publishedUrl, router, uploadPendingMedia]);
+  }, [userId, currentPostId, caption, mediaItems, scheduledDate, scheduledTime, contentPillar, formato, documentTitle, publishedUrl, router, uploadPendingMedia]);
 
   /**
    * Debounce: a cada mudança relevante no editor, agenda um save em 1.5s.
@@ -485,7 +500,7 @@ function EditorContent() {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caption, mediaItems, scheduledDate, scheduledTime, contentPillar, formato, isLoadingPost]);
+  }, [caption, mediaItems, scheduledDate, scheduledTime, contentPillar, formato, documentTitle, isLoadingPost]);
 
   /**
    * beforeunload protection — se há save em andamento, avisa o user
@@ -566,6 +581,7 @@ function EditorContent() {
           ...(formato && { formato }),
           mediaUrls: urls,
           mediaTypes: types,
+          ...(types[0] === 'application/pdf' && { documentTitle }),
         });
         if (result.success) {
           toast({ title: t.colabNewPost.postUpdated, description: t.colabNewPost.postUpdatedDescription });
@@ -583,6 +599,7 @@ function EditorContent() {
           mediaType: types[0],
           mediaUrls: urls,
           mediaTypes: types,
+          ...(types[0] === 'application/pdf' && { documentTitle }),
           scheduledFor,
           status: 'scheduled',
           ...(contentPillar && { contentPillar }),
@@ -630,6 +647,7 @@ function EditorContent() {
           status: 'scheduled',
           mediaUrls: urls,
           mediaTypes: types,
+          ...(types[0] === 'application/pdf' && { documentTitle }),
         });
         if (!updateResult.success) {
           toast({ variant: 'destructive', title: t.common.error, description: updateResult.error || t.colabNewPost.scheduleError });
@@ -645,6 +663,7 @@ function EditorContent() {
           types[0], // legado
           urls,
           types,
+          types[0] === 'application/pdf' ? documentTitle : undefined,
         );
 
         if (result.success) {
@@ -667,6 +686,7 @@ function EditorContent() {
           mediaType: types[0],
           mediaUrls: urls,
           mediaTypes: types,
+          ...(types[0] === 'application/pdf' && { documentTitle }),
           scheduledFor: new Date().toISOString(),
           status: 'scheduled',
         });
@@ -681,6 +701,7 @@ function EditorContent() {
           token, userId, caption,
           urls[0], createResult.postId, types[0],
           urls, types,
+          types[0] === 'application/pdf' ? documentTitle : undefined,
         );
 
         if (result.success) {
@@ -1059,6 +1080,9 @@ function EditorContent() {
                 <div className="flex flex-col items-center justify-center h-40 w-full gap-2 text-muted-foreground">
                   <Upload className="h-8 w-8" />
                   <span className="text-sm">PDF carregado</span>
+                  <span className="text-xs text-muted-foreground">
+                    O título abaixo aparece no carrossel do LinkedIn.
+                  </span>
                 </div>
               ) : mediaItems[0].previewUrl.startsWith('http') ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -1089,6 +1113,29 @@ function EditorContent() {
                   />
                 </label>
               )}
+            </div>
+          )}
+
+          {/* Título do PDF — só aparece quando há PDF.
+              É o que o LinkedIn renderiza como nome do carrossel na timeline
+              (ex: "Como crescer mais que o setor · 7 pages"). Limite prático:
+              100 caracteres. Sem isso, cai pro fallback "Documento". */}
+          {primaryKind === 'pdf' && (
+            <div className="mt-3 space-y-1.5">
+              <Label htmlFor="documentTitle" className="text-sm font-medium">
+                Título do PDF
+              </Label>
+              <Input
+                id="documentTitle"
+                value={documentTitle}
+                onChange={(e) => setDocumentTitle(e.target.value.slice(0, 100))}
+                placeholder="Ex: 5 perguntas que toda PME precisa responder"
+                maxLength={100}
+                disabled={!!publishedUrl}
+              />
+              <p className="text-xs text-muted-foreground">
+                Aparece como nome do carrossel no LinkedIn. {documentTitle.length}/100
+              </p>
             </div>
           )}
         </div>
