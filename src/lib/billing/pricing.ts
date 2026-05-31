@@ -74,7 +74,7 @@ export const TL_MATRIX: Readonly<Record<TLExecutiveCount, Readonly<Record<TLFreq
   1: Object.freeze({ 2: 550000,  3: 770000,  4: 960000 }),
   2: Object.freeze({ 2: 900000,  3: 1260000, 4: 1570000 }),
   3: Object.freeze({ 2: 1200000, 3: 1680000, 4: 2090000 }),
-  4: Object.freeze({ 2: 1480000, 3: 2070000, 4: 2580000 }),
+  4: Object.freeze({ 2: 1520000, 3: 2130000, 4: 2650000 }),
   5: Object.freeze({ 2: 1800000, 3: 2520000, 4: 3140000 }),
 });
 
@@ -110,8 +110,8 @@ export interface DesignPack {
 
 export const DESIGN_PACKS: Readonly<Record<DesignPackId, DesignPack>> = Object.freeze({
   starter: Object.freeze({ id: 'starter', label: 'Starter', piecesPerMonth: 4,  priceCents: 160000 }),
-  growth:  Object.freeze({ id: 'growth',  label: 'Growth',  piecesPerMonth: 8,  priceCents: 280000 }),
-  scale:   Object.freeze({ id: 'scale',   label: 'Scale',   piecesPerMonth: 12, priceCents: 360000 }),
+  growth:  Object.freeze({ id: 'growth',  label: 'Growth',  piecesPerMonth: 7,  priceCents: 280000 }),
+  scale:   Object.freeze({ id: 'scale',   label: 'Scale',   piecesPerMonth: 10, priceCents: 360000 }),
 });
 
 export function getDesignPack(id: string | undefined | null): DesignPack | null {

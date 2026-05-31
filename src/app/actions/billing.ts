@@ -239,8 +239,9 @@ function computePlatformUsage(
   collaboratorsCount: number,
   betaActive: boolean,
 ): PlatformUsageInfo {
-  const billedSeats = Math.max(collaboratorsCount, PLATFORM_MIN_SEATS);
-  const atMinimum = collaboratorsCount < PLATFORM_MIN_SEATS;
+  const minBillable = b.platform.minBillableSeats ?? PLATFORM_MIN_SEATS;
+  const billedSeats = Math.max(collaboratorsCount, minBillable);
+  const atMinimum = collaboratorsCount < minBillable;
 
   // Decide tipo de cobranca
   let chargeType: BillingChargeType;

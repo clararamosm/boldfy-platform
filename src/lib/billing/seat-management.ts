@@ -60,10 +60,15 @@ export async function resyncPlatformSeats(companyId: string): Promise<SeatSyncRe
 
   const activeCollaborators = countSnap.data().count;
 
-  // Seats contratados seguem regra de negocio: max(collabs atuais, minimo 5).
-  // Se admin tem 3 colabs, continuamos pagando por 5 (minimo de tier).
-  // Se admin tem 12 colabs, pagamos por 12.
-  const desiredSeats = Math.max(activeCollaborators, PLATFORM_MIN_SEATS);
+  const billing = companySnap.data()?.billing as CompanyBillingBlock | undefined;
+  const platform = billing?.platform;
+
+  // Seats contratados seguem regra de negocio: max(collabs atuais, piso do tier).
+  // O piso vem de minBillableSeats (default 5). Empresa que fechou um tier
+  // superior paga pelo piso daquele tier mesmo com menos colabs ativos
+  // (isca de aquisicao / "pegadinha do tier").
+  const minBillable = platform?.minBillableSeats ?? PLATFORM_MIN_SEATS;
+  const desiredSeats = Math.max(activeCollaborators, minBillable);
 
   if (desiredSeats > PLATFORM_ENTERPRISE_THRESHOLD) {
     // Nao bloqueamos o add do colaborador, mas registramos flag para time comercial
@@ -72,9 +77,6 @@ export async function resyncPlatformSeats(companyId: string): Promise<SeatSyncRe
       'billing.updatedAt': FieldValue.serverTimestamp(),
     });
   }
-
-  const billing = companySnap.data()?.billing as CompanyBillingBlock | undefined;
-  const platform = billing?.platform;
 
   // Sempre grava o seat count atual (fonte de verdade).
   await companyRef.update({

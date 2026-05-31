@@ -36,6 +36,13 @@ export type MaybeTimestamp =
 export interface PlatformBillingState {
   active: boolean;
   seats: number;
+  /**
+   * Piso de seats cobráveis (isca de aquisição / "pegadinha do tier").
+   * Setado no onboarding = piso do tier escolhido (5/11/21/41). A cobrança é
+   * sempre max(colaboradores ativos, minBillableSeats). Ausente em empresas
+   * antigas: tratar como PLATFORM_MIN_SEATS (5).
+   */
+  minBillableSeats?: number;
   stripeSubscriptionId?: string;
   /** @deprecated use cardDeadlineEndsAt */
   firstPaymentDeadline?: MaybeTimestamp;
