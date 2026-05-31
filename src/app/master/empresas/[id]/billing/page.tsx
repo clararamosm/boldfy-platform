@@ -159,6 +159,9 @@ export default function MasterCompanyBillingPage() {
   const [editName, setEditName] = useState('');
   const [editLocale, setEditLocale] = useState<'pt-BR' | 'en'>('pt-BR');
   const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
+  // Tier de entrada: valor = piso do tier (5/11/21/41) = minBillableSeats.
+  const [editTier, setEditTier] = useState('5');
+  const [loadedTier, setLoadedTier] = useState('5');
   const [createdAtISO, setCreatedAtISO] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingIdentity, setIsSavingIdentity] = useState(false);
@@ -224,6 +227,10 @@ export default function MasterCompanyBillingPage() {
           setEditName(name);
           setEditLocale(data.locale === 'en' ? 'en' : 'pt-BR');
           setEditLogoUrl(typeof data.logoUrl === 'string' && data.logoUrl ? data.logoUrl : null);
+          const billingBlock = data.billing as { platform?: { minBillableSeats?: number } } | undefined;
+          const minBillable = String(billingBlock?.platform?.minBillableSeats ?? 5);
+          setEditTier(minBillable);
+          setLoadedTier(minBillable);
           // createdAt: Firestore Timestamp ou string
           const created = data.createdAt;
           if (created && typeof created === 'object' && 'toDate' in created) {
@@ -547,6 +554,7 @@ export default function MasterCompanyBillingPage() {
         companyName: editName,
         locale: editLocale,
         logoUrl: editLogoUrl ?? '',
+        ...(editTier !== loadedTier ? { licenses: Number(editTier) } : {}),
       });
       if (!res.success || !res.data) {
         toast({ variant: 'destructive', title: 'Erro', description: res.error });
@@ -554,6 +562,7 @@ export default function MasterCompanyBillingPage() {
       }
       toast({ title: 'Identidade salva.' });
       setCompanyName(res.data.companyName);
+      setLoadedTier(editTier);
     } finally {
       setIsSavingIdentity(false);
     }
@@ -899,6 +908,24 @@ export default function MasterCompanyBillingPage() {
                             <SelectItem value="en">English</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="ident-tier">Tier de entrada (piso de cobrança)</Label>
+                        <Select value={editTier} onValueChange={setEditTier}>
+                          <SelectTrigger id="ident-tier" className="w-full md:w-60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="5">Tier 1 · 5–10 seats (piso 5)</SelectItem>
+                            <SelectItem value="11">Tier 2 · 11–20 seats (piso 11)</SelectItem>
+                            <SelectItem value="21">Tier 3 · 21–40 seats (piso 21)</SelectItem>
+                            <SelectItem value="41">Tier 4 · 41–70 seats (piso 41)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          A empresa entra pagando pelo piso do tier e cresce conforme adiciona colaboradores ativos. Acima de 70 é enterprise (manual).
+                        </p>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">

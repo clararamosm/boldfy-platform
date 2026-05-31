@@ -10,6 +10,7 @@ import { requireMaster } from '@/lib/auth-guard';
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { appendActivityLog } from '@/lib/billing/activity-log';
 import { getPlatformTier } from '@/lib/billing/pricing';
+import { resyncPlatformSeats } from '@/lib/billing/seat-management';
 import type { BillingActionResult } from './billing';
 
 /** Mascara email pra activity log (joao@x.com -> jo***@x.com). */
@@ -120,6 +121,19 @@ export async function saveCompanyIdentity(
     }
 
     await docRef.update(updates);
+
+    // Se as licencas (tier) mudaram, o minBillableSeats novo precisa ser
+    // propagado pro billing.platform.seats e pro Stripe (proration). O resync
+    // recalcula max(colaboradores ativos, minBillableSeats) e sincroniza a
+    // quantity da subscription. Best-effort: nao quebra o save de identidade
+    // se o resync falhar (ex: sem subscription ativa).
+    if (input.licenses !== undefined) {
+      try {
+        await resyncPlatformSeats(input.companyId);
+      } catch (seatErr) {
+        console.error('[saveCompanyIdentity] resyncPlatformSeats falhou:', seatErr);
+      }
+    }
 
     // Activity log — best effort.
     if (identityChanged.length > 0) {
