@@ -19,9 +19,9 @@ export interface PlatformTier {
 
 export const PLATFORM_TIERS: readonly PlatformTier[] = Object.freeze([
   { name: 'Tier 1', minSeats: 5,  maxSeats: 10, pricePerSeatCents: 49900, betaPricePerSeatCents: 34900 },
-  { name: 'Tier 2', minSeats: 11, maxSeats: 20, pricePerSeatCents: 44900, betaPricePerSeatCents: 31500 },
+  { name: 'Tier 2', minSeats: 11, maxSeats: 20, pricePerSeatCents: 44900, betaPricePerSeatCents: 31400 },
   { name: 'Tier 3', minSeats: 21, maxSeats: 40, pricePerSeatCents: 39900, betaPricePerSeatCents: 27900 },
-  { name: 'Tier 4', minSeats: 41, maxSeats: 70, pricePerSeatCents: 34900, betaPricePerSeatCents: 24500 },
+  { name: 'Tier 4', minSeats: 41, maxSeats: 70, pricePerSeatCents: 34900, betaPricePerSeatCents: 24400 },
   // Tier 5 (70+) e enterprise e deve ser negociado manualmente
 ]);
 

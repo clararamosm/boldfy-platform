@@ -9,6 +9,7 @@
 import { requireMaster } from '@/lib/auth-guard';
 import { auth as adminAuth, db as adminDb } from '@/lib/firebase-admin';
 import { appendActivityLog } from '@/lib/billing/activity-log';
+import { getPlatformTier } from '@/lib/billing/pricing';
 import type { BillingActionResult } from './billing';
 
 /** Mascara email pra activity log (joao@x.com -> jo***@x.com). */
@@ -87,7 +88,17 @@ export async function saveCompanyIdentity(
         return { success: false, error: 'Seats Platform deve ser inteiro >= 5.' };
       }
       updates.licenses = input.licenses;
-      seatsChanged.push(`Platform=${input.licenses}`);
+      // Piso de cobranca (isca de aquisicao): entrar num tier = pagar pelo
+      // minimo daquele tier. Deriva o tier do numero de licencas e grava
+      // minBillableSeats = piso do tier. Acima de 70 (enterprise) nao mexe;
+      // empresas nunca editadas ficam sem o campo e caem no default 5.
+      const tier = getPlatformTier(input.licenses);
+      if (tier) {
+        updates['billing.platform.minBillableSeats'] = tier.minSeats;
+        seatsChanged.push(`Platform=${input.licenses} (min ${tier.minSeats})`);
+      } else {
+        seatsChanged.push(`Platform=${input.licenses}`);
+      }
     }
 
     if (input.tlLicenses !== undefined) {
