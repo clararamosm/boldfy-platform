@@ -4,21 +4,14 @@ import { useAuth } from '@/contexts/auth-context';
 import { Header } from '@/components/dashboard/header';
 import { AnalyticsDashboard } from '@/components/linkedin-analytics/analytics-dashboard';
 import { Loader2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useExtractPending } from '@/hooks/use-extract-pending';
 
 export default function ThoughtLeaderAnalyticsPage() {
   const { user } = useAuth();
-
-  const uploadPending = useMemo(() => {
-    if (!user) return false;
-    const status = (user as { linkedinSnapshotStatus?: { lastUploadMonth?: string } }).linkedinSnapshotStatus;
-    const lastMonth = status?.lastUploadMonth;
-    // O extract pendente é o do MÊS PASSADO (em maio, espera-se abril).
-    const now = new Date();
-    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const previousMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
-    return !lastMonth || lastMonth < previousMonth;
-  }, [user]);
+  // Source-of-truth: existence of the previous month's *monthly* snapshot doc.
+  // Antes lia linkedinSnapshotStatus.lastUploadMonth do user-doc — flag que
+  // dessincroniza (mesmo bug do colaborador). Unificado no hook.
+  const { pending: uploadPending } = useExtractPending(user?.uid);
 
   if (!user) {
     return (

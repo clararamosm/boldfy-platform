@@ -7,8 +7,16 @@
 // from a seed/script that didn't touch the flag).
 //
 // Rule: the extract for month M is "available" starting day 1 of month
-// M+1, and stays pending until a snapshot with id "YYYY-MM" for that
-// previous month exists under users/{uid}/linkedinSnapshots.
+// M+1, and stays pending until a *monthly* snapshot with id "YYYY-MM"
+// for that previous month exists under users/{uid}/linkedinSnapshots.
+//
+// IMPORTANT — only a `monthly` upload clears the pending state. A
+// `historical` snapshot (the 12-month retroactive import done at
+// onboarding) covers the same month but is partial: it feeds the trend
+// charts, not the monthly KPIs/top-posts. Treating it as "done" was the
+// real bug Clara hit — a user with a historical May snapshot never saw
+// the banner to upload May's actual monthly extract. So a month whose
+// only snapshot is `historical` is still pending.
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -47,7 +55,14 @@ export function useExtractPending(uid: string | undefined): ExtractPendingState 
     const unsub = onSnapshot(
       doc(db, 'users', uid, 'linkedinSnapshots', previousMonth),
       snap => {
-        setPending(!snap.exists());
+        // Pending unless a *monthly* snapshot exists. A historical/partial
+        // snapshot does NOT clear the reminder. `uploadType` undefined is
+        // treated as 'monthly' for backward-compat with older docs that
+        // predate the field (mirrors the `?? 'monthly'` default used in
+        // the analytics dashboard).
+        const uploadType = snap.exists() ? snap.data()?.uploadType : undefined;
+        const hasMonthly = snap.exists() && uploadType !== 'historical';
+        setPending(!hasMonthly);
         setLoading(false);
       },
       () => {

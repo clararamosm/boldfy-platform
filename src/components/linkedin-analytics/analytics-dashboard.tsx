@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Loader2, History } from 'lucide-react';
+import { Loader2, History, Upload, CheckCircle2 } from 'lucide-react';
 import { getAuthToken } from '@/lib/auth-client';
 import { getLinkedInSnapshot, getLinkedInSnapshotBatch, listLinkedInSnapshots } from '@/app/actions/linkedin-analytics';
 import type { LinkedInSnapshot } from '@/lib/linkedin-analytics-types';
@@ -306,6 +306,15 @@ export function AnalyticsDashboard({
   // Tem dados históricos mas nenhum upload mensal ainda
   const hasOnlyHistorical = monthlyMonths.length === 0;
 
+  // Label do mês anterior (alvo do upload mensal) — "em junho, o alvo é maio".
+  const previousMonthLabel = formatMesAno(
+    (() => {
+      const d = new Date();
+      const p = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+      return `${p.getFullYear()}-${String(p.getMonth() + 1).padStart(2, '0')}`;
+    })(),
+  );
+
   // Seletor de mês individual — substituiu o filtro 1M/3M/6M/1A.
   // Mostra qual mês está sendo exibido (default = último monthly cadastrado).
   // Meses com upload historical aparecem marcados como "(parcial)".
@@ -328,6 +337,34 @@ export function AnalyticsDashboard({
         </SelectContent>
       </Select>
 
+      {/* Botão de upload SEMPRE visível (dono/gestor dos dados).
+          Pendente → laranja chamativo "Fazer upload de {mês}".
+          Em dia   → estado discreto com ✓, mas ainda clicável. */}
+      {canManageHistory && (
+        uploadPending ? (
+          <Button
+            size="sm"
+            className="h-8 bg-orange-600 text-white hover:bg-orange-700 shrink-0"
+            title={`Fazer upload do extract de ${previousMonthLabel}`}
+            onClick={() => setUploadModalOpen(true)}
+          >
+            <Upload className="h-3.5 w-3.5 mr-1.5" />
+            Fazer upload de {previousMonthLabel}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50 shrink-0"
+            title={`Upload de ${previousMonthLabel} em dia — clique para enviar outro mês`}
+            onClick={() => setUploadModalOpen(true)}
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+            Upload em dia
+          </Button>
+        )
+      )}
+
       {/* Botão ícone — histórico de uploads */}
       {canManageHistory && (
         <Button
@@ -346,7 +383,10 @@ export function AnalyticsDashboard({
   return (
     <div className="space-y-6">
       {uploadPending && (
-        <UploadPendingBanner onUploadClick={() => setUploadModalOpen(true)} />
+        <UploadPendingBanner
+          onUploadClick={() => setUploadModalOpen(true)}
+          variant="highlight"
+        />
       )}
 
       {/* ── SEÇÃO DO MÊS SELECIONADO ─────────────────────────────
