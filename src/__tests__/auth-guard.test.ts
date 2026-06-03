@@ -98,17 +98,17 @@ describe('requireAdmin', () => {
 
   it('blocks colaborador role', async () => {
     mockUser('colaborador', 'company-1');
-    await expect(requireAdmin('token')).rejects.toThrow('permissao de administrador');
+    await expect(requireAdmin('token')).rejects.toThrow('permissão de administrador');
   });
 
   it('blocks strategist role', async () => {
     mockUser('strategist');
-    await expect(requireAdmin('token')).rejects.toThrow('permissao de administrador');
+    await expect(requireAdmin('token')).rejects.toThrow('permissão de administrador');
   });
 
   it('blocks admin from accessing another company', async () => {
     mockUser('admin', 'company-1');
-    await expect(requireAdmin('token', 'company-2')).rejects.toThrow('nao tem permissao nesta empresa');
+    await expect(requireAdmin('token', 'company-2')).rejects.toThrow('não tem permissão nesta empresa');
   });
 
   it('allows admin in their own company', async () => {
@@ -131,12 +131,12 @@ describe('requireMaster', () => {
 
   it('blocks admin role', async () => {
     mockUser('admin', 'company-1');
-    await expect(requireMaster('token')).rejects.toThrow('permissao de master');
+    await expect(requireMaster('token')).rejects.toThrow('permissão de master');
   });
 
   it('blocks colaborador role', async () => {
     mockUser('colaborador');
-    await expect(requireMaster('token')).rejects.toThrow('permissao de master');
+    await expect(requireMaster('token')).rejects.toThrow('permissão de master');
   });
 });
 
@@ -153,7 +153,7 @@ describe('requireStrategist', () => {
 
   it('blocks master role (strict strategist-only)', async () => {
     mockUser('master');
-    await expect(requireStrategist('token')).rejects.toThrow('permissao de estrategista');
+    await expect(requireStrategist('token')).rejects.toThrow('permissão de estrategista');
   });
 });
 
@@ -232,7 +232,7 @@ describe('requireAdminOrStrategist', () => {
 
   it('blocks admin for another company', async () => {
     mockUser('admin', 'company-1');
-    await expect(requireAdminOrStrategist('token', 'company-2')).rejects.toThrow('nao tem permissao');
+    await expect(requireAdminOrStrategist('token', 'company-2')).rejects.toThrow('não tem permissão');
   });
 
   it('blocks colaborador role entirely', async () => {

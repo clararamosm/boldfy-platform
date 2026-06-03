@@ -65,7 +65,16 @@ export function useAiCredits() {
     return () => unsubscribe();
   }, [user?.uid]);
 
-  const totalAvailable = credits.remaining + credits.bonusCredits;
+  // Renovação é LAZY no servidor (ensureAndRenewCredits roda só ao gerar
+  // conteúdo). Se a UI bloquear com base no doc cru — que ainda mostra
+  // remaining:0 e renewsAt no passado — o usuário nunca consegue gerar e a
+  // renovação nunca dispara (deadlock). Aqui refletimos o saldo EFETIVO:
+  // se renewsAt já venceu, o usuário já tem direito ao limite mensal cheio.
+  // O servidor reconcilia o doc na primeira geração.
+  const renewalDue = credits.renewsAt != null && credits.renewsAt.getTime() <= Date.now();
+  const effectiveRemaining = renewalDue ? credits.monthlyLimit : credits.remaining;
+
+  const totalAvailable = effectiveRemaining + credits.bonusCredits;
 
   const daysUntilRenewal = credits.renewsAt
     ? Math.max(0, Math.ceil((credits.renewsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -73,6 +82,7 @@ export function useAiCredits() {
 
   return {
     ...credits,
+    remaining: effectiveRemaining,
     totalAvailable,
     daysUntilRenewal,
     loading,
