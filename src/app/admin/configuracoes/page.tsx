@@ -98,7 +98,7 @@ function ConfiguracoesPageContent() {
             email: company.adminProfile?.email || '',
             adminPhotoURL: company.adminPhotoURL,
             status: company.status || 'Trial',
-            licenses: company.licenses || 5,
+            licenses: company.licenses || 3,
             trialEndsAt: company.trialEndsAt,
         });
         setIsLoading(false);

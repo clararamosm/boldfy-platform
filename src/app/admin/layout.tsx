@@ -33,7 +33,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
     const searchParams = useSearchParams();
     const [companyLogoUrl, setCompanyLogoUrl] = useState<string | undefined>();
     const [companyName, setCompanyName] = useState('');
-    const [licensesCount, setLicensesCount] = useState(5);
+    const [licensesCount, setLicensesCount] = useState(3);
 
     // Preserva ?companyId= (master) ou ?c= (slug) nos links do footer.
     // Sem isto, master clica em Configuracoes/Billing/etc e perde o contexto
@@ -57,7 +57,7 @@ function AdminLayoutInner({ children }: { children: React.ReactNode }) {
             // permanece para empresas que ainda nao foram migradas.
             const billingSeats = data?.billing?.platform?.seats;
             const legacySeats = data?.subscription?.totalLicenses;
-            setLicensesCount(billingSeats || legacySeats || 5);
+            setLicensesCount(billingSeats || legacySeats || 3);
         }).catch(() => {});
     }, [companyId]);
 

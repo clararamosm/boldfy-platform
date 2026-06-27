@@ -85,9 +85,9 @@ export type BillingChargeType =
 export interface PlatformUsageInfo {
   /** Numero real de colaboradores no Firestore (count de users). */
   collaboratorsCount: number;
-  /** Seats efetivamente cobrados (max(collabsCount, 5)). */
+  /** Seats efetivamente cobrados (max(collabsCount, 3)). */
   billedSeats: number;
-  /** True se a empresa esta no minimo (5 seats por menos colabs). */
+  /** True se a empresa esta no minimo (3 seats por menos colabs). */
   atMinimum: boolean;
   /** Preco por seat (em centavos), ja com desconto beta se aplicavel. */
   perSeatCents: number | null;

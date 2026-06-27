@@ -419,7 +419,7 @@ const InviteAdminSchema = z.object({
   companyName: z.string().min(1, 'Nome da empresa é obrigatório.'),
   adminName: z.string().optional().default(''),
   adminEmail: z.string().optional().default(''),
-  licenses: z.coerce.number().int().min(5, 'O número de licenças deve ser no mínimo 5.').positive('Número de licenças deve ser positivo.'),
+  licenses: z.coerce.number().int().min(3, 'O número de licenças deve ser no mínimo 3.').positive('Número de licenças deve ser positivo.'),
   tlLicenses: z.coerce.number().int().min(0).default(0),
   locale: z.enum(['pt-BR', 'en']).default('pt-BR'),
   skipInvite: z.string().optional(),
@@ -1422,7 +1422,7 @@ export async function toggleCollaboratorStatus(
     });
 
     // Billing: sincroniza seats apos mudanca de status. Ativar conta um seat;
-    // desativar libera. resyncPlatformSeats respeita o minimo de 5 seats via
+    // desativar libera. resyncPlatformSeats respeita o minimo de 3 seats via
     // Math.max(activeCollaborators, PLATFORM_MIN_SEATS).
     try {
       await resyncPlatformSeats(companyId);

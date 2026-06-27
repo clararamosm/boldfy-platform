@@ -95,8 +95,8 @@ function CompanyFormContent() {
               </>
             )}
              <div className="space-y-2">
-                <Label htmlFor="licenses">Número de Licenças (mín. 5)</Label>
-                <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="5" defaultValue="5" disabled={pending} required />
+                <Label htmlFor="licenses">Número de Licenças (mín. 3)</Label>
+                <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="3" defaultValue="3" disabled={pending} required />
              </div>
              <div className="space-y-2">
                 <Label htmlFor="tlLicenses">Licenças Thought Leader (opcional)</Label>
@@ -117,7 +117,7 @@ function CompanyFormContent() {
                 </Select>
                 <p className="text-xs text-muted-foreground">Define o idioma de toda a interface para esta empresa.</p>
              </div>
-             <p className="text-xs text-muted-foreground">Licenças contam apenas colaboradores (a conta de admin é gratuita). Mínimo de 5 licenças.</p>
+             <p className="text-xs text-muted-foreground">Licenças contam apenas colaboradores (a conta de admin é gratuita). Mínimo de 3 licenças.</p>
         </div>
     );
 }

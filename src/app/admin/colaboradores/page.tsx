@@ -244,7 +244,7 @@ export default function AdminColaboradoresPage() {
   }, [inviteTLState, toast, companyId, fetchCollaborators]);
 
   // Modelo per-seat dinamico: convite e sempre permitido. Novos colaboradores
-  // alem dos 5 seats minimos comecam a ser cobrados quando ativam a conta.
+  // alem dos 3 seats minimos comecam a ser cobrados quando ativam a conta.
   const inviteButton = (
     <Button size="sm" disabled={isLoading || !companyId}>
       <PlusCircle className="mr-2 h-4 w-4" />
@@ -530,11 +530,11 @@ export default function AdminColaboradoresPage() {
           <StatCard title={t.adminCollaborators.activeCollaborators} value={String(collaborators.filter(c => c.status === 'Ativo').length)} icon={UserCheck} isLoading={isLoading} />
           {/*
             Modelo per-seat: nao ha mais limite. O numero mostrado e o de
-            assentos cobrados (minimo 5, escala com colaboradores ativos).
+            assentos cobrados (minimo 3, escala com colaboradores ativos).
             Label da chave i18n availableLicenses ja foi atualizado para
             "Assentos Cobrados" / "Billed Seats".
           */}
-          <StatCard title={t.adminCollaborators.availableLicenses} value={String(Math.max(collaborators.filter(c => c.status === 'Ativo').length, 5))} icon={Users} isLoading={isLoading} />
+          <StatCard title={t.adminCollaborators.availableLicenses} value={String(Math.max(collaborators.filter(c => c.status === 'Ativo').length, 3))} icon={Users} isLoading={isLoading} />
         </div>
         <Card>
           <CardHeader>

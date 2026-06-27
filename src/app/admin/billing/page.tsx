@@ -231,7 +231,7 @@ export default function AdminBillingPage() {
       // - Platform: usa seats reais (min 5)
       // - TL: usa executives/frequency reais se > 0, senao defaults pra preview vazio nao quebrar
       // - Design: usa pack atual ou starter
-      const previewSeats = Math.max(res.data.platform.seats || 5, 5);
+      const previewSeats = Math.max(res.data.platform.seats || 3, 3);
       const previewExec = res.data.tl.executives > 0 ? res.data.tl.executives : 1;
       const previewFreq = [2, 3, 4].includes(res.data.tl.frequency)
         ? (res.data.tl.frequency as 2 | 3 | 4)
@@ -271,7 +271,7 @@ export default function AdminBillingPage() {
         const idToken = await getIdToken();
         const sim = await simulatePricing({
           idToken,
-          platform: { seats: Math.max(billing.platform.seats || 5, 5) },
+          platform: { seats: Math.max(billing.platform.seats || 3, 3) },
           tl: { executives: tlExecutives, frequency: tlFrequency },
           design: { pack: designPack },
         });
@@ -296,7 +296,7 @@ export default function AdminBillingPage() {
           module,
           // Para Platform o server faz resync e usa seats reais; passamos o que vimos
           platformSeats:
-            module === 'platform' ? Math.max(billing?.platform.seats || 5, 5) : undefined,
+            module === 'platform' ? Math.max(billing?.platform.seats || 3, 3) : undefined,
           tlExecutives: module === 'tl' ? tlExecutives : undefined,
           tlFrequency: module === 'tl' ? tlFrequency : undefined,
           designPack: module === 'design' ? designPack : undefined,
@@ -450,7 +450,7 @@ export default function AdminBillingPage() {
     );
   }
 
-  const platformSeats = Math.max(billing.platform.seats || 5, 5);
+  const platformSeats = Math.max(billing.platform.seats || 3, 3);
   const isBeta = billing.isBetaTester;
 
   // Botao Platform: muda conforme estado

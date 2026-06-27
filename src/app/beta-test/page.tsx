@@ -407,7 +407,7 @@ function BetaTestContent() {
                 <Slider
                   value={[simColabs]}
                   onValueChange={(v) => setSimColabs(v[0])}
-                  min={5}
+                  min={3}
                   max={70}
                   step={1}
                   className="w-full"

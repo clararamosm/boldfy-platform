@@ -159,9 +159,9 @@ export default function MasterCompanyBillingPage() {
   const [editName, setEditName] = useState('');
   const [editLocale, setEditLocale] = useState<'pt-BR' | 'en'>('pt-BR');
   const [editLogoUrl, setEditLogoUrl] = useState<string | null>(null);
-  // Tier de entrada: valor = piso do tier (5/11/21/41) = minBillableSeats.
-  const [editTier, setEditTier] = useState('5');
-  const [loadedTier, setLoadedTier] = useState('5');
+  // Tier de entrada: valor = piso do tier (3/11/21/41) = minBillableSeats.
+  const [editTier, setEditTier] = useState('3');
+  const [loadedTier, setLoadedTier] = useState('3');
   const [createdAtISO, setCreatedAtISO] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingIdentity, setIsSavingIdentity] = useState(false);
@@ -228,7 +228,7 @@ export default function MasterCompanyBillingPage() {
           setEditLocale(data.locale === 'en' ? 'en' : 'pt-BR');
           setEditLogoUrl(typeof data.logoUrl === 'string' && data.logoUrl ? data.logoUrl : null);
           const billingBlock = data.billing as { platform?: { minBillableSeats?: number } } | undefined;
-          const minBillable = String(billingBlock?.platform?.minBillableSeats ?? 5);
+          const minBillable = String(billingBlock?.platform?.minBillableSeats ?? 3);
           setEditTier(minBillable);
           setLoadedTier(minBillable);
           // createdAt: Firestore Timestamp ou string
@@ -917,7 +917,7 @@ export default function MasterCompanyBillingPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="5">Tier 1 · 5–10 seats (piso 5)</SelectItem>
+                            <SelectItem value="3">Tier 1 · 3–10 seats (piso 3)</SelectItem>
                             <SelectItem value="11">Tier 2 · 11–20 seats (piso 11)</SelectItem>
                             <SelectItem value="21">Tier 3 · 21–40 seats (piso 21)</SelectItem>
                             <SelectItem value="41">Tier 4 · 41–70 seats (piso 41)</SelectItem>

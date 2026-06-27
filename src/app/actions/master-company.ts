@@ -85,8 +85,8 @@ export async function saveCompanyIdentity(
     }
 
     if (input.licenses !== undefined) {
-      if (!Number.isInteger(input.licenses) || input.licenses < 5) {
-        return { success: false, error: 'Seats Platform deve ser inteiro >= 5.' };
+      if (!Number.isInteger(input.licenses) || input.licenses < 3) {
+        return { success: false, error: 'Seats Platform deve ser inteiro >= 3.' };
       }
       updates.licenses = input.licenses;
       // Piso de cobranca (isca de aquisicao): entrar num tier = pagar pelo

@@ -7,7 +7,7 @@
 //   2. quantity do item da Subscription no Stripe (proration automatico)
 //
 // Regras:
-// - Minimo SEMPRE 5 seats (PLATFORM_MIN_SEATS). Nao deixa cair abaixo.
+// - Minimo SEMPRE 3 seats (PLATFORM_MIN_SEATS). Nao deixa cair abaixo.
 // - Maximo 70 (enterprise precisa contrato separado).
 // - So atualiza Stripe se status === 'active' (sub existente).
 // - Se status === 'disabled' ou 'pending': apenas atualiza Firestore.

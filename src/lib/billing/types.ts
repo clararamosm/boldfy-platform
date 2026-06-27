@@ -31,16 +31,16 @@ export type MaybeTimestamp =
 
 /**
  * Estado do modulo Platform (colaboradores).
- * seats: quantidade atual, minimo 5 quando active, 0 quando disabled.
+ * seats: quantidade atual, minimo 3 quando active, 0 quando disabled.
  */
 export interface PlatformBillingState {
   active: boolean;
   seats: number;
   /**
    * Piso de seats cobráveis (isca de aquisição / "pegadinha do tier").
-   * Setado no onboarding = piso do tier escolhido (5/11/21/41). A cobrança é
+   * Setado no onboarding = piso do tier escolhido (3/11/21/41). A cobrança é
    * sempre max(colaboradores ativos, minBillableSeats). Ausente em empresas
-   * antigas: tratar como PLATFORM_MIN_SEATS (5).
+   * antigas: tratar como PLATFORM_MIN_SEATS (3).
    */
   minBillableSeats?: number;
   stripeSubscriptionId?: string;
