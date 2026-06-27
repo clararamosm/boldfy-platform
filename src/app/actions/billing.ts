@@ -38,6 +38,11 @@ import {
   type BillingModule,
 } from '@/lib/billing/stripe-modules';
 import { resyncPlatformSeats } from '@/lib/billing/seat-management';
+import {
+  evaluateModuleAccess,
+  moduleFromRole,
+  type LegacySubscriptionShape,
+} from '@/lib/billing/module-gate';
 import { computeBillingWarnings, type BillingWarning } from '@/lib/billing/warnings';
 import type { CompanyBillingBlock } from '@/lib/billing/types';
 import type { ActivityLogEntry } from '@/lib/billing/activity-log-types';
@@ -994,6 +999,121 @@ export async function getBillingWarnings(
     return {
       success: false,
       error: e instanceof Error ? e.message : 'Erro ao carregar avisos.',
+    };
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// ACESSO: gate de paywall (overlay global no client)
+// ────────────────────────────────────────────────────────────
+
+const MODULE_LABEL_ACCESS: Record<BillingModule, string> = {
+  platform: 'Plataforma',
+  tl: 'Thought Leaders',
+  design: 'Design',
+};
+
+export interface BillingAccessResult {
+  /** True quando o modulo do role do usuario esta sem acesso (blocked / pending vencido / beta expirado). */
+  blocked: boolean;
+  /** Motivo tecnico vindo do module-gate (module-blocked | pending-expired | ...). */
+  reason?: string;
+  /** Label legivel do modulo bloqueado (Plataforma / Thought Leaders). */
+  moduleLabel?: string;
+  /** True so para admin — quem pode iniciar o pagamento. Colaborador/TL veem mensagem pra falar com o admin. */
+  canManageBilling: boolean;
+}
+
+/**
+ * Pergunta canonica do paywall: "esse usuario esta bloqueado?".
+ * Reusa evaluateModuleAccess — a MESMA funcao que gateia as server actions —
+ * entao o overlay no client e o bloqueio no server NUNCA divergem.
+ *
+ * fail-open por design: qualquer erro/ausencia retorna blocked=false. O
+ * bloqueio REAL continua server-side por acao (requireActiveModule); o overlay
+ * e camada de UX e jamais pode trancar um cliente pagante por um bug.
+ */
+export async function getBillingAccess(
+  idToken: string,
+): Promise<BillingActionResult<BillingAccessResult>> {
+  try {
+    if (!idToken) {
+      return { success: true, data: { blocked: false, canManageBilling: false } };
+    }
+    const user = await requireAuth(idToken);
+    const canManageBilling = user.role === 'admin';
+    // Roles internos (master/strategist) nunca sao bloqueados.
+    if (user.role === 'master' || user.role === 'strategist') {
+      return { success: true, data: { blocked: false, canManageBilling: false } };
+    }
+    const moduleKey = moduleFromRole(user.role);
+    if (!moduleKey || !user.companyId) {
+      return { success: true, data: { blocked: false, canManageBilling } };
+    }
+    const snap = await adminDb.collection('companies').doc(user.companyId).get();
+    if (!snap.exists) {
+      return { success: true, data: { blocked: false, canManageBilling } };
+    }
+    const data = snap.data() ?? {};
+    const billing = (data.billing as CompanyBillingBlock | undefined) ?? null;
+    const legacySubscription = data.subscription as LegacySubscriptionShape | undefined;
+    const decision = evaluateModuleAccess(billing, moduleKey, {
+      graceLegacy: true,
+      legacySubscription,
+    });
+    if (decision.allowed) {
+      return { success: true, data: { blocked: false, canManageBilling } };
+    }
+    return {
+      success: true,
+      data: {
+        blocked: true,
+        reason: decision.reason,
+        moduleLabel: MODULE_LABEL_ACCESS[moduleKey],
+        canManageBilling,
+      },
+    };
+  } catch (e: unknown) {
+    console.error('[getBillingAccess] falhou (fail-open):', e);
+    return { success: true, data: { blocked: false, canManageBilling: false } };
+  }
+}
+
+/**
+ * Gera um Stripe Checkout do modulo Platform da empresa do admin, pra
+ * regularizar o pagamento direto do overlay de paywall. NAO altera o status do
+ * modulo (continua blocked ate o webhook confirmar o pagamento) — evita
+ * re-liberar acesso de graca. So admin paga; colaborador/TL falam com o admin.
+ */
+export async function createRegularizationCheckout(
+  idToken: string,
+): Promise<BillingActionResult<{ checkoutUrl: string }>> {
+  try {
+    if (!idToken) {
+      return { success: false, error: 'Token de autenticação ausente.' };
+    }
+    const admin = await requireAdmin(idToken);
+    if (!admin.companyId || !admin.email) {
+      return { success: false, error: 'Admin sem empresa ou email vinculado.' };
+    }
+    const billing = await getCompanyBillingBlock(admin.companyId);
+    const platformSeats = Math.max(
+      billing.platform?.seats || PLATFORM_MIN_SEATS,
+      PLATFORM_MIN_SEATS,
+    );
+    const result = await createModuleCheckoutSession({
+      companyId: admin.companyId,
+      adminUid: admin.uid,
+      adminEmail: admin.email,
+      modules: ['platform'],
+      platformSeats,
+    });
+    return { success: true, data: { checkoutUrl: result.checkoutUrl } };
+  } catch (e: unknown) {
+    console.error('[createRegularizationCheckout] falhou:', e);
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : 'Erro ao gerar checkout de regularização.',
     };
   }
 }
