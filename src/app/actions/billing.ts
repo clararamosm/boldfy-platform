@@ -1016,7 +1016,7 @@ const MODULE_LABEL_ACCESS: Record<BillingModule, string> = {
 export interface BillingAccessResult {
   /** True quando o modulo do role do usuario esta sem acesso (blocked / pending vencido / beta expirado). */
   blocked: boolean;
-  /** Motivo tecnico vindo do module-gate (module-blocked | pending-expired | ...). */
+  /** Motivo tecnico (module-blocked | pending-expired | trial-expired). */
   reason?: string;
   /** Label legivel do modulo bloqueado (Plataforma / Thought Leaders). */
   moduleLabel?: string;
@@ -1061,7 +1061,16 @@ export async function getBillingAccess(
       graceLegacy: true,
       legacySubscription,
     });
-    if (decision.allowed) {
+    // Paywall dispara SO nos gatilhos combinados com a Clara: modulo 'blocked'
+    // (prazo do cartao estourou) ou 'pending' com prazo vencido — que tambem
+    // cobre beta expirado que caiu nesses estados. NAO travamos empresas sem
+    // billing configurado (legado sem assinatura: 'no-billing'/'no-billing-no-legacy')
+    // nem modulo 'disabled' (nunca ativado): essas seguem gateadas por acao no
+    // server, mas sem overlay global — evita trancar legado nao rastreado.
+    const isPaywallTrigger =
+      !decision.allowed &&
+      (decision.reason === 'module-blocked' || decision.reason === 'pending-expired');
+    if (!isPaywallTrigger) {
       return { success: true, data: { blocked: false, canManageBilling } };
     }
     return {

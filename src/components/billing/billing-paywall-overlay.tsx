@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { CreditCard, Loader2, Lock, LogOut } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth as firebaseAuth } from '@/lib/firebase';
@@ -30,6 +30,11 @@ const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 export function BillingPaywallOverlay() {
   const router = useRouter();
+  const pathname = usePathname();
+  // A pagina de cobranca (/admin/billing) e a UNICA rota interna liberada
+  // mesmo bloqueado: e ali que o admin gerencia pagamento, conecta Stripe e
+  // resolve a config. Sem essa excecao o overlay cobriria a propria saida.
+  const onBillingPage = (pathname ?? '').startsWith('/admin/billing');
   const [access, setAccess] = useState<BillingAccessResult | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [checkoutError, setCheckoutError] = useState(false);
@@ -69,15 +74,16 @@ export function BillingPaywallOverlay() {
     };
   }, [fetchAccess]);
 
-  // Trava o scroll do body enquanto o paywall esta ativo.
+  // Trava o scroll do body enquanto o paywall esta ativo (exceto na pagina de
+  // cobranca, onde o overlay nao aparece).
   useEffect(() => {
-    if (!access?.blocked) return;
+    if (!access?.blocked || onBillingPage) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = previous;
     };
-  }, [access?.blocked]);
+  }, [access?.blocked, onBillingPage]);
 
   const handleRegularize = useCallback(async () => {
     setCheckoutError(false);
@@ -111,7 +117,8 @@ export function BillingPaywallOverlay() {
     router.push('/login');
   }, [router]);
 
-  if (!access?.blocked) return null;
+  // Bloqueado, mas na pagina de cobranca: libera a tela pra resolver pagamento.
+  if (!access?.blocked || onBillingPage) return null;
 
   const canPay = access.canManageBilling;
   const moduleLabel = access.moduleLabel ?? 'sua conta';
