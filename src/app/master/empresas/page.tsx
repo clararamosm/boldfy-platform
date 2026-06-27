@@ -99,9 +99,9 @@ function CompanyFormContent() {
                 <Input name="licenses" id="licenses" type="number" placeholder="Ex: 50" min="3" defaultValue="3" disabled={pending} required />
              </div>
              <div className="space-y-2">
-                <Label htmlFor="tlLicenses">Licenças Thought Leader (opcional)</Label>
+                <Label htmlFor="tlLicenses">Licenças do Módulo Executivo (opcional)</Label>
                 <Input name="tlLicenses" id="tlLicenses" type="number" placeholder="Ex: 2" min="0" defaultValue="0" disabled={pending} />
-                <p className="text-xs text-muted-foreground">Número de assentos para Thought Leaders (Content Full-Service). Cobrados separadamente.</p>
+                <p className="text-xs text-muted-foreground">Número de assentos do Módulo Executivo (Content as a Service). Cobrados separadamente.</p>
              </div>
              <div className="space-y-2">
                 <Label htmlFor="locale">Idioma da Plataforma</Label>

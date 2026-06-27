@@ -579,10 +579,10 @@ export default function AdminBillingPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <MessagesSquare className="h-5 w-5" />
-                    Thought Leaders
+                    Módulo Executivo
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    Content Full-Service para executivos da sua empresa.
+                    Conteúdo feito pela Boldfy para executivos da sua empresa.
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-3">
@@ -596,7 +596,7 @@ export default function AdminBillingPage() {
                       billing.tl.status === 'active' ||
                       billing.tl.status === 'pending'
                     }
-                    aria-label="Expandir Thought Leaders"
+                    aria-label="Expandir Módulo Executivo"
                   />
                 </div>
               </div>
@@ -691,7 +691,7 @@ export default function AdminBillingPage() {
                         ? 'Ativo'
                         : billing.tl.status === 'pending'
                         ? 'Aguardando pagamento'
-                        : 'Ativar Thought Leaders'}
+                        : 'Ativar Módulo Executivo'}
                     </Button>
                   </CardFooter>
                 )}
