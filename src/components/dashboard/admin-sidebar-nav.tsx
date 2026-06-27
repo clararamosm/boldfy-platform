@@ -155,9 +155,9 @@ export function AdminSidebarNav() {
           <SimpleItem href="/admin/brand-context" icon={Palette} title="Manual de Marca" />
           <SimpleItem href="/admin/colaboradores" icon={Users} title={t.nav.collaborators} />
 
-          {/* Módulo Colaboradores */}
+          {/* Modo Time */}
           <CollapsibleGroup
-            label="Módulo Colaboradores"
+            label="Modo Time"
             icon={Layers}
             defaultOpen={true}
             items={[
@@ -169,9 +169,9 @@ export function AdminSidebarNav() {
             ]}
           />
 
-          {/* Módulo Executivo */}
+          {/* Modo Executivo */}
           <CollapsibleGroup
-            label="Módulo Executivo"
+            label="Modo Executivo"
             icon={Users}
             defaultOpen={true}
             items={[

@@ -213,8 +213,8 @@ function buildTLLineItem(args: {
         unit_amount: totalCents,
         recurring: { interval: 'month' },
         product_data: {
-          name: `Boldfy Módulo Executivo: ${args.executives} exec x ${args.frequency} posts/sem`,
-          description: 'Conteúdo feito pela Boldfy (Módulo Executivo)',
+          name: `Boldfy Modo Executivo: ${args.executives} exec x ${args.frequency} posts/sem`,
+          description: 'Conteúdo feito pela Boldfy (Modo Executivo)',
         },
       },
       quantity: 1, // TL e pacote fixo, nao per-seat

@@ -579,7 +579,7 @@ export default function AdminBillingPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <MessagesSquare className="h-5 w-5" />
-                    Módulo Executivo
+                    Modo Executivo
                   </CardTitle>
                   <CardDescription className="mt-1">
                     Conteúdo feito pela Boldfy para executivos da sua empresa.
@@ -596,7 +596,7 @@ export default function AdminBillingPage() {
                       billing.tl.status === 'active' ||
                       billing.tl.status === 'pending'
                     }
-                    aria-label="Expandir Módulo Executivo"
+                    aria-label="Expandir Modo Executivo"
                   />
                 </div>
               </div>
@@ -691,7 +691,7 @@ export default function AdminBillingPage() {
                         ? 'Ativo'
                         : billing.tl.status === 'pending'
                         ? 'Aguardando pagamento'
-                        : 'Ativar Módulo Executivo'}
+                        : 'Ativar Modo Executivo'}
                     </Button>
                   </CardFooter>
                 )}
