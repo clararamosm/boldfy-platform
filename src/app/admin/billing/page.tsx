@@ -404,7 +404,7 @@ export default function AdminBillingPage() {
           variant: 'info',
           icon: Sparkles,
           title: 'Você está pagando preço beta',
-          message: `Desconto de 30% no Platform por mais ${days} ${days === 1 ? 'dia' : 'dias'}. Depois disso, preço cheio.`,
+          message: `Desconto de 30% no Modo Time por mais ${days} ${days === 1 ? 'dia' : 'dias'}. Depois disso, preço cheio.`,
         };
       }
     }
@@ -473,7 +473,7 @@ export default function AdminBillingPage() {
     <>
       <Header
         title="Planos e Cobranca"
-        subtitle="Veja seu plano atual e gerencie modulos opcionais."
+        subtitle="Veja seu plano atual e gerencie modos opcionais."
       />
       <main className="flex-1 overflow-auto p-4 md:p-6">
         <div className="grid gap-6 max-w-5xl mx-auto">
@@ -487,7 +487,7 @@ export default function AdminBillingPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5" />
-                    Platform
+                    Modo Time
                   </CardTitle>
                   <CardDescription className="mt-1">
                     Gamificacao, trilhas, recompensas e gestao de colaboradores.
@@ -732,7 +732,7 @@ export default function AdminBillingPage() {
                 <CardContent className="space-y-4">
                   {billing.platform.status !== 'active' && (
                     <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-900">
-                      Design so pode ser ativado apos Platform estar pago (active).
+                      Design so pode ser ativado apos o Modo Time estar pago (active).
                     </div>
                   )}
 
