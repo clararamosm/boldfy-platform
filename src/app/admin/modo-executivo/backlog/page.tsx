@@ -25,6 +25,7 @@ import {
   type CalendarPipelinePost,
   type PipelineStatus,
 } from '@/app/actions/content-pipeline';
+import { TeamCalendar } from '@/components/calendar/team-calendar';
 
 const MAX_VISIBLE_POSTS = 10;
 
@@ -78,6 +79,14 @@ export default function AdminBacklogPage() {
     if (tlFilter === 'all') return posts;
     return posts.filter(p => p.tlUserId === tlFilter);
   }, [posts, tlFilter]);
+
+  // ─── Posts com data plotável (decide se o calendário aparece) ──────
+  const scheduledCount = useMemo(
+    () => filteredPosts.filter(
+      p => p.status !== 'arquivado' && (p.scheduledFor || (p.status === 'postado' && p.publishedAt))
+    ).length,
+    [filteredPosts]
+  );
 
   // ─── Posts grouped by status ──────
   const postsByStatus = useMemo(() => {
@@ -203,6 +212,17 @@ export default function AdminBacklogPage() {
               );
             })}
           </div>
+
+          {/* Calendário geral da equipe — entre o grid e os concluídos */}
+          {scheduledCount > 0 && (
+            <div className="rounded-lg border bg-card p-3">
+              <TeamCalendar
+                posts={filteredPosts}
+                isProfileView={tlFilter !== 'all'}
+                heading="Calendário da equipe"
+              />
+            </div>
+          )}
 
           {/* Completed section */}
           {(() => {

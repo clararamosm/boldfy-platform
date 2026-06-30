@@ -78,7 +78,7 @@ export function AdminExecutiveNav() {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <SidebarMenuSub>
-            {/* Backlog consolidado */}
+            {/* Backlog consolidado (inclui o calendário geral da equipe) */}
             <SidebarMenuSubItem>
               <SidebarMenuSubButton
                 asChild
@@ -87,19 +87,6 @@ export function AdminExecutiveNav() {
                 <Link href="/admin/modo-executivo/backlog">
                   <ClipboardList className="h-3.5 w-3.5" />
                   <span>Backlog</span>
-                </Link>
-              </SidebarMenuSubButton>
-            </SidebarMenuSubItem>
-
-            {/* Calendário geral */}
-            <SidebarMenuSubItem>
-              <SidebarMenuSubButton
-                asChild
-                isActive={isActive('/admin/modo-executivo/calendario')}
-              >
-                <Link href="/admin/modo-executivo/calendario">
-                  <CalendarDays className="h-3.5 w-3.5" />
-                  <span>Calendário</span>
                 </Link>
               </SidebarMenuSubButton>
             </SidebarMenuSubItem>
