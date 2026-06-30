@@ -40,7 +40,34 @@ async function requirePostAccess(idToken: string, tlUserId: string) {
     return { ...user, canEdit: true };
   }
 
+  // Admin da empresa pode agir sobre os posts dos lideres da PROPRIA empresa
+  // (Modo Executivo): aprovar/comentar/pedir ajuste no lugar do lider.
+  if (user.role === 'admin') {
+    const tlDoc = await adminDb.collection('users').doc(tlUserId).get();
+    if (!tlDoc.exists) throw new Error('Thought Leader não encontrado.');
+
+    const tlCompanyId = tlDoc.data()?.companyId;
+    if (!tlCompanyId) throw new Error('Thought Leader sem empresa vinculada.');
+
+    if (!user.companyId || tlCompanyId !== user.companyId) {
+      throw new Error('Acesso negado: este Thought Leader não pertence à sua empresa.');
+    }
+
+    return { ...user, canEdit: true };
+  }
+
   throw new Error('Acesso negado.');
+}
+
+/**
+ * Mapeia o role do usuario autenticado para o authorRole gravado em comentarios.
+ * Mantem 'thoughtleader' para TL/colaborador; admin/master/strategist preservados.
+ */
+function mapAuthorRole(role?: string): 'strategist' | 'thoughtleader' | 'admin' | 'master' {
+  if (role === 'thoughtleader' || role === 'colaborador') return 'thoughtleader';
+  if (role === 'admin') return 'admin';
+  if (role === 'master') return 'master';
+  return 'strategist';
 }
 
 // ---- Get Post with Access ----
@@ -102,6 +129,9 @@ export async function getPostWithAccess(
       mediaTypes: Array.isArray(data.mediaTypes) ? data.mediaTypes : undefined,
       tlFeedback: data.tlFeedback,
       tlApprovedAt: data.tlApprovedAt,
+      approvedById: data.approvedById,
+      approvedByName: data.approvedByName,
+      approvedByRole: data.approvedByRole,
       linkedinPostId: data.linkedinPostId,
       linkedinPostUrl: data.linkedinPostUrl,
       publishedAt: data.publishedAt,
@@ -295,7 +325,7 @@ export async function addPostComment(
     const commentData: Omit<PostComment, 'id'> = {
       authorId: user.uid,
       authorName: user.name || 'Usuário',
-      authorRole: (user.role === 'thoughtleader' || user.role === 'colaborador') ? 'thoughtleader' : 'strategist',
+      authorRole: mapAuthorRole(user.role),
       content: content.trim(),
       resolved: false,
       createdAt: now,
@@ -451,7 +481,7 @@ export async function addPostCommentWithAttachments(
     const commentData: Omit<PostComment, 'id'> = {
       authorId: user.uid,
       authorName: user.name || 'Usuário',
-      authorRole: (user.role === 'thoughtleader' || user.role === 'colaborador') ? 'thoughtleader' : 'strategist',
+      authorRole: mapAuthorRole(user.role),
       content: content.trim(),
       resolved: false,
       createdAt: now,
@@ -499,7 +529,7 @@ export async function addAdjustmentComment(
     const commentData: Omit<PostComment, 'id'> = {
       authorId: user.uid,
       authorName: user.name || 'Usuário',
-      authorRole: 'thoughtleader',
+      authorRole: mapAuthorRole(user.role),
       content: feedback.trim(),
       resolved: false,
       createdAt: now,

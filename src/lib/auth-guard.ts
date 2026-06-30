@@ -194,3 +194,43 @@ export async function requireStrategistForTL(idToken: string, tlUserId: string):
 
   return user;
 }
+
+/**
+ * Verifica que o admin tem acesso ao Thought Leader especifico.
+ * O admin so acessa TLs da PROPRIA empresa (admin.companyId === tl.companyId).
+ * Master tem acesso total. Usado para que o admin aprove/comente/peca ajuste
+ * nos posts dos lideres da empresa dele (Modo Executivo).
+ */
+export async function requireAdminForTL(idToken: string, tlUserId: string): Promise<AuthUser> {
+  const user = await requireAuth(idToken);
+
+  if (user.role === 'master') {
+    return user;
+  }
+
+  if (user.role !== 'admin') {
+    throw new Error('Acesso negado: permissão de administrador necessária.');
+  }
+
+  if (!user.companyId) {
+    throw new Error('Acesso negado: administrador sem empresa vinculada.');
+  }
+
+  // Buscar o TL para saber a empresa
+  const tlDoc = await adminDb.collection('users').doc(tlUserId).get();
+  if (!tlDoc.exists) {
+    throw new Error('Thought Leader não encontrado.');
+  }
+
+  const tlCompanyId = tlDoc.data()?.companyId;
+  if (!tlCompanyId) {
+    throw new Error('Thought Leader sem empresa vinculada.');
+  }
+
+  // Fronteira de seguranca: admin so age sobre lideres da PROPRIA empresa.
+  if (tlCompanyId !== user.companyId) {
+    throw new Error('Acesso negado: este Thought Leader não pertence à sua empresa.');
+  }
+
+  return user;
+}

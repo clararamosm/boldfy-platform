@@ -27,6 +27,7 @@ import {
   requireTLOrMaster,
   requireStrategistOrMaster,
   requireAdminOrStrategist,
+  requireAdminForTL,
 } from '@/lib/auth-guard';
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -238,5 +239,70 @@ describe('requireAdminOrStrategist', () => {
   it('blocks colaborador role entirely', async () => {
     mockUser('colaborador', 'company-1');
     await expect(requireAdminOrStrategist('token', 'company-1')).rejects.toThrow('admin ou estrategista');
+  });
+});
+
+// ─── requireAdminForTL (Modo Executivo: isolamento entre empresas) ─────
+
+describe('requireAdminForTL', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // 1ª chamada de get() = doc do admin (requireAuth); 2ª = doc do TL.
+  function mockAdminAndTL(
+    adminData: Record<string, unknown> | null,
+    tlData: Record<string, unknown> | null
+  ) {
+    mockVerifyIdToken.mockResolvedValue({ uid: 'admin-1', email: 'admin@boldfy.com' });
+    mockGet
+      .mockResolvedValueOnce(
+        adminData
+          ? { exists: true, data: () => ({ profile: { name: 'Admin' }, ...adminData }) }
+          : { exists: false, data: () => undefined }
+      )
+      .mockResolvedValueOnce(
+        tlData
+          ? { exists: true, data: () => tlData }
+          : { exists: false, data: () => undefined }
+      );
+  }
+
+  it('allows admin to act on a TL of their OWN company', async () => {
+    mockAdminAndTL({ role: 'admin', companyId: 'company-1' }, { role: 'thoughtleader', companyId: 'company-1' });
+    const user = await requireAdminForTL('token', 'tl-1');
+    expect(user.role).toBe('admin');
+  });
+
+  it('BLOCKS admin from a TL of ANOTHER company (cross-company isolation)', async () => {
+    mockAdminAndTL({ role: 'admin', companyId: 'company-1' }, { role: 'thoughtleader', companyId: 'company-2' });
+    await expect(requireAdminForTL('token', 'tl-2')).rejects.toThrow('não pertence à sua empresa');
+  });
+
+  it('allows master (full access) without company check', async () => {
+    mockVerifyIdToken.mockResolvedValue({ uid: 'master-1', email: 'master@boldfy.com' });
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ role: 'master' }) });
+    const user = await requireAdminForTL('token', 'tl-anything');
+    expect(user.role).toBe('master');
+  });
+
+  it('blocks non-admin roles (e.g. strategist)', async () => {
+    mockVerifyIdToken.mockResolvedValue({ uid: 'strat-1', email: 's@boldfy.com' });
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ role: 'strategist' }) });
+    await expect(requireAdminForTL('token', 'tl-1')).rejects.toThrow('permissão de administrador');
+  });
+
+  it('blocks admin without a company linked', async () => {
+    mockVerifyIdToken.mockResolvedValue({ uid: 'admin-1', email: 'a@boldfy.com' });
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ role: 'admin' }) });
+    await expect(requireAdminForTL('token', 'tl-1')).rejects.toThrow('administrador sem empresa');
+  });
+
+  it('throws when the TL does not exist', async () => {
+    mockAdminAndTL({ role: 'admin', companyId: 'company-1' }, null);
+    await expect(requireAdminForTL('token', 'ghost')).rejects.toThrow('não encontrado');
+  });
+
+  it('throws when the TL has no company linked', async () => {
+    mockAdminAndTL({ role: 'admin', companyId: 'company-1' }, { role: 'thoughtleader' });
+    await expect(requireAdminForTL('token', 'tl-1')).rejects.toThrow('sem empresa vinculada');
   });
 });

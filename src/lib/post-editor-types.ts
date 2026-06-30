@@ -18,7 +18,7 @@ export type PostComment = {
   id: string;
   authorId: string;
   authorName: string;
-  authorRole: 'strategist' | 'thoughtleader';
+  authorRole: 'strategist' | 'thoughtleader' | 'admin' | 'master';
   content: string;
   resolved: boolean;
   resolvedBy?: string;

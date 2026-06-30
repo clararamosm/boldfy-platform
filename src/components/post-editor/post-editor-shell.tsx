@@ -373,10 +373,14 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     setPost(prev => prev ? { ...prev, mediaUrl, mediaType, mediaUrls, mediaTypes } : prev);
   }, []);
 
-  // ---- TL Approve / Request Adjustment ----
+  // ---- TL / Admin Approve / Request Adjustment ----
+  // O admin da empresa pode aprovar/pedir ajuste no lugar do líder (Modo
+  // Executivo). A server action revalida que o TL pertence à empresa do admin.
   const isTL = user?.role === 'thoughtleader';
-  const canApproveIdea = isTL && post?.status === 'aprovar_ideia';
-  const canApprovePost = isTL && post?.status === 'aprovar_post';
+  const isAdmin = user?.role === 'admin';
+  const canActOnApproval = isTL || isAdmin;
+  const canApproveIdea = canActOnApproval && post?.status === 'aprovar_ideia';
+  const canApprovePost = canActOnApproval && post?.status === 'aprovar_post';
   const showApproveActions = canApproveIdea || canApprovePost;
 
   const handleApprove = useCallback(async () => {
@@ -386,14 +390,14 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
       const token = await getAuthToken();
       if (post.status === 'aprovar_ideia') {
         const { approvePipelineIdea } = await import('@/app/actions/content-pipeline');
-        const result = await approvePipelineIdea(token, postId);
+        const result = await approvePipelineIdea(token, postId, tlId);
         if (result.success) {
           setPost(prev => prev ? { ...prev, status: 'em_producao' as PipelineStatus, tlApprovedAt: new Date().toISOString() } : prev);
           toast({ title: 'Ideia aprovada!', description: 'A ideia foi enviada para produção.' });
         }
       } else if (post.status === 'aprovar_post') {
         const { approvePipelinePost } = await import('@/app/actions/content-pipeline');
-        const result = await approvePipelinePost(token, postId);
+        const result = await approvePipelinePost(token, postId, tlId);
         if (result.success) {
           setPost(prev => prev ? { ...prev, status: 'pronto_pra_postar' as PipelineStatus, tlApprovedAt: new Date().toISOString() } : prev);
           toast({ title: 'Post aprovado!', description: 'O post está pronto para publicação.' });
@@ -404,7 +408,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     } finally {
       setApprovalLoading(false);
     }
-  }, [post, postId, toast]);
+  }, [post, postId, tlId, toast]);
 
   const handleRequestAdjustment = useCallback(async () => {
     if (!post || !rejectFeedback.trim()) return;
@@ -412,7 +416,7 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
     try {
       const token = await getAuthToken();
       const { requestPipelineAdjustment } = await import('@/app/actions/content-pipeline');
-      const result = await requestPipelineAdjustment(token, postId, rejectFeedback.trim());
+      const result = await requestPipelineAdjustment(token, postId, rejectFeedback.trim(), tlId);
       if (result.success) {
         setPost(prev => prev ? { ...prev, status: 'ajuste' as PipelineStatus, tlFeedback: rejectFeedback.trim() } : prev);
 
@@ -580,6 +584,28 @@ export function PostEditorShell({ companyId, tlId, postId }: Props) {
                 <XCircle className="h-4 w-4" />
                 Pedir Ajuste
               </Button>
+            </div>
+          )}
+
+          {/* Audit tag — quem aprovou (reforço visual do registro do Boldfy Bot) */}
+          {!showApproveActions && post.approvedByName && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-emerald-50 border-emerald-200 text-emerald-800 text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+              <span>
+                Aprovado por <strong>{post.approvedByName}</strong>
+                <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
+                  {post.approvedByRole === 'admin'
+                    ? 'admin'
+                    : post.approvedByRole === 'master'
+                    ? 'Boldfy'
+                    : post.approvedByRole === 'strategist'
+                    ? 'estrategista'
+                    : 'líder'}
+                </span>
+                {post.approvedByRole === 'admin' && (
+                  <span className="ml-1.5 text-emerald-600">no lugar do líder</span>
+                )}
+              </span>
             </div>
           )}
 

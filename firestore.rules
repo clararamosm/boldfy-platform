@@ -155,6 +155,11 @@ service cloud.firestore {
       // Content pipeline — posts produced for Thought Leaders
       // TL can read all and update status (approve/reject)
       // Strategist can read/write for TLs in assigned companies
+      // Admin can read/write for TLs of their OWN company (Modo Executivo:
+      // aprovar/comentar/pedir ajuste no lugar do líder). As escritas de fato
+      // passam por server actions (Admin SDK), mas liberamos aqui por defesa
+      // em profundidade e paridade com o estrategista — sempre escopado à
+      // mesma empresa (isolamento entre empresas).
       match /contentPipeline/{postId} {
         allow read: if request.auth.uid == userId;
         allow update: if request.auth.uid == userId
@@ -162,8 +167,8 @@ service cloud.firestore {
                       && isReasonableSize();
         allow read, write: if isStrategistForCompany(request.auth.uid, getCompanyId(userId));
         allow read, write: if hasRole(request.auth.uid, 'master');
-        allow read: if hasRole(request.auth.uid, 'admin')
-                    && getCompanyId(request.auth.uid) == getCompanyId(userId);
+        allow read, write: if hasRole(request.auth.uid, 'admin')
+                           && getCompanyId(request.auth.uid) == getCompanyId(userId);
       }
     }
 

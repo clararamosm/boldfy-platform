@@ -22,6 +22,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { cn } from '@/lib/utils';
 import { useUnreadFeed } from '@/hooks/use-unread-feed';
 import { useT } from '@/lib/i18n/context';
+import { AdminExecutiveNav } from '@/components/dashboard/admin-executive-nav';
 
 // Preserva ?companyId= ou ?c= na navegacao do sidebar.
 // Sem isto, master/strategist visualizando uma empresa perdem o contexto
@@ -169,15 +170,8 @@ export function AdminSidebarNav() {
             ]}
           />
 
-          {/* Modo Executivo */}
-          <CollapsibleGroup
-            label="Modo Executivo"
-            icon={Users}
-            defaultOpen={true}
-            items={[
-              { href: '/admin/analytics/thought-leaders', icon: BarChart2, title: 'Analytics' },
-            ]}
-          />
+          {/* Modo Executivo — backlog, calendário e por executivo */}
+          <AdminExecutiveNav />
 
           {/* LinkedIn — itens simples no final */}
           <SimpleItem

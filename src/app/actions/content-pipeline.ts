@@ -3,7 +3,7 @@
 
 import { db as adminDb } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { requireAuth, requireStrategistForTL, requireAdminOrStrategist, requireTLOrMaster } from '@/lib/auth-guard';
+import { requireAuth, requireStrategistForTL, requireAdminOrStrategist, requireAdminForTL, type AuthUser } from '@/lib/auth-guard';
 import { requireActiveModule, requireActiveModuleForCompany } from '@/lib/billing/module-gate';
 import { triggerSlackNotification } from '@/lib/slack-notifications';
 import { generateSlug } from '@/lib/slugify';
@@ -58,6 +58,12 @@ export type PipelinePost = {
   documentTitle?: string;
   tlFeedback?: string;
   tlApprovedAt?: string;
+  // Auditoria: quem destravou a última transição de aprovação/ajuste.
+  // Quando o próprio TL aprova, actorRole === 'thoughtleader'. Quando o admin
+  // da empresa aprova no lugar do líder, actorRole === 'admin' (etc).
+  approvedById?: string;
+  approvedByName?: string;
+  approvedByRole?: 'thoughtleader' | 'admin' | 'strategist' | 'master';
   linkedinPostId?: string;
   linkedinPostUrl?: string;
   publishedAt?: string;
@@ -380,17 +386,95 @@ export async function getPipelinePosts(
   }
 }
 
-// ---- TL Actions: Approve Idea ----
+// ---- Helper: resolver o ator de uma ação de aprovação/ajuste ----
+// Define em qual pipeline (tlUserId) a ação acontece e quem é o ator.
+//  - thoughtleader: age só no próprio pipeline (tlUserId = uid).
+//  - admin: age sobre TLs da PRÓPRIA empresa (requireAdminForTL valida).
+//  - master: age sobre qualquer TL.
+// Strategist NÃO aprova (mantém o comportamento atual — ele move via update).
+async function resolvePostActor(
+  idToken: string,
+  tlUserId?: string
+): Promise<{ user: AuthUser; tlUserId: string }> {
+  const user = await requireAuth(idToken);
+
+  if (user.role === 'thoughtleader') {
+    if (tlUserId && tlUserId !== user.uid) {
+      throw new Error('Acesso negado.');
+    }
+    return { user, tlUserId: user.uid };
+  }
+
+  if (user.role === 'master') {
+    return { user, tlUserId: tlUserId || user.uid };
+  }
+
+  if (user.role === 'admin') {
+    if (!tlUserId) throw new Error('Thought Leader não especificado.');
+    await requireAdminForTL(idToken, tlUserId);
+    return { user, tlUserId };
+  }
+
+  throw new Error('Acesso negado: permissão para aprovar/ajustar necessária.');
+}
+
+// authorRole de auditoria a partir do role do ator.
+function auditRole(role?: string): 'thoughtleader' | 'admin' | 'strategist' | 'master' {
+  if (role === 'admin') return 'admin';
+  if (role === 'master') return 'master';
+  if (role === 'strategist') return 'strategist';
+  return 'thoughtleader';
+}
+
+// Grava um comentário de sistema ("Boldfy Bot") registrando a ação.
+// Fire-and-forget: falha aqui não deve quebrar a transição de status.
+async function writeBotAuditComment(tlUserId: string, postId: string, content: string): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+    await adminDb
+      .collection(getPipelinePath(tlUserId))
+      .doc(postId)
+      .collection('comments')
+      .doc()
+      .set({
+        authorId: 'system',
+        authorName: 'Boldfy Bot',
+        authorRole: 'strategist',
+        content,
+        resolved: false,
+        createdAt: now,
+        updatedAt: now,
+        anchor: null,
+      });
+  } catch (err) {
+    console.error('writeBotAuditComment failed:', err);
+  }
+}
+
+// Sufixo da mensagem do bot — destaca quando NÃO foi o próprio líder.
+function actorSuffix(role?: string, name?: string): string {
+  const who = name || 'Usuário';
+  if (role === 'admin') return ` por ${who} (admin, no lugar do líder)`;
+  if (role === 'master') return ` por ${who} (Boldfy)`;
+  return ` por ${who}`;
+}
+
+// ---- TL/Admin Actions: Approve Idea ----
 
 export async function approvePipelineIdea(
   idToken: string,
-  postId: string
+  postId: string,
+  tlUserId?: string
 ): Promise<ActionResult> {
   try {
-    const user = await requireTLOrMaster(idToken);
-    await requireActiveModule(user, 'tl');
+    const { user, tlUserId: tlId } = await resolvePostActor(idToken, tlUserId);
 
-    const collPath = getPipelinePath(user.uid);
+    const tlCompanyId = await getCompanyIdOfTL(tlId);
+    if (tlCompanyId) {
+      await requireActiveModuleForCompany(tlCompanyId, 'tl');
+    }
+
+    const collPath = getPipelinePath(tlId);
     const docRef = adminDb.collection(collPath).doc(postId);
     const docSnap = await docRef.get();
 
@@ -403,11 +487,17 @@ export async function approvePipelineIdea(
       return { error: 'Este post não está aguardando aprovação de ideia.' };
     }
 
+    const now = new Date().toISOString();
     await docRef.update({
       status: 'em_producao',
-      tlApprovedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      tlApprovedAt: now,
+      approvedById: user.uid,
+      approvedByName: user.name || 'Usuário',
+      approvedByRole: auditRole(user.role),
+      updatedAt: now,
     });
+
+    await writeBotAuditComment(tlId, postId, `Ideia aprovada${actorSuffix(user.role, user.name)}.`);
 
     return { success: true };
   } catch (error) {
@@ -421,13 +511,18 @@ export async function approvePipelineIdea(
 
 export async function approvePipelinePost(
   idToken: string,
-  postId: string
+  postId: string,
+  tlUserId?: string
 ): Promise<ActionResult> {
   try {
-    const user = await requireTLOrMaster(idToken);
-    await requireActiveModule(user, 'tl');
+    const { user, tlUserId: tlId } = await resolvePostActor(idToken, tlUserId);
 
-    const collPath = getPipelinePath(user.uid);
+    const tlCompanyId = await getCompanyIdOfTL(tlId);
+    if (tlCompanyId) {
+      await requireActiveModuleForCompany(tlCompanyId, 'tl');
+    }
+
+    const collPath = getPipelinePath(tlId);
     const docRef = adminDb.collection(collPath).doc(postId);
     const docSnap = await docRef.get();
 
@@ -441,16 +536,22 @@ export async function approvePipelinePost(
     }
 
     // Approve post → auto-advance to pronto_pra_postar
+    const now = new Date().toISOString();
     await docRef.update({
       status: 'pronto_pra_postar',
-      tlApprovedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      tlApprovedAt: now,
+      approvedById: user.uid,
+      approvedByName: user.name || 'Usuário',
+      approvedByRole: auditRole(user.role),
+      updatedAt: now,
     });
+
+    await writeBotAuditComment(tlId, postId, `Post aprovado${actorSuffix(user.role, user.name)}.`);
 
     // Fire-and-forget: Slack notification for post ready
     const postTitle = docSnap.data()?.title || '';
     triggerSlackNotification('post_pronto', {
-      tlUserId: user.uid,
+      tlUserId: tlId,
       postId,
       postTitle,
     }).catch(err => console.error('Slack post_pronto notification failed:', err));
@@ -468,12 +569,13 @@ export async function approvePipelinePost(
 export async function requestPipelineAdjustment(
   idToken: string,
   postId: string,
-  feedback: string
+  feedback: string,
+  tlUserId?: string
 ): Promise<ActionResult> {
   try {
-    const user = await requireTLOrMaster(idToken);
+    const { user, tlUserId: tlId } = await resolvePostActor(idToken, tlUserId);
 
-    const collPath = getPipelinePath(user.uid);
+    const collPath = getPipelinePath(tlId);
     const docRef = adminDb.collection(collPath).doc(postId);
     const docSnap = await docRef.get();
 
@@ -492,10 +594,12 @@ export async function requestPipelineAdjustment(
       updatedAt: new Date().toISOString(),
     });
 
+    await writeBotAuditComment(tlId, postId, `Ajuste solicitado${actorSuffix(user.role, user.name)}.`);
+
     // Fire-and-forget: Slack notification for feedback received
     const postTitle = docSnap.data()?.title || '';
     triggerSlackNotification('feedback_recebido', {
-      tlUserId: user.uid,
+      tlUserId: tlId,
       postId,
       postTitle,
       feedbackText: feedback,
@@ -839,7 +943,7 @@ export async function getAllPipelinePostsForStrategist(
 export type Activity = {
   type: 'comment' | 'status_change' | 'approval' | 'published';
   authorName: string;
-  authorRole: 'strategist' | 'thoughtleader';
+  authorRole: 'strategist' | 'thoughtleader' | 'admin' | 'master';
   content: string;
   postTitle: string;
   postId: string;
@@ -1028,6 +1132,123 @@ export async function getRecentActivitiesForStrategist(
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
     console.error('Error in getRecentActivitiesForStrategist:', msg);
+    return { error: msg };
+  }
+}
+
+// ============================================================================
+// MODO EXECUTIVO (ADMIN) — leituras escopadas à própria empresa do admin
+// O admin enxerga só os Thought Leaders onde tl.companyId === admin.companyId.
+// ============================================================================
+
+export type AdminExecutiveTL = {
+  id: string;
+  slug: string;
+  name: string;
+  photoUrl?: string;
+  linkedinConnected?: boolean;
+};
+
+// Helper interno: resolve a empresa do admin e lista os TLs dela.
+async function getAdminCompanyAndTLs(
+  user: AuthUser
+): Promise<{ companyId: string; companyName: string; companySlug: string; tls: AdminExecutiveTL[] } | null> {
+  if (!user.companyId) return null;
+
+  const [companyDoc, tlSnap] = await Promise.all([
+    adminDb.collection('companies').doc(user.companyId).get(),
+    adminDb.collection('users')
+      .where('companyId', '==', user.companyId)
+      .where('role', '==', 'thoughtleader')
+      .get(),
+  ]);
+
+  const compData = companyDoc.exists ? companyDoc.data() : undefined;
+  const companyName = compData?.companyName || 'Empresa';
+  const companySlug = (compData?.slug as string) || generateSlug(companyName, user.companyId);
+
+  const tls: AdminExecutiveTL[] = tlSnap.docs.map(d => {
+    const tlData = d.data();
+    const tlName = tlData.profile?.name || tlData.name || 'TL';
+    return {
+      id: d.id,
+      slug: (tlData.slug as string) || generateSlug(tlName, d.id),
+      name: tlName,
+      photoUrl: (tlData.photoURL as string) || (tlData.profile?.avatarUrl as string) || undefined,
+      linkedinConnected: !!(tlData.linkedinConnection as Record<string, unknown>)?.accessToken,
+    };
+  });
+
+  tls.sort((a, b) => a.name.localeCompare(b.name));
+
+  return { companyId: user.companyId, companyName, companySlug, tls };
+}
+
+// Sidebar do Modo Executivo do admin: lista dos executivos da própria empresa.
+export async function getAdminExecutiveData(
+  idToken: string
+): Promise<{ companyName?: string; companySlug?: string; tls?: AdminExecutiveTL[]; error?: string }> {
+  try {
+    const user = await requireAuth(idToken);
+    if (user.role !== 'admin' && user.role !== 'master') {
+      return { error: 'Acesso negado.' };
+    }
+
+    const info = await getAdminCompanyAndTLs(user);
+    if (!info) return { tls: [] };
+
+    return { companyName: info.companyName, companySlug: info.companySlug, tls: info.tls };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in getAdminExecutiveData:', msg);
+    return { error: msg };
+  }
+}
+
+// Calendário/Backlog consolidado: todos os posts de todos os TLs da empresa do admin.
+export async function getAllPipelinePostsForAdmin(
+  idToken: string
+): Promise<{ posts?: CalendarPipelinePost[]; error?: string }> {
+  try {
+    const user = await requireAuth(idToken);
+    if (user.role !== 'admin' && user.role !== 'master') {
+      return { error: 'Acesso negado.' };
+    }
+
+    const info = await getAdminCompanyAndTLs(user);
+    if (!info || info.tls.length === 0) return { posts: [] };
+
+    const pipelineSnapshots = await Promise.all(
+      info.tls.map(tl =>
+        adminDb.collection(getPipelinePath(tl.id))
+          .orderBy('createdAt', 'desc')
+          .get()
+          .then(snap => ({ tl, snap }))
+      )
+    );
+
+    const allPosts: CalendarPipelinePost[] = [];
+    for (const { tl, snap } of pipelineSnapshots) {
+      for (const postDoc of snap.docs) {
+        allPosts.push({
+          id: postDoc.id,
+          ...(postDoc.data() as Omit<PipelinePost, 'id'>),
+          tlUserId: tl.id,
+          tlSlug: tl.slug,
+          tlName: tl.name,
+          tlPhotoUrl: tl.photoUrl,
+          tlLinkedinConnected: tl.linkedinConnected,
+          companyName: info.companyName,
+          companyId: info.companyId,
+          companySlug: info.companySlug,
+        });
+      }
+    }
+
+    return { posts: allPosts };
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'Erro desconhecido.';
+    console.error('Error in getAllPipelinePostsForAdmin:', msg);
     return { error: msg };
   }
 }
