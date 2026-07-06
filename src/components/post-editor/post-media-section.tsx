@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
 import { getAuthToken } from '@/lib/auth-client';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, X, FileText, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
 import type { PipelinePost } from '@/app/actions/content-pipeline';
 import {
   ACCEPTED_MEDIA_INPUT,
@@ -17,6 +18,20 @@ import {
   validateNewMedia,
   MAX_GALLERY_IMAGES,
 } from '@/lib/media-rules';
+
+// pdf.js depende de canvas/worker do browser — carrega lazy e sem SSR.
+// O chunk só é baixado quando o post tem PDF anexado.
+const PdfPreview = dynamic(
+  () => import('@/components/pdf-preview').then((m) => m.PdfPreview),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-40 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
+        Carregando preview…
+      </div>
+    ),
+  },
+);
 
 type Props = {
   post: PipelinePost;
@@ -66,11 +81,14 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
    * Save da lista atualizada de mídia direto no Firestore + callback ao shell.
    * Sincroniza mediaUrl/mediaType com a primeira mídia da lista pra retrocompat.
    */
-  const persistMedia = useCallback(async (urls: string[], types: string[]) => {
+  const persistMedia = useCallback(async (urls: string[], types: string[], pdfThumbUrl?: string) => {
     const token = await getAuthToken();
     await updatePipelinePost(token, tlId, postId, {
       mediaUrls: urls,
       mediaTypes: types,
+      // Capa do PDF gerada no upload. Quando a mídia deixa de ser PDF, o
+      // cascade server-side apaga o campo — não precisamos mandar null aqui.
+      ...(pdfThumbUrl && { pdfThumbUrl }),
     });
     // Notifica shell — mediaUrl singular = primeira (ou undefined se vazio)
     onMediaUpdate(
@@ -93,6 +111,9 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
     try {
       const newUrls: string[] = [];
       const newTypes: string[] = [];
+      // Capa gerada quando o arquivo é PDF (página 1 → PNG). Best-effort:
+      // se a geração falhar, o upload segue e o calendário usa o fallback.
+      let pdfThumbUrl: string | undefined;
 
       for (const file of files) {
         const result = validateNewMedia(
@@ -119,6 +140,23 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
 
         newUrls.push(url);
         newTypes.push(file.type);
+
+        // PDF: gera a capa (página 1 → PNG) e sobe junto. Import dinâmico
+        // pra manter o pdf.js fora do bundle de quem nunca anexa PDF.
+        if (classifyMimeType(file.type) === 'pdf') {
+          try {
+            const { renderPdfCoverPng } = await import('@/lib/pdf-thumb');
+            const thumbBlob = await renderPdfCoverPng(file);
+            if (thumbBlob) {
+              const thumbPath = `pipeline/${tlId}/${postId}/thumb-${Date.now()}.png`;
+              const thumbRef = ref(storage, thumbPath);
+              await uploadBytes(thumbRef, thumbBlob, { contentType: 'image/png' });
+              pdfThumbUrl = await getDownloadURL(thumbRef);
+            }
+          } catch (err) {
+            console.error('Falha ao gerar capa do PDF (upload segue sem thumb):', err);
+          }
+        }
       }
 
       if (newUrls.length === 0) return;
@@ -126,7 +164,7 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
       // Append aos existentes e persiste
       const combinedUrls = [...currentUrls, ...newUrls];
       const combinedTypes = [...currentTypes, ...newTypes];
-      await persistMedia(combinedUrls, combinedTypes);
+      await persistMedia(combinedUrls, combinedTypes, pdfThumbUrl);
     } catch (err) {
       console.error('Upload failed:', err);
       toast({ variant: 'destructive', title: 'Erro ao fazer upload', description: 'Tente novamente.' });
@@ -217,15 +255,7 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
           {primaryKind === 'video' ? (
             <video src={currentUrls[0]} controls className="rounded-lg border w-full bg-muted" />
           ) : primaryKind === 'pdf' ? (
-            <a
-              href={currentUrls[0]}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 p-4 rounded-lg border bg-muted hover:bg-muted/80 transition-colors"
-            >
-              <FileText className="h-6 w-6 text-muted-foreground" />
-              <span className="text-sm">Visualizar PDF</span>
-            </a>
+            <PdfPreview url={currentUrls[0]} />
           ) : (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={currentUrls[0]} alt="Post media" className="rounded-lg border w-full object-contain bg-muted" />

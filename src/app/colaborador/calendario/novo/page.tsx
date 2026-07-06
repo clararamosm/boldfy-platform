@@ -53,6 +53,22 @@ import {
   MAX_GALLERY_IMAGES,
 } from '@/lib/media-rules';
 import type { PersonalBrandPillar } from '@/types/personal-brand';
+import dynamic from 'next/dynamic';
+
+// pdf.js depende de canvas/worker do browser — carrega lazy e sem SSR.
+// O chunk só é baixado quando o post tem PDF anexado. O previewUrl local
+// (data:) funciona como fonte antes mesmo do upload.
+const PdfPreview = dynamic(
+  () => import('@/components/pdf-preview').then((m) => m.PdfPreview),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-40 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
+        Carregando preview…
+      </div>
+    ),
+  },
+);
 
 // Item de midia interno do editor. Pode ser um File local (ainda nao
 // uploaded) ou uma URL ja no Firebase Storage (vinda do edit mode).
@@ -359,6 +375,10 @@ function EditorContent() {
     e.target.value = '';
   };
 
+  // Cache File → URL da capa de PDF já gerada/subida nesta sessão do editor.
+  // WeakMap: quando o item é removido, o File sai de escopo e a entrada morre.
+  const pdfThumbCacheRef = useRef(new WeakMap<File, string>());
+
   const removeMediaAt = (idx: number) => {
     setMediaItems((prev) => {
       const item = prev[idx];
@@ -379,10 +399,13 @@ function EditorContent() {
    * uploadedUrl. Retorna arrays paralelos urls[] / types[] na ordem dos items.
    * Em modo single (1 item), o saver downstream coloca em mediaUrl/mediaType.
    */
-  const uploadPendingMedia = async (): Promise<{ urls: string[]; types: string[] }> => {
+  const uploadPendingMedia = async (): Promise<{ urls: string[]; types: string[]; pdfThumbUrl?: string }> => {
     if (!userId) return { urls: [], types: [] };
     const urls: string[] = [];
     const types: string[] = [];
+    // Capa do PDF (página 1 → PNG) gerada no primeiro upload do arquivo.
+    // Best-effort: falha na geração não bloqueia o save.
+    let pdfThumbUrl: string | undefined;
     for (const item of mediaItems) {
       if (item.uploadedUrl) {
         urls.push(item.uploadedUrl);
@@ -396,8 +419,33 @@ function EditorContent() {
         continue; // shouldn't happen — defensive
       }
       types.push(item.mimeType);
+
+      // PDF com File local: gera/reusa a capa. Cache por File porque o
+      // auto-save chama este upload a cada 1.5s — sem cache a capa seria
+      // renderizada e re-subida em todo save. Import dinâmico mantém o
+      // pdf.js fora do bundle de quem nunca anexa PDF.
+      if (item.file && classifyMimeType(item.mimeType) === 'pdf') {
+        const cached = pdfThumbCacheRef.current.get(item.file);
+        if (cached) {
+          pdfThumbUrl = cached;
+        } else {
+          try {
+            const { renderPdfCoverPng } = await import('@/lib/pdf-thumb');
+            const thumbBlob = await renderPdfCoverPng(item.file);
+            if (thumbBlob) {
+              const thumbRef = ref(storage, `users/${userId}/posts/thumb_${Date.now()}.png`);
+              await uploadBytes(thumbRef, thumbBlob, { contentType: 'image/png' });
+              const thumbUrl = await getDownloadURL(thumbRef);
+              pdfThumbCacheRef.current.set(item.file, thumbUrl);
+              pdfThumbUrl = thumbUrl;
+            }
+          } catch (err) {
+            console.error('Falha ao gerar capa do PDF (save segue sem thumb):', err);
+          }
+        }
+      }
     }
-    return { urls, types };
+    return { urls, types, pdfThumbUrl };
   };
 
   // ─── Auto-save ──────────────────────────────────────
@@ -421,7 +469,7 @@ function EditorContent() {
     setAutoSaveStatus('saving');
     try {
       const token = await getAuthToken();
-      const { urls, types } = await uploadPendingMedia();
+      const { urls, types, pdfThumbUrl } = await uploadPendingMedia();
       const scheduledFor = scheduledDate
         ? new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString()
         : null;
@@ -442,6 +490,7 @@ function EditorContent() {
           // server-side cascade não apaga o título acidentalmente em saves de
           // posts com outras mídias.
           ...(types[0] === 'application/pdf' && { documentTitle }),
+          ...(types[0] === 'application/pdf' && pdfThumbUrl && { pdfThumbUrl }),
           contentPillar,
           status: autoSaveStatus,
           ...(formato && { formato }),
@@ -460,6 +509,7 @@ function EditorContent() {
           mediaUrls: urls,
           mediaTypes: types,
           ...(types[0] === 'application/pdf' && { documentTitle }),
+          ...(types[0] === 'application/pdf' && pdfThumbUrl && { pdfThumbUrl }),
           contentPillar,
           ...(formato && { formato }),
           status: autoSaveStatus,
@@ -559,7 +609,7 @@ function EditorContent() {
 
     try {
       // Upload de toda midia pendente em sequencia.
-      const { urls, types } = await uploadPendingMedia();
+      const { urls, types, pdfThumbUrl } = await uploadPendingMedia();
 
       // Create ISO date from date + time
       const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString();
@@ -582,6 +632,7 @@ function EditorContent() {
           mediaUrls: urls,
           mediaTypes: types,
           ...(types[0] === 'application/pdf' && { documentTitle }),
+          ...(types[0] === 'application/pdf' && pdfThumbUrl && { pdfThumbUrl }),
         });
         if (result.success) {
           toast({ title: t.colabNewPost.postUpdated, description: t.colabNewPost.postUpdatedDescription });
@@ -600,6 +651,7 @@ function EditorContent() {
           mediaUrls: urls,
           mediaTypes: types,
           ...(types[0] === 'application/pdf' && { documentTitle }),
+          ...(types[0] === 'application/pdf' && pdfThumbUrl && { pdfThumbUrl }),
           scheduledFor,
           status: 'scheduled',
           ...(contentPillar && { contentPillar }),
@@ -634,7 +686,7 @@ function EditorContent() {
 
     try {
       // Upload de todas as midias pendentes
-      const { urls, types } = await uploadPendingMedia();
+      const { urls, types, pdfThumbUrl } = await uploadPendingMedia();
       const token = await getAuthToken();
 
       if (isEditMode && editPostId) {
@@ -648,6 +700,7 @@ function EditorContent() {
           mediaUrls: urls,
           mediaTypes: types,
           ...(types[0] === 'application/pdf' && { documentTitle }),
+          ...(types[0] === 'application/pdf' && pdfThumbUrl && { pdfThumbUrl }),
         });
         if (!updateResult.success) {
           toast({ variant: 'destructive', title: t.common.error, description: updateResult.error || t.colabNewPost.scheduleError });
@@ -687,6 +740,7 @@ function EditorContent() {
           mediaUrls: urls,
           mediaTypes: types,
           ...(types[0] === 'application/pdf' && { documentTitle }),
+          ...(types[0] === 'application/pdf' && pdfThumbUrl && { pdfThumbUrl }),
           scheduledFor: new Date().toISOString(),
           status: 'scheduled',
         });
@@ -1077,12 +1131,8 @@ function EditorContent() {
               {primaryKind === 'video' ? (
                 <video src={mediaItems[0].previewUrl} controls className="max-h-[600px] max-w-full" />
               ) : primaryKind === 'pdf' ? (
-                <div className="flex flex-col items-center justify-center h-40 w-full gap-2 text-muted-foreground">
-                  <Upload className="h-8 w-8" />
-                  <span className="text-sm">PDF carregado</span>
-                  <span className="text-xs text-muted-foreground">
-                    O título abaixo aparece no carrossel do LinkedIn.
-                  </span>
+                <div className="w-full p-3">
+                  <PdfPreview url={mediaItems[0].previewUrl} />
                 </div>
               ) : mediaItems[0].previewUrl.startsWith('http') ? (
                 /* eslint-disable-next-line @next/next/no-img-element */

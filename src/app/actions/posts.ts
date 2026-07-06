@@ -27,6 +27,11 @@ export type ScheduledPost = {
   // "5 perguntas que toda PME precisa responder · 7 pages"). Ausente/vazio
   // cai no fallback 'Documento'.
   documentTitle?: string;
+  // Capa do PDF (página 1 renderizada em PNG no upload, client-side). Usada
+  // como preview do carrossel no calendário. Só faz sentido quando a mídia
+  // é PDF — cascade no update apaga junto com o documentTitle. PDFs anexados
+  // antes desse campo existirem não têm capa (fallback: ícone no card).
+  pdfThumbUrl?: string;
   // ISO date string. Null/ausente em drafts criados pelo auto-save
   // antes de o user definir uma data.
   scheduledFor: string | null;
@@ -70,6 +75,7 @@ export async function createScheduledPost(
     mediaUrls?: string[];
     mediaTypes?: string[];
     documentTitle?: string;
+    pdfThumbUrl?: string;
     // Status inicial. Default 'in_progress' quando ha data, 'draft' quando nao.
     // Caller pode forçar 'scheduled' (botão Agendar) ou outros explicitamente.
     // Auto-save NUNCA cria como 'scheduled' — só o gesto explícito de agendar
@@ -108,6 +114,8 @@ export async function createScheduledPost(
       // documentTitle só é gravado quando vier com conteúdo — Firestore rejeita
       // undefined e gravar string vazia poluiria o doc sem necessidade.
       ...(data.documentTitle && data.documentTitle.trim() && { documentTitle: data.documentTitle.trim() }),
+      // pdfThumbUrl segue a mesma regra do documentTitle: só grava com conteúdo.
+      ...(data.pdfThumbUrl && { pdfThumbUrl: data.pdfThumbUrl }),
       scheduledFor: data.scheduledFor ?? null,
       status: inferredStatus,
       linkedinPostId: null,
@@ -140,6 +148,7 @@ export async function updateScheduledPost(
     mediaUrls?: string[];
     mediaTypes?: string[];
     documentTitle?: string;
+    pdfThumbUrl?: string;
   }
 ): Promise<{ success?: boolean; error?: string }> {
   try {
@@ -228,6 +237,14 @@ export async function updateScheduledPost(
     } else if (firstTypeAfterUpdate !== undefined && firstTypeAfterUpdate !== 'application/pdf') {
       // Mídia trocada pra não-PDF (ou removida) — limpa título residual.
       updateData.documentTitle = FieldValue.delete();
+    }
+
+    // pdfThumbUrl: mesma regra em cascata do documentTitle — só existe
+    // enquanto a mídia for PDF.
+    if (data.pdfThumbUrl !== undefined) {
+      updateData.pdfThumbUrl = data.pdfThumbUrl || FieldValue.delete();
+    } else if (firstTypeAfterUpdate !== undefined && firstTypeAfterUpdate !== 'application/pdf') {
+      updateData.pdfThumbUrl = FieldValue.delete();
     }
 
     await adminDb.collection('users').doc(userId).collection('scheduledPosts').doc(postId).update(updateData);

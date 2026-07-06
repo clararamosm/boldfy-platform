@@ -56,6 +56,11 @@ export type PipelinePost = {
   // aparece como nome visível do carrossel na timeline. Ausente/vazio cai no
   // fallback 'Documento'.
   documentTitle?: string;
+  // Capa do PDF (página 1 renderizada em PNG no upload, client-side). Usada
+  // como preview do carrossel no calendário. Só faz sentido quando a mídia
+  // é PDF — cascade no update apaga junto com o documentTitle. PDFs anexados
+  // antes desse campo existirem não têm capa (fallback: ícone no card).
+  pdfThumbUrl?: string;
   tlFeedback?: string;
   tlApprovedAt?: string;
   // Auditoria: quem destravou a última transição de aprovação/ajuste.
@@ -217,6 +222,7 @@ export async function updatePipelinePost(
     mediaUrls: string[] | null;
     mediaTypes: string[] | null;
     documentTitle: string | null;
+    pdfThumbUrl: string | null;
   }>
 ): Promise<ActionResult> {
   try {
@@ -282,6 +288,16 @@ export async function updatePipelinePost(
       }
     } else if (firstTypeAfterUpdate !== undefined && firstTypeAfterUpdate !== 'application/pdf') {
       updatePayload.documentTitle = FieldValue.delete();
+    }
+
+    // pdfThumbUrl: mesma regra em cascata do documentTitle — só existe
+    // enquanto a mídia for PDF.
+    if (data.pdfThumbUrl !== undefined) {
+      updatePayload.pdfThumbUrl = data.pdfThumbUrl === null
+        ? FieldValue.delete()
+        : data.pdfThumbUrl;
+    } else if (firstTypeAfterUpdate !== undefined && firstTypeAfterUpdate !== 'application/pdf') {
+      updatePayload.pdfThumbUrl = FieldValue.delete();
     }
     updatePayload.updatedAt = new Date().toISOString();
 
