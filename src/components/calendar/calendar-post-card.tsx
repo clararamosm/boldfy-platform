@@ -2,10 +2,11 @@
 'use client';
 
 import React from 'react';
-import { Clock, User, Heart, Eye } from 'lucide-react';
+import { Clock, User, Heart, Eye, FileText, Video } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { getPillarClasses } from '@/lib/pillar-colors';
+import { classifyMimeType } from '@/lib/media-rules';
 
 export type CalendarCardPost = {
   id: string;
@@ -23,6 +24,16 @@ export type CalendarCardPost = {
   // Métricas do LinkedIn Analytics (preenchidas pelo enrichment do XLSX upload)
   analyticsReactions?: number;
   analyticsImpressions?: number;
+  // Mídia do post — opcionais, usados só pelo preview no card (prop
+  // showMediaPreview). Views que passam o post inteiro (strategist) já
+  // trazem tudo; colaborador/TL precisam mapear explicitamente.
+  mediaUrl?: string;
+  mediaType?: string;
+  mediaUrls?: string[];
+  mediaTypes?: string[];
+  // Capa do PDF gerada no upload (página 1 → PNG). PDFs antigos não têm —
+  // o preview cai no ícone de documento.
+  pdfThumbUrl?: string;
   // Strategist-specific
   tlUserId?: string;
   tlName?: string;
@@ -45,6 +56,9 @@ interface CalendarPostCardProps {
   onClick?: () => void;
   /** Show TL name + company (strategist view) */
   showProfile?: boolean;
+  /** Quadrado de preview da mídia acima do título (toggle das views de
+   *  calendário). Default false — comportamento antigo intacto. */
+  showMediaPreview?: boolean;
   /** Enable drag */
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
@@ -58,6 +72,7 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
   statusConfig,
   onClick,
   showProfile = false,
+  showMediaPreview = false,
   draggable = false,
   onDragStart,
   onDragEnd,
@@ -73,6 +88,22 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
   const impressions = post.analyticsImpressions;
   const isPublished = post.status === 'postado' || post.status === 'published';
   const hasMetrics = isPublished && (reactions != null || impressions != null);
+
+  // Preview de mídia: primeira mídia do post (galeria tem prioridade,
+  // igual aos editores). Imagem/GIF usam a própria URL; PDF usa a capa
+  // gerada no upload (pdfThumbUrl) ou ícone quando não há; vídeo fica no
+  // ícone (sem thumbnail de vídeo por ora). Sem mídia = sem quadrado.
+  const previewMediaUrl = post.mediaUrls?.[0] ?? post.mediaUrl;
+  const previewMediaKind = previewMediaUrl
+    ? classifyMimeType(post.mediaTypes?.[0] ?? post.mediaType)
+    : null;
+  const previewImageSrc =
+    previewMediaKind === 'image' || previewMediaKind === 'gif'
+      ? previewMediaUrl
+      : previewMediaKind === 'pdf'
+        ? post.pdfThumbUrl
+        : undefined;
+  const renderPreview = showMediaPreview && previewMediaKind != null;
 
   return (
     <button
@@ -90,6 +121,42 @@ export const CalendarPostCard = React.memo(function CalendarPostCard({
       )}
       title={`${displayTitle}${post.tlName ? ` — ${post.tlName}` : ''}${post.companyName ? ` · ${post.companyName}` : ''} — ${statusConfig.label}`}
     >
+      {/* Preview de mídia (quadrado acima do título, atrás do toggle) */}
+      {renderPreview && (
+        <div className="relative aspect-square w-full rounded overflow-hidden border bg-muted">
+          {previewImageSrc ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={previewImageSrc}
+              alt=""
+              loading="lazy"
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            // Fallback: PDF sem capa (anexado antes da geração existir) ou vídeo.
+            <div className="flex items-center justify-center w-full h-full text-muted-foreground">
+              {previewMediaKind === 'video' ? (
+                <Video className="h-5 w-5" />
+              ) : (
+                <FileText className="h-5 w-5" />
+              )}
+            </div>
+          )}
+          {/* Badge de tipo pra PDF/vídeo — bate o olho e sabe o formato */}
+          {(previewMediaKind === 'pdf' || previewMediaKind === 'video') && (
+            <span className="absolute bottom-0.5 right-0.5 px-1 rounded text-[7px] font-semibold bg-background/85 text-muted-foreground border">
+              {previewMediaKind === 'pdf' ? 'PDF' : 'VÍDEO'}
+            </span>
+          )}
+          {/* Contador de galeria */}
+          {previewMediaKind === 'image' && (post.mediaUrls?.length ?? 0) > 1 && (
+            <span className="absolute bottom-0.5 right-0.5 px-1 rounded text-[7px] font-semibold bg-background/85 text-muted-foreground border">
+              +{(post.mediaUrls?.length ?? 1) - 1}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Title */}
       <p className="text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
         {displayTitle}

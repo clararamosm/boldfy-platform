@@ -18,6 +18,7 @@ import {
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
+import { CalendarPreviewToggle, useCalendarMediaPreview } from '@/components/calendar/calendar-preview-toggle';
 import { PostListTable } from '@/components/calendar/post-list-table';
 import { getContentStrategy } from '@/app/actions/content-strategy';
 import {
@@ -52,6 +53,8 @@ export default function StrategistCalendarioPerfilPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [posts, setPosts] = useState<PipelinePost[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Preview de mídia nos cards do calendário (toggle, persistido em localStorage)
+  const [showMediaPreview, setShowMediaPreview] = useCalendarMediaPreview();
   const [statusFilter, setStatusFilter] = useState<PipelineStatus | 'all'>('all');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -353,10 +356,13 @@ export default function StrategistCalendarioPerfilPage() {
                 <ChevronRight className="h-5 w-5" />
               </Button>
             </div>
-            <Button size="sm" onClick={createPostDirect} disabled={isCreating}>
-              {isCreating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
-              Novo Post
-            </Button>
+            <div className="flex items-center gap-4">
+              <CalendarPreviewToggle enabled={showMediaPreview} onChange={setShowMediaPreview} />
+              <Button size="sm" onClick={createPostDirect} disabled={isCreating}>
+                {isCreating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+                Novo Post
+              </Button>
+            </div>
           </div>
 
           {/* Status filters */}
@@ -424,6 +430,7 @@ export default function StrategistCalendarioPerfilPage() {
                           tlUserId: tlId || undefined,
                           tlName,
                         }}
+                        showMediaPreview={showMediaPreview}
                         statusConfig={getCardConfig(post.status)}
                         onClick={() => handlePostClick(post)}
                         showProfile={false}

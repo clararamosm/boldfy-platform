@@ -14,6 +14,7 @@ import type { PipelinePost, PipelineStatus } from '@/app/actions/content-pipelin
 import { getStatusConfig, buildGetStatusLabel } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
+import { CalendarPreviewToggle, useCalendarMediaPreview } from '@/components/calendar/calendar-preview-toggle';
 import { PostListTable } from '@/components/calendar/post-list-table';
 import { cn } from '@/lib/utils';
 import {
@@ -60,6 +61,8 @@ export default function ThoughtLeaderCalendarioPage() {
   const [posts, setPosts] = useState<PipelinePost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Preview de mídia nos cards do calendário (toggle, persistido em localStorage)
+  const [showMediaPreview, setShowMediaPreview] = useCalendarMediaPreview();
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
@@ -299,6 +302,7 @@ export default function ThoughtLeaderCalendarioPage() {
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
+          <CalendarPreviewToggle enabled={showMediaPreview} onChange={setShowMediaPreview} />
         </div>
 
         {/* Status filters */}
@@ -387,7 +391,14 @@ export default function ThoughtLeaderCalendarioPage() {
                           contentPillar: post.contentPillar,
                           analyticsReactions: post.analyticsReactions,
                           analyticsImpressions: post.analyticsImpressions,
+                          // Mídia pro preview do card (atrás do toggle)
+                          mediaUrl: post.mediaUrl,
+                          mediaType: post.mediaType,
+                          mediaUrls: post.mediaUrls,
+                          mediaTypes: post.mediaTypes,
+                          pdfThumbUrl: post.pdfThumbUrl,
                         }}
+                        showMediaPreview={showMediaPreview}
                         statusConfig={getCardConfig(post.status)}
                         draggable={post.status !== 'postado'}
                         onDragStart={(e) => handleDragStart(post, e)}

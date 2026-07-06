@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
+import { CalendarPreviewToggle, useCalendarMediaPreview } from '@/components/calendar/calendar-preview-toggle';
 import type { CalendarPipelinePost, PipelineStatus } from '@/app/actions/content-pipeline';
 import {
   format,
@@ -44,6 +45,8 @@ export function TeamCalendar({
   const router = useRouter();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  // Preview de mídia nos cards do calendário (toggle, persistido em localStorage)
+  const [showMediaPreview, setShowMediaPreview] = useCalendarMediaPreview();
 
   // Ativos (sem arquivados)
   const activePosts = useMemo(
@@ -123,6 +126,7 @@ export function TeamCalendar({
             <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
+        <CalendarPreviewToggle enabled={showMediaPreview} onChange={setShowMediaPreview} />
       </div>
 
       {/* Status filter chips */}
@@ -181,6 +185,7 @@ export function TeamCalendar({
                     statusConfig={getCardConfig(post.status)}
                     onClick={() => handlePostClick(post)}
                     showProfile={!isProfileView}
+                    showMediaPreview={showMediaPreview}
                   />
                 ))}
                 {dayPosts.length > 3 && (

@@ -16,6 +16,7 @@ import {
 } from '@/app/actions/content-pipeline';
 import { STATUS_CONFIG } from '@/lib/pipeline-config';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
+import { useCalendarMediaPreview } from '@/components/calendar/calendar-preview-toggle';
 
 import {
   Activity as ActivityIcon,
@@ -154,6 +155,10 @@ export default function StrategistDashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [allPosts, setAllPosts] = useState<CalendarPipelinePost[]>([]);
+  // Segue a mesma preferência de preview de mídia dos calendários (localStorage).
+  // Sem toggle próprio aqui — o dashboard é overview; liga/desliga em qualquer
+  // view de calendário e reflete aqui.
+  const [showMediaPreview] = useCalendarMediaPreview();
 
   // Fetch both in parallel on mount
   useEffect(() => {
@@ -330,6 +335,7 @@ export default function StrategistDashboardPage() {
                                 statusConfig={getCardConfig(post.status)}
                                 onClick={() => handlePostClick(post)}
                                 showProfile
+                                showMediaPreview={showMediaPreview}
                               />
                             ))}
                             {dayPosts.length > 4 && (

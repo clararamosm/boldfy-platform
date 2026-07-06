@@ -26,6 +26,7 @@ import {
 import { STATUS_CONFIG, PIPELINE_STATUSES } from '@/lib/pipeline-config';
 
 import { CalendarPostCard, type CalendarCardPost, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
+import { CalendarPreviewToggle, useCalendarMediaPreview } from '@/components/calendar/calendar-preview-toggle';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
 import { PostListTable } from '@/components/calendar/post-list-table';
 import {
@@ -57,6 +58,8 @@ export default function StrategistCalendarioPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [allPosts, setAllPosts] = useState<CalendarPipelinePost[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Preview de mídia nos cards do calendário (toggle, persistido em localStorage)
+  const [showMediaPreview, setShowMediaPreview] = useCalendarMediaPreview();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
   const [tlFilter, setTlFilter] = useState<string>('all');
@@ -370,7 +373,8 @@ export default function StrategistCalendarioPage() {
             </div>
 
             {/* Company + TL dropdowns */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <CalendarPreviewToggle enabled={showMediaPreview} onChange={setShowMediaPreview} />
               {companies.length > 1 && (
                 <Select value={companyFilter} onValueChange={setCompanyFilter}>
                   <SelectTrigger className="w-[180px] h-9">
@@ -465,6 +469,7 @@ export default function StrategistCalendarioPage() {
                         statusConfig={getCardConfig(post.status)}
                         onClick={() => handlePostClick(post)}
                         showProfile={!isProfileView}
+                        showMediaPreview={showMediaPreview}
                         draggable
                         onDragStart={(e) => handleDragStart(post, e)}
                         onDragEnd={handleDragEnd}

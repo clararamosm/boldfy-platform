@@ -46,6 +46,7 @@ import { useT, useLocale } from '@/lib/i18n/context';
 import { getDateLocale } from '@/lib/i18n/date-utils';
 import { CalendarPostCard, type CalendarCardConfig } from '@/components/calendar/calendar-post-card';
 import { CalendarDayCell } from '@/components/calendar/calendar-day-cell';
+import { CalendarPreviewToggle, useCalendarMediaPreview } from '@/components/calendar/calendar-preview-toggle';
 import { resolvePersonalBrand } from '@/lib/personal-brand';
 import { getPostStatusConfig } from '@/lib/post-status-config';
 import { stripHtml } from '@/lib/text-utils';
@@ -95,6 +96,8 @@ export default function CalendarioPage() {
   // pilar correspondente nas tags do calendario.
   const [pillarsMap, setPillarsMap] = useState<Map<string, PersonalBrandPillar>>(new Map());
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  // Preview de mídia nos cards do calendário (toggle, persistido em localStorage)
+  const [showMediaPreview, setShowMediaPreview] = useCalendarMediaPreview();
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const { toast } = useToast();
@@ -571,10 +574,13 @@ export default function CalendarioPage() {
                   <ChevronRight className="h-5 w-5" />
                 </Button>
               </div>
-              <Button onClick={() => handleNewPost()} className="gap-2">
-                <Plus className="h-4 w-4" />
-                {t.colabCalendar.newPost}
-              </Button>
+              <div className="flex items-center gap-4">
+                <CalendarPreviewToggle enabled={showMediaPreview} onChange={setShowMediaPreview} />
+                <Button onClick={() => handleNewPost()} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  {t.colabCalendar.newPost}
+                </Button>
+              </div>
             </div>
 
             {/* Status filters */}
@@ -704,7 +710,14 @@ export default function CalendarioPage() {
                                 contentPillarColor: pillar.color,
                               }),
                               ...(formatoLabel && { formato: formatoLabel }),
+                              // Mídia pro preview do card (atrás do toggle)
+                              mediaUrl: item.data.mediaUrl,
+                              mediaType: item.data.mediaType,
+                              mediaUrls: item.data.mediaUrls,
+                              mediaTypes: item.data.mediaTypes,
+                              pdfThumbUrl: item.data.pdfThumbUrl,
                             }}
+                            showMediaPreview={showMediaPreview}
                             statusConfig={getCardConfig(item.data.status)}
                             draggable={item.data.status !== 'published'}
                             onDragStart={(e) => handleDragStart(item.data, e)}
