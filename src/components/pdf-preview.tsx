@@ -15,12 +15,12 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import { ChevronLeft, ChevronRight, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// Worker resolvido pelo bundler (webpack/turbopack) a partir do pdfjs-dist
-// instalado — evita depender de CDN externo.
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString();
+// Worker servido de /public (copiado do pdfjs-dist pelo postinstall).
+// Caminho estático de propósito: o truque do bundler com
+// new URL('pdfjs-dist/...', import.meta.url) falhava em produção quando o
+// módulo era duplicado em outro chunk (erro "Failed to resolve module
+// specifier 'pdf.worker.mjs'" — caso real do backfill de capa, jul/2026).
+pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 type Props = {
   /** URL do PDF: https, data: ou blob: */

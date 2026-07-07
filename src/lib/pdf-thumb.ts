@@ -16,14 +16,13 @@ const THUMB_MAX_WIDTH = 640;
 
 export async function renderPdfCoverPng(source: File | Blob | string): Promise<Blob | null> {
   try {
-    // Reusa o pdfjs que o react-pdf traz — mesma versão, mesmo worker.
+    // Reusa o pdfjs que o react-pdf traz. Worker servido de /public (copiado
+    // pelo postinstall) — atribuição SEM guard e sem new URL(import.meta.url):
+    // em produção o chunk podia ter outra instância do pdfjs com workerSrc
+    // vazio, e o truque do bundler falhava ("Failed to resolve module
+    // specifier 'pdf.worker.mjs'", caso real jul/2026).
     const { pdfjs } = await import('react-pdf');
-    if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-      pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-        'pdfjs-dist/build/pdf.worker.min.mjs',
-        import.meta.url,
-      ).toString();
-    }
+    pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
     // String = URL de um PDF já no Storage (backfill de posts antigos).
     // Firebase Storage libera CORS nas download URLs.
