@@ -259,6 +259,11 @@ function EditorContent() {
     }
   };
 
+  // Cache fonte-do-PDF → URL da capa já gerada/subida. Key é o File (upload
+  // novo) ou a URL no Storage (post existente, backfill). Evita regerar a
+  // capa em todo auto-save.
+  const pdfThumbCacheRef = useRef(new Map<File | string, string>());
+
   // Load existing post when in edit mode
   useEffect(() => {
     if (!editPostId || !userId) return;
@@ -295,6 +300,13 @@ function EditorContent() {
           }
           // Hidrata título customizado do PDF — só aparece se existir.
           if (result.post.documentTitle) setDocumentTitle(result.post.documentTitle);
+          // Hidrata capa do PDF já salva — evita regenerar em todo save.
+          // Cache keyed pela URL do PDF: se o user trocar o arquivo, a key
+          // muda e a capa é gerada de novo.
+          if (result.post.pdfThumbUrl) {
+            const pdfUrl = galleryUrls[0] ?? result.post.mediaUrl;
+            if (pdfUrl) pdfThumbCacheRef.current.set(pdfUrl, result.post.pdfThumbUrl);
+          }
           if (result.post.contentPillar) setContentPillar(result.post.contentPillar);
           if (result.post.formato) setFormato(result.post.formato);
           // Hidrata status pra badge — quando o post existente ja foi
@@ -375,10 +387,6 @@ function EditorContent() {
     e.target.value = '';
   };
 
-  // Cache File → URL da capa de PDF já gerada/subida nesta sessão do editor.
-  // WeakMap: quando o item é removido, o File sai de escopo e a entrada morre.
-  const pdfThumbCacheRef = useRef(new WeakMap<File, string>());
-
   const removeMediaAt = (idx: number) => {
     setMediaItems((prev) => {
       const item = prev[idx];
@@ -420,27 +428,31 @@ function EditorContent() {
       }
       types.push(item.mimeType);
 
-      // PDF com File local: gera/reusa a capa. Cache por File porque o
+      // PDF: gera/reusa a capa. Fonte é o File local (upload novo) ou a URL
+      // já no Storage (post antigo sem capa — backfill). Cache porque o
       // auto-save chama este upload a cada 1.5s — sem cache a capa seria
       // renderizada e re-subida em todo save. Import dinâmico mantém o
       // pdf.js fora do bundle de quem nunca anexa PDF.
-      if (item.file && classifyMimeType(item.mimeType) === 'pdf') {
-        const cached = pdfThumbCacheRef.current.get(item.file);
-        if (cached) {
-          pdfThumbUrl = cached;
-        } else {
-          try {
-            const { renderPdfCoverPng } = await import('@/lib/pdf-thumb');
-            const thumbBlob = await renderPdfCoverPng(item.file);
-            if (thumbBlob) {
-              const thumbRef = ref(storage, `users/${userId}/posts/thumb_${Date.now()}.png`);
-              await uploadBytes(thumbRef, thumbBlob, { contentType: 'image/png' });
-              const thumbUrl = await getDownloadURL(thumbRef);
-              pdfThumbCacheRef.current.set(item.file, thumbUrl);
-              pdfThumbUrl = thumbUrl;
+      if (classifyMimeType(item.mimeType) === 'pdf') {
+        const source: File | string | null = item.file ?? item.uploadedUrl;
+        if (source) {
+          const cached = pdfThumbCacheRef.current.get(source);
+          if (cached) {
+            pdfThumbUrl = cached;
+          } else {
+            try {
+              const { renderPdfCoverPng } = await import('@/lib/pdf-thumb');
+              const thumbBlob = await renderPdfCoverPng(source);
+              if (thumbBlob) {
+                const thumbRef = ref(storage, `users/${userId}/posts/thumb_${Date.now()}.png`);
+                await uploadBytes(thumbRef, thumbBlob, { contentType: 'image/png' });
+                const thumbUrl = await getDownloadURL(thumbRef);
+                pdfThumbCacheRef.current.set(source, thumbUrl);
+                pdfThumbUrl = thumbUrl;
+              }
+            } catch (err) {
+              console.error('Falha ao gerar capa do PDF (save segue sem thumb):', err);
             }
-          } catch (err) {
-            console.error('Falha ao gerar capa do PDF (save segue sem thumb):', err);
           }
         }
       }

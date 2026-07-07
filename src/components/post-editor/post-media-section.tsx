@@ -73,6 +73,33 @@ export function PostMediaSection({ post, canEdit, tlId, postId, onMediaUpdate }:
   const primaryKind = currentUrls.length > 0
     ? classifyMimeType(currentTypes[0])
     : null;
+
+  // Backfill da capa do PDF: posts com PDF anexado antes da geração de capa
+  // existirem não têm pdfThumbUrl. Ao abrir o post no editor, gera a capa a
+  // partir do arquivo já no Storage e persiste — o calendário passa a mostrar
+  // sem precisar re-anexar. Guard por postId evita repetir na mesma sessão.
+  const thumbBackfilledRef = useRef<Set<string>>(new Set());
+  const firstUrl = currentUrls[0];
+  useEffect(() => {
+    if (!canEdit) return;
+    if (primaryKind !== 'pdf' || post.pdfThumbUrl || !firstUrl) return;
+    if (thumbBackfilledRef.current.has(postId)) return;
+    thumbBackfilledRef.current.add(postId);
+    void (async () => {
+      try {
+        const { renderPdfCoverPng } = await import('@/lib/pdf-thumb');
+        const thumbBlob = await renderPdfCoverPng(firstUrl);
+        if (!thumbBlob) return;
+        const thumbRef = ref(storage, `pipeline/${tlId}/${postId}/thumb-${Date.now()}.png`);
+        await uploadBytes(thumbRef, thumbBlob, { contentType: 'image/png' });
+        const url = await getDownloadURL(thumbRef);
+        const token = await getAuthToken();
+        await updatePipelinePost(token, tlId, postId, { pdfThumbUrl: url });
+      } catch (err) {
+        console.error('Backfill da capa do PDF falhou (post segue sem capa):', err);
+      }
+    })();
+  }, [canEdit, primaryKind, post.pdfThumbUrl, firstUrl, postId, tlId]);
   const isGallery = primaryKind === 'image' && currentUrls.length > 1;
   const canAddMore = currentUrls.length === 0
     || (primaryKind === 'image' && currentUrls.length < MAX_GALLERY_IMAGES);

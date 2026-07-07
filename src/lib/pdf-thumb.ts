@@ -14,7 +14,7 @@
  *  calendário (~200px) com folga pra telas retina. */
 const THUMB_MAX_WIDTH = 640;
 
-export async function renderPdfCoverPng(file: File | Blob): Promise<Blob | null> {
+export async function renderPdfCoverPng(source: File | Blob | string): Promise<Blob | null> {
   try {
     // Reusa o pdfjs que o react-pdf traz — mesma versão, mesmo worker.
     const { pdfjs } = await import('react-pdf');
@@ -25,7 +25,11 @@ export async function renderPdfCoverPng(file: File | Blob): Promise<Blob | null>
       ).toString();
     }
 
-    const data = await file.arrayBuffer();
+    // String = URL de um PDF já no Storage (backfill de posts antigos).
+    // Firebase Storage libera CORS nas download URLs.
+    const data = typeof source === 'string'
+      ? await (await fetch(source)).arrayBuffer()
+      : await source.arrayBuffer();
     const doc = await pdfjs.getDocument({ data }).promise;
     const page = await doc.getPage(1);
 
