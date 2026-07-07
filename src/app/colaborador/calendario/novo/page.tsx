@@ -565,6 +565,41 @@ function EditorContent() {
   }, [caption, mediaItems, scheduledDate, scheduledTime, contentPillar, formato, documentTitle, isLoadingPost]);
 
   /**
+   * Backfill da capa do PDF pra posts antigos (anexados antes da geração de
+   * capa existir): ao abrir um post com PDF sem capa, gera a partir da URL
+   * já no Storage e persiste SÓ o pdfThumbUrl via update dedicado.
+   * De propósito NÃO passa pelo auto-save: o auto-save rebaixa post agendado
+   * pra 'in_progress', e aqui nada além da capa deve mudar.
+   */
+  const thumbBackfilledRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (isLoadingPost || !userId || !currentPostId) return;
+    const first = mediaItems[0];
+    if (!first?.uploadedUrl || classifyMimeType(first.mimeType) !== 'pdf') return;
+    // Capa já conhecida (hidratada do post ou gerada nesta sessão) — nada a fazer.
+    if (pdfThumbCacheRef.current.has(first.uploadedUrl)) return;
+    if (thumbBackfilledRef.current.has(currentPostId)) return;
+    thumbBackfilledRef.current.add(currentPostId);
+    const pdfUrl = first.uploadedUrl;
+    const postId = currentPostId;
+    void (async () => {
+      try {
+        const { renderPdfCoverPng } = await import('@/lib/pdf-thumb');
+        const thumbBlob = await renderPdfCoverPng(pdfUrl);
+        if (!thumbBlob) return;
+        const thumbRef = ref(storage, `users/${userId}/posts/thumb_${Date.now()}.png`);
+        await uploadBytes(thumbRef, thumbBlob, { contentType: 'image/png' });
+        const thumbUrl = await getDownloadURL(thumbRef);
+        const token = await getAuthToken();
+        await updateScheduledPost(token, userId, postId, { pdfThumbUrl: thumbUrl });
+        pdfThumbCacheRef.current.set(pdfUrl, thumbUrl);
+      } catch (err) {
+        console.error('Backfill da capa do PDF falhou (post segue sem capa):', err);
+      }
+    })();
+  }, [isLoadingPost, userId, currentPostId, mediaItems]);
+
+  /**
    * beforeunload protection — se há save em andamento, avisa o user
    * antes de sair. Não bloqueia, só pede confirmação.
    */
