@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["https://app.boldfy.com.br", "http://localhost:3000"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]
